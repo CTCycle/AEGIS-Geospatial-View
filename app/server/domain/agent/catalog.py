@@ -11,6 +11,10 @@ class CapabilityCatalogFilter:
     query: str | None = None
     category: str | None = None
     geometry_type: str | None = None
+    capability_domain: str | None = None
+    temporal_support: str | None = None
+    analysis_operation: str | None = None
+    renderable: bool | None = None
     bbox: list[float] | None = None
     limit: int = CATALOG_PAGE_LIMIT
     cursor: str | None = None
@@ -25,3 +29,6 @@ class GeospatialCapabilityExecutionResult(TypedDict, total=False):
     direct_result: dict[str, Any] | None
     capability_selection: dict[str, Any] | None
     observations: list[dict[str, Any]]
+    warnings: list[Any]
+    error: dict[str, Any] | None
+    metadata: dict[str, Any]

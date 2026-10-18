@@ -1,0 +1,134 @@
+{
+  "id": "usgs_water_gauges",
+  "name": "USGS Water Gauges",
+  "provider": "usgs",
+  "type": "vector-overlay",
+  "description": "USGS latest-continuous OGC API observations for active stream and water-level gauges.",
+  "capabilities": [
+    "water",
+    "stream",
+    "gauge",
+    "flood",
+    "current"
+  ],
+  "coverage": "united-states",
+  "metadata": {
+    "label": "USGS Water Gauges",
+    "requires_key": false,
+    "attribution": "U.S. Geological Survey",
+    "keywords": [
+      "water",
+      "stream",
+      "gauge",
+      "river",
+      "flood"
+    ],
+    "action_tags": [
+      "water",
+      "flood",
+      "hazard"
+    ],
+    "task_tags": [
+      "stream gauge map",
+      "flood context"
+    ],
+    "source_protocol": "OGC API - Features",
+    "data_format": "GeoJSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://api.waterdata.usgs.gov/docs/ogcapi/",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://api.waterdata.usgs.gov/docs/ogcapi/"
+  ],
+  "license": {
+    "name": "USGS public domain",
+    "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "water gauge",
+      "stream",
+      "river",
+      "flood"
+    ],
+    "requiredUserAction": [
+      "water",
+      "flood",
+      "hazard"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-08-27",
+    "knownLimitations": [
+      "Measurements and station density vary by parameter and region.",
+      "The provider uses the current latest-continuous OGC API during the Water Services migration."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 900,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.timestamp",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "united-states",
+    "limitations": [
+      "Measurements and station density vary by parameter and region.",
+      "The provider uses the current latest-continuous OGC API during the Water Services migration."
+    ],
+    "fallback_ids": []
+  }
+}

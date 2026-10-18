@@ -1,0 +1,49 @@
+
+> aegis-client@1.0.0 test
+> ng test --watch=false --browsers=ChromeHeadlessNoGpu --include src/app/components/raster-visibility.spec.ts --include src/app/components/map-preview-rendering.spec.ts
+
+The "@angular-devkit/build-angular:karma" builder is deprecated as part of Angular's Webpack support deprecation. Use "@angular/build:karma" instead. For more information, see https://angular.dev/tools/cli/build-system-migration.
+- Generating browser application bundles (phase: setup)...
+√ Browser application bundle generation complete.
+17 10 2026 13:37:16.687:INFO [karma-server]: Karma v6.4.4 server started at http://localhost:9876/
+17 10 2026 13:37:16.689:INFO [launcher]: Launching browsers ChromeHeadlessNoGpu with concurrency unlimited
+17 10 2026 13:37:16.719:INFO [launcher]: Starting browser ChromeHeadless
+17 10 2026 13:37:18.799:INFO [Chrome Headless 155.0.0.0 (Windows 10)]: Connected on socket stFNdjNAnJPUspkRAAAB with id 69257945
+Chrome Headless 155.0.0.0 (Windows 10): Executed 0 of 33 SUCCESS (0 secs / 0 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 1 of 33 SUCCESS (0 secs / 0.008 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 2 of 33 SUCCESS (0 secs / 0.009 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 3 of 33 SUCCESS (0 secs / 0.01 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 4 of 33 SUCCESS (0 secs / 0.011 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 5 of 33 SUCCESS (0 secs / 0.013 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 6 of 33 SUCCESS (0 secs / 0.014 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 7 of 33 SUCCESS (0 secs / 0.015 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 8 of 33 SUCCESS (0 secs / 0.017 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 9 of 33 SUCCESS (0 secs / 0.017 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 10 of 33 SUCCESS (0 secs / 0.018 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 11 of 33 SUCCESS (0 secs / 0.02 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 12 of 33 SUCCESS (0 secs / 0.02 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 13 of 33 SUCCESS (0 secs / 0.02 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 14 of 33 SUCCESS (0 secs / 0.021 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 15 of 33 SUCCESS (0 secs / 0.021 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 16 of 33 SUCCESS (0 secs / 0.021 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 17 of 33 SUCCESS (0 secs / 0.021 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 18 of 33 SUCCESS (0 secs / 0.022 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 19 of 33 SUCCESS (0 secs / 0.022 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 20 of 33 SUCCESS (0 secs / 0.022 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 21 of 33 SUCCESS (0 secs / 0.024 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 22 of 33 SUCCESS (0 secs / 0.025 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 23 of 33 SUCCESS (0 secs / 0.025 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 24 of 33 SUCCESS (0 secs / 0.026 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 25 of 33 SUCCESS (0 secs / 0.027 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 26 of 33 SUCCESS (0 secs / 0.027 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 27 of 33 SUCCESS (0 secs / 0.028 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 28 of 33 SUCCESS (0 secs / 0.028 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 29 of 33 SUCCESS (0 secs / 0.029 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 30 of 33 SUCCESS (0 secs / 0.029 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 31 of 33 SUCCESS (0 secs / 0.03 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 32 of 33 SUCCESS (0 secs / 0.03 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 33 of 33 SUCCESS (0 secs / 0.03 secs)
+Chrome Headless 155.0.0.0 (Windows 10): Executed 33 of 33 SUCCESS (0.058 secs / 0.03 secs)
+TOTAL: 33 SUCCESS
+TOTAL: 33 SUCCESS
+√ Browser application bundle generation complete.

@@ -1,0 +1,209 @@
+INFO:     Started server process [8388]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\tool-e2e-20261018\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50775 - "WebSocket /api/conversations/conv_4af4c2417c80419fa90c1dd85677e202/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:64883 - "WebSocket /api/conversations/conv_4af4c2417c80419fa90c1dd85677e202/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2817.png relay=no
+INFO:     127.0.0.1:58572 - "WebSocket /api/conversations/conv_141e17aefcc24d73b1a1063b72b7a2ad/realtime" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:50260 - "WebSocket /api/conversations/conv_d5e01c34fa344d518015e8fba8357449/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4120/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4120/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4121/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4121/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4119/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4119/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4120/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4120/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4121/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4121/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4122/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4122/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4119/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4119/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4122/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4122/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4118/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4118/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4123/2797.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4123/2798.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4118/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4118/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4123/2796.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4123/2799.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/45.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/6/32/21/2/1_1.png relay=no
+INFO:     127.0.0.1:50260 - "WebSocket /api/conversations/conv_1252bd0b50384151878861675378dbcb/realtime" [accepted]
+INFO:     connection open
+[WARNING] Rejecting geocoder candidate that does not match target=Tokyo type=administrative display=Tokyo, Japan
+INFO:     127.0.0.1:55278 - "WebSocket /api/conversations/conv_cda90414af1c40ca9159e2600d38d795/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7264/3200.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7264/3201.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7263/3200.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7265/3200.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7264/3199.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7263/3201.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7265/3201.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7263/3199.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7265/3199.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7264/3202.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7262/3200.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7266/3200.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7263/3202.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7265/3202.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7262/3201.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7266/3201.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7262/3199.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7266/3199.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7262/3202.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/7266/3202.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/28/13.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/28/12.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/27/12.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/27/13.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/29/12.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/28/11.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/29/13.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/27/11.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/28/14.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/29/11.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/26/12.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/27/14.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/26/13.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/29/14.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/30/12.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/26/11.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/30/13.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/26/14.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/30/11.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/5/30/14.png relay=no
+[WARNING] Rejecting geocoder candidate that does not match target=Tokyo type=administrative display=Tokyo, Japan
+INFO:     127.0.0.1:54971 - "WebSocket /api/conversations/conv_5f039fe5d7a341b48bd59f6dc7b5a654/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4148/2816.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4150/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4149/2816.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4150/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4147/2816.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4150/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4146/2818.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4146/2817.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4150/2816.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4146/2819.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4146/2816.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/64/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/65/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/63/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/66/42.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/62/42.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/64/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/66/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/62/42/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/65/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/63/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/67/44.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/67/43.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/67/45.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/7/67/42.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/67/44/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/67/43/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/67/45/2/1_1.png relay=no
+[INFO] geospatial_tile_proxy provider=rainviewer capability=rainviewer_precipitation_radar upstream=https://tilecache.rainviewer.com/v2/radar/3f05dbfe70f6/256/7/67/42/2/1_1.png relay=no
+INFO:     127.0.0.1:50467 - "WebSocket /api/conversations/conv_a4b18128d1bd46748c608a29ac779d97/realtime" [accepted]
+INFO:     connection open

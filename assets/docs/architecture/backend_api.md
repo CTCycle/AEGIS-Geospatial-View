@@ -1,10 +1,13 @@
 # Backend API
 
-Last updated: 2026-06-24
+Last updated: 2026-10-18
 
 ## Mounting
 
 All routers are mounted with `/api` prefix in `app/server/app.py`.
+
+`GET /api/health` returns `{"status": "ok"}` for launcher readiness checks.
+It is intentionally excluded from the generated OpenAPI schema.
 
 ## Job Routes
 
@@ -28,9 +31,14 @@ Defined in `app/server/api/geospatial.py`:
 - `GET /api/geospatial/layers/{layer_id}/health`
   Returns `GeospatialLayerHealthResponse`.
 - `GET /api/geospatial/layers/{layer_id}/features`
-  Returns `GeospatialProviderPayloadResponse`.
+  Returns `GeospatialProviderPayloadResponse`. A capability that is disabled
+  for the deployment (for example a `restricted_usage_opt_in` source without
+  `AEGIS_ALLOW_RESTRICTED_SOURCES`) returns `403` with its availability reason
+  and never reaches the provider. Unconfigured but enabled sources still return
+  their metadata payload.
 - `GET /api/geospatial/layers/{layer_id}/geojson`
-  Returns raw GeoJSON `FeatureCollection` for map rendering.
+  Returns raw GeoJSON `FeatureCollection` for map rendering, with the same
+  `403` rule for disabled capabilities.
 - `GET /api/geospatial/providers/{provider_id}/layers`
   Returns normalized live provider-native layer descriptors. NASA GIBS uses WMS/WMTS XML capabilities and does not expose raw XML to the frontend.
 - `GET /api/geospatial/providers/{provider_id}/layers/{layer_id}`
@@ -54,22 +62,49 @@ Defined in `app/server/api/geospatial.py`:
 - `POST /api/geospatial/audit`
   Returns `LayerAuditReport`.
 
+Geospatial credential status and provider execution use the same
+`GeospatialCredentialResolver`. It reads the active encrypted SQLite credential,
+decrypts and validates it, and reports a saved but undecryptable credential as
+unconfigured or as a structured credential-resolution error. There is no
+environment-variable fallback.
+
 ## Chat And Model Routes
 
 Defined in `app/server/api/chat.py`:
 
 - `POST /api/chat/turn`
-  Executes a chat turn and returns the structured result.
+  Executes a chat turn and returns the structured result when the run reaches a
+  terminal response within the request window. `conversation_id` is required.
+  A run that has been accepted but is still `pending`, `running`, `updating`,
+  or `awaiting_render` returns `202 AgentRunAcceptedResponse`; it is not a
+  conflict. The response includes `run_id`, `run_version`, `state`,
+  `presentation_status`, a status URL, and the realtime URL. A `409` is reserved
+  for a genuine active-run/idempotency/ownership conflict.
 - `POST /api/chat/jobs`
-  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`.
+  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
 - `POST /api/chat/stream`
-  Streams NDJSON chat events.
+  Streams NDJSON chat events. `conversation_id` is required.
 - `GET /api/chat/models`
   Returns available cloud and local models.
-  Optional query: `provider=deepseek` to fetch the live DeepSeek model catalog using the saved DeepSeek API key.
+  Optional query: `provider=deepseek`, `provider=opencode`, or
+  `provider=opencode-go` fetches the selected live catalog using the saved
+  provider API key. The response includes per-source `ok`, reachability, error,
+  and model-count status; a provider catalog failure is not converted into a
+  usable empty catalog. `reachable` means catalogue transport success only;
+  it is not inference or structured-output proof. Source statuses also expose
+  the separate process-local structured-probe status and expiry timestamps.
+- `GET /api/chat/models/structured-probe`
+  Returns the latest selected-provider/model native structured-response probe, or `not_tested` when
+  no unexpired result exists. Results are keyed by provider, model, protocol,
+  base URL, and credential fingerprint and expire after 15 minutes.
+- `POST /api/chat/models/structured-probe`
+  Runs the selected model through the native route/tool contract using the
+  fixed `Show a map of Italy` request. It stops before location resolution,
+  provider execution, map assembly, and conversation persistence. A probe never
+  changes model selection and never substitutes another provider or model.
 - `GET /api/chat/settings`
   Reads persisted settings.
-- `PUT /api/chat/settings`
+- `PATCH /api/chat/settings`
   Updates settings and credentials.
 - `POST /api/chat/models/ollama/refresh`
   Refreshes local Ollama models.
@@ -80,20 +115,39 @@ Defined in `app/server/api/chat.py`:
 
 ### Chat Turn Response
 
-`POST /api/chat/turn` returns `ChatTurnResponse`.
+`POST /api/chat/turn` returns `ChatTurnResponse` (`200`) or
+`AgentRunAcceptedResponse` (`202`).
 
 High-level fields:
 
 - `request_id`
-- `session_id`
+- `conversation_id`
 - `assistant_message`
-- `turn_contract`
-- `decision`
 - `operation`
 - `tool_payload`
 - `map_session`
 - `memory_snapshot`
 - `context_usage`
+- `execution_trace`
+- `route`
+- `goal`
+- `completion_contract`
+- `conversation_state`
+
+`map_session.overlay_collection` is the required, revisioned authoritative
+overlay collection. Its `instances` contain the render descriptor, stable
+capability/scope/variant identity, visibility, opacity, and bounded
+inspections. Render-entry arrays and separate overlay-ID projections are not
+part of the map-session wire contract; clients derive those views from the
+collection. The native `apply_map_plan` tool describes deterministic
+add/remove/keep-only/show/hide/update operations against the revisioned
+collection and returns the resulting map candidate. Browser render
+acknowledgement is the only promotion path for a realtime map run.
+
+Map-session inspections are carried by their owning overlay instance and may
+represent feature, location, overlay, or non-spatial associations. Clients
+should render only the normalized inspection contract and must not expose raw
+provider metadata or unsafe links.
 
 `operation` is the stable frontend-facing summary of verified backend outcome.
 
@@ -101,24 +155,23 @@ Supported `operation.kind` values:
 
 - `map_session`
 - `direct_answer`
-- `capability_catalog`
 - `clarification`
 - `rejection`
 - `error`
-- `failure_diagnostic`
-
-Additional optional response fields:
-
-- `task_snapshot`
-- `tool_plan`
-- `failure_diagnostic`
-- `visualization_update`
 
 Supported `operation.status` values:
 
 - `success`
 - `partial`
 - `failed`
+
+An accepted active run is polled with:
+
+- `GET /api/conversations/{conversation_id}/runs/{run_id}`
+  Returns the typed `AgentRunSnapshot`. For a terminal run, `response` contains
+  the same serialized terminal chat response that a synchronous `200` would
+  have returned. The snapshot remains the source of truth when realtime events
+  arrive out of order or a websocket reconnects.
 
 ### Chat Stream Events
 
@@ -129,15 +182,45 @@ Current event sequence is lifecycle-oriented rather than token-oriented.
 Supported event names:
 
 - `status`
-- `parsed`
-- `policy`
-- `tool_call_started`
-- `tool_call_completed`
-- `map_session_created`
+- `context_usage`
+- `stage`
 - `final`
 - `error`
 
 `final` carries the full serialized `ChatTurnResponse`, including `operation`.
+
+`POST /api/chat/turn` returns `503` when the selected provider credentials or
+local provider configuration cannot be used. Dynamic model catalog requests
+return `400` for an unsupported provider and `502` when the upstream catalog
+cannot be loaded. Provider request failures are normalized into safe provider,
+stage, code, HTTP-status, and retryability metadata without exposing response
+bodies or credentials.
+
+`POST /api/chat/turn` first checks that the conversation exists and returns
+`404 Conversation not found.` without invoking the orchestrator when it does
+not. Native runs start at the configured initial deadline and promote once to
+the simple or complex profile after route validation. Traces contain bounded
+stage observations, model/tool/transition counters, context usage, recovery,
+and terminal reasons; prompts, credentials, and provider payloads are
+excluded.
+
+### Intentional limitation contract
+
+- Antimeridian handling remains provider-dependent.
+- Point or metadata-only weather sampling cannot claim an area overlay.
+- Flood comparisons require verified comparable measures, units, and time
+  windows; otherwise the existing clarification operation asks for separate
+  layers or a comparable data contract.
+- FIRMS and other provider credential failures remain structured limitations;
+  provider fallback is not implied.
+- Valid empty results are distinct from unavailable providers and produce an
+  explicit no-results state.
+- Browser acknowledgment is client-reported rendering evidence; backend
+  semantic validation remains authoritative.
+
+Native tool execution, evidence persistence, progress events, and final
+response construction are owned by `NativeAgentOrchestrator`, `AgentLoop`,
+and the typed tool registry/executor.
 
 ## Conversation Run Routes
 
@@ -145,16 +228,21 @@ Defined in `app/server/api/conversations.py`:
 
 - `POST /api/conversations`
   Creates a durable conversation shell.
-- `POST /api/conversations/{conversation_id}/runs`
-  Creates one active agent run for the conversation and returns its SSE stream URL.
-- `GET /api/conversations/{conversation_id}/runs/{run_id}/events`
-  Streams durable user-visible run events as Server-Sent Events. Supports `after_event_id` and `Last-Event-ID` replay.
-- `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`
-  Adds a steering message to the active run, rebuilds the deterministic aggregate request, and increments the run version.
-- `POST /api/conversations/{conversation_id}/runs/{run_id}/cancel`
-  Marks the active run cancelled as a terminal user action.
+- `GET /api/conversations/{conversation_id}/realtime` (WebSocket)
+  Opens the interactive `aegis.realtime.v1` protocol. The client sends
+  `session.resume`, `run.start`, `run.steer`, and `run.cancel` envelopes; the
+  server returns acknowledgements and ordered durable `run.event` envelopes.
+  `client_request_id` and `client_mutation_id` make retries idempotent.
+- `GET /api/realtime/metrics`
+  Loopback-only JSON counters for active sockets, protocol errors, delivered
+  events, and command latency. It is intentionally process-local in the
+  supported single-replica deployment.
 
-The v1 run stream emits concise user-visible events only: progress labels, assistant text completion, request updates, terminal errors, completion, and cancellation. Internal diagnostics can be persisted with internal visibility and are not replayed on the normal user stream.
+The v1 run stream emits concise user-visible events only: progress labels,
+assistant text completion, request updates from steering, terminal errors,
+completion, cancellation, and clarification-needed. Internal diagnostics can be
+persisted with internal visibility and are not replayed on the normal user
+stream.
 
 Clarifications use the terminal `clarification_needed` event and may carry a
 partial map session plus a visualization delta.

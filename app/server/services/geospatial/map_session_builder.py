@@ -1,0 +1,842 @@
+"""Build renderer-safe map candidates from typed agent actions."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from math import cos, isfinite, radians
+from collections.abc import Callable, Sequence
+from typing import Any, cast
+from urllib.parse import urlparse
+from uuid import uuid4
+
+from server.common.typing import json_object
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ViewportPolicy,
+)
+from server.domain.agent.evidence import AgentEvidenceEnvelope
+from server.domain.agent.map_plan import (
+    AddEvidenceLayerAction,
+    KeepOnlyLayersAction,
+    MapAction,
+    RemoveLayerAction,
+    SetBasemapAction,
+    SetLayerOpacityAction,
+    SetLayerVisibilityAction,
+)
+from server.domain.agent.decision import ResolvedLocation
+from server.services.agent.overlay_collection import OverlayCollectionService
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.raster_tiles import (
+    build_backend_raster_proxy_template,
+)
+
+###############################################################################
+MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
+MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
+_GEOJSON_RENDERING_MODES = frozenset(
+    {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points"}
+)
+_GEOJSON_GEOMETRY_TYPES = frozenset(
+    {
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+        "Polygon",
+        "MultiPolygon",
+        "GeometryCollection",
+    }
+)
+_RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"})
+_RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
+
+
+###############################################################################
+class MapPlanBuildError(ValueError):
+
+    # -------------------------------------------------------------------------
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+###############################################################################
+class MapSessionBuilder:
+    """Turn catalog descriptors and evidence references into a MapSession."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self, *, capability_registry: CapabilityRegistry) -> None:
+        self.capability_registry = capability_registry
+
+    # -------------------------------------------------------------------------
+    async def build(
+        self,
+        *,
+        location: ResolvedLocation,
+        evidence: list[AgentEvidenceEnvelope],
+        active_session: MapSession | None,
+        actions: list[MapAction],
+    ) -> MapSession:
+        evidence_by_ref = {
+            item.evidence_ref: item for item in evidence if item.evidence_ref
+        }
+        candidate = self._initial_session(location, active_session, actions)
+        for action in actions:
+            candidate = self._apply_action(
+                candidate,
+                action,
+                evidence_by_ref=evidence_by_ref,
+            )
+        return candidate.model_copy(
+            update={"session_id": f"candidate-{uuid4().hex}"},
+            deep=True,
+        )
+
+    # -------------------------------------------------------------------------
+    def _initial_session(
+        self,
+        location: ResolvedLocation,
+        active_session: MapSession | None,
+        actions: list[MapAction],
+    ) -> MapSession:
+        if active_session is not None:
+            candidate = active_session.model_copy(deep=True)
+            if candidate.resolved_location != location:
+                viewport = _viewport_for_location(location)
+                return candidate.model_copy(
+                    update={
+                        "resolved_location": location,
+                        "viewport": viewport,
+                        "center": {
+                            "latitude": viewport.center_latitude,
+                            "longitude": viewport.center_longitude,
+                        },
+                        "bounds": viewport.bbox,
+                    },
+                    deep=True,
+                )
+            return candidate
+        basemap_action = next(
+            (action for action in actions if isinstance(action, SetBasemapAction)),
+            None,
+        )
+        if basemap_action is None:
+            raise MapPlanBuildError(
+                "missing_basemap",
+                "A new map candidate requires a set_basemap action.",
+            )
+        basemap = self._capability_descriptor(basemap_action.capability_id)
+        viewport = _viewport_for_location(location)
+        return MapSession(
+            session_id=f"candidate-{uuid4().hex}",
+            resolved_location=location,
+            basemap_id=basemap_action.capability_id,
+            viewport=viewport,
+            generated_at=datetime.now(UTC),
+            payload={"map_candidate": True},
+            center={
+                "latitude": viewport.center_latitude,
+                "longitude": viewport.center_longitude,
+            },
+            bounds=viewport.bbox,
+            basemap=basemap,
+            overlay_collection=OverlayCollectionState(),
+        )
+
+    # -------------------------------------------------------------------------
+    def _apply_action(
+        self,
+        session: MapSession,
+        action: MapAction,
+        *,
+        evidence_by_ref: dict[str, AgentEvidenceEnvelope],
+    ) -> MapSession:
+        if isinstance(action, SetBasemapAction):
+            return session.model_copy(
+                update={
+                    "basemap_id": action.capability_id,
+                    "basemap": self._capability_descriptor(action.capability_id),
+                },
+                deep=True,
+            )
+        if isinstance(action, AddEvidenceLayerAction):
+            evidence = evidence_by_ref.get(action.evidence_ref)
+            if evidence is None:
+                raise MapPlanBuildError(
+                    "unknown_evidence",
+                    f"Evidence '{action.evidence_ref}' is not available to the map plan.",
+                )
+            if evidence.status == "failed":
+                raise MapPlanBuildError(
+                    "failed_evidence",
+                    f"Evidence '{action.evidence_ref}' failed and cannot be rendered.",
+                )
+            descriptor = self._capability_descriptor(action.capability_id)
+            descriptor.update(
+                {
+                    "id": f"evidence:{action.evidence_ref}:{action.capability_id}",
+                    "instance_id": f"evidence:{action.evidence_ref}:{action.capability_id}",
+                    "capability_id": action.capability_id,
+                    "evidence_ref": action.evidence_ref,
+                    "evidence_status": evidence.status,
+                    "visible": action.visible,
+                    "default_opacity": action.opacity,
+                }
+            )
+            # Every layer carries the session location, so its own extent is
+            # what distinguishes one compared place from another.
+            evidence_extent = _single_evidence_bbox(evidence)
+            if evidence_extent is not None:
+                descriptor["evidence_bbox"] = evidence_extent
+            evidence_payload = json_object(evidence.payload)
+            for key in (
+                "url",
+                "tileUrl",
+                "tile_url_template",
+                "serviceUrl",
+                "service_url",
+                "source_url",
+                "layers",
+                "layerId",
+                "layer_id",
+                "source_layer",
+                "tileMatrixSet",
+                "tile_matrix_set",
+                "format",
+                "version",
+                "style",
+            ):
+                if key in evidence_payload and key not in descriptor:
+                    descriptor[key] = evidence_payload[key]
+            if (
+                "tile_url_template" not in descriptor
+                and isinstance(descriptor.get("tileUrl"), str)
+            ):
+                descriptor["tile_url_template"] = descriptor["tileUrl"]
+            if (
+                "url" not in descriptor
+                and isinstance(descriptor.get("serviceUrl"), str)
+            ):
+                descriptor["url"] = descriptor["serviceUrl"]
+            render_payload = json_object(evidence_payload.get("render"))
+            if render_payload:
+                descriptor["render"] = render_payload
+            self._apply_backend_raster_proxy(descriptor)
+            render_data = _geojson_render_data(evidence.payload)
+            if render_data is not None:
+                descriptor["data"] = render_data
+                descriptor["result_status"] = evidence.summary.get(
+                    "result_status", evidence.status
+                )
+                descriptor["result_type"] = evidence.summary.get(
+                    "result_type", "features"
+                )
+            self._validate_render_descriptor(descriptor)
+            additions = OverlayCollectionService.from_rendered_descriptors(
+                [descriptor],
+                resolved_location=session.resolved_location,
+                viewport=session.viewport,
+                revision=session.overlay_collection.revision,
+            )
+            collection = OverlayCollectionService.merge_instances(
+                session.overlay_collection,
+                additions.instances,
+            )
+            return OverlayCollectionService.merge_into_map_session(session, collection)
+        if isinstance(action, SetLayerVisibilityAction):
+            return self._update_instance(
+                session,
+                action.instance_id,
+                lambda instance: instance.model_copy(
+                    update={"visible": action.visible}, deep=True
+                ),
+            )
+        if isinstance(action, SetLayerOpacityAction):
+            return self._update_instance(
+                session,
+                action.instance_id,
+                lambda instance: instance.model_copy(
+                    update={"opacity": action.opacity}, deep=True
+                ),
+            )
+        if isinstance(action, RemoveLayerAction):
+            instances = session.overlay_collection.instances
+            if not any(item.instance_id == action.instance_id for item in instances):
+                raise MapPlanBuildError(
+                    "unknown_layer",
+                    f"Layer '{action.instance_id}' is not in the active map.",
+                )
+            collection = session.overlay_collection.model_copy(
+                update={
+                    "instances": [
+                        item
+                        for item in instances
+                        if item.instance_id != action.instance_id
+                    ],
+                    "revision": session.overlay_collection.revision + 1,
+                },
+                deep=True,
+            )
+            return OverlayCollectionService.merge_into_map_session(session, collection)
+        if isinstance(action, KeepOnlyLayersAction):
+            current_ids = {item.instance_id for item in session.overlay_collection.instances}
+            missing = sorted(set(action.instance_ids) - current_ids)
+            if missing:
+                raise MapPlanBuildError(
+                    "unknown_layer",
+                    f"Layer '{missing[0]}' is not in the active map.",
+                )
+            kept = [
+                item
+                for item in session.overlay_collection.instances
+                if item.instance_id in set(action.instance_ids)
+            ]
+            if len(kept) == len(session.overlay_collection.instances):
+                return session
+            collection = session.overlay_collection.model_copy(
+                update={
+                    "instances": kept,
+                    "revision": session.overlay_collection.revision + 1,
+                },
+                deep=True,
+            )
+            return OverlayCollectionService.merge_into_map_session(session, collection)
+        if action.strategy == "preserve_current":
+            return session
+        evidence = [
+            evidence_by_ref[ref]
+            for ref in action.evidence_refs
+            if ref in evidence_by_ref
+        ]
+        if action.strategy == "fit_evidence":
+            bbox = _evidence_bbox(evidence)
+            if bbox is not None:
+                viewport = _viewport_for_bbox(bbox, session.viewport)
+                return _with_viewport(session, viewport)
+        if action.strategy == "fit_location":
+            return _with_viewport(
+                session,
+                _viewport_for_location(session.resolved_location),
+            )
+        raise MapPlanBuildError(
+            "viewport_bounds_unavailable",
+            "The requested viewport cannot be derived from validated state.",
+        )
+
+    # -------------------------------------------------------------------------
+    def _update_instance(
+        self,
+        session: MapSession,
+        instance_id: str,
+        update: Callable[[OverlayInstance], OverlayInstance],
+    ) -> MapSession:
+        instances = list(session.overlay_collection.instances)
+        for index, instance in enumerate(instances):
+            if instance.instance_id == instance_id:
+                updated = update(instance)
+                if updated == instance:
+                    return session
+                instances[index] = updated
+                collection = session.overlay_collection.model_copy(
+                    update={
+                        "instances": instances,
+                        "revision": session.overlay_collection.revision + 1,
+                    },
+                    deep=True,
+                )
+                return OverlayCollectionService.merge_into_map_session(
+                    session, collection
+                )
+        raise MapPlanBuildError(
+            "unknown_layer",
+            f"Layer '{instance_id}' is not in the active map.",
+        )
+
+    # -------------------------------------------------------------------------
+    def _capability_descriptor(self, capability_id: str) -> dict[str, Any]:
+        capability = self.capability_registry.get_capability(capability_id)
+        if capability is None:
+            raise MapPlanBuildError(
+                "unknown_capability",
+                f"Capability '{capability_id}' is not in the validated catalog.",
+            )
+        metadata = json_object(capability.get("metadata"))
+        descriptor = dict(metadata)
+        descriptor.update(
+            {
+                "id": capability_id,
+                "capability_id": capability_id,
+                "label": str(
+                    metadata.get("label")
+                    or capability.get("name")
+                    or capability_id
+                ),
+                "provider": str(capability.get("provider") or "unknown"),
+                "type": str(
+                    capability.get("type")
+                    or capability.get("capabilityKind")
+                    or "overlay"
+                ),
+                "rendering_mode": str(
+                    capability.get("renderingMode") or "metadata-only"
+                ),
+            }
+        )
+        return descriptor
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _apply_backend_raster_proxy(descriptor: dict[str, Any]) -> None:
+        """Keep public raster URLs server-side in the native map-plan path."""
+
+        render_value = descriptor.get("render")
+        render = json_object(render_value)
+        rendering_mode = str(
+            render.get("rendering_mode")
+            or descriptor.get("rendering_mode")
+            or descriptor.get("renderingMode")
+            or descriptor.get("type")
+            or ""
+        )
+        provider = str(
+            render.get("provider")
+            or descriptor.get("provider")
+            or ""
+        )
+        proxy_template = build_backend_raster_proxy_template(
+            str(descriptor.get("capability_id") or descriptor.get("id") or ""),
+            provider=provider,
+            render={
+                "rendering_mode": rendering_mode,
+                "time": render.get("time") or descriptor.get("time"),
+                "default_time": render.get("default_time")
+                or descriptor.get("default_time"),
+            },
+        )
+        if proxy_template is None:
+            return
+
+        source_url = _first_non_proxy_url(
+            descriptor.get("source_url"),
+            render.get("url"),
+            render.get("tile_url_template"),
+            descriptor.get("tileUrl"),
+            descriptor.get("serviceUrl"),
+            descriptor.get("service_url"),
+            descriptor.get("url_template"),
+            descriptor.get("url"),
+            descriptor.get("tile_url_template"),
+        )
+        if source_url is not None:
+            descriptor["source_url"] = source_url
+        descriptor["url"] = proxy_template
+        descriptor["tile_url_template"] = proxy_template
+        if render:
+            # The client only accepts a nested render descriptor when its
+            # identity fields are complete. Preserve the provider selected
+            # for the proxy route so temporal and zoom metadata are retained.
+            render.setdefault("provider", provider)
+            render.setdefault(
+                "layer_id",
+                descriptor.get("layer_id")
+                or descriptor.get("layerId")
+                or descriptor.get("capability_id"),
+            )
+            render.setdefault("rendering_mode", rendering_mode)
+            render["tile_url_template"] = proxy_template
+            descriptor["render"] = render
+            for key in (
+                "time",
+                "default_time",
+                "min_zoom",
+                "max_zoom",
+                "tile_size",
+                "crs",
+                "source_protocol",
+                "format",
+                "style",
+                "tile_matrix_set",
+                "attribution",
+                "attribution_url",
+            ):
+                if key not in descriptor and render.get(key) is not None:
+                    descriptor[key] = render[key]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _validate_render_descriptor(descriptor: dict[str, Any]) -> None:
+        """Reject candidates the browser renderer cannot consume safely."""
+
+        mode = str(
+            descriptor.get("rendering_mode")
+            or descriptor.get("renderingMode")
+            or descriptor.get("type")
+            or ""
+        ).strip().casefold()
+        if mode in _RENDERING_MODE_ALIASES and descriptor.get("data") is not None:
+            mode = _RENDERING_MODE_ALIASES[mode]
+            descriptor["rendering_mode"] = mode
+        if mode in {"metadata-only", "metadata_only", ""}:
+            raise MapPlanBuildError(
+                "render_descriptor_unavailable",
+                "The selected evidence has no browser-renderable layer descriptor.",
+            )
+        if mode in _GEOJSON_RENDERING_MODES:
+            data = descriptor.get("data")
+            has_feature_collection = _valid_geojson_feature_collection(data)
+            if data is not None and not has_feature_collection:
+                raise MapPlanBuildError(
+                    "render_descriptor_invalid",
+                    "The GeoJSON layer contains invalid feature data.",
+                )
+            has_url = _usable_render_url(descriptor.get("url"))
+            if not has_feature_collection and not has_url:
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    "The GeoJSON layer is missing feature data or a source URL.",
+                )
+            return
+        if mode in _RASTER_RENDERING_MODES:
+            if mode in {"wms", "wmts"} and not descriptor.get("url"):
+                service_url = descriptor.get("service_url") or descriptor.get("serviceUrl")
+                if service_url:
+                    descriptor["url"] = service_url
+            has_source = bool(
+                _usable_render_url(
+                    descriptor.get("tile_url_template")
+                    or descriptor.get("url")
+                )
+            )
+            if not has_source:
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    f"The {mode} layer is missing a tile or service URL.",
+                )
+            return
+        if mode == "vector-tile":
+            if not _usable_render_url(
+                descriptor.get("tile_url_template") or descriptor.get("url")
+            ):
+                raise MapPlanBuildError(
+                    "render_descriptor_unavailable",
+                    "The vector-tile layer is missing a tile URL template.",
+                )
+            if not str(
+                descriptor.get("source_layer") or descriptor.get("layer_id") or ""
+            ).strip():
+                raise MapPlanBuildError(
+                    "render_descriptor_invalid",
+                    "The vector-tile layer is missing source_layer metadata.",
+                )
+            return
+        raise MapPlanBuildError(
+            "render_descriptor_invalid",
+            f"Unsupported browser rendering mode '{mode}'.",
+        )
+
+###############################################################################
+def _usable_render_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip()
+    if not candidate or candidate.startswith("//"):
+        return False
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        return False
+    if parsed.scheme in {"http", "https"}:
+        return bool(parsed.netloc)
+    return candidate.startswith("/")
+
+
+###############################################################################
+def _first_non_proxy_url(*values: object) -> str | None:
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        candidate = value.strip()
+        if candidate and not candidate.startswith("/api/geospatial/tiles/"):
+            return candidate
+    return None
+
+
+###############################################################################
+def _valid_geojson_feature_collection(value: object) -> bool:
+    data = json_object(value)
+    features = data.get("features")
+    if data.get("type") != "FeatureCollection" or not isinstance(features, list):
+        return False
+    feature_items = cast(list[object], features)
+    return bool(feature_items) and all(
+        _valid_geojson_feature(feature) for feature in feature_items
+    )
+
+
+###############################################################################
+def _valid_geojson_feature(value: object) -> bool:
+    feature = json_object(value)
+    return feature.get("type") == "Feature" and _valid_geojson_geometry(
+        feature.get("geometry")
+    )
+
+
+###############################################################################
+def _valid_geojson_geometry(value: object) -> bool:
+    geometry = json_object(value)
+    geometry_type = geometry.get("type")
+    if (
+        not isinstance(geometry_type, str)
+        or geometry_type not in _GEOJSON_GEOMETRY_TYPES
+    ):
+        return False
+    if geometry_type == "GeometryCollection":
+        geometries = geometry.get("geometries")
+        if not isinstance(geometries, list):
+            return False
+        geometry_items = cast(list[object], geometries)
+        return bool(geometry_items) and all(
+            _valid_geojson_geometry(item) for item in geometry_items
+        )
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        return _valid_geojson_position(coordinates)
+    if geometry_type == "MultiPoint":
+        return _valid_geojson_sequence(coordinates, _valid_geojson_position)
+    if geometry_type == "LineString":
+        return _valid_geojson_sequence(coordinates, _valid_geojson_position, minimum=2)
+    if geometry_type == "MultiLineString":
+        return _valid_geojson_sequence(
+            coordinates,
+            lambda value: _valid_geojson_sequence(
+                value, _valid_geojson_position, minimum=2
+            ),
+        )
+    if geometry_type == "Polygon":
+        return _valid_geojson_sequence(
+            coordinates,
+            lambda value: _valid_geojson_sequence(
+                value, _valid_geojson_position, minimum=4
+            ),
+        )
+    return _valid_geojson_sequence(
+        coordinates,
+        lambda value: _valid_geojson_sequence(
+            value,
+            lambda ring: _valid_geojson_sequence(
+                ring, _valid_geojson_position, minimum=4
+            ),
+        ),
+    )
+
+
+###############################################################################
+def _valid_geojson_position(value: object) -> bool:
+    if not isinstance(value, list):
+        return False
+    position = cast(list[object], value)
+    return len(position) >= 2 and all(_finite_number(item) for item in position)
+
+
+###############################################################################
+def _finite_number(value: object) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
+###############################################################################
+def _valid_geojson_sequence(
+    value: object,
+    validator: Callable[[object], bool],
+    *,
+    minimum: int = 1,
+) -> bool:
+    if not isinstance(value, list):
+        return False
+    items = cast(list[object], value)
+    return len(items) >= minimum and all(validator(item) for item in items)
+
+###############################################################################
+def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
+    return session.model_copy(
+        update={
+            "viewport": viewport,
+            "center": {
+                "latitude": viewport.center_latitude,
+                "longitude": viewport.center_longitude,
+            },
+            "bounds": viewport.bbox,
+        },
+        deep=True,
+    )
+
+###############################################################################
+def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
+    bbox = _usable_location_bbox(location)
+    return ViewportPolicy(
+        center_latitude=location.latitude,
+        center_longitude=location.longitude,
+        bbox=bbox,
+    )
+
+
+###############################################################################
+def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
+    bbox = _valid_bbox(location.bbox)
+    if bbox is None:
+        return bbox
+    min_lon, min_lat, max_lon, max_lat = bbox
+    if max(max_lon - min_lon, max_lat - min_lat) < MIN_LOCATION_VIEWPORT_SPAN_DEGREES:
+        return None
+    if location.location_type not in {"city", "municipality"}:
+        return bbox
+    if (
+        max_lon - min_lon > MAX_CITY_VIEWPORT_SPAN_DEGREES
+        or max_lat - min_lat > MAX_CITY_VIEWPORT_SPAN_DEGREES
+    ):
+        return None
+    return bbox
+
+###############################################################################
+def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportPolicy:
+    min_lon, min_lat, max_lon, max_lat = bbox
+    center_latitude = (min_lat + max_lat) / 2
+    center_longitude = (min_lon + max_lon) / 2
+    lat_radius = max(abs(max_lat - min_lat) * 111_320 / 2, 1.0)
+    lon_radius = max(
+        abs(max_lon - min_lon)
+        * 111_320
+        * max(abs(cos(radians(center_latitude))), 0.01)
+        / 2,
+        1.0,
+    )
+    return ViewportPolicy(
+        center_latitude=center_latitude,
+        center_longitude=center_longitude,
+        radius_m=max(lat_radius, lon_radius, previous.radius_m * 0.1),
+        bbox=bbox,
+    )
+
+###############################################################################
+def _valid_bbox(value: object) -> list[float] | None:
+    if isinstance(value, list):
+        items = cast(Sequence[object], value)
+    elif isinstance(value, tuple):
+        items = cast(Sequence[object], value)
+    else:
+        return None
+    if len(items) != 4:
+        return None
+    result: list[float] = []
+    for item in items:
+        if not isinstance(item, (str, int, float)) or isinstance(item, bool):
+            return None
+        try:
+            result.append(float(item))
+        except ValueError:
+            return None
+    min_lon, min_lat, max_lon, max_lat = result
+    if not (-180 <= min_lon <= max_lon <= 180 and -90 <= min_lat <= max_lat <= 90):
+        return None
+    return result
+
+###############################################################################
+def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
+    """Return the union of every evidence item's extent."""
+
+    extents = [
+        extent for extent in (_single_evidence_bbox(item) for item in evidence) if extent
+    ]
+    if not extents:
+        return None
+    return [
+        min(extent[0] for extent in extents),
+        min(extent[1] for extent in extents),
+        max(extent[2] for extent in extents),
+        max(extent[3] for extent in extents),
+    ]
+
+###############################################################################
+def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:
+    for source in (item.summary, item.provenance):
+        for key in ("bbox", "bounds", "analysis_bbox"):
+            bbox = _valid_bbox(source.get(key))
+            if bbox is not None:
+                return bbox
+        coverage = json_object(source.get("coverage"))
+        if coverage:
+            bbox = _valid_bbox(coverage.get("bbox"))
+            if bbox is not None:
+                return bbox
+    return None
+
+
+###############################################################################
+def _geojson_render_data(value: object) -> dict[str, Any] | None:
+    """Convert a bounded provider feature payload to client GeoJSON."""
+
+    payload = json_object(value)
+    raw_features = payload.get("features")
+    if not isinstance(raw_features, list):
+        return None
+    raw_features = cast(list[Any], raw_features)
+    normalized_features = [json_object(item) for item in raw_features]
+    if all(
+        item.get("type") == "Feature"
+        and isinstance(item.get("geometry"), dict)
+        for item in normalized_features
+    ):
+        return {"type": "FeatureCollection", "features": normalized_features}
+    features: list[dict[str, Any]] = []
+    for item in normalized_features:
+        if not item:
+            continue
+        raw_geometry = item.get("geometry")
+        geometry = cast(dict[str, Any], raw_geometry)
+        if isinstance(raw_geometry, dict) and geometry.get("type"):
+            properties = dict(item)
+            properties.pop("latitude", None)
+            properties.pop("longitude", None)
+            properties.pop("geometry", None)
+            properties.pop("type", None)
+            properties.pop("id", None)
+            feature: dict[str, Any] = {
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": properties,
+            }
+            if item.get("id") is not None:
+                feature["id"] = item["id"]
+            features.append(feature)
+            continue
+        latitude = item.get("latitude")
+        longitude = item.get("longitude")
+        if not isinstance(latitude, (int, float)) or isinstance(latitude, bool):
+            continue
+        if not isinstance(longitude, (int, float)) or isinstance(longitude, bool):
+            continue
+        properties = dict(item)
+        properties.pop("latitude", None)
+        properties.pop("longitude", None)
+        feature: dict[str, Any] = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [float(longitude), float(latitude)],
+            },
+            "properties": properties,
+        }
+        if item.get("id") is not None:
+            feature["id"] = item["id"]
+        features.append(feature)
+    return {"type": "FeatureCollection", "features": features}
+
+
+__all__ = ["MapPlanBuildError", "MapSessionBuilder"]

@@ -1,0 +1,321 @@
+{
+  "scenario": "retry_exhausted",
+  "run_id": "controlled-map-run-1",
+  "run_version": 1,
+  "final_run_version": 1,
+  "map_session_id": "rome-earthquake-session-attempt-2",
+  "candidate_map_sessions": [
+    {
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "run_version": 1,
+      "status": "ready"
+    },
+    {
+      "map_session_id": "rome-earthquake-session-attempt-1",
+      "collection_revision": 8,
+      "run_version": 1,
+      "status": "ready"
+    },
+    {
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "run_version": 1,
+      "status": "ready"
+    }
+  ],
+  "tested_commit": "a53040ae137d3e5c7c4cd1ddf8a09274e56aeb1d",
+  "acknowledgment_count": 3,
+  "acknowledgments": [
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    },
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-1",
+      "collection_revision": 8,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    },
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    }
+  ],
+  "ack_payloads": [
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    },
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-1",
+      "collection_revision": 8,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    },
+    {
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9,
+      "status": "ready",
+      "viewport_bounds": [
+        12.276163154800713,
+        41.78872434628582,
+        12.72383684520139,
+        42.01123841234292
+      ],
+      "checks": {
+        "required_sources_loaded": true,
+        "required_layers_present": true,
+        "viewport_valid": true
+      },
+      "overlay_results": [
+        {
+          "overlay_id": "earthquake-rome-1",
+          "capability_id": "usgs_earthquakes",
+          "source_present": true,
+          "layer_present": true,
+          "loaded": true,
+          "metadata_only": false,
+          "visibility_matches": true,
+          "style_valid": true,
+          "zoom_range_valid": true,
+          "rendered_feature_count": 1,
+          "failure_code": null
+        }
+      ],
+      "failure_code": null,
+      "failure_stage": null,
+      "failure_summary": null
+    }
+  ],
+  "synthetic_event_sequence": [
+    {
+      "sequence": 1,
+      "type": "progress",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 2,
+      "type": "assistant_text_completed",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 3,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7
+    },
+    {
+      "sequence": 4,
+      "type": "render_observed",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "collection_revision": 7,
+      "map_session_id": "rome-earthquake-session",
+      "recovery": "alternate_source",
+      "status": "failed"
+    },
+    {
+      "sequence": 5,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-1",
+      "collection_revision": 8
+    },
+    {
+      "sequence": 6,
+      "type": "render_observed",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "collection_revision": 8,
+      "map_session_id": "rome-earthquake-session-attempt-1",
+      "recovery": "alternate_source",
+      "status": "failed"
+    },
+    {
+      "sequence": 7,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session-attempt-2",
+      "collection_revision": 9
+    },
+    {
+      "sequence": 8,
+      "type": "error",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "code": "render_retry_exhausted"
+    }
+  ],
+  "final_ui_state_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show recent earthquakes around Rome Data prepared; the map is loading. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention Execution details Operational events only. Model reasoning and raw payloads are not shown. Refresh \u00d7 RUN controlled-map-run-1 VERSION 1 The map update could not be completed. The previous map was retained when available. No operational trace events have been recorded yet.",
+  "console_output": [],
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-retry_exhausted]\\controlled-map-retry_exhausted.png",
+  "screenshot_path": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-retry_exhausted]\\controlled-map-retry_exhausted.png",
+  "final_presentation_status": "render_timeout",
+  "rejected_acknowledgments": [],
+  "fault_injection": "WebSocket fixture only"
+}

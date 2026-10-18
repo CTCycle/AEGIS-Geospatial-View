@@ -1,0 +1,133 @@
+{
+  "id": "noaa_coops_water_levels",
+  "name": "NOAA CO-OPS Water Levels",
+  "provider": "noaa",
+  "type": "vector-overlay",
+  "description": "NOAA CO-OPS station metadata joined with the latest water-level observation available for each selected station.",
+  "capabilities": [
+    "water",
+    "tide",
+    "coastal",
+    "flood",
+    "current"
+  ],
+  "coverage": "united-states-coastal",
+  "metadata": {
+    "label": "NOAA Water Levels",
+    "requires_key": false,
+    "attribution": "NOAA CO-OPS",
+    "keywords": [
+      "tide",
+      "water level",
+      "coastal",
+      "flood"
+    ],
+    "action_tags": [
+      "water",
+      "coastal",
+      "flood"
+    ],
+    "task_tags": [
+      "coastal condition",
+      "water level stations"
+    ],
+    "source_protocol": "NOAA CO-OPS station metadata + datagetter JSON API",
+    "data_format": "JSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://api.tidesandcurrents.noaa.gov/api/dev",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://api.tidesandcurrents.noaa.gov/api/dev"
+  ],
+  "license": {
+    "name": "NOAA public data",
+    "url": "https://tidesandcurrents.noaa.gov/disclaimer.html",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "tide",
+      "water level",
+      "coastal",
+      "flood"
+    ],
+    "requiredUserAction": [
+      "water",
+      "coastal",
+      "freshness"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-08-27",
+    "knownLimitations": [
+      "Station discovery is paired with a station-specific observation request for full rendering.",
+      "Observation availability depends on the selected station, product, datum, and provider coverage."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 900,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.timestamp",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "search"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "united-states-coastal",
+    "limitations": [
+      "Station discovery is paired with a station-specific observation request for full rendering.",
+      "Observation availability depends on the selected station, product, datum, and provider coverage."
+    ],
+    "fallback_ids": []
+  }
+}

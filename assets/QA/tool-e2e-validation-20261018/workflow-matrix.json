@@ -1,0 +1,2374 @@
+[
+ {
+  "scenario": "T3-18-provenance",
+  "verdict": "PASS provenance matches stored evidence, no re-fetch",
+  "conversation_id": "conv_5f039fe5d7a341b48bd59f6dc7b5a654",
+  "run_id": "run_c06fa64ce2044bf2a98be03aaee5eed1",
+  "request": "For the two layers on this map, which provider supplied each one and when was each fetched? Use the saved evidence, do not fetch again.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 2,
+     "actions": [
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "paris"
+      }
+     ]
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-886eee12a7344b1a98cdb2cd8f590984",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -3.766950501564338,
+     45.98317114439121,
+     8.460832701560776,
+     51.578389534671174
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "vision_attached",
+    "call_kind": "terminal",
+    "vision_calls": 1,
+    "mime_type": "image/jpeg",
+    "width": 1024,
+    "height": 712
+   }
+  ],
+  "answer_excerpt": "Both layers on this map come from the saved evidence — no new fetch was made.\n\n**1. Open-Meteo Weather Forecast**\n- **Provider:** Open-Meteo (`openmeteo`)\n- **Fetched at:** 2026-10-18 13:11:20 UTC\n- **Observation time:** 2026-10-18 15:00 Europe/Paris\n- **Attribution:** Data from Open-Meteo\n\n**2. RainViewer Recent Precipitation Radar**\n- **Provider:** RainViewer (`rainviewer`)\n- **Fetched at:** 2026-10-18 13:11:54 UTC\n- **Observation time:** 2026-10-18 13:10 UTC (latest available radar frame)\n- **Attribution:** © RainViewer\n\nBoth entries are marked `stale: false` and `result_status: ok` in the "
+ },
+ {
+  "scenario": "T3-18-unsupported-2",
+  "verdict": "PASS honest rejection, last-known-good map preserved",
+  "conversation_id": "conv_cda90414af1c40ca9159e2600d38d795",
+  "run_id": "run_d1dd3c0640834cb38a474bbd3d19785c",
+  "request": "Add live train positions across Japan to this map.",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "The available capability catalog does not include any live train or transit vehicle position provider. Let me confirm the shortlisted capabilities before concluding.\n\nThe shortlisted capabilities for this run are: IMERG_Precipitation_Rate, openmeteo_air_quality_forecast, openmeteo_pressure_humidity_wind, openmeteo_weather_forecast, overpass_residential_buildings, and overpass_poi_amenities. None of these provide live train positions, real-time rail vehicle locations, or GTFS-realtime transit feeds.\n\n**I cannot add live train positions across Japan to this map.**\n\n**Why:** There is no registere"
+ },
+ {
+  "scenario": "T3-18-unsupported",
+  "verdict": "BLOCKED by Tokyo resolver finding F-12 (map preserved)",
+  "conversation_id": "conv_cda90414af1c40ca9159e2600d38d795",
+  "run_id": "run_fb2f643570094404b0c975d7ffa1be08",
+  "request": "Add live subway train positions for Tokyo to this map.",
+  "state": "completed",
+  "presentation_status": "not_required",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Tokyo",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "failed",
+    "summary": "I could not safely resolve Tokyo. Can you provide a city, country, or coordinates?",
+    "error": "clarification_required"
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "I could not safely resolve Tokyo. Can you provide a city, country, or coordinates?"
+ },
+ {
+  "scenario": "VISION-always-2",
+  "verdict": "Clarification (northern France ambiguous)",
+  "conversation_id": "conv_141e17aefcc24d73b1a1063b72b7a2ad",
+  "run_id": "run_a7198bc2ae3f4af1b2749bd10cdded1f",
+  "request": "Show the latest RainViewer precipitation radar over northern France on the map. Then look at the rendered map and tell me which part of the visible map has the most intense rain.",
+  "state": "completed",
+  "presentation_status": "not_required",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "northern France",
+     "expected_location_type": "region"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "failed",
+    "summary": "Which location do you mean: Northern Vosges, Bas-Rhin, European Collectivity of Alsace, Grand Est, Metropolitan France, France, Northern Catalonia, Baillestavy, Prades, Pyrénées-Orientales, Occitania, Metropolitan France, 66320, France?",
+    "error": "clarification_required"
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "Which location do you mean: Northern Vosges, Bas-Rhin, European Collectivity of Alsace, Grand Est, Metropolitan France, France, Northern Catalonia, Baillestavy, Prades, Pyrénées-Orientales, Occitania, Metropolitan France, 66320, France?"
+ },
+ {
+  "scenario": "VISION-always-3",
+  "verdict": "PASS vision always: image attached and description matches render",
+  "conversation_id": "conv_d5e01c34fa344d518015e8fba8357449",
+  "run_id": "run_5240813c588d4aae93512e78b4821e39",
+  "request": "Show the latest RainViewer precipitation radar map for the area around Rouen, France. Then look at the rendered map and tell me where on the visible map the most intense rain is.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Rouen, France",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Rouen, Seine-Maritime, Normandy, Metropolitan France, France.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability rainviewer_precipitation_radar.",
+    "error": null
+   },
+   {
+    "seq": 30,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar",
+     "location_ref": "rouen, france",
+     "operation": "show",
+     "arguments": {
+      "location_ref": "rouen, france",
+      "temporal_mode": "current",
+      "scope": "bbox"
+     }
+    }
+   },
+   {
+    "seq": 32,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'rainviewer_precipitation_radar' returned a raster result from provider 'rainviewer'.",
+    "error": null
+   },
+   {
+    "seq": 39,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_a4ee0a416fc24983b4e737341c88ae13",
+       "capability_id": "rainviewer_precipitation_radar",
+       "opacity": 0.8,
+       "visible": true
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "rouen, france"
+      }
+     ]
+    }
+   },
+   {
+    "seq": 41,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-16c5dd0e88df4073ae0d2e437e5aa42d",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -5.022801351565079,
+     46.59839290931626,
+     7.204981851559893,
+     52.128329070849816
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "vision_attached",
+    "call_kind": "terminal",
+    "vision_calls": 1,
+    "mime_type": "image/jpeg",
+    "width": 1024,
+    "height": 712
+   }
+  ],
+  "answer_excerpt": "The map is rendered and verified. Here's what I found.\n\n## RainViewer Precipitation Radar — Rouen, France\n\n**Map status:** The latest observed radar frame (valid ~13:30 UTC, 18 Oct 2026) is displayed over the Rouen area, centered on Normandy with the wider view spanning from southern England and the Channel down to the Loire. The radar overlay loaded successfully (verified visible, ~30,000 radar pixels rendered). Attribution: © RainViewer. Note this is recent *observed* radar only — no future nowcast is available.\n\n### Where the most intense rain is on the visible map\n\nLooking at the rendered "
+ },
+ {
+  "scenario": "VISION-always",
+  "verdict": "FAIL (capture never requested) -> fixed; also point-scope radar narration finding",
+  "conversation_id": "conv_4af4c2417c80419fa90c1dd85677e202",
+  "run_id": "run_95a10b03b83b4b28ba54f1daf1b0d030",
+  "request": "Show the latest RainViewer precipitation radar over Paris, then look at the rendered map and tell me in which direction from Paris the most intense rain cells are.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Paris",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Paris, Ile-de-France, Metropolitan France, France.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_weather_forecast.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_pressure_humidity_wind"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_pressure_humidity_wind.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar"
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "describe_geospatial_capability",
+    "status": "failed",
+    "summary": "Tool arguments failed semantic validation.",
+    "error": "semantic_validation_failed"
+   },
+   {
+    "seq": 58,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "location_ref": "paris",
+     "operation": "show",
+     "arguments": {
+      "temporal_mode": "current",
+      "requested_attributes": [
+       "precipitation",
+       "rain"
+      ]
+     }
+    }
+   },
+   {
+    "seq": 60,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 67,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_8870a0990c4a4bf4b80865f3b9b80e5c",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "paris"
+      }
+     ]
+    }
+   },
+   {
+    "seq": 69,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-009b185cede84b3ea89ec09122c47e22",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     2.217123760683762,
+     48.79945437101878,
+     2.476758439316228,
+     48.91824409110254
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "The map rendered successfully, but I need to be clear about what it actually shows.\n\n**Important limitation:** The requested **RainViewer precipitation radar** is not available in this environment. The only registered capabilities for Paris are Open-Meteo weather forecast and Open-Meteo pressure/humidity/wind. Neither provides radar tiles — the weather capability explicitly states it samples values at a single point and provides **no area raster**. So I could not produce a true precipitation-radar map, and I cannot answer \"in which direction the most intense rain cells are\" from radar imagery,"
+ },
+ {
+  "scenario": "VISION-final-check-2",
+  "verdict": "PASS vision final_check: attached on terminal call only",
+  "conversation_id": "conv_cda90414af1c40ca9159e2600d38d795",
+  "run_id": "run_61ba178c186f4a14926e490002961dbf",
+  "request": "Show recent earthquakes in Japan on the map and describe what the rendered map shows.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Japan",
+     "expected_location_type": "country",
+     "target_id": "Japan"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Japan.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability usgs_earthquakes.",
+    "error": null
+   },
+   {
+    "seq": 30,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes",
+     "location_ref": "japan",
+     "operation": "show",
+     "arguments": {
+      "location": "Japan",
+      "scope": "bbox",
+      "temporal_mode": "current",
+      "time": "recent_feed"
+     }
+    }
+   },
+   {
+    "seq": 32,
+    "tool": "execute_geospatial_capability",
+    "status": "valid_empty",
+    "summary": "Capability 'usgs_earthquakes' returned no matching data.",
+    "error": null
+   },
+   {
+    "seq": 40,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "recent earthquakes seismic events",
+     "limit": 12
+    }
+   },
+   {
+    "seq": 42,
+    "tool": "discover_geospatial_capabilities",
+    "status": "success",
+    "summary": "Found 1 eligible capabilities.",
+    "error": null
+   },
+   {
+    "seq": 49,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "japan"
+      }
+     ]
+    }
+   },
+   {
+    "seq": 51,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-def85ddbb6ac428ab336174249ec4884",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     114.40439769872097,
+     18.99298785588627,
+     162.515318701281,
+     46.60938839800443
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "vision_attached",
+    "call_kind": "terminal",
+    "vision_calls": 1,
+    "mime_type": "image/jpeg",
+    "width": 1024,
+    "height": 712
+   }
+  ],
+  "answer_excerpt": "The map rendered successfully. Here's what it shows:\n\n**Map summary — Recent earthquakes in Japan**\n\n- **Location:** Japan, centered on the Japanese archipelago (viewport spans roughly 114°E–163°E, 19°N–47°N), with the four main islands (Hokkaido, Honshu, Shikoku, Kyushu) and surrounding seas clearly visible.\n- **Basemap:** Standard OpenStreetMap-style basemap with place labels (Tokyo, Osaka, Sapporo, Sendai, etc.) and neighboring areas of Korea, China, and Russia.\n- **Earthquake overlay:** **None — no earthquake data is displayed.**\n\n**Why no earthquakes appear:** The USGS Earthquakes capabil"
+ },
+ {
+  "scenario": "VISION-final-check",
+  "verdict": "BLOCKED by Tokyo resolver finding F-12",
+  "conversation_id": "conv_1252bd0b50384151878861675378dbcb",
+  "run_id": "run_b938bf3a5b6a4dea8befc6f386fc5611",
+  "request": "Show recent earthquakes around Tokyo on the map and describe what the rendered map shows.",
+  "state": "completed",
+  "presentation_status": "not_required",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Tokyo",
+     "expected_location_type": "city",
+     "target_id": "Tokyo"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "failed",
+    "summary": "I could not safely resolve Tokyo. Can you provide a city, country, or coordinates?",
+    "error": "clarification_required"
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "I could not safely resolve Tokyo. Can you provide a city, country, or coordinates?"
+ },
+ {
+  "scenario": "X-01-fixed",
+  "verdict": "BLOCKED upstream Overpass timeout; accurate provider-failure message verified",
+  "conversation_id": "conv_c9c4e272ae1740f49d129fcf76a7e54d",
+  "run_id": "run_4130080409544a59a71e9eee83531d2f",
+  "request": "Show pharmacies near the Pantheon in Rome on the map",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Pantheon, Rome",
+     "expected_location_type": "landmark"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Pantheon, Piazza della Rotonda, Colonna, Municipio Roma I, Rome, Roma Capitale, Lazio, 00186, Italy.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "overpass_poi_amenities"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability overpass_poi_amenities.",
+    "error": null
+   },
+   {
+    "seq": 30,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "overpass_poi_amenities",
+     "location_ref": "pantheon, rome",
+     "operation": "near",
+     "arguments": {
+      "poi_categories": [
+       "pharmacy"
+      ],
+      "radius_m": 1000,
+      "limit": 100
+     }
+    }
+   },
+   {
+    "seq": 32,
+    "tool": "execute_geospatial_capability",
+    "status": "failed",
+    "summary": "The provider did not respond within its execution deadline.",
+    "error": "provider_timeout"
+   },
+   {
+    "seq": 40,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "pharmacies nearby places POI search",
+     "limit": 20
+    }
+   },
+   {
+    "seq": 42,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   },
+   {
+    "seq": 50,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "limit": 20,
+     "query": "place search near landmark"
+    }
+   },
+   {
+    "seq": 52,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "The overpass provider did not respond within its execution deadline, and no alternative capability matched the request after discovery."
+ },
+ {
+  "scenario": "X-01-retry",
+  "verdict": "FAIL (POI routing variant defect) -> fixed",
+  "conversation_id": "conv_64e9e027aecf4f908fab1b6ebcdd5360",
+  "run_id": "run_4c784e6248b447ce8cf6182b80463a6a",
+  "request": "Show pharmacies near the Pantheon in Rome on the map",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Pantheon, Rome",
+     "expected_location_type": "landmark"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Pantheon, Piazza della Rotonda, Colonna, Municipio Roma I, Rome, Roma Capitale, Lazio, 00186, Italy.",
+    "error": null
+   },
+   {
+    "seq": 14,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "limit": 12
+    }
+   },
+   {
+    "seq": 16,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "pharmacies points of interest near a landmark",
+     "limit": 12
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "No supported capability matched the request after discovery."
+ },
+ {
+  "scenario": "X-01",
+  "verdict": "FAIL -> routing fixed; superseded by X-01-fixed",
+  "conversation_id": "conv_aa2af6fd004e4ac6b3981e75bab9d353",
+  "run_id": "run_bb1052b3fd02470e9059d591dc0cd642",
+  "request": "Show pharmacies near the Pantheon in Rome on the map",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Pantheon, Rome",
+     "expected_location_type": "landmark",
+     "target_id": "Pantheon, Rome"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Pantheon, Piazza della Rotonda, Colonna, Municipio Roma I, Rome, Roma Capitale, Lazio, 00186, Italy.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "overpass_poi_amenities"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability overpass_poi_amenities.",
+    "error": null
+   },
+   {
+    "seq": 30,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "overpass_poi_amenities",
+     "location_ref": "pantheon, rome",
+     "operation": "near",
+     "arguments": {
+      "poi_categories": [
+       "pharmacy"
+      ],
+      "radius_m": 1000,
+      "limit": 100
+     }
+    }
+   },
+   {
+    "seq": 32,
+    "tool": "execute_geospatial_capability",
+    "status": "failed",
+    "summary": "The provider did not respond within its execution deadline.",
+    "error": "provider_timeout"
+   },
+   {
+    "seq": 40,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "pharmacies points of interest nearby",
+     "limit": 20
+    }
+   },
+   {
+    "seq": 42,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   },
+   {
+    "seq": 50,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "limit": 50
+    }
+   },
+   {
+    "seq": 52,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "No supported capability matched the request after discovery."
+ },
+ {
+  "scenario": "X-02-clean",
+  "verdict": "FAIL (compare operation filtered catalog) -> fixed",
+  "conversation_id": "conv_b243b754208e410f8c93a5a8bb915a06",
+  "run_id": "run_0332873284bb4d218a28912f0d3f0656",
+  "request": "Compare today's weather forecast for Zurich and Lisbon on the map. Which city will be warmer and which will be wetter?",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Zurich",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Lisbon",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 14,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Zurich, Switzerland.",
+    "error": null
+   },
+   {
+    "seq": 16,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Lisbon, Portugal.",
+    "error": null
+   },
+   {
+    "seq": 18,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "limit": 12
+    }
+   },
+   {
+    "seq": 20,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   },
+   {
+    "seq": 28,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "weather forecast temperature precipitation",
+     "limit": 20
+    }
+   },
+   {
+    "seq": 30,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "No supported capability matched the request after discovery."
+ },
+ {
+  "scenario": "X-02-final",
+  "verdict": "PASS grounded (values match evidence)",
+  "conversation_id": "conv_ca00668640c9415cb17f839151024a19",
+  "run_id": "run_982b6337068f47deb017587afd56fee3",
+  "request": "Compare today's weather forecast for Zurich and Lisbon on the map. Which city will be warmer and which will be wetter?",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Zurich",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Lisbon",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 14,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Zurich, Switzerland.",
+    "error": null
+   },
+   {
+    "seq": 16,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Lisbon, Portugal.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_weather_forecast.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "zurich",
+     "arguments": {
+      "location_ref": "zurich",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day"
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "lisbon",
+     "arguments": {
+      "location_ref": "lisbon",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day"
+     }
+    }
+   },
+   {
+    "seq": 38,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 40,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 47,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_0fb7aac57e09484994168a58c71644b5",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_0de7fd77d9e34497b88e0105b2a1daa6",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_0fb7aac57e09484994168a58c71644b5",
+        "evidence_0de7fd77d9e34497b88e0105b2a1daa6"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 49,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-5f7f4354106d4a7c97451955c95a97cd",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -9.640228199143678,
+     38.2755117292356,
+     9.044678499147153,
+     47.74710556936975
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "The map is ready with both cities' forecast points rendered.\n\n## Zurich vs. Lisbon — today's forecast (18 Oct 2026)\n\n| | **Zurich** 🇨🇭 | **Lisbon** 🇵🇹 |\n|---|---|---|\n| Current temperature | 12.0 °C | **23.2 °C** |\n| Precipitation (current) | 0.0 mm | 0.0 mm |\n| Conditions | Overcast (code 3) | Partly cloudy (code 2) |\n| Humidity | 81 % | 44 % |\n| Wind | 7.2 km/h | 18.1 km/h (gusts 45 km/h) |\n| Today's range (next 24 h) | 9.4 → 15.0 °C | 15.4 → 24.8 °C |\n\n### Which is warmer?\n**Lisbon — decisively.** It's roughly 11 °C warmer right now (23.2 °C vs. 12.0 °C), and every hour of the forecast wind"
+ },
+ {
+  "scenario": "X-02-fixed",
+  "verdict": "FAIL (same-capability layers collapsed, first-only viewport) -> fixed",
+  "conversation_id": "conv_ae005bb9149c47c8913e260f9aba57e1",
+  "run_id": "run_801d08c0a24144aabd3fa5b303b11815",
+  "request": "Compare today's weather forecast for Zurich and Lisbon on the map. Which city will be warmer and which will be wetter?",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Zurich",
+     "expected_location_type": "city",
+     "target_id": "Zurich"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Lisbon",
+     "expected_location_type": "city",
+     "target_id": "Lisbon"
+    }
+   },
+   {
+    "seq": 14,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Zurich, Switzerland.",
+    "error": null
+   },
+   {
+    "seq": 16,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Lisbon, Portugal.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_weather_forecast.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "zurich",
+     "arguments": {
+      "location_ref": "zurich",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day",
+      "aggregation": "daily",
+      "requested_attributes": [
+       "temperature_2m_max",
+       "temperature_2m_min",
+       "precipitation_sum"
+      ]
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "lisbon",
+     "arguments": {
+      "location_ref": "lisbon",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day",
+      "aggregation": "daily",
+      "requested_attributes": [
+       "temperature_2m_max",
+       "temperature_2m_min",
+       "precipitation_sum"
+      ]
+     }
+    }
+   },
+   {
+    "seq": 38,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 40,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 47,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_7854965b8e5a499f92c0b202ff8ef8df",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_5f6b48fff0c041b0b3036e06ae12e6e8",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_7854965b8e5a499f92c0b202ff8ef8df",
+        "evidence_5f6b48fff0c041b0b3036e06ae12e6e8"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 49,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   },
+   {
+    "seq": 73,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 2,
+     "actions": [
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_7854965b8e5a499f92c0b202ff8ef8df",
+        "evidence_5f6b48fff0c041b0b3036e06ae12e6e8"
+       ]
+      },
+      {
+       "action": "set_layer_visibility",
+       "instance_id": "evidence:evidence_7854965b8e5a499f92c0b202ff8ef8df:openmeteo_weather_forecast",
+       "visible": true
+      },
+      {
+       "action": "set_layer_visibility",
+       "instance_id": "evidence:evidence_5f6b48fff0c041b0b3036e06ae12e6e8:openmeteo_weather_forecast",
+       "visible": true
+      }
+     ]
+    }
+   },
+   {
+    "seq": 75,
+    "tool": "apply_map_plan",
+    "status": "failed",
+    "summary": "Tool arguments failed semantic validation.",
+    "error": "semantic_validation_failed"
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-c749d4dc2b0045fa991bc13aacaf2b3c",
+    "attempt": 1,
+    "status": "failed",
+    "viewport_bounds": [
+     8.5395495506813,
+     47.37374594730781,
+     8.542534849314364,
+     47.375151843320936
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": "render_validation_failed"
+   }
+  ],
+  "vision_events": [],
+  "answer_excerpt": "Render recovery requires a materially different map action.\n\nPrevious map render failed (render_validation_failed) during backend_validation: Required rendered features are not visible: evidence:evidence_5f6b48fff0c041b0b3036e06ae12e6e8:openmeteo_weather_forecast The last-known-good map was left unchanged."
+ },
+ {
+  "scenario": "X-02",
+  "verdict": "INVALID (composer contamination defect) -> fixed",
+  "conversation_id": "conv_980f857fa6f44c3ab3ce3e296d11cec0",
+  "run_id": "run_d58b93c08c17448683c35d53ee5a982b",
+  "request": "Show pharmaciesCompare today's weather forecast for Zurich and Lisbon. Which city will be warmer and which will be wetter? near the Pantheon in Rome on the map",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Pantheon, Rome",
+     "expected_location_type": "landmark",
+     "target_id": "Pantheon, Rome"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Zurich",
+     "expected_location_type": "city",
+     "target_id": "Zurich"
+    }
+   },
+   {
+    "seq": 14,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Lisbon",
+     "expected_location_type": "city",
+     "target_id": "Lisbon"
+    }
+   },
+   {
+    "seq": 16,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Pantheon, Piazza della Rotonda, Colonna, Municipio Roma I, Rome, Roma Capitale, Lazio, 00186, Italy.",
+    "error": null
+   },
+   {
+    "seq": 18,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Zurich, Switzerland.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Lisbon, Portugal.",
+    "error": null
+   },
+   {
+    "seq": 28,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast"
+    }
+   },
+   {
+    "seq": 30,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_weather_forecast.",
+    "error": null
+   },
+   {
+    "seq": 32,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_pressure_humidity_wind"
+    }
+   },
+   {
+    "seq": 34,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_pressure_humidity_wind.",
+    "error": null
+   },
+   {
+    "seq": 42,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "zurich",
+     "arguments": {
+      "location_ref": "zurich",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day",
+      "requested_attributes": [
+       "temperature_2m_max",
+       "temperature_2m_min",
+       "precipitation_sum",
+       "precipitation_probability_max"
+      ]
+     }
+    }
+   },
+   {
+    "seq": 44,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "operation": "forecast",
+     "location_ref": "lisbon",
+     "arguments": {
+      "location_ref": "lisbon",
+      "temporal_mode": "forecast",
+      "temporal_granularity": "day",
+      "requested_attributes": [
+       "temperature_2m_max",
+       "temperature_2m_min",
+       "precipitation_sum",
+       "precipitation_probability_max"
+      ]
+     }
+    }
+   },
+   {
+    "seq": 46,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 48,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 56,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openstreetmap_poi_search"
+    }
+   },
+   {
+    "seq": 58,
+    "tool": "describe_geospatial_capability",
+    "status": "failed",
+    "summary": "Tool arguments failed semantic validation.",
+    "error": "semantic_validation_failed"
+   },
+   {
+    "seq": 65,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_025159c2a1f4464bb18995bd742d1c48",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_11149de986d549ce943838160c6da088",
+       "capability_id": "openmeteo_weather_forecast"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_025159c2a1f4464bb18995bd742d1c48",
+        "evidence_11149de986d549ce943838160c6da088"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 67,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   },
+   {
+    "seq": 91,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "capability_id": "openmeteo_weather_forecast",
+       "evidence_ref": "evidence_025159c2a1f4464bb18995bd742d1c48"
+      },
+      {
+       "action": "add_evidence_layer",
+       "capability_id": "openmeteo_weather_forecast",
+       "evidence_ref": "evidence_11149de986d549ce943838160c6da088"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "pantheon, rome"
+      }
+     ],
+     "expected_collection_revision": 0
+    }
+   },
+   {
+    "seq": 93,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-4da4f8cebe584415a5356967923608bf",
+    "attempt": 1,
+    "status": "failed",
+    "viewport_bounds": [
+     8.5410422,
+     47.3744489,
+     8.5410422,
+     47.3744489
+    ],
+    "checks": {
+     "required_sources_loaded": false,
+     "required_layers_present": false,
+     "viewport_valid": false
+    },
+    "failure_code": "render_timeout"
+   }
+  ],
+  "vision_events": [],
+  "answer_excerpt": "Here's what the verified data shows, plus the map status.\n\n**Weather comparison (today, 18 Oct 2026 — point forecasts)**\n\n| | Zurich | Lisbon |\n|---|---|---|\n| Current temperature | 12.0 °C | 22.9 °C |\n| Today's range (next 24 h) | ~9.4–15.0 °C | ~15.4–24.8 °C |\n| Precipitation | 0.0 mm (all hours) | 0.0 mm (trace 0.1 mm at 16:00) |\n| Conditions | Overcast (WMO 3) | Partly cloudy (WMO 2) |\n| Humidity / wind | 81 % / 6.9 km/h | 45 % / 18.3 km/h |\n\n- **Warmer: Lisbon** — by roughly 11 °C right now, and warmer at every hour of the forecast window.\n- **Wetter: effectively a tie** — both cities are"
+ },
+ {
+  "scenario": "X-06-followup",
+  "verdict": "PASS grounded, zero tool calls, no re-fetch",
+  "conversation_id": "conv_ca00668640c9415cb17f839151024a19",
+  "run_id": "run_8cd8f5334c2744598abe2f6a392c88c8",
+  "request": "Of those two cities, which one had the stronger wind gusts in the forecast you just retrieved?",
+  "state": "completed",
+  "presentation_status": "not_required",
+  "error_code": null,
+  "tool_sequence": [],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "**Lisbon had the stronger wind gusts.**\n\n- **Lisbon:** peak gust **46.4 km/h** (16:00 local), with gusts staying in the 27–46 km/h range through the evening. Current gust at observation time: 45.4 km/h.\n- **Zurich:** peak gust **25.2 km/h** (late in the window, 14:00 next day), mostly 7–22 km/h. Current gust: 19.4 km/h.\n\nLisbon's gusts were roughly **double** Zurich's at their strongest, and Lisbon was gustier at essentially every hour of the 24-hour forecast. Sustained wind speeds tell the same story: Lisbon peaked around 18 km/h versus Zurich's ~9 km/h.\n\nOne caveat: the two forecast windows "
+ },
+ {
+  "scenario": "X-07-add-layer",
+  "verdict": "FAIL (avoid-phrase veto) -> fixed",
+  "conversation_id": "conv_ca00668640c9415cb17f839151024a19",
+  "run_id": "run_c78d758b37e94bb1a3ae32e60cb16f49",
+  "request": "Now also add the latest precipitation radar to this map, keeping both forecast points.",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 17,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Lisbon, Portugal",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 19,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Lisbon, Portugal.",
+    "error": null
+   },
+   {
+    "seq": 21,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "limit": 12
+    }
+   },
+   {
+    "seq": 23,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "I can't add a precipitation radar layer — no radar capability is available in this session.\n\n**What I checked:** a capability search for precipitation radar / rain radar imagery returned no eligible providers. The only weather source reachable here is the Open-Meteo point forecast, which supplies the two city markers already on your map. It has no radar or imagery product, so there's nothing I can render as a radar overlay.\n\n**What's unchanged:** both forecast points remain on the map — Zurich (12.0 °C, overcast, 81 % humidity) and Lisbon (23.2 °C, partly cloudy, 44 % humidity). I have not mod"
+ },
+ {
+  "scenario": "X-07-clean",
+  "verdict": "PASS (radar added, weather layer retained)",
+  "conversation_id": "conv_5f039fe5d7a341b48bd59f6dc7b5a654",
+  "run_id": "run_093e2dfaafeb440d8a7c05f65aa20df0",
+  "request": "Now add the latest precipitation radar to this map and keep the weather layer.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "precipitation radar"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "discover_geospatial_capabilities",
+    "status": "success",
+    "summary": "Found 4 eligible capabilities.",
+    "error": null
+   },
+   {
+    "seq": 14,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "weather radar"
+    }
+   },
+   {
+    "seq": 16,
+    "tool": "discover_geospatial_capabilities",
+    "status": "success",
+    "summary": "Found 1 eligible capabilities.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability rainviewer_precipitation_radar.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar",
+     "location_ref": "paris",
+     "operation": "overlay",
+     "arguments": {
+      "location_ref": "paris",
+      "temporal_mode": "current"
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'rainviewer_precipitation_radar' returned a raster result from provider 'rainviewer'.",
+    "error": null
+   },
+   {
+    "seq": 43,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 1,
+     "actions": [
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_6de3929e16af4958949fca61ddd0c6cf",
+       "capability_id": "rainviewer_precipitation_radar",
+       "visible": true,
+       "opacity": 1.0
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_e38f0c65723548cd8fcd445979e3304f",
+        "evidence_6de3929e16af4958949fca61ddd0c6cf"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 45,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-d69b73045691432d8672d14eb14ecc12",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -3.7938506015612177,
+     45.98317666819585,
+     8.433932601564067,
+     51.57839447477997
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "The precipitation radar has been added and the map is verified.\n\n**Map now shows two layers over Paris:**\n1. **Open-Meteo Weather Forecast** (kept from before) — point weather at Paris center\n2. **RainViewer Recent Precipitation Radar** (new) — latest observed radar frame\n\n**Radar details:**\n- **Observation time:** 2026-10-18 13:10 UTC (latest available frame)\n- **Coverage:** global-partial; spatial and temporal scope satisfied for Paris\n- **Attribution:** © RainViewer\n- **Render check:** raster tile loaded and non-transparent (9,957 visible pixels), zoom level 6\n\n**Important limitations to no"
+ },
+ {
+  "scenario": "X-07-fixed",
+  "verdict": "FAIL (named-provider route + key/label goal target) -> fixed",
+  "conversation_id": "conv_ca00668640c9415cb17f839151024a19",
+  "run_id": "run_069bdba328a947caacd1bac021a3c25d",
+  "request": "Please try again: add the RainViewer precipitation radar to this map, keeping both forecast points.",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "rainviewer precipitation radar"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "discover_geospatial_capabilities",
+    "status": "success",
+    "summary": "Found 2 eligible capabilities.",
+    "error": null
+   },
+   {
+    "seq": 14,
+    "tool": "discover_geospatial_capabilities",
+    "arguments": {
+     "query": "weather radar tiles"
+    }
+   },
+   {
+    "seq": 16,
+    "tool": "discover_geospatial_capabilities",
+    "status": "valid_empty",
+    "summary": "No eligible capabilities matched the request.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability rainviewer_precipitation_radar.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar",
+     "operation": "overlay",
+     "location_ref": "zurich",
+     "arguments": {
+      "location_refs": [
+       "zurich",
+       "lisbon"
+      ],
+      "temporal_mode": "current",
+      "scope": "viewport"
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "status": "failed",
+    "summary": "Tool arguments failed semantic validation.",
+    "error": "semantic_validation_failed"
+   },
+   {
+    "seq": 44,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "rainviewer_precipitation_radar",
+     "operation": "overlay",
+     "location_ref": "Zurich, Switzerland",
+     "arguments": {
+      "location_refs": [
+       "Zurich, Switzerland",
+       "Lisbon, Portugal"
+      ],
+      "temporal_mode": "current",
+      "scope": "viewport"
+     }
+    }
+   },
+   {
+    "seq": 46,
+    "tool": "execute_geospatial_capability",
+    "status": "failed",
+    "summary": "Tool is outside the validated capability route.",
+    "error": "policy_rejection"
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "The agent stopped after repeated invalid tool calls."
+ },
+ {
+  "scenario": "X-07-retry",
+  "verdict": "FAIL (resolved label not recognised as known target) -> fixed",
+  "conversation_id": "conv_ca00668640c9415cb17f839151024a19",
+  "run_id": "run_9a05db3e152f48df8f3ee19b8b4191ef",
+  "request": "Now also add the latest precipitation radar to this map, keeping both forecast points.",
+  "state": "failed",
+  "presentation_status": "failed",
+  "error_code": "agent_operation_failed",
+  "tool_sequence": [],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "I can't add a precipitation radar layer — no radar capability is available in this session.\n\n**What I checked:** capability searches for \"precipitation radar,\" \"weather radar imagery,\" and \"rain radar latest\" returned no eligible providers. The only weather source reachable here is the Open-Meteo point forecast, which supplies the two city markers already on your map. It has no radar or imagery product, so there is nothing I can render as a radar overlay.\n\n**What's unchanged:** both forecast points remain on the map — Zurich (12.0 °C, overcast, 81 % humidity) and Lisbon (23.2 °C, partly cloudy"
+ },
+ {
+  "scenario": "X-10-turn1",
+  "verdict": "PASS",
+  "conversation_id": "conv_5f039fe5d7a341b48bd59f6dc7b5a654",
+  "run_id": "run_a323f43204d943d691da8005612745ca",
+  "request": "Show the current weather in Paris on the map.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Paris",
+     "expected_location_type": "city",
+     "target_id": "Paris"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Paris, Ile-de-France, Metropolitan France, France.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_weather_forecast.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_pressure_humidity_wind"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability openmeteo_pressure_humidity_wind.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "openmeteo_weather_forecast",
+     "location_ref": "paris",
+     "operation": "show",
+     "arguments": {
+      "temporal_mode": "current",
+      "scope": "point",
+      "show_marker": true,
+      "show_label": true
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'openmeteo_weather_forecast' returned 1 feature(s) from provider 'openmeteo'.",
+    "error": null
+   },
+   {
+    "seq": 43,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_e38f0c65723548cd8fcd445979e3304f",
+       "capability_id": "openmeteo_weather_forecast",
+       "visible": true,
+       "opacity": 1
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_e38f0c65723548cd8fcd445979e3304f"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 45,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-15c57398b32944d0a86d4b054a8bae6e",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     2.3185483506834146,
+     48.858206768980295,
+     2.321533649316507,
+     48.85957262170152
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "The map is ready and verified. Here's the current weather in Paris:\n\n**Paris, Île-de-France, France** — current conditions (Open-Meteo, observed 2026-10-18 15:00 Europe/Paris):\n\n- **Temperature:** 13.2 °C\n- **Conditions:** Partly cloudy (WMO code 2)\n- **Precipitation:** 0.0 mm\n- **Humidity:** 60%\n- **Surface pressure:** 1020.1 hPa\n- **Wind:** 8.1 km/h from 32° (NE), gusts to 25.9 km/h\n\n**Near-term outlook (next 24 h):** Dry throughout, with temperatures easing from ~13 °C this afternoon down to a low near 5 °C around 09:00–10:00 tomorrow, then recovering to ~12 °C by mid-afternoon. Winds stay "
+ },
+ {
+  "scenario": "X-13-fixed",
+  "verdict": "PASS at proxy level; browser ack reused a cached pre-fix tile",
+  "conversation_id": "conv_e7edd4922a094456a9ef7af9522e1f5a",
+  "run_id": "run_549ecbb09a854f5ca289a650586a8294",
+  "request": "For California, show recent earthquakes and active wildfire detections together on one map.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "California",
+     "expected_location_type": "administrative_geometry",
+     "target_id": "California"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved California, United States.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability usgs_earthquakes.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability MODIS_Combined_Thermal_Anomalies_Fire.",
+    "error": null
+   },
+   {
+    "seq": 34,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes",
+     "location_ref": "california",
+     "operation": "show",
+     "arguments": {
+      "temporal_mode": "current",
+      "scope": "bbox"
+     }
+    }
+   },
+   {
+    "seq": 36,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire",
+     "location_ref": "california",
+     "operation": "show",
+     "arguments": {
+      "temporal_mode": "current",
+      "scope": "bbox"
+     }
+    }
+   },
+   {
+    "seq": 38,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'MODIS_Combined_Thermal_Anomalies_Fire' returned a raster result from provider 'gibs'.",
+    "error": null
+   },
+   {
+    "seq": 40,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'usgs_earthquakes' returned 73 feature(s) from provider 'usgs'.",
+    "error": null
+   },
+   {
+    "seq": 47,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_0bb500133fec4be5b235344294bd3314",
+       "capability_id": "usgs_earthquakes"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_2eb88e42c31045b0ba28ce4b7da721b8",
+       "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_evidence",
+       "evidence_refs": [
+        "evidence_0bb500133fec4be5b235344294bd3314",
+        "evidence_2eb88e42c31045b0ba28ce4b7da721b8"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "seq": 49,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-668f52ca650441ba8547f8fd8b08a224",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -125.78224016865633,
+     32.24508621361204,
+     -112.41392328349,
+     39.755075536774285
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "Here's your combined map for California, with both hazard layers rendered and verified:\n\n**Recent earthquakes (USGS)**\n- 73 recent earthquake observations across California, shown as clustered points.\n- Notable clusters include The Geysers area, the Anza/Ocotillo Wells region, and near Trona and Johannesburg.\n\n**Active wildfire detections (NASA MODIS, daily thermal anomalies)**\n- A raster thermal-anomaly overlay highlighting potential active fire detections across the state.\n\n**Map details**\n- Basemap: standard street map.\n- Viewport fitted to the data, covering California from roughly the Ore"
+ },
+ {
+  "scenario": "X-13-hazards",
+  "verdict": "FALSE PASS: GIBS error tiles acknowledged as rendered -> fixed",
+  "conversation_id": "conv_f55c03a6ca8643bb97598001220bc332",
+  "run_id": "run_cf4a4f7cbe7948eca5178bb485634f76",
+  "request": "For California, show recent earthquakes, active NOAA weather alerts and active wildfire detections together on one map.",
+  "state": "completed",
+  "presentation_status": "ready",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "California",
+     "expected_location_type": "administrative_geometry",
+     "target_id": "California"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved California, United States.",
+    "error": null
+   },
+   {
+    "seq": 20,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes"
+    }
+   },
+   {
+    "seq": 22,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability usgs_earthquakes.",
+    "error": null
+   },
+   {
+    "seq": 24,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "noaa_weather_alerts"
+    }
+   },
+   {
+    "seq": 26,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability noaa_weather_alerts.",
+    "error": null
+   },
+   {
+    "seq": 28,
+    "tool": "describe_geospatial_capability",
+    "arguments": {
+     "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire"
+    }
+   },
+   {
+    "seq": 30,
+    "tool": "describe_geospatial_capability",
+    "status": "success",
+    "summary": "Described geospatial capability MODIS_Combined_Thermal_Anomalies_Fire.",
+    "error": null
+   },
+   {
+    "seq": 38,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "usgs_earthquakes",
+     "operation": "show",
+     "location_ref": "california",
+     "arguments": {
+      "location_ref": "california",
+      "temporal_mode": "current",
+      "scope": "bbox"
+     }
+    }
+   },
+   {
+    "seq": 40,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "noaa_weather_alerts",
+     "operation": "show",
+     "location_ref": "california",
+     "arguments": {
+      "location_ref": "california",
+      "temporal_mode": "current",
+      "scope": "bbox"
+     },
+     "filters": {
+      "status": "active"
+     }
+    }
+   },
+   {
+    "seq": 42,
+    "tool": "execute_geospatial_capability",
+    "arguments": {
+     "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire",
+     "operation": "overlay",
+     "location_ref": "california",
+     "arguments": {
+      "location_ref": "california",
+      "temporal_mode": "current",
+      "scope": "bbox"
+     }
+    }
+   },
+   {
+    "seq": 44,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'usgs_earthquakes' returned 74 feature(s) from provider 'usgs'.",
+    "error": null
+   },
+   {
+    "seq": 46,
+    "tool": "execute_geospatial_capability",
+    "status": "valid_empty",
+    "summary": "Capability 'noaa_weather_alerts' returned no matching data.",
+    "error": null
+   },
+   {
+    "seq": 48,
+    "tool": "execute_geospatial_capability",
+    "status": "success",
+    "summary": "Capability 'MODIS_Combined_Thermal_Anomalies_Fire' returned a raster result from provider 'gibs'.",
+    "error": null
+   },
+   {
+    "seq": 55,
+    "tool": "apply_map_plan",
+    "arguments": {
+     "expected_collection_revision": 0,
+     "actions": [
+      {
+       "action": "set_basemap",
+       "capability_id": "osm_default"
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_068d264d8b3e4f73bfac8751809e953a",
+       "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire",
+       "opacity": 0.75
+      },
+      {
+       "action": "add_evidence_layer",
+       "evidence_ref": "evidence_b13f89142f2047c99bca0c17e072fbbc",
+       "capability_id": "usgs_earthquakes"
+      },
+      {
+       "action": "set_viewport",
+       "strategy": "fit_location",
+       "location_ref": "california"
+      }
+     ]
+    }
+   },
+   {
+    "seq": 57,
+    "tool": "apply_map_plan",
+    "status": "success",
+    "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+    "error": null
+   }
+  ],
+  "render_observations": [
+   {
+    "map_session_id": "candidate-9bc62ea8357f4e4bb28d540cf55529a1",
+    "attempt": 1,
+    "status": "ready",
+    "viewport_bounds": [
+     -128.61415412691883,
+     32.105483507159846,
+     -109.99863047308102,
+     42.38123518837057
+    ],
+    "checks": {
+     "required_sources_loaded": true,
+     "required_layers_present": true,
+     "viewport_valid": true
+    },
+    "failure_code": null
+   }
+  ],
+  "vision_events": [
+   {
+    "kind": "capture_missing",
+    "call_kind": null,
+    "vision_calls": null,
+    "mime_type": null,
+    "width": null,
+    "height": null
+   }
+  ],
+  "answer_excerpt": "The map is ready for California, with two of the three requested layers showing data.\n\n**On the map**\n- **Recent earthquakes (USGS):** 74 events across California, rendered as clustered points (10 visible at the current zoom). The densest activity is around The Geysers in the north and the Anza–Ocotillo Wells–Cabazon corridor in the south.\n- **Active wildfire detections (NASA MODIS thermal anomalies, daily):** raster overlay loaded and visible over the state.\n- **Active NOAA weather alerts:** none. The query completed successfully with full spatial and temporal coverage but returned zero activ"
+ },
+ {
+  "scenario": "X-14-cancel",
+  "verdict": "PASS cancelled during model call; no late tool events",
+  "conversation_id": "conv_a4b18128d1bd46748c608a29ac779d97",
+  "run_id": "run_c1aadc248b1b41978e43a4a109e1d175",
+  "request": "For Milan, show the weather forecast, air quality forecast, and land surface temperature together on one map.",
+  "state": "cancelled",
+  "presentation_status": "not_required",
+  "error_code": null,
+  "tool_sequence": [
+   {
+    "seq": 10,
+    "tool": "resolve_geospatial_location",
+    "arguments": {
+     "query": "Milan",
+     "expected_location_type": "city"
+    }
+   },
+   {
+    "seq": 12,
+    "tool": "resolve_geospatial_location",
+    "status": "success",
+    "summary": "Resolved Milan, Lombardy, Italy.",
+    "error": null
+   }
+  ],
+  "render_observations": [],
+  "vision_events": [],
+  "answer_excerpt": "For Milan, show the weather forecast, air quality forecast, and land surface temperature together on one map."
+ }
+]

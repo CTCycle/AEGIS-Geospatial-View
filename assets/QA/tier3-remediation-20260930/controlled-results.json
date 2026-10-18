@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-30",
+  "source_head": "db3d650a931d3e22367bb4d11992b8c1c71e6b84",
+  "working_tree": true,
+  "raster_contract": {
+    "status": "PASS",
+    "specs": 9,
+    "cases": [
+      "opaque decoded PNG",
+      "transparent decoded PNG",
+      "non-image response",
+      "hidden layer",
+      "zero opacity",
+      "outside viewport",
+      "missing source or layer",
+      "unsupported zoom",
+      "temporal tile selection",
+      "failed tile then recovery"
+    ]
+  },
+  "automated": {
+    "map_preview_component": "33/33",
+    "frontend_karma": "264/264",
+    "geospatial_browser_smoke": "6/6",
+    "frontend_state": "19/19",
+    "backend_render_completion": "18/18",
+    "backend_unit_suite": "1026 passed; 2 warnings",
+    "repository_e2e": "52 passed; 25 skipped; 3 failures outside raster contract",
+    "ruff": "PASS",
+    "angular_build": "PASS",
+    "strict_manifest_auditor": {
+      "status": "PASS",
+      "manifest_count": 86,
+      "error_count": 0,
+      "warning_count": 0
+    }
+  },
+  "browser": {
+    "catalog": "86 entries; Ready",
+    "basemaps": 6,
+    "rainviewer_proxy_tile": "200 image/png; visibly rendered in full-size Chrome",
+    "agent_map_ack": "UNPROVEN; isolated runtime has no selected agent model"
+  },
+  "bounded_tile_probes": {
+    "200_image_png": [
+      "IMERG_Precipitation_Rate",
+      "rainviewer_precipitation_radar"
+    ],
+    "502_backend_transport": [
+      "noaa_radar",
+      "eea_noise_2019",
+      "fema_nfhl_flood_zones",
+      "esa_worldcover"
+    ]
+  },
+  "status": {
+    "T3-07": "PARTIAL",
+    "T3-08": "PASS",
+    "T3-09": "PARTIAL",
+    "maps.raster-overlays": "PARTIAL"
+  }
+}

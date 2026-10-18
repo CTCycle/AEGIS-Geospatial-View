@@ -1,5 +1,5 @@
 <div class="settings-modal-backdrop" role="presentation" (click)="onBackdropClick($event)">
-  <section class="settings-modal" [class]="panelClass ? 'settings-modal ' + panelClass : 'settings-modal'" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel">
+  <section #dialog class="settings-modal" [class]="panelClass ? 'settings-modal ' + panelClass : 'settings-modal'" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel">
     @if (showHeader) {
       <header class="settings-modal__header">
         <h2>{{ title }}</h2>

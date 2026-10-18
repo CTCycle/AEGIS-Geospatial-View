@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
-from server.services.geospatial.overpass import OverpassRateLimitError, OverpassRequestError
+from server.services.geospatial.overpass import (
+    OverpassInvalidQueryError,
+    OverpassRateLimitError,
+    OverpassRequestError,
+)
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
+    ProviderInvalidQueryError,
     ProviderRateLimitError,
     ProviderRequest,
     ProviderUnavailableError,
 )
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.census import CensusProvider
-from server.services.geospatial.providers.geoapify import GeoapifyProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
@@ -189,7 +193,7 @@ async def _gibs_capabilities_fetcher(url: str, headers: dict[str, str] | None = 
 def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
 
-    weather = asyncio.run(
+    weather = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_weather_forecast",
@@ -197,7 +201,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
             )
         )
     )
-    air = asyncio.run(
+    air = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_air_quality_forecast",
@@ -207,7 +211,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     )
 
     assert weather.payload["kind"] == "weather_forecast"
-    assert weather.payload["renderingMode"] == "metadata-only"
+    assert weather.payload["renderingMode"] == "clustered-points"
     assert air.payload["kind"] == "air_quality_forecast"
     assert air.payload["renderingMode"] == "clustered-points"
     assert air.payload["features"][0]["metadata"]["pollutantSymbols"]["pm25"] == 8
@@ -216,7 +220,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
 def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_pressure_humidity_wind",
@@ -232,11 +236,83 @@ def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     assert feature["metadata"]["pressure"] == 1008
 
 ###############################################################################
+def test_openmeteo_provider_preserves_zero_measurements() -> None:
+
+    ###############################################################################
+    class _ZeroWeatherService(_OpenMeteoService):
+
+        # -------------------------------------------------------------------------
+        async def get_weather_forecast(self, *, latitude: float, longitude: float):
+            return {
+                "kind": "weather_forecast",
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": {
+                    "relative_humidity_2m": 0,
+                    "surface_pressure": 0,
+                    "wind_speed_10m": 0,
+                    "wind_direction_10m": 0,
+                    "wind_gusts_10m": 0,
+                },
+                "hourly_preview": [{"time": "2026-05-11T00:00"}],
+                "result_status": "partial",
+                "partial": True,
+                "source_url": "https://weather.example/forecast",
+            }
+
+    response = run_async_in_thread(
+        OpenMeteoProvider(service=_ZeroWeatherService()).fetch(  # type: ignore[arg-type]
+            ProviderRequest(
+                capability_id="openmeteo_pressure_humidity_wind",
+                params={"latitude": 43.817, "longitude": 7.777},
+            )
+        )
+    )
+
+    feature = response.payload["features"][0]
+    assert feature["relative_humidity_2m"] == 0
+    assert feature["metadata"]["humidity"] == 0
+    assert feature["surface_pressure"] == 0
+    assert feature["metadata"]["windArrow"] == {"speed": 0, "direction": 0}
+    assert response.result_status == "partial"
+
+###############################################################################
+def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() -> None:
+    forecast = [
+        {"time": f"2026-05-11T{hour:02d}:00", "temperature_2m": 18 + hour}
+        for hour in range(24)
+    ]
+
+    class _HourlyWeatherService(_OpenMeteoService):
+        async def get_weather_forecast(self, *, latitude: float, longitude: float):
+            return {
+                "kind": "weather_forecast",
+                "latitude": latitude,
+                "longitude": longitude,
+                "hourly_preview": forecast[:6],
+                "hourly_forecast": forecast,
+                "result_status": "ok",
+                "partial": False,
+            }
+
+    response = run_async_in_thread(
+        OpenMeteoProvider(service=_HourlyWeatherService()).fetch(  # type: ignore[arg-type]
+            ProviderRequest(
+                capability_id="get_weather_forecast",
+                params={"latitude": 41.9, "longitude": 12.5},
+            )
+        )
+    )
+
+    assert response.payload["hourlyForecast"] == forecast
+    assert len(response.payload["features"]) == 1
+
+
 def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -254,7 +330,7 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]
 
-    asyncio.run(
+    run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -270,6 +346,24 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
         "pharmacy",
         "doctors",
     ]
+
+###############################################################################
+def test_overpass_provider_maps_nested_specific_category_to_service_filter() -> None:
+    service = _OverpassService()
+    provider = OverpassProvider(service=service)  # type: ignore[arg-type]
+
+    run_async_in_thread(
+        provider.fetch(
+            ProviderRequest(
+                capability_id="overpass_poi_amenities",
+                bbox=(12.0, 41.0, 13.0, 42.0),
+                params={"filters": {"category": "pharmacy"}},
+            )
+        )
+    )
+
+    assert service.calls[0]["amenity_tags"] is None
+    assert service.calls[0]["categories"] == ["pharmacy"]
 
 ###############################################################################
 def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
@@ -289,7 +383,7 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             raise OverpassRequestError("timed out")
 
     with pytest.raises(ProviderRateLimitError):
-        asyncio.run(
+        run_async_in_thread(
             OverpassProvider(service=_RateLimitedService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(
                     capability_id="overpass_poi_amenities",
@@ -298,8 +392,28 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             )
         )
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             OverpassProvider(service=_TimeoutService()).fetch(  # type: ignore[arg-type]
+                ProviderRequest(
+                    capability_id="overpass_poi_amenities",
+                    bbox=(12.0, 41.0, 13.0, 42.0),
+                )
+            )
+        )
+
+###############################################################################
+def test_overpass_provider_distinguishes_invalid_query_from_transport_failure() -> None:
+
+    ###############################################################################
+    class _InvalidQueryService(_OverpassService):
+
+        # -------------------------------------------------------------------------
+        async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
+            raise OverpassInvalidQueryError("unsupported category")
+
+    with pytest.raises(ProviderInvalidQueryError):
+        run_async_in_thread(
+            OverpassProvider(service=_InvalidQueryService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(
                     capability_id="overpass_poi_amenities",
                     bbox=(12.0, 41.0, 13.0, 42.0),
@@ -317,7 +431,7 @@ def test_overpass_provider_returns_empty_result() -> None:
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             return {"items": [], "attribution": "OSM"}
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OverpassProvider(service=_EmptyService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -333,7 +447,7 @@ def test_overpass_provider_returns_empty_result() -> None:
 def test_openaq_provider_returns_station_features() -> None:
     provider = OpenAQProvider(api_key="openaq-test", service=_OpenAQService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -348,7 +462,7 @@ def test_openaq_provider_returns_station_features() -> None:
 ###############################################################################
 def test_openaq_provider_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             OpenAQProvider(service=_OpenAQService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(capability_id="openaq_air_quality")
             )
@@ -356,7 +470,7 @@ def test_openaq_provider_requires_key() -> None:
 
 ###############################################################################
 def test_openaq_provider_filters_pollutants() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenAQProvider(api_key="openaq-test", service=_OpenAQService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -382,7 +496,7 @@ def test_openaq_provider_returns_empty_bbox_result() -> None:
             self.calls.append({"lat": lat, "lon": lon, "radius_m": radius_m})
             return {"locations": [], "summary": {}, "attribution": "OpenAQ"}
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenAQProvider(api_key="openaq-test", service=_EmptyOpenAQService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -425,11 +539,11 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
         params={"latitude": 41.9, "longitude": 12.5},
     )
 
-    first = asyncio.run(provider.fetch(request))
-    second = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
+    second = run_async_in_thread(provider.fetch(request))
     clock = 2.0
     provider.service = _FailingOpenAQService()  # type: ignore[assignment]
-    stale = asyncio.run(provider.fetch(request))
+    stale = run_async_in_thread(provider.fetch(request))
 
     assert first.payload == second.payload
     assert len(service.calls) == 1
@@ -441,7 +555,7 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
 def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     provider = PVGISProvider(service=_PVGISService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="pvgis_solar",
@@ -452,18 +566,14 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
 
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["yearlyKwhPerKwpEstimate"] == 1234.5
+    assert response.result_type == "metadata"
+    assert response.result_status == "ok"
 
 ###############################################################################
-def test_tomtom_and_geoapify_require_keys_before_emitting_urls() -> None:
+def test_tomtom_requires_keys_before_emitting_urls() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
-            TomTomProvider().fetch(
-                ProviderRequest(capability_id="tomtom_traffic_flow")
-            )
-        )
-    with pytest.raises(ProviderAuthError):
-        asyncio.run(
-            GeoapifyProvider().fetch(ProviderRequest(capability_id="geoapify_osm"))
+        run_async_in_thread(
+            TomTomProvider().fetch(ProviderRequest(capability_id="tomtom_traffic_flow"))
         )
 
 ###############################################################################
@@ -492,7 +602,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         TomTomProvider(api_key="tomtom-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="tomtom_traffic_incidents",
@@ -509,7 +619,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
 
 ###############################################################################
 def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         TomTomProvider(api_key="tomtom-test").fetch(
             ProviderRequest(capability_id="tomtom_traffic_flow")
         )
@@ -522,127 +632,24 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
     assert "tomtom-test" not in str(response.payload)
 
 ###############################################################################
-def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch) -> None:
+def test_provider_registry_ignores_environment_keys_for_gated_adapters(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test")
-    monkeypatch.setenv("GEOAPIFY_API_KEY", "geoapify-test")
     registry = ProviderRegistry()
     registry.build_from_manifests()
 
-    tomtom = asyncio.run(
-        registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
-    )
-    geoapify = asyncio.run(
-        registry.fetch("geoapify", ProviderRequest(capability_id="geoapify_osm"))
-    )
-
-    assert tomtom.payload["tileUrl"] == (
-        "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
-    )
-    assert "tomtom-test" not in str(tomtom.payload)
-    assert "geoapify-test" in str(geoapify.payload["tileUrl"])
-
-###############################################################################
-def test_geoapify_provider_normalizes_live_places() -> None:
-    calls: list[str] = []
-
-    async def fetcher(url: str, headers: dict[str, str] | None = None):
-        calls.append(url)
-        return {
-            "features": [
-                {
-                    "properties": {
-                        "place_id": "poi-1",
-                        "name": "Clinic",
-                        "categories": ["healthcare.clinic"],
-                        "formatted": "1 Test Street",
-                    },
-                    "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
-                }
-            ]
-        }
-
-    response = asyncio.run(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True, "categories": "healthcare"},
+    assert getattr(registry.get("tomtom"), "api_key") == ""
+    with pytest.raises(ProviderAuthError, match="API key is required"):
+        run_async_in_thread(
+            registry.fetch(
+                "tomtom", ProviderRequest(capability_id="tomtom_traffic_flow")
             )
         )
-    )
-
-    assert "apiKey=geoapify-test" in calls[0]
-    assert "filter=rect%3A12.0%2C42.0%2C13.0%2C41.0" in calls[0]
-    assert response.payload["totalResults"] == 1
-    assert response.payload["features"][0]["source"] == "geoapify"
-
-###############################################################################
-def test_geoapify_provider_caches_live_places_by_bbox_and_category() -> None:
-    calls: list[str] = []
-
-    async def fetcher(url: str, headers: dict[str, str] | None = None):
-        calls.append(url)
-        return {
-            "features": [
-                {
-                    "properties": {
-                        "place_id": "poi-1",
-                        "name": "Clinic",
-                        "categories": ["healthcare.clinic"],
-                    },
-                    "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
-                }
-            ]
-        }
-
-    provider = GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher)
-    request = ProviderRequest(
-        capability_id="geoapify_amenities",
-        bbox=(12.0, 41.0, 13.0, 42.0),
-        params={"live": True, "categories": "healthcare"},
-    )
-
-    first = asyncio.run(provider.fetch(request))
-    second = asyncio.run(provider.fetch(request))
-
-    assert first.payload == second.payload
-    assert len(calls) == 1
-
-###############################################################################
-def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads() -> None:
-    async def empty_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"features": []}
-
-    async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"features": [{"properties": {"name": "Missing geometry"}}]}
-
-    empty = asyncio.run(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=empty_fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True},
-            )
-        )
-    )
-    malformed = asyncio.run(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=malformed_fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True},
-            )
-        )
-    )
-
-    assert empty.payload["features"] == []
-    assert empty.payload["totalResults"] == 0
-    assert malformed.payload["features"] == []
-    assert malformed.payload["totalResults"] == 0
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         NASAGIBSProvider(fetcher=_gibs_capabilities_fetcher).fetch(
             ProviderRequest(
                 capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
@@ -653,12 +660,14 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
 
     assert response.payload["layer"]["rendering_mode"] == "wmts"
     assert response.payload["render"]["rendering_mode"] == "wmts"
-    assert response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
+    assert (
+        response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
+    )
     assert response.attribution
 
 ###############################################################################
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         ArcGISRestProvider().fetch(
             ProviderRequest(
                 capability_id="arcgis_layer",
@@ -674,7 +683,7 @@ def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
 
 ###############################################################################
 def test_census_provider_selects_demographic_choropleth() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         CensusProvider().fetch(
             ProviderRequest(
                 capability_id="census_tigerweb_demographics",
@@ -685,7 +694,8 @@ def test_census_provider_selects_demographic_choropleth() -> None:
 
     assert response.provider_id == "census"
     assert response.payload["renderingMode"] == "choropleth"
-    assert "tigerweb.geo.census.gov" in response.payload["featuresUrl"]
+    assert response.payload["status"] == "server-side-only"
+    assert "featuresUrl" not in response.payload
 
 ###############################################################################
 def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
@@ -706,7 +716,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="windy_webcams",
@@ -717,7 +727,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
     )
 
     assert calls[0][1] == {"x-windy-api-key": "windy-test"}
-    assert "bbox=7.0,45.0,7.5,45.5" in calls[0][0]
+    assert "bbox=45.5,7.5,45.0,7.0" in calls[0][0]
     assert response.payload["renderingMode"] == "camera-points"
     assert response.payload["features"][0]["preview_image_url"].endswith("preview.jpg")
     assert response.payload["features"][0]["embedding_allowed"] is False
@@ -725,7 +735,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
 ###############################################################################
 def test_windy_webcams_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             WindyWebcamsProvider().fetch(
                 ProviderRequest(capability_id="windy_webcams", params={"live": True})
             )
@@ -752,7 +762,7 @@ def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -788,7 +798,7 @@ def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -816,7 +826,7 @@ def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
         }
 
     provider = WindyWebcamsProvider(api_key="windy-test", fetcher=first_fetcher)
-    asyncio.run(
+    run_async_in_thread(
         provider.fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -826,7 +836,7 @@ def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
         raise RuntimeError("network down")
 
     provider.fetcher = failing_fetcher
-    stale = asyncio.run(
+    stale = run_async_in_thread(
         provider.fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )

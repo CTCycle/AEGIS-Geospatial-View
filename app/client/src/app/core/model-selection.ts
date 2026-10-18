@@ -23,10 +23,10 @@ export interface SelectedAgentModelSummary {
   provider: string;
   runtimeMode: ModelProviderMode;
   installedLocally: boolean;
-  supportsTools: boolean;
-  supportsStructuredOutput: boolean;
-  supportsVision: boolean;
-  supportsEmbeddings: boolean;
+  supportsTools: boolean | null;
+  supportsStructuredOutput: boolean | null;
+  supportsVision: boolean | null;
+  supportsEmbeddings: boolean | null;
   toolSupportSource: string;
   capabilities: string[];
 }
@@ -51,6 +51,12 @@ export const providerDisplayLabel = (providerKey: string): string => {
   if (normalized === 'deepseek') {
     return 'DeepSeek';
   }
+  if (normalized === 'opencode') {
+    return 'OpenCode Zen';
+  }
+  if (normalized === 'opencode-go') {
+    return 'OpenCode Go';
+  }
   return providerKey;
 };
 
@@ -64,10 +70,13 @@ export const isSelectedAgentModel = (
 };
 
 export const agentSelectionDisabledReason = (model: ModelCardDescriptor): string | null => {
-  if (!model.supports_tools) {
+  if (model.agent_selection_disabled_reason) {
+    return model.agent_selection_disabled_reason;
+  }
+  if (model.supports_tools === false) {
     return 'Agent model requires native tool calling.';
   }
-  if (!model.supports_structured_output) {
+  if (model.supports_structured_output === false) {
     return 'Agent model requires structured output.';
   }
   return null;
@@ -116,6 +125,39 @@ export const mergeModelCards = (...groups: ModelCardDescriptor[][]): ModelCardDe
   return [...models.values()];
 };
 
+export const ensureSelectedModelVisible = (
+  settings: ModelSettingsResponse,
+  models: readonly ModelCardDescriptor[],
+): ModelCardDescriptor[] => {
+  const provider = normalizeSettingField(settings.agent_model_provider);
+  const name = normalizeSettingField(settings.agent_model_name);
+  if (!provider || !name || models.some((model) => model.provider === provider && model.name === name)) {
+    return [...models];
+  }
+  return [
+    ...models,
+    {
+      id: name,
+      name,
+      provider,
+      description: 'This saved model is not present in the current provider catalog.',
+      capabilities: [],
+      supports_tools: false,
+      supports_structured_output: false,
+      supports_vision: null,
+      supports_embeddings: null,
+      tool_support_source: 'saved_selection',
+      protocol: null,
+      agent_selection_disabled_reason:
+        'This saved model is not present in the live provider catalog. Choose another model deliberately.',
+      metadata: {
+        invalid_configuration: true,
+        invalid_configuration_reason: 'model_absent_from_live_catalog',
+      },
+    },
+  ];
+};
+
 export const baseModelName = (value: string): string =>
   value.toLowerCase().split('/').pop()?.split(':')[0] ?? '';
 
@@ -155,7 +197,7 @@ export const modelDisplayDescription = (model: ModelCardDescriptor): string => {
     return description;
   }
   if (model.provider === 'ollama') {
-    return `Installed Ollama model available for agent duties, structured extraction, tool calling, and chat. ${modelDetails(model)}`;
+    return `Installed Ollama model available for native routing, tool calling, and chat. ${modelDetails(model)}`;
   }
   return description || 'Model available for agent selection.';
 };
@@ -195,8 +237,8 @@ export const buildSelectedAgentModelSummary = (
     provider,
     runtimeMode: provider === 'ollama' ? 'local' : 'cloud',
     installedLocally: provider === 'ollama' && localModelIds.has(name),
-    supportsTools: Boolean(model?.supports_tools),
-    supportsStructuredOutput: Boolean(model?.supports_structured_output),
+    supportsTools: model?.supports_tools ?? null,
+    supportsStructuredOutput: model?.supports_structured_output ?? null,
     supportsVision: Boolean(model?.supports_vision),
     supportsEmbeddings: Boolean(model?.supports_embeddings),
     toolSupportSource: model?.tool_support_source || 'unknown',

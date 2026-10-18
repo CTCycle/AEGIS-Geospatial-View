@@ -1,0 +1,1442 @@
+{
+  "scenario_id": "eea_noise_milan",
+  "prompt": "Show noise exposure in Milan.",
+  "expected_kind": "map",
+  "classification": "map_absent",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show noise exposure in Milan. I've prepared a revised map candidate for noise exposure in Milan, but I need to be transparent about the outcome. What was retrieved Location: Milan, Lombardy, Italy (resolved with bounding box covering the city). Data: EEA noise exposure raster (eea_noise_2019), returned successfully as a renderable raster result with spatial scope satisfied for Milan. Map status: not yet verified Two render attempts have failed at the browser stage: First attempt (OSM default basemap) — the noise raster source failed to load; viewport reported invalid. Second attempt (terrain basemap, viewport fitted to Milan) — same failure: the raster data source could not be loaded, and the layer was not present. The revised candidate (candidate-bb467b02dca440a1baf3ea5cd1ff57c5) is prepared and awaiting render acknowledgment, but I cannot confirm it renders successfully. The recurring failure is specifically the EEA noise raster source failing to load in the map renderer — a provider/source availability issue rather than a viewport or basemap problem, since changing the basemap and viewport strategy did not resolve it. Bottom line: The noise exposure data for Milan was successfully retrieved, but the map showing it has not been render-verified. The EEA noise raster source appears unavailable to the renderer at this time. If you'd like, I can try a location-only map of Milan (without the noise overlay) as a fallback, or attempt the noise overlay again later in case the source availability is transient. Previous map render failed (render_failed) during maplibre: A map data source could not be loaded. Check provider availability and try again. The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 36,
+    "proxy_response_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "proxy_capabilities_seen": [
+      "osm_default"
+    ],
+    "direct_upstream_browser_request_count": 24,
+    "events": [
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2931.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2931.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2932.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2932.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2930.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2931.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2930.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2932.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2931.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2933.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2932.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2933.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2930.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2930.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2933.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2933.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2932.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2931.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2932.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2930.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2931.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2931.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2930.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4305/2933.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2932.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2931.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2932.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4304/2933.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2930.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2930.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4306/2933.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/4303/2933.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1467.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1465.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1466.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1466.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1466.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1465.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527706%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527706%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322646%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1466.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322646%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2152/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732729%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1464.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732729%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527706%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2153/1467.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2151/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.9798914865%2C1027313.6601527706%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5704036.798752993%2C1017529.7205322646%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1464.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5674684.9798914865%2C1017529.7205322646%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5694252.859132491%2C1007745.7809117623%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2150/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5684468.919511989%2C1007745.7809117623%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1466.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1467.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5704036.798752993%2C1037097.5997732729%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5674684.9798914865%2C1037097.5997732729%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1465.png"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5704036.798752993%2C1007745.7809117623%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322646%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5674684.9798914865%2C1007745.7809117623%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322646%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527706%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527706%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1464.png"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732729%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/12/2154/1464.png"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732729%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527706%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.9798914865%2C1027313.6601527706%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5704036.798752993%2C1017529.7205322646%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5674684.9798914865%2C1017529.7205322646%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5694252.859132491%2C1007745.7809117623%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5684468.919511989%2C1007745.7809117623%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5704036.798752993%2C1037097.5997732729%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5674684.9798914865%2C1037097.5997732729%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5704036.798752993%2C1007745.7809117623%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=997961.84129126%2C5674684.9798914865%2C1007745.7809117623%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527706%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527706%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322646%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322646%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732729%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732729%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527706%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5684468.919511989%2C1027313.6601527706%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "request",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.9798914865%2C1027313.6601527706%2C5684468.919511989&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5694252.859132491%2C1017529.7205322646%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5694252.859132491%2C1027313.6601527706%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_FAILED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623%2C5684468.919511989%2C1017529.7205322646%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5694252.859132491%2C1037097.5997732729%2C5704036.798752993&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706%2C5684468.919511989%2C1037097.5997732729%2C5694252.859132491&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5704036.798752993%2C1027313.6601527706%2C5713820.738373496&width=256&height=256"
+      },
+      {
+        "kind": "requestfailed",
+        "transport": "direct_upstream",
+        "method": "GET",
+        "resource_type": "fetch",
+        "failure": "net::ERR_ABORTED",
+        "capability_id": null,
+        "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646%2C5674684.9798914865%2C1027313.6601527706%2C5684468.919511989&width=256&height=256"
+      }
+    ]
+  },
+  "console": [
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623,5694252.859132491,1017529.7205322646,5704036.798752993&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623,5684468.919511989,1017529.7205322646,5694252.859132491&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646,5684468.919511989,1027313.6601527706,5694252.859132491&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646,5694252.859132491,1027313.6601527706,5704036.798752993&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1027313.6601527706,5694252.859132491,1037097.5997732729,5704036.798752993&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646,5684468.919511989,1027313.6601527706,5694252.859132491&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623,5694252.859132491,1017529.7205322646,5704036.798752993&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1017529.7205322646,5694252.859132491,1027313.6601527706,5704036.798752993&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "type": "error",
+      "text": "Access to fetch at 'https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer?service=WMS&request=GetMap&layers=0&styles=&format=image%2Fpng&transparent=true&version=1.1.1&srs=EPSG%3A3857&exceptions=application%2Fvnd.ogc.se_inimage&bbox=1007745.7809117623,5684468.919511989,1017529.7205322646,5694252.859132491&width=256&height=256' from origin 'http://127.0.0.1:5079' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    }
+  ],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_bd9ca5bf9d2b494d902b3ed3e24d4f93",
+    "run_id": "run_57785ca5a1284761a6d2a4767811c08c",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "data_retrieval",
+      "secondary_domains": [
+        "map_rendering",
+        "place_search"
+      ],
+      "task_mode": "execute",
+      "operation": "retrieve",
+      "target_refs": [
+        "Milan"
+      ],
+      "temporal_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "eea_noise_2019",
+      "osm_default",
+      "osm_terrain"
+    ],
+    "iteration_count": 8,
+    "model_call_count": 9,
+    "tool_call_count": 7,
+    "state_transition_count": 51,
+    "terminal_or_stopped_reason": "failed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location"
+      ],
+      "2": [
+        "describe_geospatial_capability",
+        "execute_geospatial_capability",
+        "apply_map_plan"
+      ],
+      "3": [
+        "execute_geospatial_capability",
+        "describe_geospatial_capability",
+        "apply_map_plan"
+      ],
+      "4": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "0": [],
+      "5": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "6": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "7": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "8": [
+        "describe_geospatial_capability",
+        "apply_map_plan"
+      ]
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "describe_geospatial_capability",
+      "execute_geospatial_capability",
+      "apply_map_plan"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "execute_geospatial_capability",
+        "status": "success",
+        "iteration": 3,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "success",
+        "iteration": 4,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "failed",
+        "iteration": 5,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "failed",
+        "iteration": 6,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "success",
+        "iteration": 7,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [
+      "evidence_5db0acea45944600aaebff7454332777"
+    ],
+    "apply_map_plan_attempts": 4,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "render_observed",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "failed",
+        "render_checks": {
+          "required_sources_loaded": false,
+          "required_layers_present": false,
+          "viewport_valid": false
+        },
+        "prepared_map": false
+      },
+      {
+        "kind": "render_observed",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "failed",
+        "render_checks": {
+          "required_sources_loaded": false,
+          "required_layers_present": false,
+          "viewport_valid": false
+        },
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 8,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 8,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]",
+      "observation_time": "[depth-limited]"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-route-matrix\\screenshots\\ROUTE-MATRIX-LIVE\\eea_noise_milan.png",
+  "backend_routed_diagnostics": []
+}

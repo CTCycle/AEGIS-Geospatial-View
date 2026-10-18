@@ -1,0 +1,7 @@
+28-09-2026 16:25:40 - alembic.runtime.migration - INFO - Context impl SQLiteImpl.
+28-09-2026 16:25:40 - alembic.runtime.migration - INFO - Will assume non-transactional DDL.
+28-09-2026 16:25:40 - root - INFO - SQLite migration check: current=202609210001, head=202609210001
+28-09-2026 16:25:40 - alembic.runtime.migration - INFO - Context impl SQLiteImpl.
+28-09-2026 16:25:40 - alembic.runtime.migration - INFO - Will assume non-transactional DDL.
+28-09-2026 16:25:40 - root - INFO - SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\tier3-raster-remediation-20260928\database.db, revisions=202609210001
+28-09-2026 16:25:40 - root - INFO - SQLite database is ready: fresh=False, migrations_applied=False

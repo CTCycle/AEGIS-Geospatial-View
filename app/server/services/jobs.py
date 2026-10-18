@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from server.common.typing import json_object
+
 import asyncio
+import logging
 import threading
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from server.common.constants import (
@@ -14,10 +17,12 @@ from server.common.constants import (
     JOB_STATUS_RUNNING,
     JOB_STATUS_SUCCEEDED,
 )
-from server.domain.chat import ChatTurnRequest
-from server.domain.geographics import LocationSearchRequest
+from server.contracts.chat import ChatTurnRequest
 from server.domain.jobs import (
     BackgroundJob,
+    BackgroundJobEventType,
+    BackgroundJobStatus,
+    BackgroundJobType,
     BackgroundJobCreateResponse,
     BackgroundJobEvent,
     BackgroundJobEventsResponse,
@@ -25,6 +30,9 @@ from server.domain.jobs import (
     JobCancelResponse,
 )
 from server.services.chat.streaming import ChatStreamingService
+from server.services.llm.errors import safe_failure_detail
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 def _utc_now() -> datetime:
@@ -38,11 +46,9 @@ class BackgroundJobService:
         self,
         *,
         chat_streaming_service: ChatStreamingService,
-        map_search_runner,
         polling_interval: float = 1.0,
     ) -> None:
         self._chat_streaming_service = chat_streaming_service
-        self._map_search_runner = map_search_runner
         self._polling_interval = polling_interval
         self._jobs: dict[str, BackgroundJob] = {}
         self._job_ids_by_request_id: dict[str, str] = {}
@@ -59,14 +65,16 @@ class BackgroundJobService:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
-        self._thread = threading.Thread(target=self._run, name="background-job-worker", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="background-job-worker", daemon=True
+        )
         self._thread.start()
 
     # -------------------------------------------------------------------------
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
-            self._thread.join(timeout=2)
+            self._thread.join()
 
     # -------------------------------------------------------------------------
     def create_chat_job(self, payload: ChatTurnRequest) -> BackgroundJobCreateResponse:
@@ -74,35 +82,11 @@ class BackgroundJobService:
         job = self._create_job(
             job_type="chat_turn",
             request_id=request_id,
-            session_id=payload.session_id,
-            input_json=payload.model_copy(update={"request_id": request_id}).model_dump(mode="json"),
+            input_json=payload.model_copy(update={"request_id": request_id}).model_dump(
+                mode="json"
+            ),
         )
         return self._to_create_response(job, "Chat job queued")
-
-    # -------------------------------------------------------------------------
-    def create_map_job(
-        self,
-        payload: LocationSearchRequest,
-        *,
-        request_id: str | None = None,
-        parent_job_id: str | None = None,
-        session_id: int | None = None,
-    ) -> BackgroundJobCreateResponse:
-        resolved_request_id = request_id or f"map-{uuid4().hex[:12]}"
-        job = self._create_job(
-            job_type="map_fetch",
-            request_id=resolved_request_id,
-            session_id=session_id,
-            parent_job_id=parent_job_id,
-            max_attempts=2,
-            input_json={
-                "request_id": resolved_request_id,
-                "parent_job_id": parent_job_id,
-                "session_id": session_id,
-                "map_request": payload.model_dump(mode="json"),
-            },
-        )
-        return self._to_create_response(job, "Map fetch job queued")
 
     # -------------------------------------------------------------------------
     def _create_job(
@@ -111,7 +95,6 @@ class BackgroundJobService:
         job_type: str,
         request_id: str,
         input_json: dict[str, Any],
-        session_id: int | None = None,
         parent_job_id: str | None = None,
         max_attempts: int = 1,
     ) -> BackgroundJob:
@@ -124,13 +107,14 @@ class BackgroundJobService:
                 job_type=job_type,
                 request_id=request_id,
                 input_json=input_json,
-                session_id=session_id,
                 parent_job_id=parent_job_id,
                 max_attempts=max_attempts,
             )
             self._jobs[job.job_id] = job
             self._job_ids_by_request_id[request_id] = job.job_id
-            self._append_event_locked(job, "queued", {"request_id": request_id, "job_type": job_type})
+            self._append_event_locked(
+                job, "queued", {"request_id": request_id, "job_type": job_type}
+            )
             return job
 
     # -------------------------------------------------------------------------
@@ -153,8 +137,14 @@ class BackgroundJobService:
             job = self._jobs.get(job_id)
             if job is None:
                 return None
-            if job.status in {JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED, JOB_STATUS_CANCELLED}:
-                return JobCancelResponse(job_id=job_id, success=False, message="Job cannot be cancelled")
+            if job.status in {
+                JOB_STATUS_SUCCEEDED,
+                JOB_STATUS_FAILED,
+                JOB_STATUS_CANCELLED,
+            }:
+                return JobCancelResponse(
+                    job_id=job_id, success=False, message="Job cannot be cancelled"
+                )
             now = _utc_now()
             job.cancel_requested_at = now
             if job.status == JOB_STATUS_QUEUED:
@@ -164,8 +154,12 @@ class BackgroundJobService:
             for child in self._jobs.values():
                 if child.parent_job_id == job_id:
                     child.cancel_requested_at = now
-            self._append_event_locked(job, "cancelled", {"message": "Cancellation requested"})
-            return JobCancelResponse(job_id=job_id, success=True, message="Cancellation requested")
+            self._append_event_locked(
+                job, "cancelled", {"message": "Cancellation requested"}
+            )
+            return JobCancelResponse(
+                job_id=job_id, success=True, message="Cancellation requested"
+            )
 
     # -------------------------------------------------------------------------
     def _run(self) -> None:
@@ -176,18 +170,15 @@ class BackgroundJobService:
                 continue
             try:
                 asyncio.run(self._execute_job(claimed))
-            except Exception as exc:  # noqa: BLE001
-                self._fail_job(claimed.job_id, {"message": str(exc) or "Unexpected job failure"})
+            except Exception:  # noqa: BLE001
+                LOGGER.exception("Unexpected background job failure")
+                self._fail_job(claimed.job_id, {"message": "Unexpected job failure"})
 
     # -------------------------------------------------------------------------
     def _claim_next_job(self) -> BackgroundJob | None:
         with self._lock:
             queued = sorted(
-                (
-                    job
-                    for job in self._jobs.values()
-                    if job.status == JOB_STATUS_QUEUED
-                ),
+                (job for job in self._jobs.values() if job.status == JOB_STATUS_QUEUED),
                 key=lambda item: (-item.priority, item.created_at),
             )
             if not queued:
@@ -198,7 +189,9 @@ class BackgroundJobService:
                 job.status = JOB_STATUS_CANCELLED
                 job.completed_at = now
                 job.status_message = "Cancelled"
-                self._append_event_locked(job, "cancelled", {"message": "Cancelled before start"})
+                self._append_event_locked(
+                    job, "cancelled", {"message": "Cancelled before start"}
+                )
                 return None
             job.status = JOB_STATUS_RUNNING
             job.started_at = job.started_at or now
@@ -214,9 +207,6 @@ class BackgroundJobService:
         if job.job_type == "chat_turn":
             await self._execute_chat_job(job)
             return
-        if job.job_type == "map_fetch":
-            await self._execute_map_job(job)
-            return
         self._fail_job(job.job_id, {"message": f"Unsupported job type: {job.job_type}"})
 
     # -------------------------------------------------------------------------
@@ -227,25 +217,33 @@ class BackgroundJobService:
             if self._is_cancel_requested(job.job_id):
                 self._cancel_running_job(job.job_id)
                 return
-            self._record_stream_event(job.job_id, event.event, dict(event.data or {}))
-            if event.event == "parsed":
-                self._heartbeat(job.job_id, 20, "Parsed request")
-            elif event.event == "policy":
-                self._heartbeat(job.job_id, 35, "Planned execution")
-            elif event.event == "tool_call_started":
+            event_data = dict(event.data or {})
+            if event.event == "error":
+                self._fail_job(job.job_id, self._safe_stream_failure(event_data))
+                return
+            if event.event != "final":
+                self._record_stream_event(job.job_id, event.event, event_data)
+            if event.event == "status":
+                self._heartbeat(job.job_id, 5, "Agent received request")
+            elif event.event == "stage":
+                stage = str(event.data.get("stage") or "native execution")
+                progress = {
+                    "context_assembly": 15,
+                    "persistence": 90,
+                }.get(stage, 35)
+                self._heartbeat(job.job_id, progress, f"Agent stage: {stage}")
+            elif event.event in {"tool_call_started", "tool_started"}:
                 self._heartbeat(job.job_id, 55, "Running tools")
             elif event.event == "map_session_created":
                 self._heartbeat(job.job_id, 85, "Map session created")
             elif event.event == "final":
                 final_response = dict(event.data or {})
         if final_response is None:
-            self._fail_job(job.job_id, {"message": "Chat job finished without final response"})
+            self._fail_job(
+                job.job_id, {"message": "Chat job finished without final response"}
+            )
             return
-        operation = (
-            final_response.get("operation")
-            if isinstance(final_response.get("operation"), dict)
-            else {}
-        )
+        operation = json_object(final_response.get("operation"))
         if self._operation_failed(operation):
             self._fail_job(
                 job.job_id,
@@ -267,33 +265,26 @@ class BackgroundJobService:
         )
 
     # -------------------------------------------------------------------------
-    async def _execute_map_job(self, job: BackgroundJob) -> None:
-        payload = LocationSearchRequest.model_validate(job.input_json["map_request"])
-        self._heartbeat(job.job_id, 25, "Fetching map data")
-        if self._is_cancel_requested(job.job_id):
-            self._cancel_running_job(job.job_id)
-            return
-        map_session = await self._map_search_runner(payload)
-        warnings = list(map_session.compliance_warnings or [])
-        self._record_stream_event(
-            job.job_id,
-            "map_session",
-            {"map_session": map_session.model_dump(mode="json"), "warnings": warnings},
-        )
-        self._complete_job(
-            job.job_id,
-            {
-                "map_session": map_session.model_dump(mode="json"),
-                "warnings": warnings,
-                "layer_results": [
-                    {"overlay_id": overlay_id, "status": "loaded", "message": ""}
-                    for overlay_id in map_session.overlay_ids
-                ],
-            },
-        )
+    @staticmethod
+    def _safe_stream_failure(event_data: dict[str, Any]) -> dict[str, Any]:
+        message = event_data.get("message")
+        error = RuntimeError(message if isinstance(message, str) else "")
+        error_json: dict[str, Any] = {
+            "message": safe_failure_detail(error, "Background chat job failed.")
+        }
+        status_code = event_data.get("status")
+        if (
+            isinstance(status_code, int)
+            and not isinstance(status_code, bool)
+            and 100 <= status_code <= 599
+        ):
+            error_json["status"] = status_code
+        return error_json
 
     # -------------------------------------------------------------------------
-    def _heartbeat(self, job_id: str, progress_percent: int, status_message: str) -> None:
+    def _heartbeat(
+        self, job_id: str, progress_percent: int, status_message: str
+    ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -304,21 +295,31 @@ class BackgroundJobService:
             self._append_event_locked(
                 job,
                 "status",
-                {"progress_percent": progress_percent, "status_message": status_message},
+                {
+                    "progress_percent": progress_percent,
+                    "status_message": status_message,
+                },
             )
 
     # -------------------------------------------------------------------------
-    def _record_stream_event(self, job_id: str, event_name: str, payload_json: dict[str, Any]) -> None:
+    def _record_stream_event(
+        self, job_id: str, event_name: str, payload_json: dict[str, Any]
+    ) -> None:
         mapped_name = {
+            "context_usage": "status",
+            "stage": "status",
             "tool_call_started": "tool_call",
             "tool_call_completed": "tool_result",
-            "final": "completed",
+            "tool_started": "tool_call",
+            "tool_completed": "tool_result",
             "map_session_created": "map_session",
         }.get(event_name, event_name)
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
                 return
+            if mapped_name == "status" and event_name not in {"status"}:
+                payload_json = {"source_event": event_name, **payload_json}
             self._append_event_locked(job, mapped_name, payload_json)
 
     # -------------------------------------------------------------------------
@@ -378,11 +379,13 @@ class BackgroundJobService:
         )
 
     # -------------------------------------------------------------------------
-    def _to_create_response(self, job: BackgroundJob, message: str) -> BackgroundJobCreateResponse:
+    def _to_create_response(
+        self, job: BackgroundJob, message: str
+    ) -> BackgroundJobCreateResponse:
         return BackgroundJobCreateResponse(
             job_id=job.job_id,
-            job_type=job.job_type,
-            status=job.status,
+            job_type=cast(BackgroundJobType, job.job_type),
+            status=cast(BackgroundJobStatus, job.status),
             request_id=job.request_id,
             message=message,
             poll_interval=self._polling_interval,
@@ -393,11 +396,10 @@ class BackgroundJobService:
     def _to_status_response(job: BackgroundJob) -> BackgroundJobStatusResponse:
         return BackgroundJobStatusResponse(
             job_id=job.job_id,
-            job_type=job.job_type,
-            status=job.status,
+            job_type=cast(BackgroundJobType, job.job_type),
+            status=cast(BackgroundJobStatus, job.status),
             request_id=job.request_id,
             parent_job_id=job.parent_job_id,
-            session_id=job.session_id,
             priority=job.priority,
             progress_percent=job.progress_percent,
             status_message=job.status_message,
@@ -414,11 +416,13 @@ class BackgroundJobService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _append_event_locked(job: BackgroundJob, event_type: str, payload_json: dict[str, Any]) -> None:
+    def _append_event_locked(
+        job: BackgroundJob, event_type: str, payload_json: dict[str, Any]
+    ) -> None:
         job.events.append(
             BackgroundJobEvent(
                 job_id=job.job_id,
-                event_type=event_type,
+                event_type=cast(BackgroundJobEventType, event_type),
                 sequence=len(job.events) + 1,
                 created_at=_utc_now(),
                 payload_json=payload_json,

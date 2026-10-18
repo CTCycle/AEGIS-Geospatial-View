@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from collections.abc import Mapping
 from urllib.parse import urlencode
 
-from server.domain.geographics import ProviderCredentialValidationResult
+from shapely.errors import GEOSException
+from shapely.geometry import box, shape
+
+from server.contracts.geospatial import ProviderCredentialValidationResult
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,
@@ -20,10 +25,7 @@ from server.services.geospatial.providers.http import (
 ###############################################################################
 class TomTomProvider(GeospatialProvider):
     provider_id = "tomtom"
-    flow_proxy_template = (
-        "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
-    )
-    basemap_proxy_template = "/api/geospatial/proxy/tomtom/basic/{z}/{x}/{y}.png"
+    flow_proxy_template = "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -39,7 +41,7 @@ class TomTomProvider(GeospatialProvider):
         if "incident" in request.capability_id or request.params.get("incidents"):
             url = _build_incidents_url(request, self.api_key)
             payload = await call_json_fetcher(self.fetcher, url)
-            features = _normalize_incidents(payload)
+            features = _normalize_incidents(payload, bbox=request.bbox)
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -49,19 +51,18 @@ class TomTomProvider(GeospatialProvider):
                     "totalResults": len(features),
                     "credentialPolicy": "server-side-only",
                 },
+                result_type="features",
                 attribution=["TomTom"],
             )
-        tile_url = self.flow_proxy_template
-        if "basic" in request.capability_id:
-            tile_url = self.basemap_proxy_template
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
                 "renderingMode": "raster-tile",
-                "tileUrl": tile_url,
+                "tileUrl": self.flow_proxy_template,
                 "credentialPolicy": "server-side-only",
             },
+            result_type="raster",
             attribution=["TomTom"],
         )
 
@@ -110,14 +111,9 @@ class TomTomProvider(GeospatialProvider):
 
 ###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
-    if kind == "basic":
-        return (
-            "https://api.tomtom.com/map/1/tile/basic/main/"
-            f"{z}/{x}/{y}.png?key={api_key}"
-        )
     return (
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
-        f"absolute/relative0/{z}/{x}/{y}.png?key={api_key}"
+        f"absolute/{z}/{x}/{y}.png?key={api_key}"
     )
 
 ###############################################################################
@@ -133,35 +129,41 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
             "startTime,endTime,from,to,roadNumbers,length,delay}}}"
         ),
         "language": str(request.params.get("language") or "en-US"),
-        "timeValidityFilter": str(request.params.get("timeValidityFilter") or "present"),
+        "timeValidityFilter": str(
+            request.params.get("timeValidityFilter") or "present"
+        ),
     }
-    return f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
+    return (
+        f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
+    )
 
 ###############################################################################
-def _normalize_incidents(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+def _normalize_incidents(
+    payload: object,
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> list[dict[str, object]]:
+    if not is_json_object(payload):
         return []
     raw_incidents = payload.get("incidents")
-    if not isinstance(raw_incidents, list):
+    if not is_json_array(raw_incidents):
         return []
     features: list[dict[str, object]] = []
     for incident in raw_incidents:
-        if not isinstance(incident, dict):
+        if not is_json_object(incident):
             continue
-        properties = (
-            incident.get("properties")
-            if isinstance(incident.get("properties"), dict)
-            else {}
-        )
-        coordinate = _representative_coordinate(incident.get("geometry"))
+        properties = json_object(incident.get("properties"))
+        coordinate = _representative_coordinate(incident.get("geometry"), bbox)
         if coordinate is None:
             continue
         longitude, latitude = coordinate
-        events = properties.get("events") if isinstance(properties.get("events"), list) else []
+        events = json_array(properties.get("events"))
         description = _first_event_description(events)
         features.append(
             {
-                "id": str(properties.get("id") or f"tomtom:{latitude:.6f}:{longitude:.6f}"),
+                "id": str(
+                    properties.get("id") or f"tomtom:{latitude:.6f}:{longitude:.6f}"
+                ),
                 "name": description or "Traffic incident",
                 "category": _incident_category(properties.get("iconCategory")),
                 "source": "tomtom",
@@ -185,23 +187,46 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
     return features
 
 ###############################################################################
-def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
-    if not isinstance(geometry, dict):
+def _representative_coordinate(
+    geometry: object,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> tuple[float, float] | None:
+    """Return a point for an incident, inside ``bbox`` when one was queried.
+
+    TomTom returns every incident line that intersects the query bbox, so a
+    line's first vertex can lie outside it.  The point stands for the incident
+    in the requested extent, so it is taken from the part inside the bbox.
+    """
+    if not is_json_object(geometry):
         return None
     coordinates = geometry.get("coordinates")
-    if not isinstance(coordinates, list):
+    if not is_json_array(coordinates):
         return None
     point = _first_coordinate_pair(coordinates)
     if point is None:
         return None
     longitude, latitude = point
-    if not isinstance(longitude, (int, float)) or not isinstance(latitude, (int, float)):
+    if not isinstance(longitude, (int, float)) or not isinstance(
+        latitude, (int, float)
+    ):
         return None
-    return float(longitude), float(latitude)
+    if bbox is None:
+        return float(longitude), float(latitude)
+    west, south, east, north = bbox
+    if west <= longitude <= east and south <= latitude <= north:
+        return float(longitude), float(latitude)
+    try:
+        inside = shape(geometry).intersection(box(west, south, east, north))
+    except (ValueError, TypeError, KeyError, AttributeError, GEOSException):
+        return None
+    if inside.is_empty:
+        return None
+    representative = inside.representative_point()
+    return float(representative.x), float(representative.y)
 
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
-    if not isinstance(value, list) or not value:
+    if not is_json_array(value) or not value:
         return None
     if len(value) >= 2 and all(isinstance(item, (int, float)) for item in value[:2]):
         return value[0], value[1]
@@ -210,7 +235,7 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
 ###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
-        if isinstance(event, dict) and event.get("description"):
+        if is_json_object(event) and event.get("description"):
             return str(event["description"])
     return None
 

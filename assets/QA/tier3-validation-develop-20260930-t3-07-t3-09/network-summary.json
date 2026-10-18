@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-09-30",
+  "FEMA": {
+    "location": "New Orleans, Louisiana",
+    "tile": {"z": 14, "x": 4092, "y": 6762},
+    "layer": "28",
+    "REST": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export",
+    "WMS": "https://hazards.fema.gov/arcgis/services/public/NFHLWMS/MapServer/WMSServer",
+    "all_lanes": "connection_failure before status/content/body",
+    "native_curl": "exit 35, zero bytes, no PNG signature",
+    "case": "C / external transport blocker"
+  },
+  "RainViewer": {
+    "metadata_endpoint": "https://api.rainviewer.com/public/weather-maps.json",
+    "latest_frame": "2026-09-30T08:00:00Z",
+    "history_start": "2026-09-30T06:00:00Z",
+    "frame_count": 13,
+    "tile_host": "https://tilecache.rainviewer.com",
+    "tile_path_shape": "/v2/radar/{opaque_frame_path}/256/{z}/{x}/{y}/2/{smooth}_{snow}.png",
+    "color_scheme": 2,
+    "max_zoom": 7,
+    "attribution": "© RainViewer",
+    "browser_proxy_requests": 1,
+    "supplemental_proxy_probe": {"status": 200, "content_type": "image/png", "bytes": 334, "png_signature": true},
+    "direct_browser_upstream_requests": 0
+  },
+  "MapLibre": {
+    "source_id": "overlay-source-evidence:evidence_39ae9bb46b004538a95ae5f9a28bda5b:rainviewer_precipitation_radar",
+    "layer_id": "overlay-layer-evidence:evidence_39ae9bb46b004538a95ae5f9a28bda5b:rainviewer_precipitation_radar",
+    "render_observed": "ready",
+    "render_verified": true
+  },
+  "raw_provider_bodies_retained": false
+}

@@ -3,7 +3,58 @@
     background: #0b141a;
     display: flex;
     flex-direction: column;
-    min-width: 0;
+    min-width: var(--minimum-desktop-viewport-width);
+}
+
+.desktop-viewport-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    place-items: center;
+    padding: 2rem;
+    background: #0b141a;
+    color: #d7e3e8;
+}
+
+.desktop-viewport-gate--visible {
+    display: grid;
+}
+
+.desktop-viewport-gate__panel {
+    width: min(100%, 34rem);
+    display: grid;
+    gap: 0.8rem;
+    padding: 1.6rem 1.8rem;
+    border: 1px solid #314954;
+    border-radius: 0.45rem;
+    background: #101c23;
+    box-shadow: 0 18px 40px rgb(0 0 0 / 38%);
+}
+
+.desktop-viewport-gate__eyebrow {
+    margin: 0;
+    color: #8fb9cc;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.desktop-viewport-gate__panel h1,
+.desktop-viewport-gate__panel p {
+    margin: 0;
+}
+
+.desktop-viewport-gate__panel h1 {
+    color: #f3fbff;
+    font-size: 1.35rem;
+    line-height: 1.25;
+}
+
+.desktop-viewport-gate__panel p:last-child {
+    color: #aec1c9;
+    line-height: 1.55;
 }
 
 .operations-bar {
@@ -67,8 +118,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    min-width: 0;
-    overflow-x: auto;
+    flex: 0 0 auto;
 }
 
 .operations-bar__nav a {
@@ -80,10 +130,6 @@
     font-size: 0.82rem;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.nav-label--compact {
-    display: none;
 }
 
 .operations-bar__nav a:hover {
@@ -108,43 +154,4 @@
     width: 100%;
     flex: 1 1 auto;
     min-height: 0;
-}
-
-@media (max-width: 900px) {
-  .operations-bar {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 0.55rem;
-    padding: 0.65rem 0.75rem;
-  }
-
-  .operations-bar__nav {
-    width: 100%;
-    order: 3;
-  }
-
-  .operations-bar__nav a {
-    padding: 0.58rem 0.58rem 0.55rem;
-    font-size: 0.78rem;
-  }
-
-  .app-content {
-    height: 100%;
-  }
-}
-
-@media (max-width: 460px) {
-  .nav-label--full {
-    display: none;
-  }
-
-  .nav-label--compact {
-    display: inline;
-  }
-
-  .operations-bar__brand {
-    margin-right: auto;
-  }
-
-  .operations-bar__spacer { display: none; }
 }

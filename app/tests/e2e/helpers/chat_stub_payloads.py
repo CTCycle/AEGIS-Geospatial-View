@@ -1,81 +1,224 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
+
+
+E2E_CONVERSATION_ID = "conversation-e2e"
+
+###############################################################################
+def map_overlay_instance(
+    *,
+    instance_id: str,
+    capability_id: str,
+    label: str,
+    provider: str,
+    overlay_type: str,
+    rendering_mode: str,
+    descriptor: dict[str, Any],
+    opacity: float = 1.0,
+) -> dict[str, Any]:
+    return {
+        "instance_id": instance_id,
+        "capability_id": capability_id,
+        "label": label,
+        "provider": provider,
+        "overlay_type": overlay_type,
+        "rendering_mode": rendering_mode,
+        "scope_key": "location",
+        "scope": {"kind": "location", "label": "Rome, Italy"},
+        "visible": True,
+        "opacity": opacity,
+        "render_variant": {},
+        "descriptor": descriptor,
+        "inspections": [],
+    }
 
 
 ROME_MAP_SESSION = {
     "session_id": "rome-map-session",
-    "resolved_location": {"label": "Rome, Italy", "latitude": 41.9028, "longitude": 12.4964},
+    "resolved_location": {
+        "label": "Rome, Italy",
+        "latitude": 41.9028,
+        "longitude": 12.4964,
+    },
     "center": {"latitude": 41.9028, "longitude": 12.4964},
     "bounds": [12.3, 41.8, 12.7, 42.0],
     "basemap_id": "osm_default",
-    "overlay_ids": ["openaq_air_quality"],
-    "viewport": {"center_latitude": 41.9028, "center_longitude": 12.4964, "radius_m": 5000},
+    "viewport": {
+        "center_latitude": 41.9028,
+        "center_longitude": 12.4964,
+        "radius_m": 5000,
+    },
     "basemap": {
         "id": "osm_default",
         "label": "OpenStreetMap",
         "provider": "osm",
-        "type": "tile",
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "requires_key": False,
+        "attribution": "OpenStreetMap contributors",
+        "render_status": "available",
+        "unavailable_reason": None,
     },
-    "overlays": [
-        {
-            "id": "openaq_air_quality",
-            "label": "OpenAQ Air Quality",
-            "provider": "openaq",
-            "type": "tile",
-            "url": "https://example.test/openaq/{z}/{x}/{y}.png",
-            "default_opacity": 0.65,
-            "requires_key": False,
-        }
-    ],
     "compliance_warnings": ["Demo alert summary for documented session."],
+    "overlay_collection": {
+        "collection_id": "rome-map-overlays",
+        "revision": 1,
+        "instances": [
+            map_overlay_instance(
+                instance_id="openaq_air_quality",
+                capability_id="openaq_air_quality",
+                label="OpenAQ Air Quality",
+                provider="openaq",
+                overlay_type="tile",
+                rendering_mode="xyz",
+                opacity=0.65,
+                descriptor={
+                    "layer_id": "openaq_air_quality",
+                    "provider": "openaq",
+                    "rendering_mode": "xyz",
+                    "source_protocol": "xyz",
+                    "tile_url_template": "https://example.test/openaq/{z}/{x}/{y}.png",
+                    "attribution": ["OpenAQ"],
+                },
+            )
+        ],
+    },
 }
 
 ###############################################################################
-def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
-    return {
-        "user_text": message,
-        "conversation_context": {"recent_messages": [], "memory_snapshot": {}},
-        "task_class": "direct_query",
-        "location_signals": [],
-        "normalized_action": {
-            "action_id": "stub",
-            "action_label": "Stub",
-            "task_tags": [],
-            "action_tags": [],
-            "requires_location": False,
-        },
-        "temporal_signal": {"mode": "none"},
-        "ambiguities": [],
-        "disallowed_patterns": [],
-        "parser_confidence": 1.0,
-    }
-
-###############################################################################
-def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
-    return {
-        "plan": {
-            "state": state,
-            "action_id": "stub",
-            "overlay_ids": [],
-        },
-        "trace": {"steps": ["stub"]},
-    }
-
-###############################################################################
-def chat_turn_map_response(
-    session_id: int, assistant_message: str, basemap_id: str = "osm_default"
+def _native_route(
+    *,
+    task_mode: str,
+    presentation: str,
+    operation: str,
+    requires_location: bool,
+    capability_query: str,
+    target_refs: list[str] | None = None,
 ) -> dict[str, Any]:
-    payload = dict(ROME_MAP_SESSION)
-    payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "primary_domain": "geospatial",
+        "secondary_domains": [],
+        "task_mode": task_mode,
+        "presentation": presentation,
+        "requires_location": requires_location,
+        "capability_queries": [capability_query],
+        "explicit_capability_ids": [],
+        "clarification_question": None,
+        "operation": operation,
+        "target_refs": target_refs or [],
+        "temporal_scope": {
+            "mode": "none",
+            "granularity": "none",
+            "aggregation": "none",
+        },
+        "spatial_scope": None,
+        "filters": {},
+    }
+
+###############################################################################
+def _native_goal(
+    *,
+    task_mode: str,
+    presentation: str,
+    operation: str,
+    requires_location: bool,
+    goal: str,
+) -> dict[str, Any]:
+    return {
+        "goal": goal,
+        "task_mode": task_mode,
+        "presentation": presentation,
+        "operation": operation,
+        "requires_location": requires_location,
+        "target_ids": [],
+        "temporal_scope": {"mode": "none"},
+        "spatial_scope": [],
+        "filters": {},
+    }
+
+###############################################################################
+def _native_conversation_state(revision: int) -> dict[str, Any]:
+    return {
+        "schema_version": 2,
+        "conversation_id": E2E_CONVERSATION_ID,
+        "revision": revision,
+        "active_directives": [],
+        "summary": None,
+        "goal": None,
+        "route": None,
+        "constraints": {},
+        "resolved_locations": {},
+        "evidence_refs": [],
+        "committed_map_session": None,
+        "pending_clarification": None,
+    }
+
+###############################################################################
+def _native_response_fields(
+    *,
+    turn_number: int,
+    assistant_message: str,
+    route: dict[str, Any],
+    goal: dict[str, Any],
+    presentation_status: str,
+    map_session: dict[str, Any] | None,
+    memory_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "context_revision": turn_number,
+        "route": route,
+        "goal": goal,
+        "completion_contract": {
+            "operation": goal["operation"],
+            "requirements": ["answer_provided"],
+            "location_required": bool(goal["requires_location"]),
+            "evidence_required": False,
+            "map_preparation_required": map_session is not None,
+            "temporal_scope_required": False,
+            "spatial_scope_required": bool(goal["requires_location"]),
+        },
+        "presentation_status": presentation_status,
+        "tool_results": [],
+        "conversation_state": _native_conversation_state(turn_number),
+        "execution_trace": {
+            "stopped_reason": "goal_satisfied",
+            "iterations": 1,
+        },
+        "memory_snapshot": memory_snapshot or {},
+    }
+
+###############################################################################
+def chat_completion_map_payload(
+    turn_number: int, assistant_message: str, basemap_id: str = "osm_default"
+) -> dict[str, Any]:
+    payload = deepcopy(ROME_MAP_SESSION)
+    payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
+    route = _native_route(
+        task_mode="execute",
+        presentation="map",
+        operation="render",
+        requires_location=True,
+        capability_query="map",
+        target_refs=["location:rome"],
+    )
+    return {
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": assistant_message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("map_search"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=assistant_message,
+            route=route,
+            goal=_native_goal(
+                task_mode="execute",
+                presentation="map",
+                operation="render",
+                requires_location=True,
+                goal=assistant_message,
+            ),
+            presentation_status="prepared",
+            map_session=payload,
+        ),
         "map_session": payload,
         "tool_payload": {
             "execution": "map_search",
@@ -84,13 +227,33 @@ def chat_turn_map_response(
     }
 
 ###############################################################################
-def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
+def chat_completion_clarification_payload(
+    turn_number: int, message: str
+) -> dict[str, Any]:
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("clarify"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=message,
+            route=_native_route(
+                task_mode="clarify",
+                presentation="text",
+                operation="clarify_location",
+                requires_location=True,
+                capability_query="location",
+            ),
+            goal=_native_goal(
+                task_mode="clarify",
+                presentation="text",
+                operation="clarify_location",
+                requires_location=True,
+                goal=message,
+            ),
+            presentation_status="not_requested",
+            map_session=None,
+        ),
         "map_session": None,
         "tool_payload": {
             "execution": "follow_up",
@@ -98,13 +261,31 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
     }
 
 ###############################################################################
-def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
+def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, Any]:
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
-        "turn_contract": _chat_turn_contract(),
-        "decision": _chat_decision("direct_tool"),
+        **_native_response_fields(
+            turn_number=turn_number,
+            assistant_message=message,
+            route=_native_route(
+                task_mode="execute",
+                presentation="text",
+                operation="lookup",
+                requires_location=False,
+                capability_query="coordinates",
+            ),
+            goal=_native_goal(
+                task_mode="execute",
+                presentation="text",
+                operation="lookup",
+                requires_location=False,
+                goal=message,
+            ),
+            presentation_status="not_requested",
+            map_session=None,
+        ),
         "map_session": None,
         "tool_payload": {"execution": "location_to_coordinates"},
     }
@@ -118,7 +299,16 @@ def model_settings_payload() -> dict[str, Any]:
         "ollama_url": "http://localhost:11434",
         "openai_base_url": None,
         "google_base_url": None,
+        "deepseek_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
+        "credential_health": {},
+        "selected_model_context": {
+            "provider": "ollama",
+            "model": "llama3.2",
+            "context_window_tokens": None,
+            "maximum_output_tokens": None,
+            "context_profile_source": "fixture",
+        },
     }
 
 ###############################################################################
@@ -133,6 +323,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "capabilities": ["chat", "tools", "structured_output"],
                 "supports_tools": True,
                 "supports_structured_output": True,
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "mini"},
             },
             {
@@ -141,6 +333,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "General purpose OpenAI cloud model.",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "mini"},
             },
             {
@@ -149,6 +343,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Fast Google cloud model.",
                 "provider": "google",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"tier": "flash"},
             },
             {
@@ -157,6 +353,8 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Local Ollama model available in cloud catalog.",
                 "provider": "ollama",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"family": "llama"},
             },
         ],
@@ -167,9 +365,12 @@ def model_catalog_payload() -> dict[str, Any]:
                 "description": "Installed local Ollama model.",
                 "provider": "ollama",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {"family": "llama"},
             }
         ],
+        "sources": {},
     }
 
 ###############################################################################
@@ -181,94 +382,219 @@ def selected_agent_settings_payload() -> dict[str, Any]:
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://api.openai.com/v1",
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "deepseek_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
+        "credential_health": {},
+        "selected_model_context": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini",
+            "context_window_tokens": None,
+            "maximum_output_tokens": None,
+            "context_profile_source": "fixture",
+        },
     }
 
 ###############################################################################
-def chat_stream_events(
-    session_id: int, assistant_message: str, include_tool_status: bool = True
-) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = [
-        {"event": "status", "data": {"message": "received"}}
-    ]
-    events.append(
-        {
-            "event": "parsed",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "task_class": "map_search",
-                "action_id": "stub",
-                "requires_location": False,
-                "location_signal_count": 0,
-                "ambiguities": [],
-            },
-        }
-    )
-    events.append(
-        {
-            "event": "policy",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "state": "map_search",
-                "mode": "map",
-                "action_id": "stub",
-                "trace_steps": ["stub"],
-                "has_clarification": False,
-            },
-        }
-    )
-    if include_tool_status:
-        events.append(
-            {
-                "event": "tool_call_started",
-                "data": {
-                    "request_id": f"chat-stub-{session_id}",
-                    "session_id": session_id,
-                    "tool_call_id": "tool-1",
-                    "name": "execute_geospatial_capability",
-                    "arguments": {"capability_id": "openaq_air_quality"},
+def _catalog_capability(
+    *,
+    capability_id: str,
+    name: str,
+    kind: str,
+    capability_type: str,
+    description: str,
+    provider: str,
+    supports_map: bool,
+    supports_direct_text: bool,
+    source_protocol: str,
+    data_format: str,
+    geometry_type: str,
+    queryable: bool,
+    rendering_mode: str,
+    render: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "id": capability_id,
+        "name": name,
+        "kind": kind,
+        "type": capability_type,
+        "description": description,
+        "provider": provider,
+        "requires_credentials": False,
+        "is_available": True,
+        "supports_map": supports_map,
+        "supports_direct_text": supports_direct_text,
+        "coverage": "global",
+        "source_protocol": source_protocol,
+        "data_format": data_format,
+        "geometry_type": geometry_type,
+        "queryable": queryable,
+        "endpoint_health": "healthy",
+        "auth_mode": "none",
+        "official_docs_url": "https://example.test/aegis-fixture",
+        "capability_kind": kind,
+        "rendering_mode": rendering_mode,
+        "reliability": {
+            "status": "verified",
+            "last_audited": "2026-08-31",
+            "known_limitations": [],
+        },
+        "auth": {
+            "type": "none",
+            "required": False,
+            "provider_key": None,
+            "access_page_provider_id": None,
+        },
+        "action_tags": [],
+        "task_tags": [],
+        "metadata": {},
+    }
+    if render is not None:
+        payload["render"] = render
+    return payload
+
+###############################################################################
+def geospatial_catalog_payload() -> dict[str, Any]:
+    return {
+        "capabilities": [
+            _catalog_capability(
+                capability_id="openmeteo_weather_forecast",
+                name="Open-Meteo Weather Forecast",
+                kind="tool",
+                capability_type="direct-tool",
+                description="Fixture weather forecast capability.",
+                provider="openmeteo",
+                supports_map=False,
+                supports_direct_text=True,
+                source_protocol="https",
+                data_format="json",
+                geometry_type="point",
+                queryable=True,
+                rendering_mode="metadata-only",
+            )
+        ],
+        "providers": [
+            _catalog_capability(
+                capability_id="osm",
+                name="OpenStreetMap",
+                kind="provider",
+                capability_type="map-provider",
+                description="Fixture map provider.",
+                provider="osm",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+            )
+        ],
+        "basemaps": [
+            _catalog_capability(
+                capability_id="osm_default",
+                name="OpenStreetMap",
+                kind="basemap",
+                capability_type="tile",
+                description="Fixture street basemap.",
+                provider="osm",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "attribution": "OpenStreetMap contributors",
                 },
-            }
-        )
-        events.append(
-            {
-                "event": "tool_call_completed",
-                "data": {
-                    "request_id": f"chat-stub-{session_id}",
-                    "session_id": session_id,
-                    "tool_call_id": "tool-1",
-                    "name": "execute_geospatial_capability",
-                    "ok": True,
-                    "error": None,
-                    "content": {
-                        "ok": True,
-                        "data": {"map_session": ROME_MAP_SESSION},
-                        "error": None,
-                    },
+            ),
+            _catalog_capability(
+                capability_id="esri_world_imagery",
+                name="Esri World Imagery",
+                kind="basemap",
+                capability_type="tile",
+                description="Fixture satellite basemap.",
+                provider="esri",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://example.test/esri/{z}/{y}/{x}.jpg",
+                    "attribution": "Esri",
                 },
-            }
-        )
-    events.append(
-        {
-            "event": "map_session_created",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "map_session": ROME_MAP_SESSION,
+            ),
+        ],
+        "overlays": [
+            _catalog_capability(
+                capability_id="openaq_air_quality",
+                name="OpenAQ Air Quality",
+                kind="overlay",
+                capability_type="tile",
+                description="Fixture air quality overlay.",
+                provider="openaq",
+                supports_map=True,
+                supports_direct_text=False,
+                source_protocol="xyz",
+                data_format="raster",
+                geometry_type="none",
+                queryable=False,
+                rendering_mode="xyz",
+                render={
+                    "status": "available",
+                    "tile_url": "https://example.test/openaq/{z}/{x}/{y}.png",
+                    "attribution": "OpenAQ",
+                },
+            )
+        ],
+        "cameras": [],
+        "transit": [],
+        "tools": [],
+    }
+
+###############################################################################
+def conversation_snapshot_payload(
+    user_message: str = "show map at 41.9028, 12.4964",
+    assistant_message: str = "Search executed successfully.",
+    map_session: dict[str, Any] | None = ROME_MAP_SESSION,
+) -> dict[str, Any]:
+    return {
+        "conversation_id": E2E_CONVERSATION_ID,
+        "title": "E2E conversation",
+        "context_revision": 5,
+        "messages": [
+            {
+                "role": "user",
+                "content": user_message,
+                "created_at": "2026-08-31T00:00:00Z",
             },
-        }
-    )
-    events.append(
-        {
-            "event": "final",
-            "data": {
-                "session_id": session_id,
-                "request_id": f"chat-stub-{session_id}",
-                "assistant_message": assistant_message,
-                "map_session": ROME_MAP_SESSION,
+            {
+                "role": "assistant",
+                "content": assistant_message,
+                "created_at": "2026-08-31T00:00:01Z",
             },
-        }
-    )
-    return events
+        ],
+        "memory_snapshot": {},
+        "map_session": deepcopy(map_session) if map_session is not None else None,
+        "active_run": None,
+        "conversation_state": {
+            "schema_version": 2,
+            "conversation_id": E2E_CONVERSATION_ID,
+            "revision": 5,
+            "active_directives": [],
+            "summary": None,
+            "goal": None,
+            "route": None,
+            "constraints": {},
+            "resolved_locations": {},
+            "evidence_refs": [],
+            "committed_map_session": None,
+            "pending_clarification": None,
+        },
+    }

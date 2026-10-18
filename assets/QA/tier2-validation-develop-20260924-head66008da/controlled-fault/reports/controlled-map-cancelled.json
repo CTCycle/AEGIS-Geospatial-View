@@ -1,0 +1,54 @@
+{
+  "scenario": "cancelled",
+  "run_id": "controlled-map-run-1",
+  "run_version": 1,
+  "final_run_version": 1,
+  "map_session_id": "rome-earthquake-session",
+  "candidate_map_sessions": [
+    {
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7,
+      "run_version": 1,
+      "status": null
+    }
+  ],
+  "tested_commit": "66008da15ea4ea23a5b1e99090441438bb163fba",
+  "acknowledgment_count": 0,
+  "acknowledgments": [],
+  "ack_payloads": [],
+  "synthetic_event_sequence": [
+    {
+      "sequence": 1,
+      "type": "progress",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 2,
+      "type": "assistant_text_completed",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    },
+    {
+      "sequence": 3,
+      "type": "map_prepared",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1,
+      "map_session_id": "rome-earthquake-session",
+      "collection_revision": 7
+    },
+    {
+      "sequence": 4,
+      "type": "cancelled",
+      "run_id": "controlled-map-run-1",
+      "run_version": 1
+    }
+  ],
+  "final_ui_state_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show recent earthquakes around Rome Data prepared; the map is loading. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Complete",
+  "console_output": [],
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924-head66008da\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-cancelled]\\controlled-map-cancelled.png",
+  "screenshot_path": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier2-validation-develop-20260924-head66008da\\controlled-fault\\screenshots\\__test_controlled_render_fault_scenarios[chromium-cancelled]\\controlled-map-cancelled.png",
+  "final_presentation_status": "failed",
+  "rejected_acknowledgments": [],
+  "fault_injection": "WebSocket fixture only"
+}

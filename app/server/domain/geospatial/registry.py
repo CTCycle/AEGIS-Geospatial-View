@@ -2,10 +2,47 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal, Mapping, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
+
+###############################################################################
+@dataclass(frozen=True)
+class GeospatialManifestSnapshot:
+    """The startup-loaded catalog shared by all geospatial registries."""
+
+    providers: tuple[dict[str, Any], ...]
+    basemaps: tuple[dict[str, Any], ...]
+    overlays: tuple[dict[str, Any], ...]
+    cameras: tuple[dict[str, Any], ...]
+    transit: tuple[dict[str, Any], ...]
+    tools: tuple[dict[str, Any], ...]
+    runtime_profiles: tuple[dict[str, Any], ...]
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "GeospatialManifestSnapshot":
+        def collection(name: str) -> tuple[dict[str, Any], ...]:
+            value = payload.get(name, ())
+            if not isinstance(value, (list, tuple)):
+                return ()
+            items = cast(list[object] | tuple[object, ...], value)
+            return tuple(
+                dict(cast(Mapping[str, Any], item))
+                for item in items
+                if isinstance(item, Mapping)
+            )
+
+        return cls(
+            providers=collection("providers"),
+            basemaps=collection("basemaps"),
+            overlays=collection("overlays"),
+            cameras=collection("cameras"),
+            transit=collection("transit"),
+            tools=collection("tools"),
+            runtime_profiles=collection("runtime_profiles"),
+        )
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -38,6 +75,7 @@ class LiveValidationCheckResult(BaseModel):
 
     provider_id: str
     capability_id: str
+    access_mode: str = "public"
     status: str
     message: str | None = None
     feature_count: int | None = None
@@ -50,7 +88,9 @@ class LiveValidationReport(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     error_count: int = 0
     skipped_count: int = 0
-    results: list[LiveValidationCheckResult] = Field(default_factory=list)
+    results: list[LiveValidationCheckResult] = Field(
+        default_factory=lambda: list[LiveValidationCheckResult]()
+    )
 
     # -------------------------------------------------------------------------
     @property
@@ -61,6 +101,27 @@ class LiveValidationReport(BaseModel):
 @dataclass(frozen=True)
 class LiveCheck:
     provider_id: str
-    request: ProviderRequest
-    credential_env: str | None = None
+    request: ProviderRequest | None = None
+    access_mode: Literal[
+        "public",
+        "credentialed",
+        "credential_or_local_source",
+        "configured_source",
+        "configuration_dependent",
+    ] = "public"
+    response_contract: Literal[
+        "feature_collection",
+        "result_list",
+        "json_object",
+        "raster_metadata",
+        "dataset",
+        "metadata",
+    ] = "json_object"
+    requires_credentials: bool = False
     required_feature_count: int | None = None
+    required_payload_keys: tuple[str, ...] = ()
+    numeric_payload_keys: tuple[str, ...] = ()
+    source_env: str | None = None
+    request_env: tuple[tuple[str, str], ...] = ()
+    source_path_only: bool = False
+    skip_message: str | None = None

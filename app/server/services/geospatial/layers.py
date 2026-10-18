@@ -6,7 +6,7 @@ from typing import Any
 from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.domain.layers import LayerProviderEntry
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 
 type LayerDefinition = dict[str, Any]
 type ResolutionProvider = Callable[[str], tuple[float, ...] | list[float]]
@@ -124,15 +124,25 @@ class LayerProviderService:
     ) -> dict[str, str]:
         lookup: dict[str, str] = {}
         for entry in entries.values():
-            lookup[entry.name.lower()] = entry.name
-            lookup[entry.label.lower()] = entry.name
+            name = entry.name
+            if name is None:
+                continue
+            lookup[name.lower()] = name
+            label = entry.label
+            if label is not None:
+                lookup[label.lower()] = name
             for alias in entry.aliases:
-                lookup[alias.lower()] = entry.name
+                if alias:
+                    lookup[alias.lower()] = name
         return lookup
 
     # -------------------------------------------------------------------------
     def list_options(self) -> dict[str, str]:
-        return {entry.name: entry.label for entry in self.layer_definitions.values()}
+        return {
+            str(entry.name): str(entry.label)
+            for entry in self.layer_definitions.values()
+            if entry.name and entry.label
+        }
 
     # -------------------------------------------------------------------------
     def resolve(self, value: str) -> LayerProviderEntry:
@@ -156,7 +166,7 @@ class LayerProviderService:
         return entry.label
 
 ###############################################################################
-def build_geospatial_layer_catalog(database: DatabaseBackend) -> LayerProviderService:
+def build_geospatial_layer_catalog(database: SQLiteRepository) -> LayerProviderService:
     repository = ReferenceCatalogRepository(database)
     return LayerProviderService(
         layer_catalog=repository.load_geospatial_layer_catalog()

@@ -1,0 +1,262 @@
+{
+  "scenario_id": "openmeteo_alias_oslo_weather",
+  "prompt": "Is it cold in Oslo right now?",
+  "expected_kind": "text",
+  "classification": "text_pass",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Is it cold in Oslo right now? No, it's not cold in Oslo right now. Current conditions in Oslo, Norway (as of ~12:45 local time, 1 Oct 2026): Temperature: 16.9 °C — mild, not cold Precipitation: 0.0 mm Humidity: 68% Wind: 10.8 km/h from the east (gusts to 22 km/h) Conditions: partly cloudy (WMO code 2) For context, the next 24 hours stay mild, ranging from about 18.5 °C this afternoon down to ~14 °C overnight into tomorrow morning, with a little light rain developing after 2 AM. So Oslo is currently experiencing mild, comfortable autumn weather — definitely not cold. (Source: Open-Meteo point forecast for Oslo.) Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "map_evidence": {
+    "maplibre_map_count": 0,
+    "maplibre_canvas_count": 0,
+    "attribution_present": false,
+    "attribution_text": "",
+    "target_overlay_status": null,
+    "target_overlay_visible": null,
+    "overlay_rows": []
+  },
+  "network": {
+    "proxy_request_count": 0,
+    "proxy_response_statuses": [],
+    "proxy_capabilities_seen": [],
+    "direct_upstream_browser_request_count": 0,
+    "events": []
+  },
+  "console": [],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_093c030b155c4a0b9607bf7d7ae6f122",
+    "run_id": "run_038499adae564be9845e6286049f3aee",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "data_retrieval",
+      "secondary_domains": [],
+      "task_mode": "execute",
+      "operation": "retrieve_current_conditions",
+      "target_refs": [
+        "Oslo"
+      ],
+      "temporal_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "get_weather_forecast",
+      "openmeteo_weather_forecast",
+      "openmeteo_pressure_humidity_wind"
+    ],
+    "iteration_count": 6,
+    "model_call_count": 7,
+    "tool_call_count": 5,
+    "state_transition_count": 29,
+    "terminal_or_stopped_reason": "failed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location"
+      ],
+      "2": [
+        "describe_geospatial_capability",
+        "execute_geospatial_capability"
+      ],
+      "3": [
+        "execute_geospatial_capability",
+        "describe_geospatial_capability"
+      ],
+      "4": [
+        "describe_geospatial_capability"
+      ],
+      "5": [
+        "describe_geospatial_capability"
+      ],
+      "6": [
+        "describe_geospatial_capability"
+      ]
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "describe_geospatial_capability",
+      "execute_geospatial_capability"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "execute_geospatial_capability",
+        "status": "success",
+        "iteration": 3,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [
+      "evidence_52f708e721b141ffa3e45b5f87a590e7"
+    ],
+    "apply_map_plan_attempts": 0,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "iteration": 2,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 3,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 4,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 4,
+        "render_verified": null,
+        "render_status": "continue",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 5,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 5,
+        "render_verified": null,
+        "render_status": "continue",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": 6,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "iteration": 6,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "current",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]",
+      "observation_time": "2026-10-01T12:45"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20261001-route-matrix\\screenshots\\ROUTE-MATRIX-LIVE\\openmeteo_alias_oslo_weather.png",
+  "backend_routed_diagnostics": []
+}

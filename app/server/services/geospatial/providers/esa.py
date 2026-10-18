@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.common.typing import is_json_object
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -45,18 +46,41 @@ class ESAProvider(GeospatialProvider):
     def _descriptor_payload(
         self, request: ProviderRequest, metadata: dict[str, Any]
     ) -> dict[str, Any]:
-        return {
-            "renderingMode": "wmts",
+        protocol = _protocol(metadata)
+        layer_id = str(
+            metadata.get("layer_id")
+            or metadata.get("layers")
+            or request.capability_id
+        )
+        base_payload: dict[str, Any] = {
             "serviceUrl": metadata.get("url"),
-            "layerId": metadata.get("layer_id") or request.capability_id,
-            "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
-            "format": metadata.get("wmts_format") or "image/png",
-            "style": metadata.get("wmts_style") or "",
+            "layerId": layer_id,
             "legend": {
                 "title": metadata.get("label") or "ESA WorldCover",
                 "source": "ESA WorldCover / Terrascope",
             },
             "freshnessLabel": "WorldCover 2021 static source layer",
+        }
+        if protocol == "wms":
+            return {
+                **base_payload,
+                "renderingMode": "wms",
+                "layers": layer_id,
+                "crs": metadata.get("crs") or "EPSG:3857",
+                "format": metadata.get("wms_format")
+                or metadata.get("format")
+                or "image/png",
+                "style": metadata.get("style") or "",
+                "version": metadata.get("wms_version") or "1.3.0",
+                "exceptions": metadata.get("wms_exceptions")
+                or "application/vnd.ogc.se_inimage",
+            }
+        return {
+            **base_payload,
+            "renderingMode": "wmts",
+            "tileMatrixSet": metadata.get("tile_matrix_set") or "EPSG:3857",
+            "format": metadata.get("wmts_format") or "image/png",
+            "style": metadata.get("wmts_style") or "",
         }
 
     # -------------------------------------------------------------------------
@@ -66,42 +90,57 @@ class ESAProvider(GeospatialProvider):
         metadata: dict[str, Any],
         payload: dict[str, Any],
     ) -> ProviderResponse:
+        protocol = _protocol(metadata).upper()
         service_url = str(payload.get("serviceUrl") or "").strip()
         cache_key = f"{self.provider_id}:{request.capability_id}:{service_url}"
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
-            return self._response(request, metadata, {**payload, "liveValidation": cached.value})
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
+            return self._response(
+                request, metadata, {**payload, "liveValidation": cached.value}
+            )
         try:
             validation = await call_json_fetcher(self.fetcher, service_url, None)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["ESA WMTS validation failed; using stale validation metadata."],
+                    warnings=[
+                        f"ESA {protocol} validation failed; using stale validation metadata."
+                    ],
                 )
             if isinstance(exc, ProviderUnavailableError):
                 raise
-            raise ProviderUnavailableError("ESA WMTS validation failed.") from exc
-        if not isinstance(validation, dict):
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            raise ProviderUnavailableError(f"ESA {protocol} validation failed.") from exc
+        if not is_json_object(validation):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(
+                cached.value
+            ):
                 return self._response(
                     request,
                     metadata,
                     {**payload, "liveValidation": cached.value},
                     stale=True,
-                    warnings=["ESA WMTS validation was malformed; using stale validation metadata."],
+                    warnings=[
+                        f"ESA {protocol} validation was malformed; using stale validation metadata."
+                    ],
                 )
-            raise ProviderUnavailableError("ESA WMTS validation returned malformed metadata.")
+            raise ProviderUnavailableError(
+                f"ESA {protocol} validation returned malformed metadata."
+            )
         self.cache.set(
             cache_key,
             validation,
             ttl_seconds=self.cache_ttl_seconds,
             stale_while_revalidate_seconds=self.stale_while_revalidate_seconds,
         )
-        return self._response(request, metadata, {**payload, "liveValidation": validation})
+        return self._response(
+            request, metadata, {**payload, "liveValidation": validation}
+        )
 
     # -------------------------------------------------------------------------
     def _response(
@@ -117,6 +156,7 @@ class ESAProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload=payload,
+            result_type="raster",
             attribution=[str(metadata.get("attribution") or "ESA WorldCover")],
             warnings=warnings or [],
             stale=stale,
@@ -125,4 +165,15 @@ class ESAProvider(GeospatialProvider):
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
-    return dict(value) if isinstance(value, dict) else {}
+    return dict(value) if is_json_object(value) else {}
+
+
+def _protocol(metadata: dict[str, Any]) -> str:
+    value = str(
+        metadata.get("source_protocol")
+        or metadata.get("renderingMode")
+        or metadata.get("rendering_mode")
+        or metadata.get("type")
+        or ""
+    ).strip().lower()
+    return "wms" if value == "wms" else "wmts"

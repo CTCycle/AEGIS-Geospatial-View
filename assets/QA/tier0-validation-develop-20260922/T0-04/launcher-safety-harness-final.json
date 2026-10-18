@@ -1,0 +1,35 @@
+[INFO] Terminating confirmed PID 2147483003 on port(s) 45871.
+{
+  "result": "PASS",
+  "launcher_parse": "PASS",
+  "unresolved_owner_fails_before_prompt_or_termination": "PASS",
+  "noninteractive_conflict_fails_without_termination": "PASS",
+  "changed_owner_requires_fresh_consent": "PASS",
+  "synthetic_termination_refusal_fails_closed": "PASS",
+  "readiness_failure_cleanup": [
+    {
+      "stage": "backend",
+      "launcher_owned_pids": [
+        27012,
+        28200
+      ],
+      "unrelated_pid_survived": 13092,
+      "expected_failure": "Backend did not become ready within 60 seconds at http://127.0.0.1:45871/api/health."
+    },
+    {
+      "stage": "frontend",
+      "launcher_owned_pids": [
+        2032,
+        17612
+      ],
+      "unrelated_pid_survived": 9572,
+      "expected_failure": "Frontend preview did not become ready within 60 seconds at http://127.0.0.1:45872."
+    }
+  ],
+  "simulated_listener_pids": [
+    2147483001,
+    2147483002,
+    2147483003
+  ],
+  "real_services_or_user_processes_targeted": false
+}

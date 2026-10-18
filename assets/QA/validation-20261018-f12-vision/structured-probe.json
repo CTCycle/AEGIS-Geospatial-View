@@ -1,0 +1,1 @@
+{"provider":"opencode-go","model":"deepseek-v4.1-flash","protocol":"openai-chat-completions","status":"passed","parse_status":"complete","duration_ms":2801,"checked_at":"2026-10-18T16:17:11.523031Z","expires_at":"2026-10-18T16:32:11.523031Z","message":"Native tool probe passed."}

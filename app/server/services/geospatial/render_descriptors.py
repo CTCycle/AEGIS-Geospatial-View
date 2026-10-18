@@ -1,15 +1,43 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import math
 import os
-from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
 
-from server.domain.geographics import LocationSearchRequest
+from server.contracts.geospatial import LocationSearchRequest
+from server.services.geospatial.api_service import (
+    GeospatialProviderResponseError,
+    normalize_geojson_feature_collection,
+)
+from server.services.geospatial.attribution import AttributionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
-from server.services.geospatial.provider_registry import ProviderRegistry
-from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
+from server.services.geospatial.provider_registry import (
+    ProviderRegistry,
+    ProviderRegistryError,
+)
+from server.services.geospatial.raster_tiles import (
+    build_backend_raster_proxy_template,
+    build_wms_tile_template as build_wms_tile_template_url,
+    build_wmts_tile_template as build_wmts_tile_template_url,
+)
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
+from server.services.geospatial.overpass import OverpassService
+from server.services.geospatial.normalizers import (
+    NormalizationError,
+    normalize_poi_feature,
+)
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderRequest,
+)
 
 ###############################################################################
 class RenderDescriptorService:
@@ -21,13 +49,21 @@ class RenderDescriptorService:
         capability_registry: CapabilityRegistry | None = None,
         provider_registry: ProviderRegistry | None = None,
         rainviewer_service: RainViewerService | None = None,
+        credential_resolver: GeospatialCredentialResolver | None = None,
+        attribution_service: AttributionService | None = None,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.provider_registry = provider_registry or ProviderRegistry()
         self.rainviewer_service = rainviewer_service or RainViewerService()
+        self.credential_resolver = (
+            credential_resolver or self.provider_registry.credential_resolver
+        )
+        self.attribution_service = attribution_service or AttributionService()
 
     # -------------------------------------------------------------------------
-    async def build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
+    async def build_basemap_descriptor(
+        self, basemap_id: str
+    ) -> dict[str, object] | None:
         capability = self.capability_registry.get_capability(basemap_id)
         if capability is None:
             return None
@@ -39,12 +75,19 @@ class RenderDescriptorService:
             or metadata.get("url"),
             capability=capability,
         )
+        style_url = self._resolve_openfreemap_style_url(metadata.get("style_url"))
+        render_status = "available" if tile_url or style_url else "unavailable"
         return {
             "id": str(capability.get("id") or basemap_id),
             "label": str(metadata.get("label") or capability.get("name") or basemap_id),
             "provider": str(capability.get("provider") or "unknown"),
             "tile_url": tile_url,
+            "style_url": style_url,
             "attribution": str(metadata.get("attribution") or ""),
+            "render_status": render_status,
+            "unavailable_reason": None
+            if render_status == "available"
+            else "render_descriptor_missing",
         }
 
     # -------------------------------------------------------------------------
@@ -66,20 +109,36 @@ class RenderDescriptorService:
         capability_type = str(capability.get("type") or "")
         rendering_mode = str(capability.get("renderingMode") or "")
         capability_kind = str(capability.get("capabilityKind") or "")
-        if capability_kind == "camera-network":
-            auth = capability.get("auth") if isinstance(capability.get("auth"), dict) else {}
-            credential_env = self._credential_env_for_provider(
-                str(auth.get("providerKey") or capability.get("provider") or "")
+        if str(
+            metadata.get("render_backend") or ""
+        ).strip().lower() == "provider" and rendering_mode in {
+            "clustered-points",
+            "geojson",
+            "choropleth",
+        }:
+            return await self._provider_overlay_descriptor(
+                capability, metadata, overlay_id, request, warnings
             )
-            if bool(auth.get("required")) and credential_env and not os.getenv(credential_env, "").strip():
-                warnings.append(f"{overlay_id}: {credential_env} is required for live camera metadata.")
+        if capability_kind == "camera-network":
+            auth = json_object(capability.get("auth"))
+            provider_id = str(
+                auth.get("providerKey") or capability.get("provider") or ""
+            )
+            if bool(
+                auth.get("required")
+            ) and not self.credential_resolver.is_configured(provider_id):
+                warnings.append(
+                    f"{overlay_id}: a saved credential for '{provider_id}' is required for live camera metadata."
+                )
             camera_params = {
                 "provider": str(capability.get("provider") or "unknown"),
                 "bbox": self._bbox_query_value(request),
             }
             return {
                 "id": str(capability.get("id") or overlay_id),
-                "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+                "label": str(
+                    metadata.get("label") or capability.get("name") or overlay_id
+                ),
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": "camera-points",
                 "rendering_mode": "camera-points",
@@ -93,30 +152,150 @@ class RenderDescriptorService:
             capability_kind in {"dataset-ingestion", "vector-overlay"}
             and rendering_mode in {"clustered-points", "geojson", "choropleth"}
             and raw_url is None
+            and not overlay_id.startswith("overpass_poi")
         ):
-            return self._feature_overlay_descriptor(capability, metadata, overlay_id, request), warnings
-        if capability_kind in {"dataset-ingestion", "vector-overlay"} and rendering_mode == "vector-tile" and raw_url is None:
-            warnings.append(f"{overlay_id}: vector tile render metadata is incomplete; exposing metadata only.")
-            return self.metadata_only_descriptor(capability, metadata, overlay_id), warnings
+            return self._feature_overlay_descriptor(
+                capability, metadata, overlay_id, request
+            ), warnings
+        if overlay_id.startswith("overpass_poi") and request.poi_categories:
+            try:
+                payload = await OverpassService().get_nearby_poi(
+                    latitude=request.viewport.center_latitude,
+                    longitude=request.viewport.center_longitude,
+                    radius_m=request.viewport.radius_m,
+                    categories=list(request.poi_categories),
+                )
+                features: list[dict[str, Any]] = []
+                for item in json_array(payload.get("items")):
+                    item = json_object(item)
+                    if not item:
+                        continue
+                    try:
+                        features.append(
+                            normalize_poi_feature(
+                                item,
+                                source="overpass",
+                                category=str(
+                                    item.get("category") or item.get("amenity") or "poi"
+                                ),
+                            ).model_dump(mode="json")
+                        )
+                    except NormalizationError:
+                        continue
+                descriptor = self._feature_overlay_descriptor(
+                    capability, metadata, overlay_id, request
+                )
+                descriptor["data"] = {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": item["id"],
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [item["longitude"], item["latitude"]],
+                            },
+                            "properties": {
+                                **(
+                                    {
+                                        "source_url": payload.get("source_url"),
+                                        "freshness": payload.get("fetched_at"),
+                                        "status": payload.get("result_status"),
+                                    }
+                                    if payload.get("source_url")
+                                    or payload.get("fetched_at")
+                                    or payload.get("result_status")
+                                    else {}
+                                ),
+                                **item,
+                            },
+                        }
+                        for item in features
+                    ],
+                }
+                descriptor.update(
+                    {
+                        key: payload[key]
+                        for key in (
+                            "source_url",
+                            "fetched_at",
+                            "result_status",
+                            "result_type",
+                            "partial",
+                            "coverage",
+                            "spatial_resolution",
+                            "units",
+                            "total_results",
+                            "returned_results",
+                            "limit",
+                            "truncated",
+                        )
+                        if payload.get(key) is not None
+                    }
+                )
+                inspection_metadata = json_object(descriptor.get("inspection_metadata"))
+                inspection_metadata.update(
+                    {
+                        key: payload[key]
+                        for key in ("source_url", "fetched_at", "result_status")
+                        if payload.get(key) is not None
+                    }
+                )
+                descriptor["inspection_metadata"] = inspection_metadata
+                descriptor.pop("url", None)
+                return descriptor, warnings
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(
+                    f"{overlay_id}: public POI retrieval failed; no layer was added ({type(exc).__name__})."
+                )
+                return self.metadata_only_descriptor(
+                    capability, metadata, overlay_id
+                ), warnings
+        if (
+            capability_kind in {"dataset-ingestion", "vector-overlay"}
+            and rendering_mode == "vector-tile"
+            and raw_url is None
+        ):
+            warnings.append(
+                f"{overlay_id}: vector tile render metadata is incomplete; exposing metadata only."
+            )
+            return self.metadata_only_descriptor(
+                capability, metadata, overlay_id
+            ), warnings
         is_point_insight = raw_url is None and (
             bool(capability.get("supports_direct_text"))
             or capability_type.endswith("insight")
             or rendering_mode == "metadata-only"
         )
-        resolved_url, url_warning = (None, None) if is_point_insight else await self._resolve_runtime_tile_url(raw_url, capability=capability)
+        resolved_url, url_warning = (
+            (None, None)
+            if is_point_insight
+            else await self._resolve_runtime_tile_url(raw_url, capability=capability)
+        )
         if url_warning is not None:
             warnings.append(f"{overlay_id}: {url_warning}")
         descriptor = self._base_overlay_descriptor(
             capability,
             metadata,
             overlay_id,
-            "point-insight" if is_point_insight else str(capability.get("type") or "tile"),
+            "point-insight"
+            if is_point_insight
+            else str(capability.get("type") or "tile"),
             rendering_mode or ("metadata-only" if is_point_insight else ""),
         )
         render = self._build_render_descriptor(rendering_mode, resolved_url, metadata)
         if resolved_url is not None:
             descriptor["url"] = resolved_url
         if render is not None:
+            proxy_template = self._backend_raster_proxy_template(
+                overlay_id,
+                provider=str(capability.get("provider") or "").strip().lower(),
+                render=render,
+            )
+            if proxy_template is not None:
+                descriptor["source_url"] = resolved_url
+                descriptor["url"] = proxy_template
+                render["tile_url_template"] = proxy_template
             descriptor["render"] = render
             tile_url_template = render.get("tile_url_template")
             if tile_url_template is not None:
@@ -141,11 +320,21 @@ class RenderDescriptorService:
             normalized = self._optional_string(value)
             if normalized is not None:
                 descriptor[key] = normalized
-        for key in ("default_opacity", "tile_size", "minzoom", "maxzoom"):
+        for key in (
+            "default_opacity",
+            "tile_size",
+            "min_zoom",
+            "max_zoom",
+            "fit_max_zoom",
+        ):
             if isinstance(metadata.get(key), int | float):
-                descriptor[key] = int(metadata[key]) if key != "default_opacity" else float(metadata[key])
+                descriptor[key] = (
+                    int(metadata[key])
+                    if key != "default_opacity"
+                    else float(metadata[key])
+                )
         if descriptor["provider"] == "rainviewer":
-            descriptor["maxzoom"] = 10
+            descriptor["max_zoom"] = 7
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
@@ -159,15 +348,26 @@ class RenderDescriptorService:
         request: LocationSearchRequest,
         refresh: bool = False,
     ) -> tuple[dict[str, object], list[str]]:
-        self.provider_registry.build_from_manifests()
-        layer = await self.provider_registry.describe_layer(provider_id, layer_id, refresh=refresh)
+        layer = await self.provider_registry.describe_layer(
+            provider_id, layer_id, refresh=refresh
+        )
         render = layer.render
         render_payload = render.model_dump(mode="json") if render else None
         requested_time = self._optional_string(getattr(request, "time", None))
         if render_payload is not None and requested_time:
             render_payload["time"] = requested_time
             if render_payload.get("tile_url_template"):
-                render_payload["tile_url_template"] = str(render_payload["tile_url_template"]).replace("{time}", requested_time)
+                render_payload["tile_url_template"] = str(
+                    render_payload["tile_url_template"]
+                ).replace("{time}", requested_time)
+        proxy_template = self._backend_raster_proxy_template(
+            f"{provider_id}:{layer.layer_id}",
+            provider=provider_id,
+            render=render_payload,
+        )
+        source_url = render.url if render else None
+        if proxy_template is not None and render_payload is not None:
+            render_payload["tile_url_template"] = proxy_template
         descriptor: dict[str, object] = {
             "id": f"{provider_id}:{layer.layer_id}",
             "label": layer.title,
@@ -175,8 +375,11 @@ class RenderDescriptorService:
             "type": "raster-overlay" if render else "metadata-only",
             "rendering_mode": render.rendering_mode if render else "metadata-only",
             "render": render_payload,
-            "url": render.url if render else None,
-            "tile_url_template": render_payload.get("tile_url_template") if isinstance(render_payload, dict) else None,
+            "url": proxy_template or source_url,
+            "source_url": source_url,
+            "tile_url_template": render_payload.get("tile_url_template")
+            if is_json_object(render_payload)
+            else None,
             "layer_id": layer.layer_id,
             "time": requested_time if requested_time else layer.default_time,
             "default_time": layer.default_time,
@@ -201,16 +404,22 @@ class RenderDescriptorService:
         if normalized_mode in {"tile", "raster-tile", "xyz", "vector-tile"}:
             return {
                 "provider": str(metadata.get("provider") or ""),
-                "layer_id": str(metadata.get("layer_id") or metadata.get("layers") or ""),
+                "layer_id": str(
+                    metadata.get("layer_id") or metadata.get("layers") or ""
+                ),
                 "rendering_mode": normalized_mode,
-                "source_protocol": str(metadata.get("source_protocol") or normalized_mode),
+                "source_protocol": str(
+                    metadata.get("source_protocol") or normalized_mode
+                ),
                 "tile_url_template": resolved_url,
                 "attribution": [str(metadata.get("attribution") or "")],
             }
         if normalized_mode == "wms":
             layer_id = str(metadata.get("layer_id") or metadata.get("layers") or "0")
             crs = str(metadata.get("crs") or "EPSG:3857")
-            image_format = str(metadata.get("format") or metadata.get("wms_format") or "image/png")
+            image_format = str(
+                metadata.get("format") or metadata.get("wms_format") or "image/png"
+            )
             return {
                 "provider": str(metadata.get("provider") or ""),
                 "layer_id": layer_id,
@@ -223,9 +432,14 @@ class RenderDescriptorService:
                     crs=crs,
                     image_format=image_format,
                     style=str(metadata.get("style") or ""),
-                    time=str(metadata.get("time") or metadata.get("default_time") or ""),
+                    time=str(
+                        metadata.get("time") or metadata.get("default_time") or ""
+                    ),
                     version=str(metadata.get("wms_version") or "1.1.1"),
-                    exceptions=str(metadata.get("wms_exceptions") or "application/vnd.ogc.se_inimage"),
+                    exceptions=str(
+                        metadata.get("wms_exceptions")
+                        or "application/vnd.ogc.se_inimage"
+                    ),
                 ),
                 "crs": crs,
                 "format": image_format,
@@ -235,10 +449,16 @@ class RenderDescriptorService:
                 "attribution": [str(metadata.get("attribution") or "")],
             }
         if normalized_mode == "wmts":
-            layer_id = str(metadata.get("layer_id") or metadata.get("layers") or "layer")
+            layer_id = str(
+                metadata.get("layer_id") or metadata.get("layers") or "layer"
+            )
             matrix_set = str(metadata.get("tile_matrix_set") or "EPSG:3857")
-            image_format = str(metadata.get("format") or metadata.get("wmts_format") or "image/png")
-            style = str(metadata.get("style") or metadata.get("wmts_style") or "default")
+            image_format = str(
+                metadata.get("format") or metadata.get("wmts_format") or "image/png"
+            )
+            style = str(
+                metadata.get("style") or metadata.get("wmts_style") or "default"
+            )
             return {
                 "provider": str(metadata.get("provider") or ""),
                 "layer_id": layer_id,
@@ -251,7 +471,9 @@ class RenderDescriptorService:
                     style=style,
                     image_format=image_format,
                     tile_matrix_set=matrix_set,
-                    time=str(metadata.get("time") or metadata.get("default_time") or ""),
+                    time=str(
+                        metadata.get("time") or metadata.get("default_time") or ""
+                    ),
                 ),
                 "format": image_format,
                 "style": style,
@@ -275,24 +497,16 @@ class RenderDescriptorService:
         version: str,
         exceptions: str,
     ) -> str:
-        crs_key = "crs" if version.startswith("1.3") else "srs"
-        query = [
-            "service=WMS",
-            "request=GetMap",
-            f"layers={layer_id}",
-            f"styles={style}",
-            f"format={image_format}",
-            "transparent=true",
-            f"version={version}",
-            f"{crs_key}={crs}",
-            f"exceptions={exceptions}",
-            "bbox={bbox-epsg-3857}",
-            "width=256",
-            "height=256",
-        ]
-        if time:
-            query.append(f"time={time}")
-        return f"{url}{'&' if '?' in url else '?'}{'&'.join(query)}"
+        return build_wms_tile_template_url(
+            url=url,
+            layer_id=layer_id,
+            crs=crs,
+            image_format=image_format,
+            style=style,
+            time=time,
+            version=version,
+            exceptions=exceptions,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -305,21 +519,28 @@ class RenderDescriptorService:
         tile_matrix_set: str,
         time: str,
     ) -> str:
-        query = [
-            "service=WMTS",
-            "request=GetTile",
-            "version=1.0.0",
-            f"layer={layer_id}",
-            f"style={style}",
-            f"tilematrixset={tile_matrix_set}",
-            f"tilematrix={tile_matrix_set}:{{z}}",
-            "tilerow={y}",
-            "tilecol={x}",
-            f"format={image_format}",
-        ]
-        if time:
-            query.append(f"time={time}")
-        return f"{url}{'&' if '?' in url else '?'}{'&'.join(query)}"
+        return build_wmts_tile_template_url(
+            url=url,
+            layer_id=layer_id,
+            style=style,
+            image_format=image_format,
+            tile_matrix_set=tile_matrix_set,
+            time=time,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _backend_raster_proxy_template(
+        capability_id: str,
+        *,
+        provider: str,
+        render: dict[str, object] | None,
+    ) -> str | None:
+        return build_backend_raster_proxy_template(
+            capability_id,
+            provider=provider,
+            render=render,
+        )
 
     # -------------------------------------------------------------------------
     def metadata_only_descriptor(
@@ -328,7 +549,9 @@ class RenderDescriptorService:
         metadata: dict[str, Any],
         overlay_id: str,
     ) -> dict[str, object]:
-        return self._base_overlay_descriptor(capability, metadata, overlay_id, "metadata-only", "metadata-only")
+        return self._base_overlay_descriptor(
+            capability, metadata, overlay_id, "metadata-only", "metadata-only"
+        )
 
     # -------------------------------------------------------------------------
     def _feature_overlay_descriptor(
@@ -350,28 +573,220 @@ class RenderDescriptorService:
         return descriptor
 
     # -------------------------------------------------------------------------
+    async def _provider_overlay_descriptor(
+        self,
+        capability: dict[str, Any],
+        metadata: dict[str, Any],
+        overlay_id: str,
+        request: LocationSearchRequest,
+        warnings: list[str],
+    ) -> tuple[dict[str, object], list[str]]:
+        provider_id = str(capability.get("provider") or "").strip().lower()
+        provider_request = ProviderRequest(
+            capability_id=overlay_id,
+            bbox=self._provider_bbox(request),
+            params={
+                "latitude": request.viewport.center_latitude,
+                "longitude": request.viewport.center_longitude,
+                "live": True,
+                "radius_m": request.analysis_radius_m,
+                "temporal_mode": request.time_mode,
+                "start_time_iso": request.start_time_iso,
+                "end_time_iso": request.end_time_iso,
+            },
+        )
+        try:
+            response = await self.provider_registry.fetch(provider_id, provider_request)
+            data = normalize_geojson_feature_collection(response.payload)
+        except ProviderAuthError:
+            raise ProviderAuthError(
+                f"{capability.get('name', 'Requested layer')} requires valid provider credentials. "
+                "Configure them in Settings under Geospatial Access."
+            ) from None
+        except (
+            GeospatialProviderResponseError,
+            ProviderError,
+            ProviderRegistryError,
+            ValueError,
+        ) as exc:
+            descriptor = self._feature_overlay_descriptor(
+                capability, metadata, overlay_id, request
+            )
+            descriptor.update(
+                {
+                    "rendering_mode": "metadata-only",
+                    "type": "metadata-only",
+                    "result_status": "unavailable",
+                    "result_type": "features",
+                    "partial": False,
+                    "warnings": [
+                        f"{overlay_id}: provider data is unavailable; retry to refresh."
+                    ],
+                }
+            )
+            warnings.append(
+                f"{overlay_id}: provider data is unavailable ({type(exc).__name__})."
+            )
+            return descriptor, warnings
+
+        descriptor = self._feature_overlay_descriptor(
+            capability, metadata, overlay_id, request
+        )
+        descriptor["data"] = data
+        descriptor.update(
+            {
+                "result_status": response.result_status,
+                "result_type": response.result_type,
+                "fetched_at": response.fetched_at.isoformat(),
+                "observation_time": response.observation_time,
+                "coverage": response.coverage,
+                "spatial_resolution": response.spatial_resolution,
+                "units": dict(response.units),
+                "source_url": response.source_url,
+                "partial": response.partial,
+                "warnings": list(response.warnings),
+                "requested_variables": list(
+                    json_array(response.payload.get("requested_variables"))
+                ),
+                "request_parameters": json_object(
+                    response.payload.get("request_parameters")
+                ),
+            }
+        )
+        if response.attribution:
+            descriptor["attribution"] = response.attribution[0]
+        warnings.extend(response.warnings)
+        inspection_metadata = json_object(descriptor.get("inspection_metadata"))
+        inspection_metadata.update(
+            {
+                key: value
+                for key, value in {
+                    "source_url": response.source_url,
+                    "fetched_at": response.fetched_at.isoformat(),
+                    "result_status": response.result_status,
+                    "partial": response.partial,
+                    "observation_time": response.observation_time,
+                }.items()
+                if value is not None
+            }
+        )
+        descriptor["inspection_metadata"] = inspection_metadata
+        return descriptor, warnings
+
+    # -------------------------------------------------------------------------
     @staticmethod
+    def _provider_bbox(
+        request: LocationSearchRequest,
+    ) -> tuple[float, float, float, float] | None:
+        bounds = request.analysis_bbox or request.viewport.bbox or RenderDescriptorService._bounds_from_viewport(
+            request.viewport
+        )
+        if (
+            not bounds
+            or len(bounds) != 4
+            or not all(not isinstance(item, bool) for item in bounds)
+        ):
+            return None
+        return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))
+
+    # -------------------------------------------------------------------------
     def _base_overlay_descriptor(
+        self,
         capability: dict[str, Any],
         metadata: dict[str, Any],
         overlay_id: str,
         overlay_type: str,
         rendering_mode: str,
     ) -> dict[str, object]:
+        def string_list(value: object) -> list[str]:
+            return list(
+                dict.fromkeys(
+                    item.strip()
+                    for item in json_array(value)
+                    if isinstance(item, str) and item.strip()
+                )
+            )
+
+        metadata_tags = string_list(metadata.get("tags"))
+        capability_tags = string_list(metadata.get("action_tags"))
+        capability_tags.extend(string_list(metadata.get("map_type_tags")))
+        tags = list(dict.fromkeys(metadata_tags or capability_tags))
+        concepts = string_list(metadata.get("concepts")) or string_list(
+            capability.get("capabilities")
+        )
+        attribution = self.attribution_service.from_manifest(capability)
+        inspection_metadata = {
+            key: value
+            for key, value in metadata.items()
+            if key
+            in {
+                "metric",
+                "value",
+                "unit",
+                "units",
+                "observation_time",
+                "observationTime",
+                "forecast_time",
+                "forecastTime",
+                "freshness",
+                "name",
+                "label",
+                "category",
+                "address",
+                "status",
+                "event",
+                "severity",
+                "effective",
+                "effective_time",
+                "expiry",
+                "expiry_time",
+                "feed",
+                "feed_id",
+                "station",
+                "station_id",
+                "camera",
+                "camera_id",
+                "period",
+                "geography",
+                "source",
+                "license",
+                "update_time",
+                "updated_at",
+                "updatedAt",
+                "source_url",
+                "sourceUrl",
+                "official_url",
+                "officialUrl",
+                "dataset_url",
+                "datasetUrl",
+                "license_url",
+                "licenseUrl",
+                "latitude",
+                "longitude",
+            }
+            and isinstance(value, str | int | float | bool)
+        }
         return {
             "id": str(capability.get("id") or overlay_id),
+            "capability_id": str(capability.get("id") or overlay_id),
             "label": str(metadata.get("label") or capability.get("name") or overlay_id),
             "provider": str(capability.get("provider") or "unknown"),
             "type": overlay_type,
             "rendering_mode": rendering_mode,
             "attribution": str(metadata.get("attribution") or ""),
+            "attribution_url": attribution.url or None,
             "source_protocol": metadata.get("source_protocol"),
             "data_format": metadata.get("data_format"),
             "geometry_type": metadata.get("geometry_type"),
+            "tags": tags,
+            "concepts": concepts,
+            "inspection_metadata": inspection_metadata,
         }
 
     # -------------------------------------------------------------------------
-    def _apply_spatial_placeholders(self, value: object, *, request: LocationSearchRequest) -> object:
+    def _apply_spatial_placeholders(
+        self, value: object, *, request: LocationSearchRequest
+    ) -> object:
         template = self._optional_string(value)
         if template is None:
             return value
@@ -386,12 +801,19 @@ class RenderDescriptorService:
         return template
 
     # -------------------------------------------------------------------------
-    def _feature_endpoint_url(self, overlay_id: str, *, request: LocationSearchRequest) -> str:
+    def _feature_endpoint_url(
+        self, overlay_id: str, *, request: LocationSearchRequest
+    ) -> str:
         return f"/api/geospatial/layers/{overlay_id}/geojson?{urlencode({'bbox': self._bbox_query_value(request), 'live': 'true'})}"
 
     # -------------------------------------------------------------------------
     def _bbox_query_value(self, request: LocationSearchRequest) -> str:
-        bounds = request.viewport.bbox or self._bounds_from_viewport(request.viewport) or []
+        bounds = (
+            request.analysis_bbox
+            or request.viewport.bbox
+            or self._bounds_from_viewport(request.viewport)
+            or []
+        )
         return ",".join(str(round(float(item), 6)) for item in bounds)
 
     # -------------------------------------------------------------------------
@@ -404,22 +826,24 @@ class RenderDescriptorService:
         template = self._optional_string(value)
         if template is None:
             return None, "Tile URL is missing from provider metadata."
-        template, credential_warning = self._resolve_credential_placeholders(template, capability)
+        template, credential_warning = self._resolve_credential_placeholders(
+            template, capability
+        )
         if credential_warning is not None:
             return None, credential_warning
         if "{time}" not in template:
             return template, None
+        provider = str((capability or {}).get("provider") or "").strip().lower()
+        if provider != "rainviewer":
+            return template, None
         rainviewer_url = await self._resolve_rainviewer_tile_url()
         if rainviewer_url is not None:
             return rainviewer_url, None
-        timestamp = int(datetime.now(UTC).timestamp())
-        rounded_timestamp = timestamp - (timestamp % 600)
-        return template.replace("{time}", str(rounded_timestamp)), "RainViewer metadata could not be fetched; using a timestamp fallback."
+        return None, "RainViewer metadata could not be fetched; no tile URL was emitted."
 
     # -------------------------------------------------------------------------
-    @classmethod
     def _resolve_credential_placeholders(
-        cls,
+        self,
         template: str,
         capability: dict[str, Any] | None,
     ) -> tuple[str, str | None]:
@@ -427,30 +851,34 @@ class RenderDescriptorService:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
         capability_id = str((capability or {}).get("id") or "").strip()
-        env_by_provider = {
-            "arcgis": "ARCGIS_API_KEY",
-            "census": "CENSUS_API_KEY",
-            "fred": "FRED_API_KEY",
-            "tomtom": "TOMTOM_API_KEY",
-            "geoapify": "GEOAPIFY_API_KEY",
-            "google_maps": "GOOGLE_MAPS_API_KEY",
-            "openaq": "OPENAQ_API_KEY",
-        }
-        env_name = env_by_provider.get(provider)
-        if env_name is None:
-            return template, f"No credential mapping is configured for provider '{provider}'."
-        api_key = os.getenv(env_name, "").strip()
-        if not api_key:
-            return template, f"{env_name} is required to render this provider tile layer."
+        if not self.credential_resolver.is_configured(provider):
+            return (
+                template,
+                f"A saved credential for '{provider}' is required to render this provider tile layer.",
+            )
         if capability_id:
             return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None
-        return template, f"Credentialed tile capability for provider '{provider}' is missing a stable id."
+        return (
+            template,
+            f"Credentialed tile capability for provider '{provider}' is missing a stable id.",
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata")
-        return dict(metadata) if isinstance(metadata, dict) else {}
+        return dict(metadata) if is_json_object(metadata) else {}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolve_openfreemap_style_url(value: object) -> str | None:
+        style_url = RenderDescriptorService._optional_string(value)
+        if style_url is None:
+            return None
+        base_url = os.getenv("OPENFREEMAP_STYLE_BASE_URL", "").strip().rstrip("/")
+        if base_url and style_url.startswith("https://tiles.openfreemap.org"):
+            return f"{base_url}{style_url[len('https://tiles.openfreemap.org') :]}"
+        return style_url
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -459,11 +887,6 @@ class RenderDescriptorService:
             return None
         stripped = value.strip()
         return stripped or None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _credential_env_for_provider(provider: str) -> str | None:
-        return {"windy_webcams": "WINDY_WEBCAMS_API_KEY"}.get(provider.strip().lower())
 
     # -------------------------------------------------------------------------
     async def _resolve_rainviewer_tile_url(self) -> str | None:
@@ -479,7 +902,11 @@ class RenderDescriptorService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_bounds(value: object) -> bool:
-        return isinstance(value, list) and len(value) == 4 and all(isinstance(item, int | float) for item in value)
+        return (
+            is_json_array(value)
+            and len(value) == 4
+            and all(isinstance(item, int | float) for item in value)
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -487,12 +914,16 @@ class RenderDescriptorService:
         latitude = getattr(viewport, "center_latitude", None)
         longitude = getattr(viewport, "center_longitude", None)
         radius_m = getattr(viewport, "radius_m", None)
-        if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        if not isinstance(latitude, int | float) or not isinstance(
+            longitude, int | float
+        ):
             return None
         if not isinstance(radius_m, int | float) or radius_m <= 0:
             return None
         lat_delta = radius_m / 111_320.0
-        lon_delta = radius_m / (111_320.0 * max(abs(math.cos(math.radians(float(latitude)))), 0.01))
+        lon_delta = radius_m / (
+            111_320.0 * max(abs(math.cos(math.radians(float(latitude)))), 0.01)
+        )
         return [
             max(-180.0, float(longitude) - lon_delta),
             max(-90.0, float(latitude) - lat_delta),

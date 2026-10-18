@@ -1,6 +1,388 @@
 from __future__ import annotations
 
+import re
+
+from typing import Any, Literal
+
+from server.services.llm.types import FailureCategory
+
+
+TimeoutOrigin = Literal[
+    "provider_transport",
+    "application_deadline",
+    "cancelled",
+    "unknown",
+]
+
+
+###############################################################################
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    for _ in range(8):
+        if current is None or current in chain:
+            break
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+###############################################################################
+def transport_diagnostics(
+    exc: BaseException,
+    *,
+    http_status: int | None = None,
+) -> dict[str, Any]:
+    """Extract bounded transport facts without retaining exception messages."""
+
+    chain = _exception_chain(exc)
+    diagnostics: dict[str, Any] = {
+        "exception_type": type(exc).__name__,
+    }
+    if len(chain) > 1:
+        diagnostics["cause_type"] = type(chain[-1]).__name__
+    if http_status is not None:
+        diagnostics["http_status"] = http_status
+
+    for current in chain:
+        for attribute, diagnostic_key in (("winerror", "winerror"), ("errno", "errno")):
+            value = getattr(current, attribute, None)
+            if isinstance(value, int) and not isinstance(value, bool):
+                diagnostics.setdefault(diagnostic_key, value)
+        match = re.search(r"winerror\s+(\d+)", str(current), flags=re.IGNORECASE)
+        if match:
+            diagnostics.setdefault("winerror", int(match.group(1)))
+    return diagnostics
+
+
+###############################################################################
+def safe_failure_detail(exc: BaseException, fallback: str) -> str:
+    """Return a user-facing failure detail without raw provider text."""
+
+    if isinstance(exc, (LLMProviderRequestError, LLMConfigurationError)):
+        return str(exc)
+    diagnostics = transport_diagnostics(exc)
+    exception_type = str(diagnostics.get("exception_type") or "Exception")
+    winerror = diagnostics.get("winerror")
+    suffix = f" (WinError {winerror})" if isinstance(winerror, int) else ""
+    return f"{fallback} [{exception_type}{suffix}]"
+
 ###############################################################################
 class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
 
+###############################################################################
+class LLMStructuredOutputError(RuntimeError):
+    """Safe structured-output failure with a user-actionable category."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        category: FailureCategory,
+        provider: str,
+        model: str,
+        stage: str,
+        code: str,
+        detail: str,
+        retryable: bool = False,
+        http_status: int | None = None,
+        metadata: dict[str, Any] | None = None,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        self.category = category
+        self.provider = provider
+        self.model = model
+        self.stage = stage
+        self.code = code
+        self.detail = detail
+        self.retryable = retryable
+        self.http_status = http_status
+        self.metadata = dict(metadata or {})
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
+        super().__init__(detail)
+
+###############################################################################
+class LLMContextLimitError(LLMStructuredOutputError):
+    """Raised when the selected model cannot accept the prepared context."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            category="context_limit",
+            provider=provider,
+            model=model,
+            stage=stage,
+            code="context_limit_exceeded",
+            detail=detail,
+            context_usage=context_usage,
+        )
+
+###############################################################################
+class LLMRequestSchemaError(LLMStructuredOutputError):
+    """Raised for invalid local response schemas or native tool definitions."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            category="schema_definition",
+            provider=provider,
+            model=model,
+            stage=stage,
+            code="invalid_schema_definition",
+            detail=detail,
+            context_usage=context_usage,
+        )
+
+###############################################################################
+class LLMResponseParsingError(LLMStructuredOutputError):
+    """Raised when a provider response cannot satisfy the requested schema."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        detail: str,
+        code: str = "response_parsing_failed",
+        context_usage: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            category="response_parsing",
+            provider=provider,
+            model=model,
+            stage=stage,
+            code=code,
+            detail=detail,
+            context_usage=context_usage,
+        )
+
+###############################################################################
+class LLMProviderRequestError(RuntimeError):
+    """Safe, structured provider failure without response-body or credential leakage."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        code: str,
+        http_status: int | None = None,
+        retryable: bool = False,
+        category: FailureCategory = "provider_api",
+        context_usage: dict[str, Any] | None = None,
+        timeout_origin: TimeoutOrigin | None = None,
+        elapsed_ms: int | None = None,
+        diagnostics: dict[str, Any] | None = None,
+    ) -> None:
+        self.provider = provider
+        self.model = model
+        self.stage = stage
+        self.code = code
+        self.http_status = http_status
+        self.retryable = retryable
+        self.category = category
+        self.timeout_origin = timeout_origin
+        self.elapsed_ms = elapsed_ms
+        self.diagnostics = dict(diagnostics or {})
+        self.context_usage = (
+            dict(context_usage) if context_usage is not None else None
+        )
+        detail = f"{provider} rejected {model} during {stage}"
+        if http_status is not None:
+            detail += f" (HTTP {http_status})"
+        super().__init__(detail + ".")
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_exception(
+        cls,
+        exc: Exception,
+        *,
+        provider: str,
+        model: str,
+        stage: str,
+        context_usage: dict[str, Any] | None = None,
+        timeout_origin: TimeoutOrigin | None = None,
+        elapsed_ms: int | None = None,
+    ) -> "LLMProviderRequestError":
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if not isinstance(status, int):
+            status = getattr(exc, "status_code", None)
+        if not isinstance(status, int):
+            status = getattr(exc, "code", None)
+        text = str(exc).lower()
+        if any(
+            marker in text
+            for marker in (
+                "context length",
+                "context window",
+                "context_length_exceeded",
+                "maximum context",
+                "prompt is too long",
+                "too many tokens",
+                "token limit",
+            )
+        ) and status in {None, 400, 413}:
+            code, retryable = "context_limit_exceeded", False
+            category: FailureCategory = "context_limit"
+        elif status == 400:
+            opencode_contract_markers = (
+                "x-opencode-session",
+                "opencode-session",
+                "session id",
+                "model unavailable",
+                "model is unavailable",
+            )
+            capability_markers = (
+                "does not support",
+                "unsupported model",
+                "tool calling is not",
+                "structured output is not",
+                "response format is not supported",
+            )
+            schema_markers = (
+                "invalid schema",
+                "malformed schema",
+                "invalid tool",
+                "tool definition",
+                "json schema",
+            )
+            if provider in {"opencode", "opencode-go"} and any(
+                marker in text for marker in opencode_contract_markers
+            ):
+                code, retryable = "provider_contract_rejected", False
+                category = "provider_api"
+            elif any(marker in text for marker in capability_markers):
+                code, retryable = "provider_model_incompatible", False
+                category = "model_capability"
+            elif any(marker in text for marker in schema_markers):
+                code, retryable = "provider_schema_rejected", False
+                category = "schema_definition"
+            else:
+                code, retryable = "provider_bad_request", False
+                category = "provider_api"
+        elif status in {401, 403}:
+            code, retryable = "provider_authentication_failed", False
+            category = "provider_api"
+        elif status == 429:
+            code, retryable = "provider_rate_limited", True
+            category = "provider_api"
+        elif cls._is_timeout_error(exc) or status in {408, 504, 524}:
+            code, retryable = "provider_timeout", False
+            category = "provider_api"
+            if timeout_origin is None:
+                detail = str(exc).casefold()
+                timeout_origin = (
+                    "application_deadline"
+                    if "bounded llm request deadline" in detail
+                    or "agent run deadline" in detail
+                    else "provider_transport"
+                )
+        elif isinstance(status, int) and status >= 500:
+            code, retryable = "provider_unavailable", True
+            category = "provider_api"
+        elif cls._is_non_retryable_transport_error(exc):
+            code, retryable = "provider_request_failed", False
+            category = "provider_api"
+        elif cls._is_transient_connection_error(exc):
+            code, retryable = "provider_request_failed", True
+            category = "provider_api"
+        else:
+            code, retryable = "provider_request_failed", False
+            category = "provider_api"
+        return cls(
+            provider=provider,
+            model=model,
+            stage=stage,
+            code=code,
+            http_status=status if isinstance(status, int) else None,
+            retryable=retryable,
+            category=category,
+            context_usage=context_usage,
+            timeout_origin=timeout_origin,
+            elapsed_ms=elapsed_ms,
+            diagnostics=transport_diagnostics(
+                exc,
+                http_status=status if isinstance(status, int) else None,
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_timeout_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            class_name = type(current).__name__.casefold()
+            detail = str(current).casefold()
+            if (
+                isinstance(current, TimeoutError)
+                or "timeout" in class_name
+                or "timed out" in detail
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_transient_connection_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            class_name = type(current).__name__.casefold()
+            detail = str(current).casefold()
+            if (
+                isinstance(current, (TimeoutError, ConnectionError))
+                or any(
+                    marker in class_name
+                    for marker in ("connection", "connecterror", "timeout")
+                )
+                or any(
+                    marker in detail
+                    for marker in ("connection error", "winerror 100", "timed out")
+                )
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_non_retryable_transport_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            winerror = getattr(current, "winerror", None)
+            if winerror == 10013 or re.search(
+                r"winerror\s+10013", str(current), flags=re.IGNORECASE
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False

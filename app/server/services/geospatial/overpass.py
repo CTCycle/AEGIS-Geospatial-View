@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 import asyncio
 import json
 import math
@@ -11,22 +13,81 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from server.configurations import get_server_settings
+from server.configurations.settings import JsonOverpassSettings, OverpassSettings
+from server.services.geospatial.providers.base import (
+    ProviderError,
+    ProviderInvalidQueryError,
+    ProviderRateLimitError,
+)
 
 ###############################################################################
-class OverpassServiceError(Exception):
+class OverpassServiceError(ProviderError):
     """Base exception for Overpass failures."""
 
 ###############################################################################
 class OverpassRequestError(OverpassServiceError):
-    """Raised when Overpass cannot fulfill a request."""
+    """Raised when an Overpass request or response cannot be completed."""
 
 ###############################################################################
-class OverpassRateLimitError(OverpassServiceError):
+class OverpassInvalidQueryError(OverpassServiceError, ProviderInvalidQueryError):
+    """Raised when a request is structurally valid but not executable."""
+
+###############################################################################
+class OverpassRateLimitError(OverpassServiceError, ProviderRateLimitError):
     """Raised when Overpass rejects a request due to rate limits."""
 
 ###############################################################################
 class OverpassService:
+    CATEGORY_SELECTORS: dict[str, tuple[tuple[str, str], ...]] = {
+        "bicycle_parking": (("amenity", "bicycle_parking"),),
+        "transit_stops": (
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+            ("highway", "bus_stop"),
+            ("amenity", "bus_station"),
+        ),
+        "rail_stations": (("railway", "station"), ("railway", "halt")),
+        "food": (
+            ("amenity", "cafe"),
+            ("amenity", "restaurant"),
+            ("amenity", "fast_food"),
+        ),
+        "restaurants": (("amenity", "restaurant"),),
+        "restaurant": (("amenity", "restaurant"),),
+        "healthcare": (
+            ("amenity", "hospital"),
+            ("amenity", "clinic"),
+            ("amenity", "doctors"),
+            ("amenity", "pharmacy"),
+        ),
+        "hospitals": (("amenity", "hospital"),),
+        "hospital": (("amenity", "hospital"),),
+        "pharmacies": (("amenity", "pharmacy"),),
+        "pharmacy": (("amenity", "pharmacy"),),
+        "education": (
+            ("amenity", "school"),
+            ("amenity", "college"),
+            ("amenity", "university"),
+        ),
+        "schools": (("amenity", "school"),),
+        "school": (("amenity", "school"),),
+        "supermarkets": (("shop", "supermarket"),),
+        "supermarket": (("shop", "supermarket"),),
+        "parks": (("leisure", "park"),),
+        "park": (("leisure", "park"),),
+        "charging_stations": (("amenity", "charging_station"),),
+        "charging_station": (("amenity", "charging_station"),),
+        "bus_stops": (
+            ("highway", "bus_stop"),
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+        ),
+        "bus_stop": (
+            ("highway", "bus_stop"),
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+        ),
+    }
     DEFAULT_AMENITIES = (
         "cafe",
         "restaurant",
@@ -46,11 +107,14 @@ class OverpassService:
         "terrace",
         "semidetached_house",
     )
+    MAX_RADIUS_M = 250_000.0
+    MAX_LIMIT = 500
 
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
+        settings: OverpassSettings | None = None,
         base_url: str | None = None,
         user_agent: str | None = None,
         timeout_s: float | None = None,
@@ -59,27 +123,31 @@ class OverpassService:
         default_radius_m: float | None = None,
         default_limit: int | None = None,
     ) -> None:
-        settings = get_server_settings().overpass
-        self.base_url = base_url or settings.base_url
-        self.user_agent = user_agent or settings.user_agent
-        self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
+        configured = settings or OverpassSettings(
+            **JsonOverpassSettings().model_dump()
+        )
+        self.base_url = base_url or configured.base_url
+        self.user_agent = user_agent or configured.user_agent
+        self.timeout_s = timeout_s if timeout_s is not None else configured.timeout
         self.cache_ttl_s = max(
-            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+            cache_ttl_s if cache_ttl_s is not None else configured.cache_ttl_s,
+            30.0,
         )
         self.min_call_interval_s = max(
             min_call_interval_s
             if min_call_interval_s is not None
-            else settings.min_call_interval_s,
+            else configured.min_call_interval_s,
             0.05,
         )
         self.default_radius_m = max(
             default_radius_m
             if default_radius_m is not None
-            else settings.default_radius_m,
+            else configured.default_radius_m,
             100.0,
         )
         self.default_limit = max(
-            1, default_limit if default_limit is not None else settings.default_limit
+            1,
+            default_limit if default_limit is not None else configured.default_limit,
         )
         self._lock = threading.Lock()
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -93,47 +161,70 @@ class OverpassService:
         longitude: float,
         radius_m: float | None = None,
         amenity_tags: list[str] | None = None,
+        categories: list[str] | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        resolved_radius_m = max(radius_m or self.default_radius_m, 100.0)
-        resolved_limit = max(1, limit or self.default_limit)
+        resolved_radius_m = min(
+            max(radius_m or self.default_radius_m, 100.0), self.MAX_RADIUS_M
+        )
+        resolved_limit = min(self.MAX_LIMIT, max(1, limit or self.default_limit))
         tags = [
             tag.strip()
             for tag in (amenity_tags or list(self.DEFAULT_AMENITIES))
             if tag and tag.strip()
         ]
+        if categories and amenity_tags is None:
+            tags = []
         if not tags:
-            tags = list(self.DEFAULT_AMENITIES)
+            tags = [] if categories else list(self.DEFAULT_AMENITIES)
+        selectors = [
+            *[("amenity", tag) for tag in tags],
+            *[
+                selector
+                for category in (categories or [])
+                for selector in self.CATEGORY_SELECTORS.get(
+                    self._normalize_category(category), ()
+                )
+            ],
+        ]
+        selectors = list(dict.fromkeys(selectors))
+        if categories and not selectors:
+            raise OverpassInvalidQueryError(
+                "No supported OpenStreetMap POI category was requested."
+            )
         payload = await asyncio.to_thread(
             self._query_overpass,
             latitude=latitude,
             longitude=longitude,
             radius_m=resolved_radius_m,
-            tags=tags,
+            selectors=selectors,
             limit=resolved_limit,
         )
-        elements = (
-            payload.get("elements") if isinstance(payload.get("elements"), list) else []
-        )
+        elements = json_array(payload.get("elements"))
         points: list[dict[str, Any]] = []
         for raw in elements:
-            if not isinstance(raw, dict):
+            if not is_json_object(raw):
                 continue
-            tags_payload = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
-            amenity = tags_payload.get("amenity")
-            if not amenity:
+            tags_payload = json_object(raw.get("tags"))
+            category = next(
+                (
+                    tags_payload.get(key)
+                    for key in ("amenity", "public_transport", "railway", "highway")
+                    if tags_payload.get(key)
+                ),
+                None,
+            )
+            if not category:
                 continue
             lat = raw.get("lat")
             lon = raw.get("lon")
             if lat is None or lon is None:
-                center = (
-                    raw.get("center") if isinstance(raw.get("center"), dict) else {}
-                )
+                center = json_object(raw.get("center"))
                 lat = center.get("lat")
                 lon = center.get("lon")
             try:
-                lat_value = float(lat)
-                lon_value = float(lon)
+                lat_value = float(str(lat))
+                lon_value = float(str(lon))
             except (TypeError, ValueError):
                 continue
             distance_m = self._haversine_distance_m(
@@ -142,8 +233,9 @@ class OverpassService:
             points.append(
                 {
                     "id": str(raw.get("id")),
-                    "name": tags_payload.get("name") or f"{amenity.title()}",
-                    "amenity": str(amenity),
+                    "name": tags_payload.get("name") or f"{category.title()}",
+                    "amenity": str(tags_payload.get("amenity") or ""),
+                    "category": str(category),
                     "latitude": lat_value,
                     "longitude": lon_value,
                     "distance_m": round(distance_m, 1),
@@ -151,17 +243,62 @@ class OverpassService:
             )
         points.sort(key=lambda item: float(item.get("distance_m") or 0.0))
         trimmed = points[:resolved_limit]
+        fetched_at = datetime.now(UTC).isoformat()
+        truncated = len(points) > len(trimmed)
         return {
             "provider": "overpass",
             "kind": "poi_amenities",
+            "source_url": self.base_url,
+            "fetched_at": fetched_at,
+            "result_status": (
+                "partial" if truncated else "valid_empty" if not trimmed else "ok"
+            ),
+            "result_type": "features",
+            "partial": truncated,
             "latitude": latitude,
             "longitude": longitude,
             "radius_m": resolved_radius_m,
-            "total_results": len(trimmed),
+            "total_results": len(points),
+            "returned_results": len(trimmed),
+            "limit": resolved_limit,
+            "truncated": truncated,
             "items": trimmed,
-            "resolved_at": datetime.now(UTC).isoformat(),
+            "resolved_at": fetched_at,
+            "coverage": {
+                "type": "circle",
+                "center": {"latitude": latitude, "longitude": longitude},
+                "radius_m": resolved_radius_m,
+            },
+            "spatial_resolution": "point features",
+            "units": {"distance_m": "m", "radius_m": "m"},
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_category(value: object) -> str:
+        normalized = str(value or "").strip().casefold().replace("-", "_")
+        normalized = normalized.replace(" ", "_")
+        aliases = {
+            "restaurant": "restaurant",
+            "restaurants": "restaurants",
+            "hospital": "hospital",
+            "hospitals": "hospitals",
+            "pharmacy": "pharmacy",
+            "pharmacies": "pharmacies",
+            "school": "school",
+            "schools": "schools",
+            "supermarket": "supermarket",
+            "supermarkets": "supermarkets",
+            "park": "park",
+            "parks": "parks",
+            "charging": "charging_station",
+            "ev_charging": "charging_station",
+            "charging_stations": "charging_stations",
+            "bus_stops": "bus_stops",
+            "rail_stations": "rail_stations",
+        }
+        return aliases.get(normalized, normalized)
 
     # -------------------------------------------------------------------------
     async def get_residential_buildings(
@@ -181,20 +318,20 @@ class OverpassService:
             radius_m=resolved_radius_m,
             limit=resolved_limit,
         )
-        elements = payload.get("elements") if isinstance(payload.get("elements"), list) else []
+        elements = json_array(payload.get("elements"))
         features: list[dict[str, Any]] = []
         for raw in elements:
-            if not isinstance(raw, dict) or raw.get("type") != "way":
+            if not is_json_object(raw) or raw.get("type") != "way":
                 continue
-            tags = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
+            tags = json_object(raw.get("tags"))
             building_type = str(tags.get("building") or "").strip()
             if building_type not in self.RESIDENTIAL_BUILDING_TAGS:
                 continue
-            geometry = raw.get("geometry") if isinstance(raw.get("geometry"), list) else []
+            geometry = json_array(raw.get("geometry"))
             coordinates = [
                 [float(point["lon"]), float(point["lat"])]
                 for point in geometry
-                if isinstance(point, dict)
+                if is_json_object(point)
                 and isinstance(point.get("lat"), int | float)
                 and isinstance(point.get("lon"), int | float)
             ]
@@ -235,20 +372,20 @@ class OverpassService:
         latitude: float,
         longitude: float,
         radius_m: float,
-        tags: list[str],
+        selectors: list[tuple[str, str]],
         limit: int,
     ) -> dict[str, Any]:
-        cache_key = f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{','.join(sorted(tags))}:{limit}"
+        cache_key = f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{','.join(f'{key}={value}' for key, value in sorted(selectors))}:{limit}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
         self._wait_for_rate_limit_slot()
         filters = "\n".join(
             [
-                f'node["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                f'\nway["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                f'\nrelation["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                for tag in tags
+                f'node["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                f'\nway["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                f'\nrelation["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                for key, value in selectors
             ]
         )
         query = f"[out:json][timeout:25];\n(\n{filters}\n);\nout center {limit};"
@@ -274,7 +411,7 @@ class OverpassService:
             data = json.loads(body)
         except json.JSONDecodeError as exc:
             raise OverpassRequestError("Overpass response was not valid JSON.") from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OverpassRequestError("Overpass response payload is malformed.")
         self._cache_set(cache_key, data)
         return data
@@ -288,9 +425,7 @@ class OverpassService:
         radius_m: float,
         limit: int,
     ) -> dict[str, Any]:
-        cache_key = (
-            f"buildings:{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{limit}"
-        )
+        cache_key = f"buildings:{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{limit}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
@@ -322,7 +457,7 @@ class OverpassService:
             data = json.loads(body)
         except json.JSONDecodeError as exc:
             raise OverpassRequestError("Overpass response was not valid JSON.") from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OverpassRequestError("Overpass response payload is malformed.")
         self._cache_set(cache_key, data)
         return data
@@ -369,4 +504,3 @@ class OverpassService:
         )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return radius * c
-

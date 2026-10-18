@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 import json
 from pathlib import Path
 from typing import Any
@@ -36,14 +38,19 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     indexed: list[IndexedFeature] = []
     for index, feature in enumerate(payload.get("features", [])):
-        if not isinstance(feature, dict):
+        if not is_json_object(feature):
             continue
-        properties = feature.get("properties") if isinstance(feature.get("properties"), dict) else {}
+        properties = json_object(feature.get("properties"))
         coordinates = _point_coordinates(feature.get("geometry"))
         indexed.append(
             IndexedFeature(
                 id=str(feature.get("id") or properties.get("id") or index),
-                label=str(properties.get("name") or properties.get("label") or properties.get("title") or ""),
+                label=str(
+                    properties.get("name")
+                    or properties.get("label")
+                    or properties.get("title")
+                    or ""
+                ),
                 category=str(properties.get("category") or "") or None,
                 source=str(properties.get("source") or "") or None,
                 longitude=coordinates[0] if coordinates else None,
@@ -54,7 +61,9 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
     return build_feature_search_index(indexed)
 
 ###############################################################################
-def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> list[IndexedFeature]:
+def query_search_index(
+    index: SearchIndex, query: str, *, limit: int = 20
+) -> list[IndexedFeature]:
     wanted = {term for term in _tokenize(query) if term}
     if not wanted:
         return []
@@ -64,12 +73,18 @@ def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> li
             score_by_id[feature_id] = score_by_id.get(feature_id, 0) + 1
     feature_by_id = {feature.id: feature for feature in index.features}
     ranked_ids = sorted(score_by_id, key=lambda item: (-score_by_id[item], item))
-    return [feature_by_id[feature_id] for feature_id in ranked_ids[:limit] if feature_id in feature_by_id]
+    return [
+        feature_by_id[feature_id]
+        for feature_id in ranked_ids[:limit]
+        if feature_id in feature_by_id
+    ]
 
 ###############################################################################
 def _terms_for_feature(feature: IndexedFeature) -> set[str]:
     values = [feature.label, feature.category or "", feature.source or ""]
-    values.extend(str(value) for value in feature.metadata.values() if isinstance(value, str))
+    values.extend(
+        str(value) for value in feature.metadata.values() if isinstance(value, str)
+    )
     terms: set[str] = set()
     for value in values:
         terms.update(_tokenize(value))
@@ -82,11 +97,11 @@ def _tokenize(value: str) -> list[str]:
 
 ###############################################################################
 def _point_coordinates(geometry: Any) -> tuple[float, float] | None:
-    if not isinstance(geometry, dict) or geometry.get("type") != "Point":
+    if not is_json_object(geometry) or geometry.get("type") != "Point":
         return None
     coordinates = geometry.get("coordinates")
     if (
-        isinstance(coordinates, list)
+        is_json_array(coordinates)
         and len(coordinates) >= 2
         and isinstance(coordinates[0], int | float)
         and isinstance(coordinates[1], int | float)

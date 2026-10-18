@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from datetime import datetime
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from server.common.time import utc_now
+
+###############################################################################
+class RunEventType(StrEnum):
+    PROGRESS = "progress"
+    CONTEXT_USAGE = "context_usage"
+    ASSISTANT_TEXT_DELTA = "assistant_text_delta"
+    ASSISTANT_TEXT_COMPLETED = "assistant_text_completed"
+    TOOL_STARTED = "tool_started"
+    TOOL_COMPLETED = "tool_completed"
+    REQUEST_UPDATED = "request_updated"
+    ERROR = "error"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    CLARIFICATION_NEEDED = "clarification_needed"
+    MAP_PREPARED = "map_prepared"
+    RENDER_OBSERVED = "render_observed"
+    TRACE = "trace"
+    CHECKPOINT = "checkpoint"
+
+###############################################################################
+class RunEventVisibility(StrEnum):
+    USER = "user"
+    INTERNAL = "internal"
+
+###############################################################################
+class RunProgressStage(StrEnum):
+    UNDERSTANDING_REQUEST = "understanding_request"
+    RETRIEVING_INFORMATION = "retrieving_information"
+    CALLING_TOOL = "calling_tool"
+    PROCESSING_TOOL_RESULTS = "processing_tool_results"
+    DRAFTING_ANSWER = "drafting_answer"
+    REQUEST_UPDATED = "request_updated"
+    WAITING_FOR_CLARIFICATION = "waiting_for_clarification"
+    AWAITING_RENDER = "awaiting_render"
+    CORRECTING_RENDER = "correcting_render"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+RUN_PROGRESS_LABELS: dict[RunProgressStage, str] = {
+    RunProgressStage.UNDERSTANDING_REQUEST: "Understanding the request",
+    RunProgressStage.RETRIEVING_INFORMATION: "Searching or retrieving information",
+    RunProgressStage.CALLING_TOOL: "Calling a relevant tool",
+    RunProgressStage.PROCESSING_TOOL_RESULTS: "Processing tool results",
+    RunProgressStage.DRAFTING_ANSWER: "Drafting the answer",
+    RunProgressStage.REQUEST_UPDATED: "Request updated because of user steering",
+    RunProgressStage.WAITING_FOR_CLARIFICATION: "Waiting for clarification",
+    RunProgressStage.AWAITING_RENDER: "Waiting for the map to finish rendering",
+    RunProgressStage.CORRECTING_RENDER: "Correcting the map after a render failure",
+    RunProgressStage.COMPLETED: "Completed",
+    RunProgressStage.FAILED: "Failed",
+    RunProgressStage.CANCELLED: "Cancelled",
+}
+
+###############################################################################
+class RunEventPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+###############################################################################
+class RunEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str
+    sequence: int
+    conversation_id: str
+    run_id: str
+    run_version: int
+    type: RunEventType
+    timestamp: datetime
+    visibility: RunEventVisibility
+    payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+###############################################################################
+class RunEventCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int
+    type: RunEventType
+    visibility: RunEventVisibility = RunEventVisibility.USER
+    payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    timestamp: datetime = Field(default_factory=utc_now)

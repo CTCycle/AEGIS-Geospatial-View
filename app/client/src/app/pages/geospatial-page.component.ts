@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import {
@@ -8,7 +8,13 @@ import {
   CapabilityStatusTone,
 } from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
-import { MapPreviewComponent } from '../components/map-preview.component';
+import { ConversationHistoryComponent } from '../components/conversation-history.component';
+import {
+  MapPreviewComponent,
+  MapRenderIdentity,
+  MapRenderStateChange,
+} from '../components/map-preview.component';
+import { ExecutionStatusComponent } from '../components/execution-status.component';
 import {
   AgentReadinessService,
   AgentReadinessState,
@@ -17,58 +23,115 @@ import {
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
-import { normalizeMapSession } from '../core/api-parsers';
+import { normalizeMapSession, parseAgentTaskState, parseContextUsage } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
+import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
+import { formatCompactTokenCount } from '../core/token-format';
+import { postRenderCapture, type RenderCapturePayload } from '../core/api';
+import {
+  parseRunCompletionPayload,
+  parseRunEvent,
+  parseRenderObservationPayload,
+  parseToolProgressPayload,
+} from '../core/realtime-parsers';
+import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
   MapSession,
+  MapRenderAcknowledgement,
   OverlayStateChange,
   SearchResponsePayload,
   ChatMessage,
   ChatRole,
   ChatTurnResponse,
   ContextUsage,
+  ConversationState,
+  AgentGoal,
+  CompletionContract,
+  CapabilityDescriptor,
+  CatalogResponse,
+  RealtimeServerMessage,
+  RealtimeConnectionState,
   RunEvent,
+  PresentationStatus,
+  AgentTaskState,
+  ConversationSummary,
+  RunTraceEntry,
+  ToolProgressItem,
+  SelectedModelContext,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
+import { mapSessionOverlayEntries, reconcileOverlayOrder } from '../components/map-preview-rendering';
 
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
-  imports: [CommonModule, CapabilityStatusListComponent, ChatMessageComponent, MapPreviewComponent],
+  imports: [
+    CommonModule,
+    CapabilityStatusListComponent,
+    ChatMessageComponent,
+    ConversationHistoryComponent,
+    MapPreviewComponent,
+    ExecutionStatusComponent,
+  ],
   templateUrl: './geospatial-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './geospatial-page.component.css',
 })
 export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('transcript', { static: false }) transcriptRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('composerInput', { static: false }) composerInputRef?: ElementRef<HTMLTextAreaElement>;
   @ViewChild(MapPreviewComponent) mapPreview?: MapPreviewComponent;
+
+  readonly maxChatMessageLength = MAX_CHAT_MESSAGE_LENGTH;
 
   payload?: SearchResponsePayload;
   toolbarWidthState = 480;
   isToolbarCollapsed = false;
-  mapState = { overlayVisibility: {}, overlayOpacity: {} } as PersistedChatPageState['mapState'];
+  mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] } as PersistedChatPageState['mapState'];
 
-  sessionId?: number;
   conversationId?: string;
+  contextRevision?: number;
+  conversationState?: ConversationState;
   activeRunId?: string;
   activeRunVersion?: number;
-  lastRunEventId?: string;
-  streamState: PersistedChatPageState['chatPanel']['streamState'] = 'idle';
+  streamState: RealtimeConnectionState = 'idle';
   progressStage?: string;
   progressLabel?: string;
+  taskState?: AgentTaskState | null;
+  toolProgress: ToolProgressItem[] = [];
+  traceEntries: RunTraceEntry[] = [];
+  isExecutionStatusOpen = false;
+  runTraceLoading = false;
+  runTraceError = '';
+  runFailureSummary = '';
+  conversationHistory: ConversationSummary[] = [];
+  conversationHistoryQuery = '';
+  conversationHistoryCursor?: string | null;
+  isConversationHistoryOpen = false;
+  conversationHistoryLoading = false;
+  conversationHistoryError = '';
   conversationNonce = 1;
   messages: ChatMessage[] = [];
-  lastDecision?: ChatTurnResponse['decision'];
+  lastRoute?: ChatTurnResponse['route'];
+  lastGoal?: AgentGoal | null;
+  completionContract?: CompletionContract | null;
   lastOperation?: ChatOperationResult | null;
   memorySnapshot: Record<string, unknown> = {};
   contextUsage?: ContextUsage;
+  selectedModelContext?: SelectedModelContext;
+  isContextProfileLoading = false;
   mapSession?: MapSession;
   status = 'Agent ready';
+  composerError = '';
   assistantDraft = '';
   composerDraft = '';
   transcriptScrollTop = 0;
   agentReadiness = INITIAL_AGENT_READINESS_STATE;
+  catalog?: CatalogResponse;
+  mapRenderState: 'preparing' | 'ready' | 'failed' = 'preparing';
+  presentationStatus?: PresentationStatus;
 
   isLoading = false;
   progressPercent = 0;
@@ -78,65 +141,97 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly minWidth = 280;
   private readonly maxWidth = 760;
   private readonly canvasMinWidth = 320;
+  private readonly maxSeenEventIds = 512;
   private readonly chatPageState: PersistedChatPageState;
   private mouseMoveHandler?: (event: MouseEvent) => void;
   private mouseUpHandler?: () => void;
-  private activeEventSource?: EventSource;
   private seenEventIds = new Set<string>();
-  private currentAssistantMessageId?: string;
   private steeringMutationCounter = 0;
-  private reconnectAttempts = 0;
   private isDestroyed = false;
+  private pendingMapSession?: MapSession;
+  private committedMapSession?: MapSession;
+  private manualBasemapPreference?: NonNullable<MapSession['basemap']>;
+  private pendingRenderContext?: {
+    runId: string;
+    runVersion: number;
+    mapSessionId: string;
+    collectionRevision: number;
+    captureRequested?: boolean;
+  };
+  private renderAckQueued = false;
+  private pendingRenderAckMessageId?: string;
+  private pendingRenderAcknowledgement?: MapRenderAcknowledgement;
+  private renderAckRetryCount = 0;
+  private latestAcceptedRunId?: string;
+  private latestAcceptedRunVersion?: number;
+  private pendingSupersession?: {
+    runId: string;
+    previousVersion: number;
+    expectedVersion: number;
+  };
+  private lastRunSequence = 0;
+  private lastHandledRunId?: string;
+  private pendingRun?: { clientRequestId: string; message: string };
+  private removeRealtimeMessageListener?: () => void;
+  private removeRealtimeStateListener?: () => void;
+  private cancelRequested = false;
+  private historyRequestNonce = 0;
+
+  get mapRenderIdentity(): MapRenderIdentity | undefined {
+    return this.pendingRenderContext;
+  }
 
   constructor(
     private readonly router: Router,
     private readonly apiClient: ApiClientService,
+    private readonly realtimeService: RealtimeService,
     private readonly appStateStore: AppStateStoreService,
     private readonly localCommandService: LocalCommandService,
     private readonly agentReadinessService: AgentReadinessService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
-    this.payload = this.chatPageState.payload;
     this.toolbarWidthState = this.chatPageState.toolbarWidth;
     this.isToolbarCollapsed = this.chatPageState.isToolbarCollapsed;
     this.mapState = this.chatPageState.mapState;
 
-    this.sessionId = this.chatPageState.chatPanel.sessionId;
     this.conversationId = this.chatPageState.chatPanel.conversationId;
-    this.activeRunId = this.chatPageState.chatPanel.activeRunId;
-    this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
-    this.lastRunEventId = this.chatPageState.chatPanel.lastRunEventId;
-    this.streamState = this.chatPageState.chatPanel.streamState ?? 'idle';
-    this.progressStage = this.chatPageState.chatPanel.progressStage;
-    this.progressLabel = this.chatPageState.chatPanel.progressLabel;
-    this.seenEventIds = new Set(this.chatPageState.chatPanel.seenRunEventIds ?? []);
-    this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
-    this.messages = this.chatPageState.chatPanel.messages;
-    this.lastDecision = this.chatPageState.chatPanel.lastDecision;
-    this.lastOperation = this.chatPageState.chatPanel.lastOperation;
-    this.memorySnapshot = this.chatPageState.chatPanel.memorySnapshot ?? {};
-    this.contextUsage = this.chatPageState.chatPanel.contextUsage;
-    this.mapSession = this.chatPageState.chatPanel.mapSession;
-    this.status = this.chatPageState.chatPanel.status;
-    this.assistantDraft = this.chatPageState.chatPanel.assistantDraft;
+    this.lastRunSequence = this.chatPageState.chatPanel.lastRunSequence ?? 0;
     this.composerDraft = this.chatPageState.chatPanel.composerDraft;
     this.transcriptScrollTop = this.chatPageState.chatPanel.transcriptScrollTop;
   }
 
   ngOnInit(): void {
+    this.removeRealtimeMessageListener = this.realtimeService.onMessage((message) => {
+      this.handleRealtimeMessage(message);
+    });
+    this.removeRealtimeStateListener = this.realtimeService.onStateChange((state) => {
+      this.streamState = state;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    });
+    if (this.conversationId) {
+      void this.hydrateConversation(this.conversationId);
+    }
     void this.loadAgentStatus();
+    void this.loadCatalog();
+    void this.loadModelContext();
   }
 
   ngAfterViewInit(): void {
     this.viewStateSync.restoreWindowScroll(this.chatPageState.scrollY);
     this.viewStateSync.restoreElementScroll(this.transcriptRef?.nativeElement, this.transcriptScrollTop);
+    this.resizeComposer();
   }
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
-    this.closeActiveEventSource();
+    this.historyRequestNonce += 1;
+    this.removeRealtimeMessageListener?.();
+    this.removeRealtimeStateListener?.();
+    this.realtimeService.disconnect({ discardPending: true });
     this.stopResize();
     this.syncState();
   }
@@ -152,10 +247,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return [...this.messages, { role: 'assistant' as ChatRole, content: this.assistantDraft }];
   }
 
-  get hasMessages(): boolean {
-    return this.renderedMessages.length > 0;
-  }
-
   get activeAlertItems(): string[] {
     const alerts: string[] = [];
     const latestAssistantMessage = [...this.messages].reverse().find((entry) => entry.role === 'assistant')?.content?.trim() ?? '';
@@ -166,7 +257,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
     }
-    if (operationMessage && (this.lastOperation?.kind === 'error' || this.lastOperation?.kind === 'rejection')) {
+    if (this.runFailureSummary) {
+      alerts.push(this.runFailureSummary);
+    } else if (operationMessage && this.lastOperation?.kind === 'rejection') {
       alerts.push(operationMessage);
     }
     if (latestAssistantMessage && this.looksLikeRuntimeFailure(latestAssistantMessage)) {
@@ -177,7 +270,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     const warnings = this.payload?.compliance_warnings ?? this.payload?.map_session?.compliance_warnings ?? [];
     warnings.forEach((warning) => alerts.push(String(warning)));
-    return alerts;
+    return [...new Set(alerts)];
   }
 
   get alertsSummary(): string {
@@ -192,80 +285,354 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return this.isLoading;
   }
 
+  get inspectedRunId(): string | undefined {
+    return this.activeRunId ?? this.lastHandledRunId;
+  }
+
   get capabilityStatusItems(): CapabilityStatusItem[] {
+    const satellite = this.catalog?.basemaps?.find((item) => item.id === 'esri_world_imagery');
+    const satelliteStatus = !this.catalog
+      ? { statusLabel: 'Checking', tone: 'none' as CapabilityStatusTone, detail: 'Loading the live basemap catalog.' }
+      : this.mapSession?.basemap_id === 'esri_world_imagery' && this.mapRenderState === 'ready'
+        ? { statusLabel: 'Active', tone: 'ok' as CapabilityStatusTone, detail: 'Esri World Imagery is rendering on the active map.' }
+        : this.mapSession?.basemap_id === 'esri_world_imagery' && this.mapRenderState === 'failed'
+          ? { statusLabel: 'Unavailable', tone: 'error' as CapabilityStatusTone, detail: 'Satellite imagery was selected but the map renderer reported a failure.' }
+        : satellite?.is_available && satellite.render?.status === 'available'
+          ? { statusLabel: 'Available', tone: 'ok' as CapabilityStatusTone, detail: 'Select Satellite from the map basemap control.' }
+          : { statusLabel: 'Unavailable', tone: 'error' as CapabilityStatusTone, detail: 'No usable public satellite render descriptor is available.' };
     return [
       {
-        label: 'Agent online',
+        label: 'Agent model',
         statusLabel: this.agentReadiness.label,
         tone: this.agentStatusTone,
       },
-      { label: 'Satellite Imagery', statusLabel: 'Active', tone: 'ok' },
-      { label: 'Weather Intel', statusLabel: 'Active', tone: 'ok' },
-      { label: 'Optional Keys', statusLabel: 'Disabled', tone: 'warn' },
+      { label: 'Satellite', ...satelliteStatus },
+      { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Settings under Geospatial Access.' },
     ];
   }
 
   get contextUsagePercent(): number {
-    return Math.max(0, Math.min(100, Math.round(this.contextUsage?.usage_percent ?? 0)));
+    return Math.max(0, Math.min(100, Math.round(this.effectiveContextUsagePercent ?? 0)));
+  }
+
+  get effectiveContextUsagePercent(): number | null {
+    const usage = this.contextUsage;
+    if (!usage) {
+      return null;
+    }
+    if (typeof usage.usage_percent === 'number' && Number.isFinite(usage.usage_percent)) {
+      return usage.usage_percent;
+    }
+    const measured = this.contextUsageTokens(usage);
+    const limit = this.contextLimitForUsage(usage);
+    return measured !== null && limit !== null && limit > 0
+      ? measured / limit * 100
+      : null;
+  }
+
+  get contextLimit(): number | null {
+    const value = this.selectedModelContext?.context_window_tokens;
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? value
+      : null;
   }
 
   get contextUsageLabel(): string {
-    if (!this.contextUsage) {
-      return '0%';
+    if (this.isContextProfileLoading) {
+      return 'Loading…';
     }
-    return `${this.contextUsagePercent}%`;
+    const peak = this.contextUsageTokens(this.contextUsage);
+    const percent = this.effectiveContextUsagePercent;
+    if (peak !== null) {
+      if (percent === null) {
+        return 'Unavailable';
+      }
+      const source = this.contextUsage?.usage_source || 'estimated';
+      return `${source === 'provider_reported' ? '' : '~'}${Math.round(percent)}%`;
+    }
+    if (this.contextLimit !== null) {
+      return `${formatCompactTokenCount(this.contextLimit)} tokens`;
+    }
+    return 'Unavailable';
   }
 
   get contextUsageDetail(): string {
-    if (!this.contextUsage) {
-      return 'Context window awaiting first request';
-    }
-    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
-    const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
-    return `${this.contextUsage.estimated_input_tokens} / ${selected} tokens${model ? ` - ${model}` : ''}`;
+    const usage = this.contextUsage;
+    const modelLimit = this.contextLimitForUsage(usage);
+    const selected = usage?.selected_context_window ?? null;
+    const model = [
+      this.selectedModelContext?.provider,
+      this.selectedModelContext?.model,
+    ].filter(Boolean).join(' / ');
+    const source = usage?.usage_source || this.selectedModelContext?.context_profile_source || 'unknown';
+    const peak = this.contextUsageTokens(usage);
+    const approximate = source !== 'provider_reported';
+    const estimateText = approximate ? 'approximate' : 'provider-reported';
+    const limitText = modelLimit
+      ? `max context ${modelLimit.toLocaleString()} (${formatCompactTokenCount(modelLimit)})`
+      : 'max context unavailable';
+    const usageText = peak === null
+      ? 'no request measured'
+      : `${approximate ? '~' : ''}${peak.toLocaleString()} peak`;
+    const remainingText = peak !== null && modelLimit
+      ? `; remaining ${Math.max(0, modelLimit - peak).toLocaleString()}`
+      : '';
+    const detailPercent = typeof usage?.usage_percent === 'number'
+      && Number.isFinite(usage.usage_percent)
+      ? usage.usage_percent
+      : this.effectiveContextUsagePercent;
+    const utilizationText = peak !== null && detailPercent !== null
+      ? ` (${detailPercent}%)`
+      : '';
+    const phases = usage?.phases && Object.keys(usage.phases).length > 0
+      ? `; phases: ${Object.entries(usage.phases).map(([name, value]) => {
+        const phase = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+        const phaseInput = typeof phase['peak_request_tokens'] === 'number'
+          ? phase['peak_request_tokens']
+          : typeof phase['reported_input_tokens'] === 'number'
+            ? phase['reported_input_tokens']
+            : typeof phase['estimated_input_tokens'] === 'number'
+              ? phase['estimated_input_tokens']
+              : undefined;
+        const phaseSource = typeof phase['usage_source'] === 'string' ? phase['usage_source'] : undefined;
+        return `${name}${phaseInput === undefined ? '' : ` ${phaseInput.toLocaleString()} peak`}${phaseSource ? ` (${phaseSource})` : ''}`;
+      }).join(', ')}`
+      : '';
+    const compaction = usage?.compaction_applied ? '; compaction applied' : '';
+    const selectedText = selected && selected !== modelLimit
+      ? `; selected context ${selected.toLocaleString()}`
+      : '';
+    return `Peak request: ${usageText}${utilizationText}; ${limitText}${remainingText}${selectedText}${model ? ` - ${model}` : ''}; source: ${source} (${estimateText})${phases}${compaction}`;
   }
 
-  get contextTrackerText(): string {
-    if (!this.contextUsage) {
-      return 'Context window';
+  get hasContextMeasurement(): boolean {
+    return this.contextUsageTokens(this.contextUsage) !== null;
+  }
+
+  private contextUsageTokens(usage: ContextUsage | null | undefined): number | null {
+    if (!usage || usage.usage_source === 'not_measured') {
+      return null;
     }
-    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
-    return `${this.contextUsage.estimated_input_tokens} / ${selected}`;
+    const candidates = [usage.peak_request_tokens, usage.reported_input_tokens];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0) {
+        return candidate;
+      }
+    }
+    if (typeof usage.estimated_input_tokens === 'number'
+      && Number.isFinite(usage.estimated_input_tokens)
+      && usage.estimated_input_tokens > 0) {
+      return usage.estimated_input_tokens;
+    }
+    return null;
+  }
+
+  get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
+    if (this.effectiveContextUsagePercent === null) {
+      return 'neutral';
+    }
+    if (this.contextUsagePercent >= 95) {
+      return 'critical';
+    }
+    if (this.contextUsagePercent >= 80) {
+      return 'warning';
+    }
+    return 'neutral';
+  }
+
+  private hasMeasuredContextUsage(): boolean {
+    return this.hasContextMeasurement;
   }
 
   startNewChat(): void {
-    this.sessionId = undefined;
+    this.realtimeService.disconnect({ discardPending: true });
+    this.historyRequestNonce += 1;
     this.conversationId = undefined;
+    this.contextRevision = undefined;
+    this.conversationState = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
-    this.lastRunEventId = undefined;
+    this.lastHandledRunId = undefined;
+    this.latestAcceptedRunId = undefined;
+    this.latestAcceptedRunVersion = undefined;
+    this.pendingRun = undefined;
+    this.lastRunSequence = 0;
     this.streamState = 'idle';
     this.progressStage = undefined;
     this.progressLabel = undefined;
     this.seenEventIds.clear();
-    this.closeActiveEventSource();
     this.conversationNonce += 1;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.isExecutionStatusOpen = false;
+    this.runTraceLoading = false;
+    this.runTraceError = '';
+    this.runFailureSummary = '';
     this.messages = [];
-    this.lastDecision = undefined;
+    this.lastRoute = undefined;
+    this.lastGoal = undefined;
+    this.completionContract = undefined;
     this.lastOperation = undefined;
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
+    this.manualBasemapPreference = undefined;
+    this.presentationStatus = undefined;
+    this.pendingMapSession = undefined;
+    this.committedMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
     this.payload = undefined;
     this.status = 'Agent ready';
+    this.isLoading = false;
     this.assistantDraft = '';
-    this.composerDraft = '';
+    this.setComposerDraft('');
     this.transcriptScrollTop = 0;
-    this.mapState = { overlayVisibility: {}, overlayOpacity: {} };
+    this.mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] };
     this.progressPercent = 0;
     this.isAlertsOpen = false;
+    this.isConversationHistoryOpen = false;
+    this.cancelRequested = false;
     this.appStateStore.resetChatPage();
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
   }
 
   toggleAlerts(): void {
     this.isAlertsOpen = !this.isAlertsOpen;
+  }
+
+  toggleConversationHistory(): void {
+    this.isConversationHistoryOpen = !this.isConversationHistoryOpen;
+    if (this.isConversationHistoryOpen && this.conversationHistory.length === 0) {
+      void this.loadConversationHistory(true);
+    }
+  }
+
+  onConversationHistoryQuery(query: string): void {
+    this.conversationHistoryQuery = query;
+    void this.loadConversationHistory(true);
+  }
+
+  loadMoreConversations(): void {
+    if (!this.conversationHistoryCursor || this.conversationHistoryLoading) {
+      return;
+    }
+    void this.loadConversationHistory(false);
+  }
+
+  async selectConversation(conversation: ConversationSummary): Promise<void> {
+    if (!conversation.conversation_id || conversation.conversation_id === this.conversationId) {
+      this.isConversationHistoryOpen = false;
+      return;
+    }
+    this.startNewChat();
+    this.conversationId = conversation.conversation_id;
+    this.isConversationHistoryOpen = false;
+    this.syncState();
+    await this.hydrateConversation(conversation.conversation_id);
+  }
+
+  toggleExecutionStatus(expanded?: boolean): void {
+    this.isExecutionStatusOpen = expanded === undefined ? !this.isExecutionStatusOpen : expanded;
+    if (this.isExecutionStatusOpen && this.inspectedRunId) {
+      void this.loadRunTrace(this.inspectedRunId, true);
+    }
+  }
+
+  refreshRunTrace(): void {
+    if (this.inspectedRunId) {
+      void this.loadRunTrace(this.inspectedRunId, true);
+    }
+  }
+
+  private async loadConversationHistory(reset: boolean): Promise<void> {
+    const requestNonce = ++this.historyRequestNonce;
+    this.conversationHistoryLoading = true;
+    this.conversationHistoryError = '';
+    const cursor = reset ? undefined : this.conversationHistoryCursor ?? undefined;
+    if (reset) {
+      this.conversationHistoryCursor = undefined;
+    }
+    this.changeDetectorRef.detectChanges();
+    try {
+      const result = await this.apiClient.fetchConversations({
+        query: this.conversationHistoryQuery.trim() || undefined,
+        limit: 30,
+        cursor,
+      });
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      const merged = reset ? result.conversations : [...this.conversationHistory, ...result.conversations];
+      const seen = new Set<string>();
+      this.conversationHistory = merged.filter((item) => {
+        if (seen.has(item.conversation_id)) {
+          return false;
+        }
+        seen.add(item.conversation_id);
+        return true;
+      });
+      this.conversationHistoryCursor = result.next_cursor;
+    } catch (error: unknown) {
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      this.conversationHistoryError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load conversation history.',
+      );
+    } finally {
+      if (!this.isDestroyed && requestNonce === this.historyRequestNonce) {
+        this.conversationHistoryLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private async loadRunTrace(runId: string, reset: boolean): Promise<void> {
+    if (!this.conversationId || !runId) {
+      return;
+    }
+    const requestNonce = this.historyRequestNonce;
+    this.runTraceLoading = true;
+    this.runTraceError = '';
+    try {
+      const result = await this.apiClient.fetchConversationRunTrace(
+        this.conversationId,
+        runId,
+        { limit: 100, cursor: reset ? undefined : undefined },
+      );
+      if (this.isDestroyed
+        || requestNonce !== this.historyRequestNonce
+        || this.inspectedRunId !== runId
+        || this.conversationId !== result.conversation_id
+        || result.run_id !== runId) {
+        return;
+      }
+      this.traceEntries = result.entries;
+    } catch (error: unknown) {
+      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+        return;
+      }
+      this.runTraceError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load the run trace.',
+      );
+    } finally {
+      if (!this.isDestroyed && requestNonce === this.historyRequestNonce) {
+        this.runTraceLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  toggleToolbar(): void {
+    this.isToolbarCollapsed = !this.isToolbarCollapsed;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
   }
 
   navigateToSettings(): void {
@@ -302,12 +669,201 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   onComposerChange(value: string): void {
     this.composerDraft = value;
+    this.composerError = '';
     this.syncState();
+  }
+
+  private async hydrateConversation(conversationId: string): Promise<void> {
+    const requestNonce = this.conversationNonce;
+    this.status = 'Restoring conversation';
+    this.syncState();
+    try {
+      const snapshot = await this.apiClient.fetchConversationSnapshot(conversationId);
+      if (this.isDestroyed
+        || this.conversationNonce !== requestNonce
+        || this.conversationId !== conversationId) {
+        return;
+      }
+      if (snapshot.conversation_id !== conversationId) {
+        throw new Error('Conversation snapshot identity mismatch.');
+      }
+
+      this.realtimeService.disconnect({ discardPending: true });
+      this.contextRevision = snapshot.context_revision;
+      this.conversationState = snapshot.conversation_state;
+      this.messages = snapshot.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        created_at: message.created_at,
+        kind: 'normal' as const,
+      }));
+      this.memorySnapshot = snapshot.memory_snapshot;
+      this.contextUsage = undefined;
+      this.lastRoute = undefined;
+      this.lastGoal = undefined;
+      this.completionContract = undefined;
+      this.lastOperation = undefined;
+      this.assistantDraft = '';
+      this.progressStage = undefined;
+      this.progressLabel = undefined;
+      this.progressPercent = 0;
+      this.taskState = snapshot.active_run?.task_state;
+      this.toolProgress = [];
+      this.traceEntries = [];
+      this.runTraceLoading = false;
+      this.runTraceError = '';
+      this.runFailureSummary = '';
+      this.pendingRun = undefined;
+      this.cancelRequested = false;
+      this.seenEventIds.clear();
+      this.activeRunId = snapshot.active_run?.run_id;
+      this.lastHandledRunId = this.activeRunId;
+      this.activeRunVersion = snapshot.active_run?.run_version;
+      this.latestAcceptedRunId = this.activeRunId;
+      this.latestAcceptedRunVersion = this.activeRunVersion;
+      this.pendingSupersession = undefined;
+      this.isLoading = snapshot.active_run !== null
+        && snapshot.active_run !== undefined
+        && ['pending', 'running', 'updating', 'awaiting_render'].includes(snapshot.active_run.state);
+      this.streamState = 'idle';
+      this.mapSession = undefined;
+      this.presentationStatus = snapshot.active_run?.presentation_status;
+      this.pendingMapSession = undefined;
+      this.committedMapSession = undefined;
+      this.pendingRenderContext = undefined;
+      this.renderAckQueued = false;
+      this.pendingRenderAckMessageId = undefined;
+      this.payload = undefined;
+      if (snapshot.map_session) {
+        this.mapSession = snapshot.map_session;
+        this.committedMapSession = snapshot.map_session;
+        this.payload = {
+          map_session: snapshot.map_session,
+          compliance_warnings: snapshot.map_session.compliance_warnings,
+        };
+      }
+      const pendingPresentation = snapshot.active_run?.presentation;
+      const restoringPendingPresentation = snapshot.active_run?.state === 'awaiting_render'
+        && snapshot.active_run.presentation_status === 'pending'
+        && pendingPresentation !== null
+        && pendingPresentation !== undefined;
+      const activeRun = snapshot.active_run;
+      if (restoringPendingPresentation && pendingPresentation && activeRun) {
+        const candidate = normalizeMapSession(pendingPresentation['pending_response']
+          && typeof pendingPresentation['pending_response'] === 'object'
+          ? (pendingPresentation['pending_response'] as Record<string, unknown>)['map_session']
+          : undefined);
+        const mapSessionId = this.readString(pendingPresentation['map_session_id']);
+        const revision = this.readNumber(pendingPresentation['collection_revision']);
+        if (candidate && mapSessionId && revision !== undefined
+          && candidate.session_id === mapSessionId
+          && candidate.overlay_collection.revision === revision) {
+          this.pendingRenderContext = {
+            runId: activeRun.run_id,
+            runVersion: activeRun.run_version,
+            mapSessionId,
+            collectionRevision: revision,
+            captureRequested: this.readBoolean(
+              pendingPresentation['vision_capture_requested'],
+            ),
+          };
+          this.handleMapSession(candidate);
+          this.status = 'Map data ready; rendering';
+          this.progressStage = 'awaiting_render';
+          this.progressLabel = 'Map data ready; rendering';
+        }
+      }
+      // Keep the presentation watchdog state visible after hydration.  The
+      // candidate is still uncommitted until the matching render
+      // acknowledgment is accepted by the backend.
+      this.status = restoringPendingPresentation
+        ? 'Map data ready; rendering'
+        : this.isLoading ? 'Reconnecting to active request' : 'Agent ready';
+      this.realtimeService.connect(conversationId, {
+        runId: this.activeRunId,
+        afterSequence: this.lastRunSequence,
+      });
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+      this.queueTranscriptScroll();
+    } catch (error: unknown) {
+      if (this.isDestroyed
+        || this.conversationNonce !== requestNonce
+        || this.conversationId !== conversationId) {
+        return;
+      }
+      if (this.readErrorStatus(error) === 404) {
+        this.resetInvalidConversation();
+        return;
+      }
+      this.status = 'Could not restore conversation';
+      this.streamState = 'failed';
+      this.changeDetectorRef.detectChanges();
+      this.syncState();
+    }
+  }
+
+  private resetInvalidConversation(): void {
+    this.realtimeService.disconnect({ discardPending: true });
+    this.historyRequestNonce += 1;
+    this.conversationId = undefined;
+    this.conversationNonce += 1;
+    this.contextRevision = undefined;
+    this.conversationState = undefined;
+    this.activeRunId = undefined;
+    this.activeRunVersion = undefined;
+    this.latestAcceptedRunId = undefined;
+    this.latestAcceptedRunVersion = undefined;
+    this.pendingSupersession = undefined;
+    this.pendingRun = undefined;
+    this.lastRunSequence = 0;
+    this.streamState = 'idle';
+    this.progressStage = undefined;
+    this.progressLabel = undefined;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.isExecutionStatusOpen = false;
+    this.runTraceLoading = false;
+    this.runTraceError = '';
+    this.runFailureSummary = '';
+    this.seenEventIds.clear();
+    this.messages = [];
+    this.lastRoute = undefined;
+    this.lastGoal = undefined;
+    this.completionContract = undefined;
+    this.lastOperation = undefined;
+    this.memorySnapshot = {};
+    this.contextUsage = undefined;
+    this.mapSession = undefined;
+    this.manualBasemapPreference = undefined;
+    this.presentationStatus = undefined;
+    this.pendingMapSession = undefined;
+    this.committedMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
+    this.payload = undefined;
+    this.assistantDraft = '';
+    this.status = 'Agent ready';
+    this.isLoading = false;
+    this.progressPercent = 0;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  private readErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+    const status = (error as { status?: unknown }).status;
+    return typeof status === 'number' ? status : undefined;
   }
 
   onComposerInput(event: Event): void {
     const target = event.target as HTMLTextAreaElement | null;
     this.onComposerChange(target?.value ?? '');
+    this.resizeComposer(target);
   }
 
   onComposerKeydown(event: KeyboardEvent): void {
@@ -322,45 +878,72 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.syncState();
   }
 
+  onComposerAction(): void {
+    if (this.isLoading) {
+      void this.cancelActiveRun();
+      return;
+    }
+    void this.sendMessage();
+  }
+
   async sendMessage(): Promise<void> {
     const trimmed = this.composerDraft.trim();
     if (!trimmed) {
       return;
     }
+    if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+      this.composerError = `Message must be ${MAX_CHAT_MESSAGE_LENGTH.toLocaleString()} characters or fewer.`;
+      this.status = this.composerError;
+      this.syncState();
+      return;
+    }
 
+    this.composerError = '';
     const message = trimmed;
     const requestNonce = this.conversationNonce;
     if (await this.tryHandleLocalCommand(message)) {
       return;
     }
-    this.composerDraft = '';
-    if (this.activeRunId && this.conversationId && this.isLoading) {
-      await this.sendSteeringMessage(message);
+    this.setComposerDraft('');
+    if (this.isLoading && this.conversationId && this.progressStage !== 'awaiting_render') {
+      if (this.activeRunId) {
+        await this.sendSteeringMessage(message);
+      } else {
+        this.setComposerDraft(message);
+        this.syncState();
+      }
       return;
     }
     await this.startAgentRun(message, requestNonce);
   }
 
   private async startAgentRun(message: string, requestNonce: number): Promise<void> {
+    // A reconnect may still have an unacknowledged render command queued for
+    // the previous candidate. Remove it before enqueueing the new run so an
+    // old browser observation cannot commit stale geography first.
+    this.realtimeService.discardPendingMapRenderAcks();
+    if (this.pendingMapSession || this.pendingRenderContext) {
+      this.restoreCommittedMap();
+    }
+    this.pendingMapSession = undefined;
+    this.pendingRenderContext = undefined;
+    this.renderAckQueued = false;
+    this.pendingRenderAckMessageId = undefined;
     this.isLoading = true;
     this.status = 'Understanding the request';
     this.progressStage = 'understanding_request';
     this.progressLabel = 'Understanding the request';
     this.progressPercent = 18;
+    this.taskState = undefined;
+    this.toolProgress = [];
+    this.traceEntries = [];
+    this.runTraceError = '';
+    this.runFailureSummary = '';
     this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
     this.syncState();
 
     try {
-      if (!this.supportsRunTransport()) {
-        const result = await this.apiClient.sendChatTurn({
-          session_id: this.sessionId,
-          message,
-        });
-        this.isLoading = false;
-        this.applyTurnResponse(result, requestNonce);
-        return;
-      }
       const conversation = this.conversationId
         ? { conversation_id: this.conversationId }
         : await this.apiClient.createConversation({ title: message.slice(0, 120) });
@@ -368,14 +951,32 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         return;
       }
       this.conversationId = conversation.conversation_id;
-      const run = await this.apiClient.createAgentRun(conversation.conversation_id, {
+      const supersededRunId = this.activeRunId;
+      const supersededRunVersion = this.activeRunVersion ?? 0;
+      this.activeRunId = undefined;
+      this.activeRunVersion = undefined;
+      this.lastHandledRunId = undefined;
+      this.pendingSupersession = supersededRunId
+        ? {
+          runId: supersededRunId,
+          previousVersion: supersededRunVersion,
+          expectedVersion: supersededRunVersion + 1,
+        }
+        : undefined;
+      const pendingRun = {
+        clientRequestId: this.newClientRequestId(),
         message,
-        client_request_id: `client_req_${Date.now()}`,
-      });
-      this.activeRunId = run.run_id;
-      this.activeRunVersion = run.run_version;
-      this.streamState = 'connecting';
-      this.openRunEventStream(run.conversation_id, run.run_id);
+      };
+      this.pendingRun = pendingRun;
+      this.lastRunSequence = 0;
+      this.syncState();
+      this.realtimeService.setResumeCursor(undefined, 0);
+      this.realtimeService.connect(conversation.conversation_id);
+      this.realtimeService.sendRunStart(
+        message,
+        pendingRun.clientRequestId,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+      );
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
@@ -384,12 +985,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.status = 'Agent ready';
       this.progressLabel = undefined;
       this.assistantDraft = '';
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
       this.progressPercent = 0;
       this.isLoading = false;
     } finally {
       this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
+      this.queueTranscriptScroll();
     }
   }
 
@@ -398,6 +999,13 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     const clientMutationId = `client_steer_${Date.now()}_${++this.steeringMutationCounter}`;
+    const steeringRunId = this.activeRunId;
+    const steeringVersion = this.activeRunVersion ?? 0;
+    this.pendingSupersession = {
+      runId: steeringRunId,
+      previousVersion: steeringVersion,
+      expectedVersion: steeringVersion + 1,
+    };
     this.messages = [
       ...this.messages,
       { role: 'user', content: message, kind: 'steering', runVersion: this.activeRunVersion },
@@ -406,119 +1014,274 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.progressLabel = 'Request updated';
     this.syncState();
     try {
-      const response = await this.apiClient.sendRunSteering(this.conversationId, this.activeRunId, {
-        message,
-        client_mutation_id: clientMutationId,
-      });
-      this.activeRunVersion = response.run_version;
+      this.realtimeService.sendRunSteer(this.activeRunId, message, clientMutationId);
     } catch (error: unknown) {
+      this.pendingSupersession = undefined;
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
         'Could not apply that refinement.',
       );
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
     } finally {
       this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
+      this.queueTranscriptScroll();
     }
   }
 
   async cancelActiveRun(): Promise<void> {
+    this.cancelRequested = true;
+    this.status = 'Stopping…';
+    this.progressLabel = 'Stopping…';
     if (!this.conversationId || !this.activeRunId) {
+      this.syncState();
       return;
     }
     try {
-      await this.apiClient.cancelAgentRun(this.conversationId, this.activeRunId);
-      this.status = 'Agent ready';
-      this.progressLabel = undefined;
-      this.isLoading = false;
-      this.activeRunId = undefined;
-      this.closeActiveEventSource();
+      this.realtimeService.sendRunCancel(this.activeRunId);
+      this.cancelRequested = false;
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
         'Could not cancel the active run.',
       );
-      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.runFailureSummary = fallback;
+      this.cancelRequested = false;
     } finally {
       this.syncState();
     }
   }
 
-  private openRunEventStream(conversationId: string, runId: string, afterEventId = this.lastRunEventId): void {
-    this.closeActiveEventSource();
-    this.streamState = afterEventId ? 'reconnecting' : 'connecting';
-    const source = this.apiClient.openRunEventSource(conversationId, runId, afterEventId);
-    this.activeEventSource = source;
-    source.onopen = () => {
-      this.streamState = 'open';
-      this.reconnectAttempts = 0;
-      this.syncState();
-    };
-    const eventTypes = [
-      'progress',
-      'assistant_text_delta',
-      'assistant_text_completed',
-      'tool_started',
-      'tool_completed',
-      'request_updated',
-      'error',
-      'completed',
-      'cancelled',
-      'clarification_needed',
-    ];
-    eventTypes.forEach((type) => {
-      source.addEventListener(type, (event) => {
-        const parsed = JSON.parse((event as MessageEvent<string>).data) as RunEvent;
-        this.handleRunEvent(parsed);
-      });
-    });
-    source.onerror = () => {
-      if (!this.activeRunId || !this.conversationId || !this.isLoading) {
-        this.closeActiveEventSource();
-        return;
+  private handleRealtimeMessage(message: RealtimeServerMessage): void {
+    if (!this.conversationId || message.conversation_id !== this.conversationId) {
+      return;
+    }
+    if (message.type === 'run.ack') {
+      const runId = this.readString(message.payload['run_id']);
+      const runVersion = this.readNumber(message.payload['run_version']);
+      if (message.payload['accepted'] !== false) {
+        this.rememberAcceptedRunVersion(runId, runVersion);
       }
-      this.streamState = 'reconnecting';
-      this.closeActiveEventSource();
-      if (this.reconnectAttempts >= 3) {
-        this.streamState = 'failed';
-        this.progressLabel = 'Stream disconnected; reconnect later to replay updates.';
-        this.syncState();
-        return;
-      }
-      this.reconnectAttempts += 1;
-      window.setTimeout(() => {
-        if (this.conversationId && this.activeRunId && this.isLoading) {
-          this.openRunEventStream(this.conversationId, this.activeRunId, this.lastRunEventId);
+      const pendingSupersession = this.pendingSupersession;
+      if (message.payload['command'] === 'run.steer'
+        && pendingSupersession !== undefined
+        && pendingSupersession.runId === runId) {
+        const steerWasRejected = message.payload['accepted'] === false;
+        const steerReachedNextVersion = runVersion !== undefined
+          && runVersion >= pendingSupersession.expectedVersion;
+        if (steerWasRejected || runVersion === undefined || steerReachedNextVersion) {
+          this.pendingSupersession = undefined;
         }
-      }, 750 * this.reconnectAttempts);
+      }
+      if (runId && message.payload['command'] === 'run.start') {
+        this.activeRunId = runId;
+        this.lastHandledRunId = runId;
+        this.activeRunVersion = runVersion;
+        this.applyTaskState(message.payload['task_state']);
+        this.toolProgress = [];
+        this.traceEntries = [];
+        this.runTraceError = '';
+        this.isLoading = true;
+        this.realtimeService.setResumeCursor(runId, this.lastRunSequence);
+        if (this.cancelRequested) {
+          this.cancelRequested = false;
+          this.realtimeService.sendRunCancel(runId);
+          // Test transports and some socket implementations can acknowledge
+          // the cancel synchronously inside sendRunCancel. Do not let the
+          // enclosing start acknowledgement put the UI back into generating.
+          if (this.activeRunId !== runId) {
+            this.isLoading = false;
+          }
+        }
+      }
+      if (message.payload['command'] === 'run.cancel') {
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
+      }
+      if (message.payload['command'] === 'map.render_ack') {
+        if (message.correlation_id === this.pendingRenderAckMessageId) {
+          this.pendingRenderAckMessageId = undefined;
+        }
+        const ackRunId = this.readString(message.payload['run_id']);
+        const presentationStatus = this.readString(message.payload['presentation_status']);
+        if (ackRunId === this.pendingRenderContext?.runId
+          && (presentationStatus === 'failed' || presentationStatus === 'render_timeout')) {
+          this.restoreCommittedMap('Map update failed; previous map retained');
+          this.isLoading = false;
+          this.activeRunId = undefined;
+          this.pendingRun = undefined;
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+        }
+        if (message.payload['accepted'] !== false) {
+          this.pendingRenderAcknowledgement = undefined;
+          this.renderAckRetryCount = 0;
+        }
+      }
       this.syncState();
-    };
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    if (message.type === 'session.resumed') {
+      this.applyTaskState(message.payload['task_state']);
+      const state = this.readString(message.payload['state']);
+      if (state === 'awaiting_render') {
+        this.isLoading = true;
+        this.status = 'Map data ready; rendering';
+        this.progressStage = 'awaiting_render';
+        this.progressLabel = 'Map data ready; rendering';
+      } else if (state === 'completed' || state === 'failed' || state === 'cancelled') {
+        if (state !== 'completed' && (this.pendingMapSession || this.pendingRenderContext)) {
+          this.restoreCommittedMap(
+            state === 'cancelled'
+              ? 'Map update cancelled; previous map retained'
+              : 'Map update failed or timed out; previous map retained',
+          );
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+        }
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+      }
+      return;
+    }
+    if (message.type === 'run.event') {
+      const event = parseRunEvent(message.payload, this.conversationId);
+      if (event) {
+        this.handleRunEvent(event);
+      }
+      return;
+    }
+    if (message.type === 'protocol.error') {
+      const code = this.readString(message.payload['code']) ?? 'connection_error';
+      const command = this.readString(message.payload['command']);
+      if (command === 'run.start' || code === 'run_not_found' || code === 'access_denied') {
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+      }
+      if (command === 'map.render_ack'
+        || code === 'render_ack_rejected'
+        || code === 'render_ack_mismatch') {
+        if (code === 'render_ack_mismatch' && this.retryPendingRenderAcknowledgement(message)) {
+          return;
+        }
+        if (code === 'render_ack_mismatch' && this.pendingRenderContext) {
+          // Keep the candidate and its identity alive until the browser can
+          // resynchronize. A mismatched tuple is not evidence that the map
+          // itself failed.
+          this.status = 'Map data ready; rendering';
+          this.progressStage = 'awaiting_render';
+          this.progressLabel = 'Map data ready; rendering';
+          this.isLoading = true;
+          this.syncState();
+          this.changeDetectorRef.detectChanges();
+          return;
+        }
+        if (this.isStaleRenderAcknowledgement(message)) {
+          // A render command from an earlier run version can be rejected after
+          // steering has already staged the newer candidate.  That rejection
+          // is an observation of superseded work, not a failure of the active
+          // candidate; keep the current render context alive.
+          return;
+        }
+        this.restoreCommittedMap('Map update failed; previous map retained');
+        this.pendingRenderContext = undefined;
+        this.renderAckQueued = false;
+        this.pendingRenderAckMessageId = undefined;
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+      }
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
+      const messageText = 'The real-time connection could not apply that request.';
+      this.runFailureSummary = messageText;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
   private handleRunEvent(event: RunEvent): void {
-    if (this.seenEventIds.has(event.event_id)) {
+    if (event.conversation_id !== this.conversationId
+      || (this.activeRunId && event.run_id !== this.activeRunId)
+      || (!this.activeRunId && this.lastHandledRunId && event.run_id !== this.lastHandledRunId)
+      || (this.activeRunId === event.run_id
+        && this.activeRunVersion !== undefined
+        && event.run_version < this.activeRunVersion)) {
+      return;
+    }
+    if (this.seenEventIds.has(event.event_id) || event.sequence <= this.lastRunSequence) {
       return;
     }
     this.seenEventIds.add(event.event_id);
-    this.lastRunEventId = event.event_id;
+    while (this.seenEventIds.size > this.maxSeenEventIds) {
+      const oldest = this.seenEventIds.values().next().value as string | undefined;
+      if (oldest === undefined) {
+        break;
+      }
+      this.seenEventIds.delete(oldest);
+    }
+    this.lastRunSequence = event.sequence;
+    this.realtimeService.setResumeCursor(event.run_id, event.sequence);
+    this.rememberAcceptedRunVersion(event.run_id, event.run_version);
     this.activeRunVersion = event.run_version;
+    this.lastHandledRunId = event.run_id;
+    this.applyTaskState(event.payload['task_state']);
+    if (event.type === 'tool_started' || event.type === 'tool_completed') {
+      const progress = parseToolProgressPayload(event.payload, event.type);
+      if (progress) {
+        this.upsertToolProgress(progress);
+      }
+    }
+    // Internal trace/checkpoint events advance the replay cursor but never
+    // become user-visible progress or transcript content. The expandable
+    // inspector reads the sanitized trace endpoint when requested.
+    if (event.visibility !== 'user') {
+      this.syncState();
+      return;
+    }
     switch (event.type) {
+      case 'context_usage': {
+        const usage = parseContextUsage(event.payload['context_usage']);
+        if (usage) {
+          this.applyContextUsage(usage);
+        }
+        break;
+      }
       case 'progress':
-      case 'tool_started':
-      case 'tool_completed':
         this.progressStage = String(event.payload['stage'] ?? event.type);
         this.progressLabel = String(event.payload['label'] ?? this.progressLabel ?? this.status);
         this.status = this.progressLabel;
         break;
+      case 'tool_started':
+      case 'tool_completed': {
+        this.progressStage = String(event.payload['stage'] ?? event.type);
+        this.progressLabel = String(event.payload['label'] ?? this.progressLabel ?? this.status);
+        this.status = this.progressLabel;
+        const iteration = this.readNumber(event.payload['iteration'] ?? event.payload['current_iteration']);
+        if (iteration !== undefined && this.taskState) {
+          this.taskState = { ...this.taskState, current_iteration: iteration };
+        }
+        break;
+      }
       case 'assistant_text_delta':
-        this.currentAssistantMessageId = event.event_id;
         this.assistantDraft += String(event.payload['delta'] ?? '');
         break;
       case 'assistant_text_completed':
         this.assistantDraft = '';
-        this.currentAssistantMessageId = undefined;
-        this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['content'] ?? '') }];
+        this.appendAssistantEventMessage(String(event.payload['content'] ?? ''));
         break;
       case 'request_updated':
         this.progressStage = 'request_updated';
@@ -526,35 +1289,171 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Request updated';
         break;
       case 'error':
-        this.status = 'Agent ready';
+        this.status = 'Agent needs attention';
         this.progressLabel = undefined;
         {
-          const message = String(event.payload['message'] ?? 'Failed');
-          if (this.messages.at(-1)?.content !== message) {
-            this.messages = [...this.messages, { role: 'assistant', content: message }];
+          const parsed = parseRunCompletionPayload(event.payload);
+          this.applyContextUsage(parsed.contextUsage);
+          const errorCode = this.readString(event.payload['code']);
+          const presentationStatus = this.readString(event.payload['presentation_status']);
+          if (parsed.operation !== undefined) {
+            this.lastOperation = parsed.operation;
           }
+          if (parsed.operation?.failure_category === 'iteration_budget_exhausted'
+            || errorCode === 'iteration_budget_exhausted') {
+            this.status = 'Iteration budget exhausted';
+            this.progressLabel = 'Iteration budget exhausted';
+          }
+          if (parsed.presentationStatus !== undefined) {
+            this.presentationStatus = parsed.presentationStatus;
+          }
+          if (presentationStatus === 'failed'
+            || presentationStatus === 'render_timeout'
+            || errorCode === 'render_failed'
+            || errorCode === 'render_timeout') {
+            this.presentationStatus = 'failed';
+            // A durable render failure arrives as an ERROR event after the
+            // browser has already displayed the candidate. Restore the last
+            // acknowledged map before clearing the pending identity.
+            this.restoreCommittedMap('Map update failed or timed out; previous map retained');
+            this.pendingRenderContext = undefined;
+            this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
+          }
+          this.runFailureSummary = this.summarizeRunFailure(
+            parsed.operation,
+            errorCode,
+            presentationStatus,
+          );
+          this.agentReadiness = {
+            status: 'needs_attention',
+            label: 'Needs attention',
+            message: this.runFailureSummary,
+          };
         }
         this.isLoading = false;
         this.activeRunId = undefined;
-        this.closeActiveEventSource();
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
+        this.streamState = 'closed';
+        this.pendingRenderAckMessageId = undefined;
         break;
+      case 'map_prepared': {
+        const presentation = event.payload['presentation'];
+        const mapSession = normalizeMapSession(event.payload['map_session']);
+        if (mapSession && presentation && typeof presentation === 'object' && !Array.isArray(presentation)) {
+          const rawPresentation = presentation as Record<string, unknown>;
+          const sessionId = this.readString(rawPresentation['map_session_id']);
+          const revision = this.readNumber(rawPresentation['collection_revision']);
+          if (sessionId && revision !== undefined
+            && sessionId === mapSession.session_id
+            && revision === mapSession.overlay_collection.revision) {
+            this.pendingRenderContext = {
+              runId: event.run_id,
+              runVersion: event.run_version,
+              mapSessionId: sessionId,
+              collectionRevision: revision,
+              captureRequested: this.readBoolean(
+                rawPresentation['vision_capture_requested'],
+              ),
+            };
+            this.pendingRenderAcknowledgement = undefined;
+            this.renderAckRetryCount = 0;
+            this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
+            this.handleMapSession(mapSession);
+            this.presentationStatus = 'prepared';
+            this.mapRenderState = 'preparing';
+            this.status = 'Map data ready; rendering';
+            this.progressStage = 'awaiting_render';
+            this.progressLabel = 'Map data ready; rendering';
+            this.isLoading = true;
+          }
+        }
+        break;
+      }
+      case 'render_observed': {
+        // A render acknowledgment is an observation in the same native run.
+        // Keep the candidate pending until the resumed run reaches a terminal
+        // event, but immediately make failures visible and discard the failed
+        // candidate so a correction can stage a fresh map identity.
+        const observation = parseRenderObservationPayload(event.payload);
+        const status = observation?.status;
+        const sessionId = observation?.map_session_id;
+        const revision = observation?.collection_revision;
+        const pendingRenderContext = this.pendingRenderContext;
+        if ((status !== 'ready' && status !== 'failed')
+          || !pendingRenderContext
+          || !sessionId
+          || sessionId !== pendingRenderContext.mapSessionId
+          || (revision !== undefined && revision !== pendingRenderContext.collectionRevision)) {
+          break;
+        }
+        this.presentationStatus = status === 'ready' ? 'ready' : 'pending';
+        if (status === 'ready') {
+          if (this.pendingMapSession?.session_id === sessionId
+            && this.pendingMapSession.overlay_collection.revision === revision) {
+            // The backend has verified this exact candidate. Promote it before
+            // the resumed model turn so the visible map is last-known-good
+            // even while the agent is still finalizing its response.
+            this.commitMapSession(this.pendingMapSession);
+            this.pendingRenderContext = undefined;
+            this.renderAckQueued = false;
+            this.pendingRenderAckMessageId = undefined;
+          }
+          this.mapRenderState = 'ready';
+          this.status = 'Map rendering verified; continuing';
+          this.progressStage = 'render_observed';
+          this.progressLabel = 'Map rendering verified; continuing';
+          this.isLoading = true;
+        } else {
+          const summary = observation.failure_summary
+            ?? 'The map did not render successfully; correcting the request.';
+          this.mapRenderState = 'failed';
+          this.restoreCommittedMap(summary);
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+          this.status = 'Correcting map rendering';
+          this.progressStage = 'correcting_render';
+          this.progressLabel = String(event.payload['label'] ?? 'Correcting the map after a render failure');
+          this.isLoading = true;
+        }
+        break;
+      }
       case 'completed':
         this.isLoading = false;
         this.status = 'Agent ready';
         this.progressLabel = undefined;
         this.progressPercent = 100;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
+        this.pendingRenderAckMessageId = undefined;
         this.applyRunCompletionPayload(event.payload);
-        this.closeActiveEventSource();
+        this.runFailureSummary = '';
+        this.agentReadiness = {
+          status: 'active',
+          label: 'Verified',
+          message: 'The selected agent model completed the latest request.',
+        };
         break;
       case 'cancelled':
+        if (this.pendingMapSession || this.pendingRenderContext) {
+          this.restoreCommittedMap('Map update cancelled; previous map retained');
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+        }
         this.isLoading = false;
         this.status = 'Agent ready';
         this.progressLabel = undefined;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
-        this.closeActiveEventSource();
+        this.runFailureSummary = '';
         break;
       case 'clarification_needed':
         this.isLoading = false;
@@ -562,55 +1461,357 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressStage = 'waiting_for_clarification';
         this.progressLabel = undefined;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
-        this.closeActiveEventSource();
+        this.runFailureSummary = '';
         break;
     }
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.changeDetectorRef.detectChanges();
+    this.queueTranscriptScroll();
   }
 
   private applyRunCompletionPayload(payload: Record<string, unknown>): void {
-    const mapSession = normalizeMapSession(payload['map_session']);
-    if (mapSession) {
-      this.handleMapSession(mapSession);
+    const parsed = parseRunCompletionPayload(payload);
+    if (
+      parsed.contextRevision !== undefined &&
+      this.contextRevision !== undefined &&
+      parsed.contextRevision < this.contextRevision
+    ) {
+      return;
     }
-    this.lastOperation = payload['operation'] as ChatOperationResult | null | undefined;
-    this.memorySnapshot = (payload['memory_snapshot'] as Record<string, unknown> | undefined) ?? this.memorySnapshot;
-    this.contextUsage = payload['context_usage'] as ContextUsage | undefined;
+    if (parsed.contextRevision !== undefined) {
+      this.contextRevision = parsed.contextRevision;
+    }
+    if (parsed.conversationState !== undefined) {
+      this.conversationState = parsed.conversationState ?? undefined;
+    }
+    if (parsed.route !== undefined) {
+      this.lastRoute = parsed.route;
+    }
+    if (parsed.goal !== undefined) {
+      this.lastGoal = parsed.goal;
+    }
+    if (parsed.completionContract !== undefined) {
+      this.completionContract = parsed.completionContract;
+    }
+    if (parsed.mapSession) {
+      if (this.pendingRenderContext) {
+        if (this.pendingRenderContext.mapSessionId === parsed.mapSession.session_id
+          && this.pendingRenderContext.collectionRevision === parsed.mapSession.overlay_collection.revision) {
+          this.commitMapSession(parsed.mapSession);
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+        } else {
+          // A completion payload for another candidate must not replace the
+          // map that is still awaiting acknowledgment for the current run.
+          this.restoreCommittedMap('Map update failed; previous map retained');
+          this.pendingRenderContext = undefined;
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+        }
+      } else {
+        // A resumable render acknowledgment may have already promoted this
+        // exact candidate while the model was finalizing. Do not stage the
+        // committed map a second time when the terminal payload arrives.
+        const currentRevision = this.mapSession?.overlay_collection?.revision;
+        const nextRevision = parsed.mapSession.overlay_collection?.revision;
+        if (this.mapSession?.session_id !== parsed.mapSession.session_id
+          || currentRevision !== nextRevision) {
+          this.handleMapSession(parsed.mapSession);
+        }
+      }
+    }
+    if (parsed.operation !== undefined) {
+      this.lastOperation = parsed.operation;
+    }
+    if (parsed.memorySnapshot !== undefined) {
+      this.memorySnapshot = parsed.memorySnapshot;
+    }
+    if (parsed.presentationStatus !== undefined) {
+      this.presentationStatus = parsed.presentationStatus;
+    }
+    if (parsed.taskState !== undefined) {
+      this.taskState = parsed.taskState;
+    }
+    this.applyContextUsage(parsed.contextUsage);
   }
 
-  private supportsRunTransport(): boolean {
-    const client = this.apiClient as unknown as Partial<ApiClientService>;
-    return typeof client.createConversation === 'function'
-      && typeof client.createAgentRun === 'function'
-      && typeof client.openRunEventSource === 'function';
+  private summarizeRunFailure(
+    operation: ChatOperationResult | null | undefined,
+    errorCode: string | undefined,
+    presentationStatus: string | undefined,
+  ): string {
+    if (presentationStatus === 'failed'
+      || presentationStatus === 'render_timeout'
+      || errorCode === 'render_failed'
+      || errorCode === 'render_timeout') {
+      return 'The map update could not be completed. The previous map was retained when available.';
+    }
+
+    const category = operation?.failure_category ?? errorCode;
+    switch (category) {
+      case 'context_limit':
+        return 'The selected model could not complete the request within its available context window.';
+      case 'model_budget_exhausted':
+      case 'tool_budget_exhausted':
+      case 'transition_budget_exhausted':
+      case 'iteration_budget_exhausted':
+      case 'run_deadline_exhausted':
+      case 'no_progress':
+        return 'The request stopped before completion because the agent reached an execution limit.';
+      case 'model_capability':
+      case 'provider_api':
+      case 'provider_failure':
+      case 'schema_definition':
+      case 'response_parsing':
+      case 'insufficient_evidence':
+        return 'The selected model or data provider could not complete the request.';
+      case 'cancelled':
+      case 'superseded':
+        return 'The request stopped before completion.';
+      default:
+        return 'The request could not be completed. Open Tool activity for execution details.';
+    }
+  }
+
+  private readString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  private readNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private readBoolean(value: unknown): boolean {
+    return value === true;
+  }
+
+  private rememberAcceptedRunVersion(runId: string | undefined, runVersion: number | undefined): void {
+    if (runId === undefined || runVersion === undefined) {
+      return;
+    }
+    if (this.latestAcceptedRunId === runId
+      && this.latestAcceptedRunVersion !== undefined
+      && runVersion <= this.latestAcceptedRunVersion) {
+      return;
+    }
+    this.latestAcceptedRunId = runId;
+    this.latestAcceptedRunVersion = runVersion;
+  }
+
+  private isStaleRenderAcknowledgement(message: RealtimeServerMessage): boolean {
+    const rejectedRunId = this.readString(message.payload['run_id']);
+    const rejectedRunVersion = this.readNumber(message.payload['run_version']);
+    if (rejectedRunId === undefined && rejectedRunVersion === undefined) {
+      return false;
+    }
+
+    const currentRunId = this.pendingRenderContext?.runId
+      ?? this.activeRunId
+      ?? this.lastHandledRunId
+      ?? this.latestAcceptedRunId;
+    const currentRunVersion = this.pendingRenderContext?.runVersion
+      ?? this.activeRunVersion
+      ?? (currentRunId === this.latestAcceptedRunId ? this.latestAcceptedRunVersion : undefined);
+    if (rejectedRunId !== undefined
+      && currentRunId !== undefined
+      && rejectedRunId !== currentRunId) {
+      return true;
+    }
+    if (this.pendingSupersession
+      && rejectedRunId === this.pendingSupersession.runId
+      && rejectedRunVersion !== undefined
+      && rejectedRunVersion <= this.pendingSupersession.previousVersion) {
+      return true;
+    }
+    return rejectedRunVersion !== undefined
+      && currentRunVersion !== undefined
+      && rejectedRunVersion < currentRunVersion;
+  }
+
+  private retryPendingRenderAcknowledgement(message: RealtimeServerMessage): boolean {
+    const pendingRenderContext = this.pendingRenderContext;
+    const pendingAcknowledgement = this.pendingRenderAcknowledgement;
+    if (!pendingRenderContext || !pendingAcknowledgement || this.renderAckRetryCount >= 1) {
+      return false;
+    }
+    const details = message.payload['details'];
+    if (!details || typeof details !== 'object' || Array.isArray(details)) {
+      return false;
+    }
+    const expected = (details as Record<string, unknown>)['expected'];
+    if (!expected || typeof expected !== 'object' || Array.isArray(expected)) {
+      return false;
+    }
+    const expectedRecord = expected as Record<string, unknown>;
+    const expectedRunId = this.readString(expectedRecord['run_id']);
+    const expectedRunVersion = this.readNumber(expectedRecord['run_version']);
+    const expectedSessionId = this.readString(expectedRecord['map_session_id']);
+    const expectedRevision = this.readNumber(expectedRecord['collection_revision']);
+    if (expectedRunId !== pendingRenderContext.runId
+      || expectedRunVersion !== pendingRenderContext.runVersion
+      || expectedSessionId !== pendingRenderContext.mapSessionId
+      || expectedRevision !== pendingRenderContext.collectionRevision) {
+      return false;
+    }
+    const acknowledgement: MapRenderAcknowledgement = {
+      ...pendingAcknowledgement,
+      run_id: expectedRunId,
+      run_version: expectedRunVersion,
+      map_session_id: expectedSessionId,
+      collection_revision: expectedRevision,
+    };
+    this.renderAckRetryCount += 1;
+    this.renderAckQueued = true;
+    this.status = 'Map data ready; rendering';
+    this.progressStage = 'awaiting_render';
+    this.progressLabel = 'Map data ready; rendering';
+    this.isLoading = true;
+    try {
+      const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+      this.pendingRenderAckMessageId = messageId;
+      this.pendingRenderAcknowledgement = acknowledgement;
+    } catch {
+      this.renderAckQueued = false;
+      this.pendingRenderAckMessageId = undefined;
+      return false;
+    }
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+    return true;
+  }
+
+  private applyTaskState(value: unknown): void {
+    if (value === undefined) {
+      return;
+    }
+    try {
+      const parsed = parseAgentTaskState(value, 'realtime run event');
+      if (parsed !== undefined) {
+        this.taskState = parsed;
+      }
+    } catch {
+      // Optional progress metadata must never make a valid run unusable.
+    }
+  }
+
+  private upsertToolProgress(progress: ToolProgressItem): void {
+    const existingIndex = this.toolProgress.findIndex((item) => item.call_id === progress.call_id);
+    if (existingIndex < 0) {
+      this.toolProgress = [...this.toolProgress, progress].slice(-48);
+      return;
+    }
+    const existing = this.toolProgress[existingIndex];
+    this.toolProgress = this.toolProgress.map((item, index) => (
+      index === existingIndex
+        ? {
+          ...existing,
+          ...progress,
+          label: progress.label ?? existing.label,
+          task_id: progress.task_id ?? existing.task_id,
+          iteration: progress.iteration ?? existing.iteration,
+          summary: progress.summary ?? existing.summary,
+          duration_ms: progress.duration_ms ?? existing.duration_ms,
+          evidence_refs: progress.evidence_refs ?? existing.evidence_refs,
+          error: progress.error ?? existing.error,
+          started_at: progress.started_at ?? existing.started_at,
+          completed_at: progress.completed_at ?? existing.completed_at,
+        }
+        : item
+    ));
+  }
+
+  private applyContextUsage(usage: ContextUsage | null | undefined): void {
+    const profile = this.selectedModelContext;
+    if (!usage || !profile
+      || usage.provider !== profile.provider
+      || usage.model !== profile.model) {
+      return;
+    }
+    if (this.contextUsageTokens(usage) === null && this.hasMeasuredContextUsage()) {
+      return;
+    }
+    const profileLimit = this.contextLimit;
+    const modelLimit = this.validPositiveNumber(usage.model_context_limit) ?? profileLimit;
+    const selectedLimit = this.validPositiveNumber(usage.selected_context_window) ?? profileLimit;
+    this.contextUsage = {
+      ...usage,
+      model_context_limit: modelLimit,
+      selected_context_window: selectedLimit,
+      expected_output_tokens: usage.expected_output_tokens
+        ?? profile.maximum_output_tokens,
+      context_profile_source: usage.context_profile_source
+        && usage.context_profile_source !== 'unknown'
+        ? usage.context_profile_source
+        : profile.context_profile_source,
+      context_metadata_authority: usage.context_metadata_authority
+        && usage.context_metadata_authority !== 'unknown'
+        ? usage.context_metadata_authority
+        : profile.context_metadata_authority,
+    };
+  }
+
+  private contextLimitForUsage(usage: ContextUsage | null | undefined): number | null {
+    return this.validPositiveNumber(usage?.model_context_limit)
+      ?? this.validPositiveNumber(usage?.selected_context_window)
+      ?? this.contextLimit;
+  }
+
+  private validPositiveNumber(value: number | null | undefined): number | null {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? value
+      : null;
+  }
+
+  private newClientRequestId(): string {
+    const random = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    return `client_req_${random}`;
   }
 
   private applyTurnResponse(result: ChatTurnResponse, requestNonce: number): void {
     if (requestNonce !== this.conversationNonce) {
       return;
     }
-    if (result.session_id > 0) {
-      this.sessionId = result.session_id;
-    }
+    this.contextRevision = result.context_revision;
+    this.conversationState = result.conversation_state ?? this.conversationState;
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
-    const mapSession = normalizeMapSession(operation?.map_session ?? result.map_session);
+    const mapSession = normalizeMapSession(result.map_session);
     if (mapSession) {
       this.handleMapSession(mapSession);
     }
-    this.lastDecision = result.decision;
+    this.lastRoute = result.route;
+    this.lastGoal = result.goal;
+    this.completionContract = result.completion_contract;
     this.lastOperation = operation;
+    this.presentationStatus = result.presentation_status;
     this.memorySnapshot = result.memory_snapshot ?? {};
-    this.contextUsage = result.context_usage ?? undefined;
+    this.taskState = result.task_state;
+    result.tool_results.forEach((tool) => {
+      this.upsertToolProgress({
+        call_id: tool.call_id,
+        tool_name: tool.tool_name,
+        status: tool.status,
+        summary: tool.summary,
+        evidence_refs: tool.evidence_refs,
+        error: tool.error && typeof tool.error['message'] === 'string'
+          ? tool.error['message']
+          : null,
+      });
+    });
+    this.applyContextUsage(result.context_usage);
     this.assistantDraft = '';
     this.status = 'Agent ready';
     this.progressPercent = 100;
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
   }
 
   private async tryHandleLocalCommand(message: string): Promise<boolean> {
@@ -626,10 +1827,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (result.assistantMessage) {
       this.messages = [...this.messages, { role: 'assistant', content: result.assistantMessage }];
     }
-    this.composerDraft = '';
+    this.setComposerDraft('');
     this.status = 'Agent ready';
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
     return true;
   }
 
@@ -637,37 +1838,240 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (!mapSession) {
       return;
     }
+    const preferredBasemap = this.manualBasemapPreference;
+    const preserveManualBasemap = preferredBasemap
+      && mapSession.basemap_id === 'osm_default'
+      && preferredBasemap.id !== 'osm_default';
+    if (preferredBasemap && !preserveManualBasemap && mapSession.basemap_id !== preferredBasemap.id) {
+      this.manualBasemapPreference = mapSession.basemap
+        ? {
+          ...mapSession.basemap,
+          id: mapSession.basemap_id,
+          render_status: mapSession.basemap.render_status ?? 'available',
+        }
+        : undefined;
+    }
+    const effectiveMapSession = preserveManualBasemap
+      ? {
+        ...mapSession,
+        basemap_id: preferredBasemap.id,
+        basemap: { ...preferredBasemap },
+      }
+      : mapSession;
+    const preserveOverlayPreferences = this.mapSession?.session_id === effectiveMapSession.session_id;
+    if (!this.pendingMapSession && this.mapSession && this.mapSession.session_id !== mapSession.session_id) {
+      this.committedMapSession = this.mapSession;
+    }
+    this.pendingMapSession = effectiveMapSession;
+    this.synchronizeOverlayState(effectiveMapSession, preserveOverlayPreferences);
+    this.payload = {
+      map_session: effectiveMapSession,
+      compliance_warnings: effectiveMapSession.compliance_warnings,
+    };
+  }
+
+  private commitMapSession(mapSession: MapSession): void {
+    this.mapPreview?.acceptRenderedCandidate();
     this.mapSession = mapSession;
+    this.committedMapSession = mapSession;
+    this.pendingMapSession = undefined;
     this.payload = {
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };
   }
 
+  private restoreCommittedMap(message?: string): void {
+    this.mapPreview?.rejectRenderedCandidate();
+    this.pendingMapSession = undefined;
+    if (this.committedMapSession) {
+      this.mapSession = this.committedMapSession;
+      this.payload = {
+        map_session: this.committedMapSession,
+        compliance_warnings: this.committedMapSession.compliance_warnings,
+      };
+    } else {
+      this.mapSession = undefined;
+      this.payload = undefined;
+    }
+    if (message) {
+      this.status = message;
+      this.progressLabel = undefined;
+      this.lastOperation = this.lastOperation
+        ? { ...this.lastOperation, status: 'partial', message }
+        : this.lastOperation;
+    }
+  }
+
+  private appendAssistantEventMessage(content: string): void {
+    const previous = this.messages.at(-1);
+    if (previous?.role === 'assistant' && previous.content === 'Data prepared; the map is loading.') {
+      this.messages = [...this.messages.slice(0, -1), { role: 'assistant', content }];
+      return;
+    }
+    // A reconnect can replay the preparation event after the durable history
+    // already contains the candidate's final text. Replace that last
+    // assistant entry with the pending presentation message instead of
+    // appending a duplicate assistant turn.
+    if (content === 'Data prepared; the map is loading.') {
+      let lastAssistantIndex = -1;
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        if (this.messages[index].role === 'assistant') {
+          lastAssistantIndex = index;
+          break;
+        }
+      }
+      if (lastAssistantIndex >= 0 && lastAssistantIndex === this.messages.length - 1) {
+        this.messages = [
+          ...this.messages.slice(0, lastAssistantIndex),
+          { role: 'assistant', content },
+        ];
+        return;
+      }
+    }
+    this.messages = [...this.messages, { role: 'assistant', content }];
+  }
+
+  private synchronizeOverlayState(session: MapSession, preservePreferences = false): void {
+    const overlays = mapSessionOverlayEntries(session);
+    const ids = new Set(overlays.map((overlay) => overlay.id));
+    const visibility = Object.fromEntries(
+      Object.entries(this.mapState.overlayVisibility).filter(([id]) => ids.has(id)),
+    );
+    const opacity = Object.fromEntries(
+      Object.entries(this.mapState.overlayOpacity).filter(([id]) => ids.has(id)),
+    );
+    const overlayOrder = reconcileOverlayOrder(overlays, this.mapState.overlayOrder);
+    overlays.forEach((overlay) => {
+      if (!preservePreferences || typeof visibility[overlay.id] !== 'boolean') {
+        if (typeof overlay.visible === 'boolean') {
+          visibility[overlay.id] = overlay.visible;
+        }
+      }
+      if (!preservePreferences || typeof opacity[overlay.id] !== 'number') {
+        if (typeof overlay.default_opacity === 'number') {
+          opacity[overlay.id] = overlay.default_opacity;
+        }
+      }
+    });
+    this.mapState = { overlayVisibility: visibility, overlayOpacity: opacity, overlayOrder };
+  }
+
+  onMapRenderStateChange(change: MapRenderStateChange): void {
+    if (this.pendingMapSession?.session_id !== change.sessionId) {
+      return;
+    }
+    const pendingRenderContext = this.pendingRenderContext;
+    if (pendingRenderContext) {
+      if (
+        change.runId !== pendingRenderContext.runId
+        || change.runVersion !== pendingRenderContext.runVersion
+        || pendingRenderContext.mapSessionId !== change.sessionId
+      ) {
+        return;
+      }
+    }
+    const expectedRevision = this.pendingMapSession.overlay_collection?.revision
+      ?? change.collectionRevision;
+    if (expectedRevision === undefined) {
+      return;
+    }
+    if (change.collectionRevision !== undefined && change.collectionRevision !== expectedRevision) {
+      return;
+    }
+    if (pendingRenderContext) {
+      if (pendingRenderContext.collectionRevision !== expectedRevision) {
+        return;
+      }
+    }
+    // All candidate identity checks are complete before mutating presentation
+    // state; delayed callbacks from an older collection cannot alter status.
+    this.mapRenderState = change.state;
+    if (pendingRenderContext) {
+      if (change.state === 'ready' && !this.renderAckQueued) {
+        const acknowledgement: MapRenderAcknowledgement = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: change.sessionId,
+          collection_revision: expectedRevision,
+          status: 'ready',
+          viewport_bounds: change.viewportBounds ?? null,
+          checks: change.checks ?? {},
+          overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
+          failure_code: null,
+          failure_stage: null,
+          failure_summary: null,
+        };
+        this.renderAckQueued = true;
+        this.pendingRenderAcknowledgement = acknowledgement;
+        this.status = 'Map data ready; rendering';
+        this.progressLabel = 'Map data ready; rendering';
+        void this.deliverReadyAcknowledgement(pendingRenderContext, acknowledgement);
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+      if (change.state === 'failed' && !this.renderAckQueued) {
+        const acknowledgement: MapRenderAcknowledgement = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: change.sessionId,
+          collection_revision: expectedRevision,
+          status: 'failed',
+          viewport_bounds: change.viewportBounds ?? null,
+          checks: change.checks ?? {},
+          overlay_results: (change.overlayResults ?? []) as Array<Record<string, import('../core/types').JsonValue>>,
+          failure_code: change.failureCode ?? 'render_failed',
+          failure_stage: change.failureStage ?? 'maplibre',
+          failure_summary: change.failureSummary ?? change.message ?? null,
+        };
+        this.renderAckQueued = true;
+        this.status = 'Map update failed';
+        this.progressLabel = undefined;
+        try {
+          const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+          if (this.renderAckQueued) {
+            this.pendingRenderAckMessageId = messageId;
+          }
+        } catch {
+          this.renderAckQueued = false;
+          this.pendingRenderAckMessageId = undefined;
+          this.restoreCommittedMap('Map update failed; previous map retained');
+        }
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+    }
+    if (change.state === 'ready') {
+      this.commitMapSession(this.pendingMapSession);
+      this.runFailureSummary = '';
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    if (change.state === 'failed') {
+      this.restoreCommittedMap();
+      const message = change.message || 'The map update could not be rendered; the previous map remains available.';
+      this.runFailureSummary = 'The map update could not be rendered. The previous map remains available.';
+      this.lastOperation = this.lastOperation
+        ? { ...this.lastOperation, status: 'partial', message }
+        : this.lastOperation;
+      this.status = 'Map update failed';
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
   private syncState(): void {
     const next: PersistedChatPageState = {
       toolbarWidth: this.toolbarWidthState,
       isToolbarCollapsed: this.isToolbarCollapsed,
-      payload: this.payload,
       chatPanel: {
-        sessionId: this.sessionId,
         conversationId: this.conversationId,
-        activeRunId: this.activeRunId,
-        activeRunVersion: this.activeRunVersion,
-        lastRunEventId: this.lastRunEventId,
-        streamState: this.streamState,
-        progressStage: this.progressStage,
-        progressLabel: this.progressLabel,
-        seenRunEventIds: [...this.seenEventIds].slice(-100),
-        conversationNonce: this.conversationNonce,
-        messages: this.messages,
-        lastDecision: this.lastDecision,
-        lastOperation: this.lastOperation ?? undefined,
-        memorySnapshot: this.memorySnapshot,
-        contextUsage: this.contextUsage,
-        mapSession: this.mapSession,
-        status: this.status,
-        assistantDraft: this.assistantDraft,
+        lastRunSequence: this.lastRunSequence,
         composerDraft: this.composerDraft,
         transcriptScrollTop: this.viewStateSync.captureElementScroll(
           this.transcriptRef?.nativeElement,
@@ -684,6 +2088,61 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     return Math.max(this.minWidth, Math.min(this.maxWidth, value));
   }
 
+  private async deliverReadyAcknowledgement(
+    pendingRenderContext: {
+      runId: string;
+      runVersion: number;
+      mapSessionId: string;
+      collectionRevision: number;
+      captureRequested?: boolean;
+    },
+    acknowledgement: MapRenderAcknowledgement,
+  ): Promise<void> {
+    if (pendingRenderContext.captureRequested === true) {
+      const captured = this.mapPreview?.captureCurrentMap();
+      if (captured) {
+        const payload: RenderCapturePayload = {
+          run_id: pendingRenderContext.runId,
+          run_version: pendingRenderContext.runVersion,
+          map_session_id: pendingRenderContext.mapSessionId,
+          collection_revision: pendingRenderContext.collectionRevision,
+          mime_type: captured.mimeType,
+          image_base64: captured.dataUrl.split(',')[1] ?? captured.dataUrl,
+          width: captured.width,
+          height: captured.height,
+          viewport_bounds: captured.viewportBounds,
+        };
+        try {
+          const race = Promise.race([
+            postRenderCapture(payload),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('capture timeout')), 2500);
+            }),
+          ]);
+          await race;
+        } catch {
+          // Vision degrades cleanly: the acknowledgment still proceeds without
+          // a capture so the run is never blocked on the screenshot.
+          console.warn('Map capture for vision inspection failed; continuing without it.');
+        }
+      }
+    }
+    if (!this.renderAckQueued) {
+      return;
+    }
+    try {
+      const messageId = this.realtimeService.sendMapRenderAck(acknowledgement);
+      if (this.renderAckQueued) {
+        this.pendingRenderAckMessageId = messageId;
+      }
+    } catch {
+      this.renderAckQueued = false;
+      this.pendingRenderAckMessageId = undefined;
+      this.pendingRenderAcknowledgement = undefined;
+      this.restoreCommittedMap('Map update failed; previous map retained');
+    }
+  }
+
   private stopResize(): void {
     this.isResizing = false;
     if (this.mouseMoveHandler) {
@@ -696,11 +2155,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
-  private closeActiveEventSource(): void {
-    this.activeEventSource?.close();
-    this.activeEventSource = undefined;
-  }
-
   private async loadAgentStatus(): Promise<void> {
     const readiness = await this.agentReadinessService.loadReadiness();
     if (this.isDestroyed) {
@@ -708,10 +2162,162 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.agentReadiness = readiness;
     this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  private async loadCatalog(): Promise<void> {
+    try {
+      const catalog = await this.apiClient.fetchCatalog();
+      if (this.isDestroyed) {
+        return;
+      }
+      this.catalog = catalog;
+      const currentSession = this.pendingMapSession || this.mapSession || this.payload?.map_session;
+      if (currentSession) {
+        const enrichedSession = this.enrichMapSessionBasemap(currentSession);
+        if (this.pendingMapSession?.session_id === currentSession.session_id) {
+          this.pendingMapSession = enrichedSession;
+        } else {
+          this.mapSession = enrichedSession;
+          this.committedMapSession = enrichedSession;
+        }
+        this.payload = {
+          map_session: enrichedSession,
+          compliance_warnings: enrichedSession.compliance_warnings,
+        };
+      }
+      this.changeDetectorRef.detectChanges();
+    } catch {
+      if (!this.isDestroyed) {
+        this.catalog = { capabilities: [], basemaps: [], overlays: [], tools: [] };
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private async loadModelContext(): Promise<void> {
+    this.isContextProfileLoading = true;
+    this.changeDetectorRef.detectChanges();
+    try {
+      const settings = await this.apiClient.fetchChatSettings();
+      if (this.isDestroyed) {
+        return;
+      }
+      const profile = settings.selected_model_context;
+      const identityChanged = !this.selectedModelContext
+        || this.selectedModelContext.provider !== profile.provider
+        || this.selectedModelContext.model !== profile.model;
+      this.selectedModelContext = profile;
+      if (identityChanged) {
+        this.contextUsage = undefined;
+      }
+      this.changeDetectorRef.detectChanges();
+    } catch {
+      if (!this.isDestroyed) {
+        this.selectedModelContext = undefined;
+        this.contextUsage = undefined;
+        this.changeDetectorRef.detectChanges();
+      }
+    } finally {
+      if (!this.isDestroyed) {
+        this.isContextProfileLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  get availableBasemaps(): CapabilityDescriptor[] {
+    return (this.catalog?.basemaps || []).filter((item) => item.is_available && item.render?.status === 'available');
+  }
+
+  private enrichMapSessionBasemap(session: MapSession): MapSession {
+    const current = session.basemap;
+    const descriptor = this.catalog?.basemaps?.find((item) => item.id === session.basemap_id);
+    if (!descriptor && current) {
+      return session;
+    }
+    const render = descriptor?.render;
+    const available = render?.status === 'available';
+    return {
+      ...session,
+      basemap: {
+        id: session.basemap_id,
+        label: descriptor?.name || current?.label || session.basemap_id,
+        provider: descriptor?.provider || current?.provider || 'unknown',
+        tile_url: render?.tile_url ?? current?.tile_url ?? null,
+        style_url: render?.style_url ?? current?.style_url ?? null,
+        attribution: render?.attribution || current?.attribution || '',
+        render_status: available ? 'available' : 'unavailable',
+        unavailable_reason: available ? null : (render?.reason || 'render_descriptor_missing'),
+      },
+    };
+  }
+
+  onBasemapChange(basemapId: string): void {
+    const current = this.mapSession || this.payload?.map_session;
+    const descriptor = this.catalog?.basemaps?.find((item) => item.id === basemapId);
+    if (!current || !descriptor || descriptor.render?.status !== 'available') {
+      this.status = 'Basemap unavailable';
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    const render = descriptor.render;
+    this.manualBasemapPreference = {
+      id: descriptor.id,
+      label: descriptor.name,
+      provider: descriptor.provider,
+      tile_url: render?.tile_url ?? null,
+      style_url: render?.style_url ?? null,
+      attribution: render?.attribution || '',
+      render_status: 'available',
+    };
+    const next: MapSession = {
+      ...current,
+      basemap_id: descriptor.id,
+      basemap: {
+        id: descriptor.id,
+        label: descriptor.name,
+        provider: descriptor.provider,
+        tile_url: render?.tile_url ?? null,
+        style_url: render?.style_url ?? null,
+        attribution: render?.attribution || '',
+        render_status: 'available',
+      },
+    };
+    this.pendingMapSession = next;
+    this.payload = { map_session: next, compliance_warnings: next.compliance_warnings };
+    this.mapRenderState = 'preparing';
+    this.status = `Switching to ${descriptor.name}`;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  // The [value] binding only repaints values it has rendered before. Enter or a
+  // paste can reach sendMessage before the zoneless scheduler renders the typed
+  // text, so programmatic draft changes also update the textarea directly.
+  private setComposerDraft(value: string): void {
+    this.composerDraft = value;
+    const element = this.composerInputRef?.nativeElement;
+    if (element && element.value !== value) {
+      element.value = value;
+      this.resizeComposer(element);
+    }
+  }
+
+  private resizeComposer(target?: HTMLTextAreaElement | null): void {
+    const resolvedTarget: HTMLTextAreaElement | null = target ?? this.composerInputRef?.nativeElement ?? null;
+    if (!resolvedTarget) {
+      return;
+    }
+    resolvedTarget.style.height = 'auto';
+    const maxHeight = 144;
+    resolvedTarget.style.height = `${Math.min(resolvedTarget.scrollHeight, maxHeight)}px`;
+    resolvedTarget.style.overflowX = 'hidden';
+    resolvedTarget.style.overflowY = resolvedTarget.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }
 
   private get agentStatusTone(): CapabilityStatusTone {
-    return this.agentReadiness.status === 'active' ? 'none' : 'warn';
+    return this.agentReadiness.status === 'active' ? 'ok' : 'warn';
   }
 
   private scrollTranscriptToBottom(): void {
@@ -723,6 +2329,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.transcriptScrollTop = container.scrollTop;
   }
 
+  private queueTranscriptScroll(): void {
+    queueMicrotask(() => {
+      if (!this.isDestroyed) {
+        this.scrollTranscriptToBottom();
+      }
+    });
+  }
+
   private looksLikeRuntimeFailure(message: string): boolean {
     const normalized = message.toLowerCase();
     return normalized.includes('cannot reach')
@@ -732,25 +2346,4 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       || normalized.includes('error');
   }
 
-  private deriveStatusLabel(result: ChatTurnResponse): string {
-    const operation = result.operation;
-    if (operation) {
-      if (operation.kind === 'clarification' || operation.status === 'partial') {
-        return 'Need more detail';
-      }
-      if (operation.kind === 'error' || operation.kind === 'rejection' || operation.status === 'failed') {
-        return 'Failed';
-      }
-      return 'Complete';
-    }
-
-    const planState = result.decision?.plan?.state;
-    if (planState === 'clarify') {
-      return 'Need more detail';
-    }
-    if (planState === 'reject') {
-      return 'Failed';
-    }
-    return 'Complete';
-  }
 }

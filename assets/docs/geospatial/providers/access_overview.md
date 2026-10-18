@@ -1,50 +1,96 @@
 # Access Overview
 
-Last updated: 2026-06-02
+Last updated: 2026-09-16
 
 ## Purpose
 
-This file covers credential handling, provider-setup boundaries, and provider exclusions.
+This file covers credential handling, provider-setup boundaries, access-policy semantics, and provider exclusions.
 
 ## Credential Configuration
 
 Preferred flow:
 
-1. Open the Access settings page.
+1. Open Settings and choose the Geospatial Access tab
+   (`/settings?tab=geospatial-access`).
 2. Add the provider credential with label `api_key`.
-3. Restart the backend if the credential is used by long-running background services.
-4. Rebuild vectors when provider coverage changes and agent retrieval should reflect it.
+3. Return to the geodata or workspace page; provider availability is resolved
+   from the current credential and runtime profile.
 
-Environment fallback variables include:
+Model-provider credentials are managed in the Model Providers tab of the same
+Settings page. Geospatial agent visibility is catalog-based and does not
+require rebuilding embeddings.
 
-- `ARCGIS_API_KEY`
-- `CENSUS_API_KEY`
-- `FRED_API_KEY`
-- `GEOAPIFY_API_KEY`
-- `GOOGLE_MAPS_API_KEY`
-- `NASA_API_KEY`
-- `NREL_API_KEY`
-- `OPENAQ_API_KEY`
-- `OPENAIP_API_KEY`
-- `OPENCHARGEMAP_API_KEY`
-- `OPENTRIPMAP_API_KEY`
-- `SENTINEL_HUB_CLIENT_ID`
-- `SENTINEL_HUB_CLIENT_SECRET`
-- `TOMTOM_API_KEY`
-- `TRANSITLAND_API_KEY`
-- `WINDY_WEBCAMS_API_KEY`
+## Resolution Semantics
+
+`app/server/services/geospatial/credential_resolver.py` is the single
+credential-resolution boundary used by provider adapters, the geospatial API,
+agent discovery/rendering, and runtime status reporting.
+
+Resolution is strict:
+
+1. Look up the active encrypted database credential for the provider and label.
+2. Decrypt and validate the saved value; mark it used when the caller requests
+   usage tracking.
+A saved credential that is empty or cannot be decrypted is an error condition;
+the resolver does not silently fall back to a second secret source. Credential
+values never enter manifests, API responses, provider payloads, browser logs,
+or map snapshots.
+
+Credentialed provider requests remain server-mediated: credentials are sent in
+request headers or used to construct an internal proxy request, never exposed
+in a frontend URL, render descriptor, or public provider payload.
+
+Public sources with the explicit runtime policy
+`restricted_usage_opt_in` are fail-closed. `AEGIS_ALLOW_RESTRICTED_SOURCES`
+defaults to `false`; set it to `true` only when the deployment owner has
+confirmed that the provider terms permit the intended use. Anonymous or
+keyless access does not satisfy this eligibility check.
+
+Non-secret deployment configuration variables include:
+
 - `LOCAL_OPEN_DATA_SOURCES`
+- `AEGIS_MOBILITY_DATABASE_CATALOG_PATH` (optional local CSV snapshot override)
+
+`LOCAL_OPEN_DATA_SOURCES` maps trusted source IDs to HTTPS URLs or local files.
+The runtime accepts a configured source ID rather than an arbitrary caller URL,
+and rejects private or loopback network targets.
+
+## Anonymous Access Is Not A License Decision
+
+A provider with `auth.type = none` is only credential-free. It is not
+necessarily eligible for every deployment or use case.
+
+Catalog review must evaluate authentication and reuse rights independently:
+
+- `auth` describes whether credentials are required to access the service.
+- `license.commercialUse` describes whether the documented source terms allow
+  commercial use under the cataloged access path.
+- attribution, embedding, redistribution, caching, and provider-specific terms
+  remain separate obligations.
+
+Current examples:
+
+- Open-Meteo free hosted access is anonymous but restricted to non-commercial
+  use. A commercial deployment requires a commercially eligible service
+  arrangement.
+- RainViewer public access is anonymous but intended for personal, educational,
+  and small-community use. It must not be treated as a generic commercial data
+  entitlement.
+
+Agent and UI copy must not infer `commercialUse = allowed` from `auth.type =
+none`.
 
 ## Secret Safety Rules
 
-- Store secrets only through encrypted credential storage or local environment variables.
+- Store secrets only through encrypted credential storage in Settings →
+  Geospatial Access.
 - Do not commit keys, tokens, `.env` files, shell history, screenshots, or provider dashboard exports.
 - Credential-gated manifests must reference only provider key names and access-page provider IDs.
 - Raw keys are prohibited in manifests, browser logs, provider responses, and snapshots.
 
 ## Guided Setup Boundary
 
-The Access page exposes an experimental human-in-the-loop `Get API key` trigger for some providers.
+The Geospatial Access tab exposes an experimental human-in-the-loop `Get API key` trigger for some providers.
 
 AEGIS:
 

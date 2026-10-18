@@ -1,0 +1,36 @@
+{
+  "slice_id": "T3-07",
+  "name": "Live FEMA and ESA public raster source/layer loading plus dependent FEMA composition/removal boundary",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-*",
+  "status": "PARTIAL",
+  "scenarios": [
+    {
+      "id": "fema_new_orleans",
+      "prompt": "Show standalone FEMA NFHL flood zones for New Orleans, Louisiana.",
+      "classification": "raster_render_pass",
+      "evidence": "reports/RASTER-LIVE-DIAGNOSTICS.json"
+    },
+    {
+      "id": "esa_worldcover_rome",
+      "prompt": "Show standalone ESA WorldCover for Rome, Italy.",
+      "classification": "raster_render_pass",
+      "evidence": "reports/RASTER-LIVE-DIAGNOSTICS.json"
+    }
+  ],
+  "fixes": [
+    "FEMA upstream routed through FEMA's official ArcGIS Online relay with required Origin/Referer headers (data/catalog/overlays/fema_nfhl_flood_zones.json, app/server/services/geospatial/api_service.py)",
+    "Raster results declare spatial_scope_satisfied coverage (app/server/services/agent/capability_execution.py)",
+    "Scale-dependent raster overlays zoom to their declared min_zoom (app/client/src/app/components/map-preview.component.ts)"
+  ],
+  "remaining_limitation": "FEMA NFHL layer 28 is scale-dependent (needs zoom >= 14); composing it with a partner layer at a single viewport is constrained because tested partners (ESA WMS, USGS gauges, GIBS, Census) do not render or overlap at that zoom. The overlay composition/removal mechanism is validated via T3-06 and FEMA's standalone render.",
+  "quality": {
+    "backend_unit_passed": 1039,
+    "frontend_karma_passed": 267,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "86 manifests, 0 errors, 0 warnings"
+  }
+}

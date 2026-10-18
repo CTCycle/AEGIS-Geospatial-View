@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -12,14 +14,19 @@ class _CredentialRepo:
 
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
-        if self.present and provider in {"tomtom", "geoapify"} and label == "api_key":
+        if self.present and provider == "tomtom" and label == "api_key":
             return object()
         return None
 
 ###############################################################################
 def _service_with_credentials(present: bool) -> GeospatialCatalogService:
+    manifest_loader = GeospatialManifestLoader()
     return GeospatialCatalogService(
-        runtime_registry=RuntimeRegistry(credentials_repo=_CredentialRepo(present)),  # type: ignore[arg-type]
+        capability_registry=CapabilityRegistry(manifest_loader=manifest_loader),
+        runtime_registry=RuntimeRegistry(
+            manifest_loader=manifest_loader,
+            credentials_repo=_CredentialRepo(present),  # type: ignore[arg-type]
+        ),
     )
 
 ###############################################################################
@@ -35,9 +42,34 @@ def test_catalog_contains_grouped_capability_sections() -> None:
     assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
 ###############################################################################
-def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(monkeypatch) -> None:
+def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
+    catalog = _service_with_credentials(False).list_catalog()
+    satellite = next(
+        item for item in catalog["basemaps"] if item["id"] == "esri_world_imagery"
+    )
+
+    render = satellite["render"]
+    assert render["status"] == "available"
+    assert "World_Imagery/MapServer/tile" in render["tile_url"]
+    assert render["attribution"]
+
+###############################################################################
+def test_satellite_basemap_declares_location_execution_arguments() -> None:
+    registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
+    satellite = registry.get_capability("esri_world_imagery")
+
+    assert satellite is not None
+    argument_schema = satellite["metadata"]["argument_schema"]
+    assert argument_schema["type"] == "object"
+    assert "location" in argument_schema["properties"]
+    assert "latitude" in argument_schema["properties"]
+    assert "longitude" in argument_schema["properties"]
+
+###############################################################################
+def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
     catalog = _service_with_credentials(False).list_catalog()
     lookup = {item["id"]: item for item in catalog["capabilities"]}
@@ -45,18 +77,51 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
 
     assert lookup["tomtom_traffic_flow"]["requires_credentials"] is True
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
-    assert lookup["geoapify_osm"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
 ###############################################################################
-def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(monkeypatch) -> None:
+def test_catalog_exposes_openchargemap_local_or_access_reason(monkeypatch) -> None:
+    monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
+
+    catalog = _service_with_credentials(False).list_catalog()
+    lookup = {item["id"]: item for item in catalog["capabilities"]}
+    openchargemap = lookup["openchargemap_ev_charging"]
+
+    assert openchargemap["requires_credentials"] is False
+    assert openchargemap["is_available"] is False
+    assert "Open Charge Map" in openchargemap["availability_reason"]
+    assert "local snapshot" in openchargemap["availability_reason"]
+
+###############################################################################
+def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(
+    monkeypatch,
+) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
     catalog = _service_with_credentials(True).list_catalog()
     lookup = {item["id"]: item for item in catalog["capabilities"]}
     providers = {item["id"]: item for item in catalog["providers"]}
 
     assert lookup["tomtom_traffic_flow"]["is_available"] is True
-    assert lookup["geoapify_osm"]["is_available"] is True
     assert providers["tomtom"]["is_available"] is True
+
+###############################################################################
+def test_catalog_exposes_snake_case_nested_api_metadata() -> None:
+    catalog = _service_with_credentials(False).list_catalog()
+    overlay = next(
+        item for item in catalog["overlays"] if item["id"] == "openaq_air_quality"
+    )
+
+    assert set(overlay["reliability"]) == {
+        "status",
+        "last_audited",
+        "known_limitations",
+    }
+    assert set(overlay["auth"]) == {
+        "type",
+        "required",
+        "provider_key",
+        "access_page_provider_id",
+    }
+    assert "lastAudited" not in overlay["reliability"]
+    assert "providerKey" not in overlay["auth"]

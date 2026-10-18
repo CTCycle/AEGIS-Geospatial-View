@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import select
 
 from server.common.constants import (
@@ -11,44 +9,55 @@ from server.common.constants import (
     OLLAMA_DEFAULT_HOST,
 )
 from server.common.time import utc_now_naive
-from server.repositories.database.backend import get_database
+from server.contracts.chat import ModelSettingsSnapshot
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
 ###############################################################################
 class ModelSettingsRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        ensure_schema = getattr(backend, "ensure_schema", None)
-        if callable(ensure_schema):
-            ensure_schema()
-        self._session_factory = backend.session
+    def __init__(self, database: SQLiteRepository) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> ModelProviderSettingsRecord:
+    def has_required(self) -> bool:
+        with self._session_factory() as session:
+            statement = select(ModelProviderSettingsRecord).order_by(
+                ModelProviderSettingsRecord.id.asc()
+            )
+            return session.execute(statement).scalars().first() is not None
+
+    # -------------------------------------------------------------------------
+    def get_required(self) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
                 ModelProviderSettingsRecord.id.asc()
             )
             record = session.execute(statement).scalars().first()
-            if record is not None:
-                return record
+            if record is None:
+                raise RuntimeError(
+                    "The model settings record is missing; database initialization must seed it."
+                )
+            return self._to_snapshot(record)
 
-            record = ModelProviderSettingsRecord(
-                active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
-                agent_model_provider=DEFAULT_MODEL_PROVIDER,
-                agent_model_name=DEFAULT_MODEL_NAME,
-                ollama_url=OLLAMA_DEFAULT_HOST,
-                capabilities_json=json.dumps([]),
-                supports_tools=False,
-                supports_structured_output=False,
-                tool_support_source="unknown",
+    # -------------------------------------------------------------------------
+    def seed_required(self) -> None:
+        with self._session_factory() as session:
+            statement = select(ModelProviderSettingsRecord).order_by(
+                ModelProviderSettingsRecord.id.asc()
             )
-            session.add(record)
+            if session.execute(statement).scalars().first() is not None:
+                return
+            session.add(
+                ModelProviderSettingsRecord(
+                    active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
+                    agent_model_provider=DEFAULT_MODEL_PROVIDER,
+                    agent_model_name=DEFAULT_MODEL_NAME,
+                    ollama_url=OLLAMA_DEFAULT_HOST,
+                )
+            )
             session.commit()
-            session.refresh(record)
-            return record
 
     # -------------------------------------------------------------------------
     def update(
@@ -61,15 +70,16 @@ class ModelSettingsRepository:
         openai_base_url: str | None,
         google_base_url: str | None,
         deepseek_base_url: str | None,
-    ) -> ModelProviderSettingsRecord:
+    ) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
                 ModelProviderSettingsRecord.id.asc()
             )
             record = session.execute(statement).scalars().first()
             if record is None:
-                record = ModelProviderSettingsRecord()
-                session.add(record)
+                raise RuntimeError(
+                    "The model settings record is missing; database initialization must seed it."
+                )
 
             record.active_provider_mode = active_provider_mode
             record.agent_model_provider = agent_model_provider
@@ -81,4 +91,18 @@ class ModelSettingsRepository:
             record.updated_at = utc_now_naive()
             session.commit()
             session.refresh(record)
-            return record
+            return self._to_snapshot(record)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _to_snapshot(record: ModelProviderSettingsRecord) -> ModelSettingsSnapshot:
+        return ModelSettingsSnapshot(
+            id=record.id,
+            active_provider_mode=record.active_provider_mode,
+            agent_model_provider=record.agent_model_provider,
+            agent_model_name=record.agent_model_name,
+            ollama_url=record.ollama_url,
+            openai_base_url=record.openai_base_url,
+            google_base_url=record.google_base_url,
+            deepseek_base_url=record.deepseek_base_url,
+        )

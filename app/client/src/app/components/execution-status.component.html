@@ -1,0 +1,185 @@
+<div class="execution-status">
+  <button
+    type="button"
+    class="execution-status__trigger"
+    [class.execution-status__trigger--active]="tone === 'active'"
+    [class.execution-status__trigger--error]="tone === 'error'"
+    [attr.aria-expanded]="expanded"
+    [attr.aria-controls]="panelId"
+    aria-label="Tool activity and execution details"
+    title="Tool activity and execution details"
+    (click)="toggle()"
+  >
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+      <path
+        d="M5 4.5h9.2a3.3 3.3 0 0 1 0 6.6H9.8a3.3 3.3 0 0 0 0 6.6H19M6.5 2.8v3.4M17.5 16v3.4"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+      />
+      <circle cx="4.5" cy="4.5" r="1.8" fill="currentColor" />
+      <circle cx="19.5" cy="17.7" r="1.8" fill="currentColor" />
+    </svg>
+    <span class="execution-status__label">Tool activity</span>
+    <span class="execution-status__summary">{{ summaryLabel }}</span>
+  </button>
+
+  @if (expanded) {
+    <section
+      class="execution-status__panel"
+      [id]="panelId"
+      aria-label="Execution details"
+      aria-live="polite"
+    >
+      <header class="execution-status__header">
+        <div>
+          <h2>Execution details</h2>
+          <p>Operational events only. Model reasoning and raw payloads are not shown.</p>
+        </div>
+        <div class="execution-status__header-actions">
+          @if (runId) {
+            <button type="button" (click)="refresh.emit()" [disabled]="traceLoading">
+              {{ traceLoading ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          }
+          <button type="button" aria-label="Close execution details" title="Close" (click)="close()">×</button>
+        </div>
+      </header>
+
+      @if (!runId && !runError) {
+        <p class="execution-status__empty">Execution details will appear after a request starts.</p>
+      } @else {
+        <dl class="execution-status__identity">
+          @if (runId) {
+            <div>
+              <dt>Run</dt>
+              <dd>{{ runId }}</dd>
+            </div>
+          }
+          @if (runVersion !== undefined) {
+            <div>
+              <dt>Version</dt>
+              <dd>{{ runVersion }}</dd>
+            </div>
+          }
+          @if (taskState?.current_iteration !== undefined) {
+            <div>
+              <dt>Iteration</dt>
+              <dd>
+                {{ taskState?.current_iteration }}
+                @if (taskState?.max_iterations !== undefined) {
+                  <span> / {{ taskState?.max_iterations }}</span>
+                }
+              </dd>
+            </div>
+          }
+          @if (taskState?.status) {
+            <div>
+              <dt>Status</dt>
+              <dd>{{ statusLabel(taskState?.status) }}</dd>
+            </div>
+          }
+        </dl>
+
+        @if (runError) {
+          <p class="execution-status__run-error" role="status">{{ runError }}</p>
+        }
+
+        @if (taskItems.length > 0) {
+          <section class="execution-status__section" aria-labelledby="execution-status-tasks-title">
+            <h3 id="execution-status-tasks-title">Tasks</h3>
+            <ul class="execution-status__tasks">
+              @for (task of taskItems; track trackTask($index, task)) {
+                <li>
+                  <span
+                    class="execution-status__dot"
+                    [class.execution-status__dot--success]="task.status === 'completed'"
+                    [class.execution-status__dot--error]="task.status === 'failed' || task.status === 'blocked'"
+                    [class.execution-status__dot--muted]="task.status === 'pending' || task.status === 'cancelled'"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="execution-status__task-copy">
+                    <span>{{ task.description }}</span>
+                    <small>{{ statusLabel(task.status) }} · {{ task.id }}</small>
+                  </span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        @if (toolProgress.length > 0) {
+          <section class="execution-status__section" aria-labelledby="execution-status-tools-title">
+            <h3 id="execution-status-tools-title">Tools</h3>
+            <ul class="execution-status__tools">
+              @for (tool of toolProgress; track tool.call_id) {
+                <li>
+                  <div class="execution-status__tool-heading">
+                    <strong>{{ tool.label || tool.tool_name }}</strong>
+                    <span>{{ statusLabel(tool.status) }}</span>
+                  </div>
+                  <div class="execution-status__meta">
+                    @if (tool.iteration !== null && tool.iteration !== undefined) {
+                      <span>iteration {{ tool.iteration }}</span>
+                    }
+                    @if (tool.duration_ms !== null && tool.duration_ms !== undefined) {
+                      <span>{{ formatDuration(tool.duration_ms) }}</span>
+                    }
+                    <span>{{ tool.call_id }}</span>
+                  </div>
+                  @if (tool.summary) {
+                    <p>{{ tool.summary }}</p>
+                  }
+                  @if (tool.error) {
+                    <p class="execution-status__item-error">{{ tool.error }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        @if (traceError) {
+          <p class="execution-status__trace-error" role="status">{{ traceError }}</p>
+        }
+
+        @if (traceEntries.length > 0) {
+          <section class="execution-status__section" aria-labelledby="execution-status-trace-title">
+            <h3 id="execution-status-trace-title">Trace</h3>
+            <ol class="execution-status__trace">
+              @for (entry of traceEntries; track trackTrace($index, entry)) {
+                <li>
+                  <div class="execution-status__trace-heading">
+                    <strong>{{ entry.kind }}</strong>
+                    <time [attr.datetime]="entry.timestamp">{{ formatTimestamp(entry.timestamp) }}</time>
+                  </div>
+                  <div class="execution-status__meta">
+                    <span>sequence {{ entry.sequence }}</span>
+                    @if (entry.iteration !== null && entry.iteration !== undefined) {
+                      <span>iteration {{ entry.iteration }}</span>
+                    }
+                    @if (entry.tool_name) {
+                      <span>{{ entry.tool_name }}</span>
+                    }
+                    @if (entry.duration_ms !== null && entry.duration_ms !== undefined) {
+                      <span>{{ formatDuration(entry.duration_ms) }}</span>
+                    }
+                  </div>
+                  @if (entry.summary) {
+                    <p>{{ entry.summary }}</p>
+                  }
+                  @if (entry.error) {
+                    <p class="execution-status__item-error">{{ entry.error }}</p>
+                  }
+                </li>
+              }
+            </ol>
+          </section>
+        } @else if (runId && !traceLoading && !traceError) {
+          <p class="execution-status__empty">No operational trace events have been recorded yet.</p>
+        }
+      }
+    </section>
+  }
+</div>

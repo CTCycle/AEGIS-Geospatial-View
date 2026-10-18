@@ -3,10 +3,31 @@ Pytest configuration for AEGIS E2E tests.
 Provides fixtures for Playwright page objects and API client.
 """
 
+import asyncio
 import os
+from collections.abc import Coroutine
+from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, TypeVar
 
 import pytest
+from server.configurations import DatabaseSettings
+from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.schemas import Base
+
+T = TypeVar("T")
+
+###############################################################################
+def run_async_in_thread(coroutine: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine safely when Playwright leaves an event loop active."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coroutine).result()
 
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
@@ -37,7 +58,7 @@ def _build_base_url(
     return f"http://{host}:{port}"
 
 
-FRONTEND_URL_FALLBACK = _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "7861")
+FRONTEND_URL_FALLBACK = _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "8001")
 BACKEND_URL_FALLBACK = _build_base_url(
     "FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000"
 )
@@ -54,6 +75,84 @@ API_BASE_URL = _pick_first_non_empty(
     os.getenv("API_BASE_URL"),
     BACKEND_URL_FALLBACK,
 )
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+CANONICAL_CACHE_ROOT = (REPOSITORY_ROOT / "runtimes" / "cache").resolve()
+CANONICAL_PYTEST_CACHE = (CANONICAL_CACHE_ROOT / "pytest").resolve()
+CANONICAL_PYTEST_TEMP = (CANONICAL_CACHE_ROOT / "pytest-tmp").resolve()
+
+###############################################################################
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+###############################################################################
+def pytest_configure(config: pytest.Config) -> None:
+    """Reject pytest invocations that would create state outside the cache root."""
+
+    basetemp = config.getoption("basetemp")
+    if basetemp is None or not _is_within(Path(basetemp), CANONICAL_PYTEST_TEMP):
+        raise pytest.UsageError(
+            "pytest requires --basetemp under runtimes/cache/pytest-tmp"
+        )
+
+    cache = getattr(config, "cache", None)
+    cachedir = getattr(cache, "_cachedir", None)
+    if cachedir is not None and Path(cachedir).resolve() != CANONICAL_PYTEST_CACHE:
+        raise pytest.UsageError(
+            "pytest cache_dir must resolve to runtimes/cache/pytest"
+        )
+
+###############################################################################
+@pytest.fixture(scope="session", autouse=True)
+def isolated_runtime_data(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[None, None, None]:
+    """Keep application-startup tests away from the user's runtime database."""
+
+    previous_data_dir = os.environ.get("AEGIS_DATA_DIR")
+    if previous_data_dir is None:
+        os.environ["AEGIS_DATA_DIR"] = str(
+            tmp_path_factory.mktemp("aegis-runtime-data")
+        )
+    try:
+        yield
+    finally:
+        if previous_data_dir is None:
+            os.environ.pop("AEGIS_DATA_DIR", None)
+
+###############################################################################
+class _SnapshotSaver:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, snapshot_dir: Path) -> None:
+        self.snapshot_dir = snapshot_dir
+
+    # -------------------------------------------------------------------------
+    def __call__(self, page: Any, name: str) -> Path:
+        filename = name if name.lower().endswith(".png") else f"{name}.png"
+        target = self.snapshot_dir / filename
+        page.screenshot(path=str(target), full_page=True)
+        return target
+
+###############################################################################
+class _BackendLogTailReader:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, backend_log_path: Path) -> None:
+        self.backend_log_path = backend_log_path
+
+    # -------------------------------------------------------------------------
+    def __call__(self, lines: int = 200) -> str:
+        if not self.backend_log_path.exists():
+            return ""
+        content = self.backend_log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
+        return "\n".join(content[-max(1, lines) :])
 
 ###############################################################################
 @pytest.fixture(scope="session")
@@ -81,7 +180,10 @@ def api_context(playwright):
 ###############################################################################
 @pytest.fixture(scope="session")
 def artifact_root() -> Path:
-    root = Path(__file__).parent / "artifacts"
+    root = Path(
+        os.environ.get("APP_TEST_ARTIFACT_ROOT")
+        or (Path(__file__).resolve().parents[2] / "assets" / "QA" / "e2e")
+    )
     root.mkdir(parents=True, exist_ok=True)
     for child in ("screenshots", "http", "logs", "reports"):
         (root / child).mkdir(parents=True, exist_ok=True)
@@ -108,24 +210,21 @@ def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
 
 ###############################################################################
 @pytest.fixture
-def save_snapshot(snapshot_dir: Path):
-    def _save(page, name: str) -> Path:  # noqa: ANN001
-        filename = name if name.lower().endswith(".png") else f"{name}.png"
-        target = snapshot_dir / filename
-        page.screenshot(path=str(target), full_page=True)
-        return target
-
-    return _save
+def save_snapshot(snapshot_dir: Path) -> _SnapshotSaver:
+    return _SnapshotSaver(snapshot_dir)
 
 ###############################################################################
 @pytest.fixture
-def read_backend_log_tail(backend_log_path: Path):
-    def _read(lines: int = 200) -> str:
-        if not backend_log_path.exists():
-            return ""
-        content = backend_log_path.read_text(
-            encoding="utf-8", errors="replace"
-        ).splitlines()
-        return "\n".join(content[-max(1, lines) :])
+def read_backend_log_tail(backend_log_path: Path) -> _BackendLogTailReader:
+    return _BackendLogTailReader(backend_log_path)
 
-    return _read
+###############################################################################
+@pytest.fixture
+def sqlite_backend(tmp_path: Path) -> SQLiteRepository:
+    backend = SQLiteRepository(
+        DatabaseSettings(
+            database_path=str(tmp_path / "database.db"),
+        )
+    )
+    Base.metadata.create_all(backend.engine)
+    return backend

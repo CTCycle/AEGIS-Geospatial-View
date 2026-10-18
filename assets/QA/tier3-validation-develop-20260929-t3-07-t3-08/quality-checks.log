@@ -1,0 +1,16 @@
+2026-09-29 | focused geospatial backend suites | PASS | 71 passed, 2 dependency deprecation warnings
+2026-09-29 | full backend unit suite | PASS | 971 passed, 2 dependency deprecation warnings
+2026-09-29 | Ruff --no-cache changed/repository Python scope | PASS
+2026-09-29 | Pyright app/server/pyproject.toml | PASS | 0 errors, 0 warnings, 0 informations
+2026-09-29 | strict production manifest audit | PASS | 86 manifests, 0 errors, 0 warnings
+2026-09-29 | Angular production build | PASS
+2026-09-29 | frontend Karma | PASS | 254 SUCCESS
+2026-09-29 | geospatial browser smoke | PASS | 6 SUCCESS
+2026-09-29 | live FEMA/ESA diagnostic | HISTORICAL | pre-key run skipped at unavailable exact-lane preflight; superseded by rerun below
+2026-09-29 | live NASA GIBS matrix | HISTORICAL | pre-key run skipped at unavailable exact-lane preflight; superseded by rerun below
+2026-09-29 | exact-lane provider probe rerun | PASS | opencode-go/deepseek-v4.1-flash; HTTP 200; complete parse
+2026-09-29 | live FEMA/ESA diagnostic rerun | PASS | 113 proxy requests; 0 direct-upstream requests; 12 provider 502 responses; no acknowledged provider raster
+2026-09-29 | live NASA GIBS matrix rerun | PASS | 12 browser cases executed; all reached the assistant execution limit before raster routing; T3-08 remains UNRUN
+2026-09-29 | scoped backend regression after proxy fix | PASS | 91 passed; 2 dependency deprecation warnings
+2026-09-29 | final Pyright after proxy fix | PASS | 0 errors, 0 warnings, 0 informations
+2026-09-29 | final Ruff after proxy fix | PASS | All changed Python checks passed with --no-cache

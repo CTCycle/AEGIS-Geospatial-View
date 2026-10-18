@@ -1,6 +1,6 @@
 # Design Tokens
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Typography
 
@@ -16,6 +16,11 @@ Type scale defined in `app/client/src/styles.css`:
 - `--font-size-title-md`
 - `--font-size-title-lg`
 
+Weight tokens:
+
+- `--font-weight-semibold`
+- `--font-weight-bold`
+
 Line-height tokens:
 
 - `--line-height-tight`
@@ -24,6 +29,11 @@ Line-height tokens:
 ## Spacing
 
 Global spacing tokens run from `--space-1` to `--space-6`. New work should prefer tokens instead of literal spacing values.
+
+Shared shape and elevation tokens include `--radius-sm`, `--radius-md`,
+`--radius-lg`, `--shadow-1`, and `--shadow-2`. The geospatial workspace also
+uses a deliberately dark map/chat palette in its page stylesheet while the
+global shell and form controls use the light surface tokens.
 
 ## Color System
 

@@ -1,19 +1,43 @@
 # System Overview
 
-Last updated: 2026-06-10
+Last updated: 2026-09-22
 
 ## Scope
 
-This branch describes the implemented system across `app/`, `settings/`, and `release/`.
+This branch describes the implemented system across `app/` and `settings/`.
 
 ## Application Shape
 
 AEGIS Geospatial View is a two-tier application:
 
-- Frontend: Angular 19 standalone SPA in `app/client/src`
+- Frontend: Angular 22 standalone SPA in `app/client/src`
 - Backend: FastAPI application in `app/server`
 
-The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace.
+The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace. The primary UI path uses a versioned WebSocket at `/api/conversations/{conversation_id}/realtime`; durable run events are replayed by sequence after reconnect. Direct chat-turn, NDJSON stream, and in-process job routes remain available for API clients and bounded test flows, but are not used by the interactive UI.
+
+## Runtime Composition
+
+```mermaid
+flowchart TD
+    A[app_lifespan] --> G[GeospatialRuntime]
+    G --> C[CapabilityRegistry]
+    G --> P[ProviderRegistry]
+    G --> R[RuntimeRegistry]
+    G --> K[CredentialResolver]
+    G --> X[GeospatialApiService]
+    A --> S[SearchRuntime]
+    A --> H[ChatRuntime]
+    S -->|shared| C
+    S -->|shared| P
+    S -->|shared| K
+    H -->|shared| G
+    X --> K
+```
+
+The composition root builds one shared geospatial runtime per process. Search,
+chat, provider discovery, rendering, and credential status receive the same
+capability registry, provider registry, runtime registry, API service, and
+database-backed credential resolver.
 
 ## Entry Points
 
@@ -22,23 +46,25 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - Frontend bootstrap: `app/client/src/main.ts`
 - Frontend root component: `app/client/src/app/app.component.ts`
 - Frontend routes: `app/client/src/app/app.routes.ts`
-- Desktop packaging config: `app/src-tauri/tauri.conf.json`
-- Windows packaging script: `release/tauri/build_with_tauri.bat`
+- Windows launcher: `start_on_windows.ps1`
 
 ## Backend Startup Behavior
 
 `app_lifespan` composes the server runtime and:
 
-- loads settings
-- ensures relational schema
-- seeds auto-generated credential encryption key material
-- seeds reference catalog data
+- synchronizes the relational schema and seeds required local data
+- loads typed application runtime settings
+- builds one shared geospatial runtime, including its validated catalog snapshot
 - composes search and chat runtimes
-- seeds chat settings through the settings service
-- runs startup validation
-- optionally syncs vectors
+- validates persisted model settings, canonical provider and credential fields,
+  and credential decryptability without requesting live model metadata
+- runs capability validation against the shared geospatial catalog snapshot
 
-`create_app()` mounts API routers under `/api`, serves the packaged SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
+The composition root also wires the durable conversation/run lifecycle, steering,
+event replay, and the in-process background-job worker. A runtime dependency is
+not constructed ad hoc inside a request handler.
+
+`create_app()` mounts API routers under `/api`, serves the built SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
 
 ## External Integrations
 
@@ -46,13 +72,19 @@ Implemented service integrations include:
 
 - OpenStreetMap and Nominatim
 - Overpass
+- Overture Maps, OpenAddresses, OurAirports, Natural Earth, and local open-data snapshots
 - NASA GIBS
+- NASA FIRMS, NOAA, USGS, FEMA, Census, Eurostat, EEA, and ESA
 - OpenAQ
 - Open-Meteo
 - PVGIS
 - RainViewer
 - TomTom
-- Geoapify
+- OpenChargeMap
+- OpenFreeMap and other public basemap styles
+- GTFS, GTFS-Realtime, and Mobility Database feed catalogs
+- Windy Webcams and configured local camera networks
 - Ollama
 - OpenAI-compatible providers
 - Google-compatible providers
+- DeepSeek and OpenCode Zen/OpenCode Go

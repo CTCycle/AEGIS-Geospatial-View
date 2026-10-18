@@ -1,47 +1,44 @@
 # Deployment
 
-Last updated: 2026-06-23
+Last updated: 2026-09-28
 
-## Backend Persistence
+## Backend persistence
 
-- SQLite and PostgreSQL are both supported.
-- Database mode is controlled by `settings/.env` or runtime environment variables.
-- `EMBEDDED_DATABASE` switches between SQLite and PostgreSQL.
-- SQLite resolves to `app/resources/database.db`.
+AEGIS is a local SQLite application. The database file defaults to
+`<repo>/data/runtime/database.db` and can be moved by setting
+`AEGIS_DATA_DIR` to a directory that the application can read and write.
+
+An empty database file is created, migrated to the Alembic head, and seeded on
+first startup. Versioned files receive pending migrations. A populated file
+without an Alembic revision is rejected; startup never stamps, deletes, or
+silently replaces existing data. The migration workflow takes a temporary
+backup and restores it if migration or first-start seeding fails.
+
+Back up the SQLite file before upgrading the application. If a legacy or
+corrupt file cannot be opened, preserve it for investigation and create a new
+data directory only after the original has been safely copied.
 
 ## Interoperability
 
-- Frontend communicates with backend through `/api`.
-- Development proxying is configured by `app/client/proxy.conf.cjs`.
-- Desktop runtime bundles frontend dist and backend/runtime resources into the Tauri package.
+- the frontend communicates with the backend through `/api`;
+- development proxying is configured by `app/client/proxy.conf.cjs`;
+- the Windows launcher runs the backend and frontend as local processes using
+  the portable runtimes under `runtimes/`.
 
-## Operational Constraints
+## Operational constraints
 
-- Background jobs are in-process and do not survive backend restart.
-- Cancellation is cooperative.
-- Desktop packaging is Windows-focused.
-- External providers influence runtime reliability based on network and credential state.
+- SQLite permits one writer at a time; AEGIS uses WAL, a busy timeout, short
+  transactions, and per-operation sessions for normal local concurrency;
+- background jobs are in-process and do not survive backend restart;
+- cancellation is cooperative;
+- external data sources influence runtime reliability based on network and
+  credential state;
+- a load-balanced deployment is outside the supported single-process runtime
+  model.
 
-## Distribution Notes
+## Distribution notes
 
-### Web Or Local Distribution
-
-Current scripts optimize for local execution, not a standalone server deployment bundle.
-
-### Desktop Distribution
-
-Build through `release/tauri/build_with_tauri.bat`.
-
-`app/src-tauri` is versioned as source/config only. Keep `Cargo.toml`, `Cargo.lock`, `build.rs`, `tauri.conf.json`, `src/`, `capabilities/`, and `icons/` in Git. Do not commit generated output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, `app/src-tauri/gen`, or packaged desktop binaries.
-
-Artifacts are exported to:
-
-- `release/windows/installers`
-- `release/windows/portable`
-
-Portable exports contain:
-
-- `aegis-desktop.exe`
-- `runtime/` with the bundled backend, settings, database seed, catalog, and embedded runtimes required at startup
-
-Publish desktop binaries as release artifacts or workflow uploads only. Do not commit `release/windows` output or packaged desktop installers back into the repository.
+Current scripts optimize for local execution rather than a standalone server
+bundle. Use `start_on_windows.ps1` for the supported Windows workflow or the
+manual commands in `assets/docs/runtime/startup.md`. There is no first-class
+container or hosted deployment manifest in this checkout.

@@ -1,0 +1,1148 @@
+[
+ {
+  "capability": "eurostat_nuts_regions",
+  "case": "normal",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 5,
+  "status": "ok",
+  "provider": "eurostat",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Eurostat GISCO\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "eurostat_nuts_regions",
+  "case": "out_of_coverage",
+  "params": {
+   "bbox": "-74.05,40.68,-73.90,40.82"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "eurostat",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Eurostat GISCO\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "eurostat_regional_demographics",
+  "case": "normal",
+  "params": {
+   "bbox": "2.25,48.80,2.45,48.92"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "eurostat",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Eurostat / European Commission\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "eurostat_housing_market",
+  "case": "normal",
+  "params": {
+   "bbox": "2.25,48.80,2.45,48.92"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "eurostat",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Eurostat / European Commission\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "natural_earth_admin_boundaries",
+  "case": "normal",
+  "params": {
+   "bbox": "8.45,47.33,8.62,47.43"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "natural_earth",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Natural Earth\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "natural_earth_admin_boundaries",
+  "case": "ocean_empty",
+  "params": {
+   "bbox": "-150.0,-30.0,-149.8,-29.8"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "natural_earth",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Natural Earth\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "ourairports_airports",
+  "case": "normal",
+  "params": {
+   "bbox": "12.0,41.6,12.8,42.1"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "ourairports",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"OurAirports\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "ourairports_airports",
+  "case": "ocean_empty",
+  "params": {
+   "bbox": "-150.0,-30.0,-149.8,-29.8"
+  },
+  "http": 200,
+  "ms": 0,
+  "status": "ok",
+  "provider": "ourairports",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"OurAirports\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "ourairports_airports",
+  "case": "antimeridian",
+  "params": {
+   "bbox": "179.5,-17.5,-179.5,-16.5"
+  },
+  "http": 400,
+  "ms": 0,
+  "detail": "bbox must be ordered west,south,east,north.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "openaddresses_points",
+  "case": "normal",
+  "params": {
+   "bbox": "-74.01,40.70,-74.00,40.71"
+  },
+  "http": 200,
+  "ms": 0,
+  "status": "ok",
+  "provider": "openaddresses",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"OpenAddresses\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "soilgrids_soil_properties",
+  "case": "normal",
+  "params": {
+   "bbox": "8.45,47.33,8.62,47.43"
+  },
+  "http": 200,
+  "ms": 7,
+  "status": "ok",
+  "provider": "soilgrids",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"ISRIC - World Soil Information, SoilGrids\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "soilgrids_soil_properties",
+  "case": "ocean",
+  "params": {
+   "bbox": "-150.0,-30.0,-149.8,-29.8"
+  },
+  "http": 200,
+  "ms": 5,
+  "status": "ok",
+  "provider": "soilgrids",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"ISRIC - World Soil Information, SoilGrids\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "census_acs_demographic_joins",
+  "case": "normal",
+  "params": {
+   "bbox": "-74.05,40.68,-73.90,40.82"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "census",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Census Bureau TIGERweb\", \"U.S. Census Bureau ACS\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "census_acs_demographic_joins",
+  "case": "out_of_coverage",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "census",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Census Bureau TIGERweb\", \"U.S. Census Bureau ACS\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "census_cartographic_boundaries",
+  "case": "normal",
+  "params": {
+   "bbox": "-74.05,40.68,-73.90,40.82"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "census",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Census Bureau TIGERweb\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "census_tigerweb_demographics",
+  "case": "normal",
+  "params": {
+   "bbox": "-74.05,40.68,-73.90,40.82"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "census",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Census Bureau TIGERweb\", \"U.S. Census Bureau ACS\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "mobility_database_feeds",
+  "case": "normal",
+  "params": {
+   "bbox": "-122.5,37.7,-122.3,37.85"
+  },
+  "http": 200,
+  "ms": 641,
+  "status": "ok",
+  "provider": "mobility_database",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Mobility Database Catalog (CC0 metadata)\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "pvgis_solar",
+  "case": "normal",
+  "params": {
+   "bbox": "12.49,41.89,12.50,41.90"
+  },
+  "http": 200,
+  "ms": 453,
+  "status": "ok",
+  "provider": "pvgis",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"PVGIS (European Commission JRC)\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "pvgis_solar",
+  "case": "ocean",
+  "params": {
+   "bbox": "-150.0,-30.0,-149.8,-29.8"
+  },
+  "http": 200,
+  "ms": 237,
+  "status": "ok",
+  "provider": "pvgis",
+  "message": null,
+  "warnings": "[\"PVGIS data unavailable\"]",
+  "attribution": "[\"PVGIS (European Commission JRC)\"]",
+  "result_status": "partial",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "usgs_water_gauges",
+  "case": "normal",
+  "params": {
+   "bbox": "-77.2,38.8,-76.9,39.0"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "usgs",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Geological Survey\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "usgs_water_gauges",
+  "case": "out_of_coverage",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "usgs",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Geological Survey\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openmeteo_air_quality_forecast",
+  "case": "normal",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 116,
+  "status": "ok",
+  "provider": "openmeteo",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Data from Open-Meteo\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openmeteo_weather_forecast",
+  "case": "normal",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 152,
+  "status": "ok",
+  "provider": "openmeteo",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Data from Open-Meteo\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openmeteo_weather_forecast",
+  "case": "antimeridian",
+  "params": {
+   "bbox": "179.5,-17.5,-179.5,-16.5"
+  },
+  "http": 400,
+  "ms": 1,
+  "detail": "bbox must be ordered west,south,east,north.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "usgs_earthquakes",
+  "case": "malformed_bbox",
+  "params": {
+   "bbox": "abc,1,2"
+  },
+  "http": 400,
+  "ms": 1,
+  "detail": "bbox must be four comma-separated numbers.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "usgs_earthquakes",
+  "case": "inverted_bbox",
+  "params": {
+   "bbox": "12.6,41.98,12.4,41.80"
+  },
+  "http": 400,
+  "ms": 1,
+  "detail": "bbox must be ordered west,south,east,north.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "usgs_earthquakes",
+  "case": "out_of_range_bbox",
+  "params": {
+   "bbox": "-200,-95,200,95"
+  },
+  "http": 400,
+  "ms": 1,
+  "detail": "bbox coordinates are outside supported geographic ranges.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "usgs_earthquakes",
+  "case": "bad_time",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98",
+   "time": "not-a-date"
+  },
+  "http": 400,
+  "ms": 0,
+  "detail": "time must be ISO-8601.",
+  "top_keys": [
+   "detail"
+  ]
+ },
+ {
+  "capability": "usgs_earthquakes",
+  "case": "sahara_empty",
+  "params": {
+   "bbox": "11.0,23.0,11.2,23.2"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "usgs",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"U.S. Geological Survey\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openmeteo_elevation",
+  "case": "disabled",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 138,
+  "status": "ok",
+  "provider": "openmeteo",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Data from Open-Meteo; Copernicus DEM GLO-90\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "tomtom_traffic_incidents",
+  "case": "no_credential",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "missing-credential",
+  "provider": "tomtom",
+  "message": "TomTom API key is required.",
+  "warnings": "[]",
+  "attribution": "[]",
+  "result_status": null,
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openaq_air_quality",
+  "case": "no_credential",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 0,
+  "status": "missing-credential",
+  "provider": "openaq",
+  "message": "OpenAQ API key is required.",
+  "warnings": "[]",
+  "attribution": "[]",
+  "result_status": null,
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "opentripmap_tourism_pois",
+  "case": "no_credential",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "missing-credential",
+  "provider": "opentripmap",
+  "message": "OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs.",
+  "warnings": "[]",
+  "attribution": "[]",
+  "result_status": null,
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "nasa_firms_active_fires",
+  "case": "no_credential",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "missing-credential",
+  "provider": "nasa_firms",
+  "message": "NASA_API_KEY is required for NASA FIRMS active fire access.",
+  "warnings": "[]",
+  "attribution": "[]",
+  "result_status": null,
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "openchargemap_ev_charging",
+  "case": "no_credential",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 0,
+  "status": "missing-credential",
+  "provider": "openchargemap",
+  "message": "Open Charge Map hosted API access requires a saved API key in encrypted Settings storage; configure it under Geospatial Access or use a local snapshot for anonymous operation.",
+  "warnings": "[]",
+  "attribution": "[]",
+  "result_status": null,
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "overture_maps_places",
+  "case": "unconfigured_source",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "overture",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"Overture Maps Foundation\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "gtfs_static",
+  "case": "unconfigured_source",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 200,
+  "ms": 1,
+  "status": "ok",
+  "provider": "gtfs_static",
+  "message": null,
+  "warnings": "[]",
+  "attribution": "[\"GTFS Static feed publisher\"]",
+  "result_status": "ok",
+  "top_keys": [
+   "attribution",
+   "coverage",
+   "error_code",
+   "fetched_at",
+   "message",
+   "observation_time",
+   "partial",
+   "payload",
+   "provider",
+   "result_status",
+   "result_type",
+   "source_url",
+   "spatial_resolution",
+   "stale",
+   "status",
+   "units",
+   "warnings"
+  ]
+ },
+ {
+  "capability": "not_a_capability",
+  "case": "unknown_id",
+  "params": {
+   "bbox": "12.40,41.80,12.60,41.98"
+  },
+  "http": 404,
+  "ms": 1,
+  "detail": "Geospatial capability 'not_a_capability' was not found.",
+  "top_keys": [
+   "detail"
+  ]
+ }
+]

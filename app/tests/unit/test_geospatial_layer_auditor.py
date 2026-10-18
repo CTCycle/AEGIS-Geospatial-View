@@ -19,8 +19,12 @@ def test_layer_auditor_production_gate_has_no_placeholder_or_visual_gaps() -> No
     payload = report.model_dump()
 
     assert report.ok, payload
-    assert all(not status.placeholder_statuses for status in report.implementation_statuses)
-    assert all(status.provider_fetch_implemented for status in report.implementation_statuses)
+    assert all(
+        not status.placeholder_statuses for status in report.implementation_statuses
+    )
+    assert all(
+        status.provider_fetch_implemented for status in report.implementation_statuses
+    )
     assert all(
         status.visual_tested
         for status in report.implementation_statuses

@@ -4,7 +4,7 @@ import re
 from collections.abc import Mapping
 
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 
 ###############################################################################
 class LocationSanitizationService:
@@ -77,7 +77,7 @@ class LocationSanitizationService:
 
 ###############################################################################
 def build_location_sanitization_service(
-    database: DatabaseBackend,
+    database: SQLiteRepository,
 ) -> LocationSanitizationService:
     repository = ReferenceCatalogRepository(database)
     return LocationSanitizationService(repository.load_country_alias_to_iso2())

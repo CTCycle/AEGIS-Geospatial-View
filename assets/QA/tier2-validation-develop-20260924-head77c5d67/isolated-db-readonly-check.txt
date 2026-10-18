@@ -1,0 +1,4 @@
+database=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\validation-20260924-head77c5d67-process-override\database.db
+connection=read-only
+quick_check=[('ok',)]
+alembic_versions=[('202609210001',)]

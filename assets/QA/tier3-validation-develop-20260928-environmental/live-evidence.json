@@ -1,0 +1,32 @@
+{
+  "tested_commit": "87ca6942",
+  "lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime_data_root": "runtimes/cache/aegis-route-validation-20260928-01",
+  "observations": [
+    {
+      "scenario": "PVGIS-ROME-20260928",
+      "status": "PASS",
+      "run_id": "run_7731b7c73cca4b9fbf5fac1f7fdaf0dd",
+      "evidence_id": "evidence_620f318fa52a4c31ab82cacc79ef181d",
+      "capability_id": "pvgis_solar",
+      "provider_id": "pvgis",
+      "result_type": "metadata",
+      "result_status": "ok",
+      "solar_potential": "1267.38 kWh/kWp/year",
+      "map_prepared": false
+    },
+    {
+      "scenario": "EEA-NOISE-MILAN-20260928",
+      "status": "PARTIAL",
+      "run_id": "run_99df20c2e9ef42898d08dbab4b319aba",
+      "evidence_id": "evidence_b7598a66953d46429524a408fb393b12",
+      "capability_id": "eea_noise_2019",
+      "provider_id": "eea",
+      "result_type": "raster",
+      "result_status": "ok",
+      "map_eligibility": "renderable",
+      "browser_render": "render_failed_source_not_loaded",
+      "render_ack": false
+    }
+  ]
+}

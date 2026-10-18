@@ -19,6 +19,15 @@ export const INITIAL_AGENT_READINESS_STATE: AgentReadinessState = {
   message: 'Validating selected agent model status.',
 };
 
+const CANONICAL_LLM_PROVIDERS = new Set([
+  'openai',
+  'google',
+  'deepseek',
+  'opencode',
+  'opencode-go',
+  'ollama',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class AgentReadinessService {
   constructor(
@@ -37,10 +46,18 @@ export class AgentReadinessService {
           message: issue,
         };
       }
+      const probe = await this.apiClient.fetchStructuredProbe();
+      if (probe.status !== 'passed') {
+        return {
+          status: probe.status === 'not_tested' ? 'unknown' : 'needs_attention',
+          label: probe.status === 'not_tested' ? 'Not verified' : 'Needs attention',
+          message: probe.message ?? 'The selected model has not passed the native structured-response probe.',
+        };
+      }
       return {
         status: 'active',
-        label: 'Active',
-        message: this.describeActiveAgent(settings),
+        label: 'Configured',
+        message: `${this.describeActiveAgent(settings)} Native structured-response probe passed.`,
       };
     } catch {
       return {
@@ -52,10 +69,13 @@ export class AgentReadinessService {
   }
 
   private async resolveIssue(settings: ModelSettingsResponse): Promise<string | null> {
-    const provider = settings.agent_model_provider.trim().toLowerCase();
+    const provider = settings.agent_model_provider;
     const model = settings.agent_model_name.trim();
     if (!provider || !model) {
-      return 'No agent model is selected. Open Model Settings before using the workspace.';
+      return 'No agent model is selected. Open Settings before using the workspace.';
+    }
+    if (!CANONICAL_LLM_PROVIDERS.has(provider)) {
+      return `Selected provider ID is not supported: ${provider}. Choose a canonical provider in Settings.`;
     }
 
     if (provider === 'ollama') {
@@ -97,11 +117,11 @@ export class AgentReadinessService {
   }
 
   private describeActiveAgent(settings: ModelSettingsResponse): string {
-    const provider = settings.agent_model_provider.trim();
+    const provider = settings.agent_model_provider;
     const model = settings.agent_model_name.trim();
     if (!provider || !model) {
       return 'No agent model selected.';
     }
-    return `${model} is ready through ${providerDisplayLabel(provider)}.`;
+    return `${model} is configured through ${providerDisplayLabel(provider)}. Live inference is verified on the first request.`;
   }
 }

@@ -1,0 +1,21 @@
+{
+  "tested_at": "2026-10-01",
+  "branch": "validation",
+  "source_commit": "ee6c36bf",
+  "working_tree_changes": "source clean; retained QA evidence under assets/QA",
+  "campaign": "Tier 4A dataset-ingestion",
+  "slices": {
+    "T4-01": {"status": "PASS", "evidence": "focused-suite.log, configured-source-materialization.json"},
+    "T4-02": {"status": "PASS", "evidence": "focused-suite.log, configured-source-materialization.json"},
+    "T4-03": {"status": "PARTIAL", "reason": "optional geospatial-ingestion extra not installed; fail-closed partial path validated"},
+    "T4-04": {"status": "PARTIAL", "reason": "deterministic GTFS tests pass; no configured live feed"},
+    "T4-05": {"status": "PARTIAL", "reason": "local fixture source passes; no configured external/local dataset"},
+    "T4-06": {"status": "BLOCKED", "reason": "no configured local camera sources/feeds"},
+    "T4-07": {"status": "BLOCKED", "reason": "no approved credentials"},
+    "T4-08": {"status": "PASS", "evidence": "descriptor-api-suite.log, strict-audit.log"}
+  },
+  "rollback_cleanup_boundary": "validated_limitation_no_product_change",
+  "optional_deps_installed": false,
+  "runtime_database_modified": false,
+  "secret_recorded": false
+}

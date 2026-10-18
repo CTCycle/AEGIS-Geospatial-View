@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
@@ -12,6 +12,7 @@ import {
   selector: 'app-overlay-controls',
   standalone: true,
   templateUrl: './overlay-controls.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './overlay-controls.component.css',
 })
 export class OverlayControlsComponent {
@@ -22,6 +23,18 @@ export class OverlayControlsComponent {
 
   @Output() overlayVisibilityChange = new EventEmitter<OverlayVisibilityChange>();
   @Output() overlayOpacityChange = new EventEmitter<OverlayOpacityChange>();
+  @Output() overlayOrderChange = new EventEmitter<string[]>();
+
+  isExpanded = false;
+  reorderAnnouncement = '';
+
+  toggleExpanded(): void {
+    this.isExpanded = !this.isExpanded;
+  }
+
+  get visibleOverlayCount(): number {
+    return this.overlays.filter((overlay) => this.overlayVisibility[overlay.id] ?? true).length;
+  }
 
   trackOverlay(_: number, overlay: MapOverlayEntry): string {
     return overlay.id;
@@ -37,6 +50,10 @@ export class OverlayControlsComponent {
 
   getRenderMessage(overlayId: string): string | undefined {
     return this.overlayRenderStatuses.find((status) => status.overlayId === overlayId)?.message;
+  }
+
+  getOpacityLabel(overlay: MapOverlayEntry): string {
+    return `Opacity for ${overlay.label}: ${this.getOpacityPercent(overlay)} percent`;
   }
 
   isOpacityDisabled(overlayId: string): boolean {
@@ -60,5 +77,18 @@ export class OverlayControlsComponent {
     }
     const clampedPercent = Math.min(100, Math.max(0, parsed));
     this.overlayOpacityChange.emit({ overlayId, percentValue: String(clampedPercent) });
+  }
+
+  moveOverlay(overlayId: string, offset: -1 | 1): void {
+    const currentIndex = this.overlays.findIndex((overlay) => overlay.id === overlayId);
+    const nextIndex = currentIndex + offset;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= this.overlays.length) {
+      return;
+    }
+
+    const nextOrder = this.overlays.map((overlay) => overlay.id);
+    [nextOrder[currentIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[currentIndex]];
+    this.overlayOrderChange.emit(nextOrder);
+    this.reorderAnnouncement = `${this.overlays[currentIndex].label} moved to position ${nextIndex + 1} of ${this.overlays.length}.`;
   }
 }

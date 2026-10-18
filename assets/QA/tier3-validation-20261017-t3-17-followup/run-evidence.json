@@ -1,0 +1,1023 @@
+[
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_3dac6616600d4543b43428a528330223",
+    "request": "Show current Open-Meteo pressure, humidity, and wind conditions for Rome, Italy as a point map.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 13,
+        "payload": {
+          "tool_name": "resolve_geospatial_location",
+          "status": "success",
+          "summary": "Resolved Rome, Roma Capitale, Lazio, Italy.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 23,
+        "payload": {
+          "tool_name": "describe_geospatial_capability",
+          "status": "success",
+          "summary": "Described geospatial capability openmeteo_pressure_humidity_wind.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 27,
+        "payload": {
+          "tool_name": "describe_geospatial_capability",
+          "status": "success",
+          "summary": "Described geospatial capability openmeteo_weather_forecast.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 37,
+        "payload": {
+          "tool_name": "execute_geospatial_capability",
+          "status": "success",
+          "summary": "Capability 'openmeteo_pressure_humidity_wind' returned 1 feature(s) from provider 'openmeteo'.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 46,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 55,
+        "payload": {
+          "session_id": "candidate-1cc019ba580d4a93ac19800fec24dcaa",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.4829321,
+            41.8933203,
+            12.4829321,
+            41.8933203
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "location_resolved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "required_data_retrieved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "temporal_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "spatial_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 57,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.481739858095494,
+            41.89254760804744,
+            12.484124341909393,
+            41.894092982605855
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:30:57.760241+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 76,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  },
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_2d55848ef9d74793a319a73679d39b10",
+    "request": "Fetch a fresh MODIS Terra Land Surface Temperature Day raster for the Rome viewport using NASA GIBS, add it as a visible raster layer, and retain the existing Open-Meteo weather point layer. Keep the viewport centered on Rome.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 13,
+        "payload": {
+          "tool_name": "discover_geospatial_capabilities",
+          "status": "valid_empty",
+          "summary": "No eligible capabilities matched the request.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 23,
+        "payload": {
+          "tool_name": "discover_geospatial_capabilities",
+          "status": "success",
+          "summary": "Found 12 eligible capabilities.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 27,
+        "payload": {
+          "tool_name": "discover_geospatial_capabilities",
+          "status": "valid_empty",
+          "summary": "No eligible capabilities matched the request.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 37,
+        "payload": {
+          "tool_name": "describe_geospatial_capability",
+          "status": "success",
+          "summary": "Described geospatial capability MODIS_Terra_Land_Surface_Temp_Day.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 47,
+        "payload": {
+          "tool_name": "execute_geospatial_capability",
+          "status": "success",
+          "summary": "Capability 'MODIS_Terra_Land_Surface_Temp_Day' returned a raster result from provider 'gibs'.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 56,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 65,
+        "payload": {
+          "session_id": "candidate-e31c18016e70466db446fb2f0e1021f7",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.2344416,
+            41.6556417,
+            12.8557603,
+            42.1410285
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "provider": "gibs",
+              "label": "Surface Temperature Day (MODIS, Daily)"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "location_resolved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "required_data_retrieved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "temporal_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "spatial_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 67,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.13912638434158,
+            41.63516656094106,
+            12.951075515655873,
+            42.161342113922444
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:31:33.962268+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": null,
+              "raster_tile_intersects_viewport": true,
+              "raster_nontransparent_pixel_count": 21584,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 86,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  },
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_65fd79523744498fa3989eac178af516",
+    "request": "Query the GBIF indexed archive for historical species occurrence records (not real-time presence or absence) within 5 km of Rome, Italy. Use gbif_species_occurrences with a new provider query limited to 25 records. Add the returned points as a visible layer, retaining both Open-Meteo and MODIS and the Rome city-wide viewport.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 13,
+        "payload": {
+          "tool_name": "describe_geospatial_capability",
+          "status": "success",
+          "summary": "Described geospatial capability gbif_species_occurrences.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 23,
+        "payload": {
+          "tool_name": "execute_geospatial_capability",
+          "status": "success",
+          "summary": "Capability 'gbif_species_occurrences' returned 25 feature(s) from provider 'gbif'.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 32,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 41,
+        "payload": {
+          "session_id": "candidate-883a255bea5747c9ab8deb4f221ac2f3",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.2344416,
+            41.6556417,
+            12.8557603,
+            42.1410285
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "provider": "gibs",
+              "label": "Surface Temperature Day (MODIS, Daily)"
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "provider": "gbif",
+              "label": "GBIF Species Occurrences"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "location_resolved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "required_data_retrieved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "temporal_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "spatial_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 43,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.13912638434158,
+            41.63516656094106,
+            12.951075515655873,
+            42.161342113922444
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:33:49.048660+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": null,
+              "raster_tile_intersects_viewport": true,
+              "raster_nontransparent_pixel_count": 21584,
+              "failure_code": null
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 3,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 62,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  },
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_05db4bbc9d704778a27345154ea06277",
+    "request": "Remove only the Surface Temperature Day (MODIS, Daily) raster from this map. Keep Open-Meteo Pressure Humidity Wind and GBIF Species Occurrences visible, preserve the Rome city-wide viewport and OpenStreetMap basemap, and verify the remaining two layers.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 12,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 21,
+        "payload": {
+          "session_id": "candidate-436ab28913dd42a3bcb56af2db004e16",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.2344416,
+            41.6556417,
+            12.8557603,
+            42.1410285
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "provider": "gbif",
+              "label": "GBIF Species Occurrences"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 23,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.13912638434158,
+            41.63516656094106,
+            12.951075515655873,
+            42.161342113922444
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:35:24.255952+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 3,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 42,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  },
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_f31312afe306447fb2e9f74d6e19eb15",
+    "request": "Fetch a fresh NASA GIBS MODIS Terra Land Surface Temperature Day raster for Rome. Re-add it as a visible layer, retaining the current Open-Meteo and GBIF point layers and the Rome city-wide viewport.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 13,
+        "payload": {
+          "tool_name": "discover_geospatial_capabilities",
+          "status": "valid_empty",
+          "summary": "No eligible capabilities matched the request.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 23,
+        "payload": {
+          "tool_name": "discover_geospatial_capabilities",
+          "status": "success",
+          "summary": "Found 1 eligible capabilities.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 33,
+        "payload": {
+          "tool_name": "describe_geospatial_capability",
+          "status": "success",
+          "summary": "Described geospatial capability MODIS_Terra_Land_Surface_Temp_Day.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 43,
+        "payload": {
+          "tool_name": "execute_geospatial_capability",
+          "status": "success",
+          "summary": "Capability 'MODIS_Terra_Land_Surface_Temp_Day' returned a raster result from provider 'gibs'.",
+          "error": null
+        }
+      },
+      {
+        "type": "tool_completed",
+        "sequence": 52,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 61,
+        "payload": {
+          "session_id": "candidate-f06c06c226554ca8bc820393fbc630e4",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.2344416,
+            41.6556417,
+            12.8557603,
+            42.1410285
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "provider": "gbif",
+              "label": "GBIF Species Occurrences"
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "provider": "gibs",
+              "label": "Surface Temperature Day (MODIS, Daily)"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "location_resolved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "required_data_retrieved",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "temporal_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "spatial_scope_applied",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 63,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.13912638434158,
+            41.63516656094106,
+            12.951075515655873,
+            42.161342113922444
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:36:05.226829+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "gbif_species_occurrences",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 3,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": null,
+              "raster_tile_intersects_viewport": true,
+              "raster_nontransparent_pixel_count": 21584,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 82,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  },
+  {
+    "conversation_id": "conv_da9b41fb32e94d97ab1f02ebcd16ec22",
+    "run_id": "run_5110096330a94abfa1a904d4940d2aef",
+    "request": "Remove only GBIF Species Occurrences. Retain Open-Meteo Pressure Humidity Wind and Surface Temperature Day (MODIS, Daily) visible, preserve the Rome city-wide viewport and OpenStreetMap basemap, then verify the remaining two layers.",
+    "state": "completed",
+    "presentation_status": "ready",
+    "events": [
+      {
+        "type": "tool_completed",
+        "sequence": 12,
+        "payload": {
+          "tool_name": "apply_map_plan",
+          "status": "success",
+          "summary": "A map candidate was prepared and is awaiting render acknowledgment.",
+          "error": null
+        }
+      },
+      {
+        "type": "map_prepared",
+        "sequence": 21,
+        "payload": {
+          "session_id": "candidate-d934ad2e31b745078ba1d65dee90d4b6",
+          "location": "Rome, Roma Capitale, Lazio, Italy",
+          "basemap_id": "osm_default",
+          "bounds": [
+            12.2344416,
+            41.6556417,
+            12.8557603,
+            42.1410285
+          ],
+          "overlays": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "provider": "openmeteo",
+              "label": "Open-Meteo Pressure Humidity Wind"
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "provider": "gibs",
+              "label": "Surface Temperature Day (MODIS, Daily)"
+            }
+          ],
+          "requirements": [
+            {
+              "name": "map_candidate_prepared",
+              "status": "satisfied",
+              "failure_code": null
+            },
+            {
+              "name": "map_state_committed",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "viewport_contains_results",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "final_response_ready",
+              "status": "pending",
+              "failure_code": null
+            },
+            {
+              "name": "render_verified",
+              "status": "pending",
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "render_observed",
+        "sequence": 23,
+        "payload": {
+          "status": "ready",
+          "viewport_bounds": [
+            12.13912638434158,
+            41.63516656094106,
+            12.951075515655873,
+            42.161342113922444
+          ],
+          "checks": {
+            "required_sources_loaded": true,
+            "required_layers_present": true,
+            "viewport_valid": true
+          },
+          "observed_at": "2026-10-17T12:36:35.115533+00:00",
+          "overlay_results": [
+            {
+              "capability_id": "openmeteo_pressure_humidity_wind",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": 1,
+              "raster_tile_intersects_viewport": null,
+              "raster_nontransparent_pixel_count": null,
+              "failure_code": null
+            },
+            {
+              "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
+              "loaded": true,
+              "layer_present": true,
+              "source_present": true,
+              "result_visible": true,
+              "visibility_matches": true,
+              "rendered_feature_count": null,
+              "raster_tile_intersects_viewport": true,
+              "raster_nontransparent_pixel_count": 21584,
+              "failure_code": null
+            }
+          ]
+        }
+      },
+      {
+        "type": "completed",
+        "sequence": 42,
+        "payload": {
+          "presentation_status": "ready",
+          "render_verified": true,
+          "render_acknowledgment": null,
+          "code": null,
+          "message": null
+        }
+      }
+    ]
+  }
+]

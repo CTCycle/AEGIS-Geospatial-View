@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.api.chat import get_models, refresh_ollama_models
-from server.domain.chat import OllamaRefreshResponse
+from server.contracts.chat import OllamaRefreshResponse
 
 ###############################################################################
 class _ModelLibraryService:
@@ -40,6 +40,7 @@ class _ModelLibraryService:
                 "ollama": {
                     "ok": True,
                     "reachable": True,
+                    "stale": False,
                     "message": None,
                     "model_count": 1,
                 }
@@ -58,24 +59,26 @@ class _MaintenanceService:
 
     # -------------------------------------------------------------------------
     def refresh_ollama_models(self):
-        return OllamaRefreshResponse.model_validate({
-            "status": "ok",
-            "library_models": [],
-            "local_models": ["llama"],
-            "local_model_capabilities": [
-                {
-                    "id": "llama",
-                    "name": "llama",
-                    "description": "local",
-                    "provider": "ollama",
-                    "capabilities": ["chat", "structured_output", "tools"],
-                    "supports_tools": True,
-                    "supports_structured_output": True,
-                    "tool_support_source": "ollama_probe",
-                    "metadata": {},
-                }
-            ],
-        })
+        return OllamaRefreshResponse.model_validate(
+            {
+                "status": "ok",
+                "library_models": [],
+                "local_models": ["llama"],
+                "local_model_capabilities": [
+                    {
+                        "id": "llama",
+                        "name": "llama",
+                        "description": "local",
+                        "provider": "ollama",
+                        "capabilities": ["chat", "structured_output", "tools"],
+                        "supports_tools": True,
+                        "supports_structured_output": True,
+                        "tool_support_source": "ollama_probe",
+                        "metadata": {},
+                    }
+                ],
+            }
+        )
 
 ###############################################################################
 class _Runtime:
@@ -92,6 +95,7 @@ def test_models_endpoint_returns_capability_metadata() -> None:
     assert response.local[0].supports_structured_output is True
     assert response.local[0].tool_support_source == "ollama_probe"
     assert response.sources["ollama"].reachable is True
+    assert response.sources["ollama"].stale is False
 
 ###############################################################################
 def test_ollama_refresh_returns_capability_metadata() -> None:

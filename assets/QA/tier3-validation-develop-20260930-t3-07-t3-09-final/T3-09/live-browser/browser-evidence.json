@@ -1,0 +1,47 @@
+{
+  "tested_at": "2026-09-30",
+  "branch": "develop",
+  "source_commit": "c8e6f416",
+  "run_id": "run_e9325598bce1432ca73642b0b7b2920b",
+  "browser": "Codex in-app Browser",
+  "url": "http://127.0.0.1:5011/",
+  "request": "Show the latest RainViewer precipitation radar over Naples, Italy.",
+  "status": "PASS",
+  "state": "completed",
+  "presentation_status": "ready",
+  "render_attempts": 1,
+  "provider": "rainviewer",
+  "capability_id": "rainviewer_precipitation_radar",
+  "location": "Naples, Campania, Italy",
+  "observation_time": "2026-09-30T21:20:00Z",
+  "retrieved_at": "2026-09-30T21:27:00Z",
+  "checks": {
+    "required_sources_loaded": true,
+    "required_layers_present": true,
+    "viewport_valid": true,
+    "raster_source_loaded": true,
+    "raster_tile_intersects_viewport": true,
+    "raster_zoom_supported": true,
+    "result_visible": true,
+    "temporal_scope_applied": true,
+    "spatial_scope_applied": true
+  },
+  "raster": {
+    "nontransparent_pixel_count": 90,
+    "tile_z": 6,
+    "tile_x": 34,
+    "tile_y": 24
+  },
+  "fix": {
+    "fit_max_zoom": 6,
+    "provider_max_zoom": 7,
+    "scope_evidence": ["temporal_mode=current", "analysis_scope=point"]
+  },
+  "prior_observed_failure": {
+    "tile_z": 7,
+    "nontransparent_pixel_count": 0,
+    "failure_code": "raster_zoom_unsupported"
+  },
+  "secret_recorded": false,
+  "fallback_used": false
+}

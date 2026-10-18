@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import os
+import logging
+import math
 from collections.abc import Callable
 from time import monotonic
-from typing import Any
+from typing import Any, cast
 
-from server.domain.geographics import GeospatialProviderLayerDescriptor
-from server.domain.geospatial.providers import ProviderExecutionPolicy
+from server.contracts.geospatial import GeospatialProviderLayerDescriptor
+from server.domain.geospatial.providers import ProviderExecutionPolicy, current_provider_policy
+from server.domain.geospatial.registry import GeospatialManifestSnapshot
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
@@ -17,26 +20,27 @@ from server.services.geospatial.providers.base import (
     ProviderError,
     ProviderRequest,
     ProviderResponse,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     response_without_credentials,
+    safe_request_params,
 )
 from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
 from server.services.geospatial.providers.fema import FEMAProvider
-from server.services.geospatial.providers.geoapify import GeoapifyProvider
+from server.services.geospatial.providers.gbif import GBIFProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
+from server.services.geospatial.providers.http import request_timeout_scope
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
-from server.services.geospatial.providers.mapillary import MapillaryProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.natural_earth import NaturalEarthProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.nominatim import NominatimProvider
-from server.services.geospatial.providers.nrel import NRELProvider
 from server.services.geospatial.providers.openaddresses import OpenAddressesProvider
 from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
@@ -47,57 +51,60 @@ from server.services.geospatial.providers.overpass import OverpassProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
+from server.services.geospatial.providers.soilgrids import SoilGridsProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
-from server.services.geospatial.providers.transitland import TransitlandProvider
+from server.services.geospatial.providers.mobility_database import (
+    MobilityDatabaseProvider,
+)
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
-ProviderFactory = Callable[[], GeospatialProvider]
+ProviderFactory = Callable[[str | None], Any]
+
+
+# Provider source modules may use descriptive filenames, while manifests and
+# runtime providers use their canonical public IDs. Keep this compatibility
+# mapping narrow to the provider-discovery boundary rather than duplicating
+# provider registrations.
+PROVIDER_ID_ALIASES: dict[str, str] = {
+    "nasa_gibs": "gibs",
+}
 
 
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
-    "arcgis": ArcGISRestProvider,
-    "census": CensusProvider,
-    "gibs": NASAGIBSProvider,
-    "eea": EEAProvider,
-    "esa": ESAProvider,
-    "eurostat": EurostatProvider,
-    "rainviewer": RainViewerProvider,
-    "openmeteo": OpenMeteoProvider,
-    "overpass": OverpassProvider,
-    "openaq": lambda: OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY")),
-    "pvgis": PVGISProvider,
-    "tomtom": lambda: TomTomProvider(api_key=os.getenv("TOMTOM_API_KEY")),
-    "geoapify": lambda: GeoapifyProvider(api_key=os.getenv("GEOAPIFY_API_KEY")),
-    "windy_webcams": lambda: WindyWebcamsProvider(
-        api_key=os.getenv("WINDY_WEBCAMS_API_KEY")
-    ),
-    "usgs": USGSProvider,
-    "noaa": NOAAProvider,
-    "fema": FEMAProvider,
-    "nasa_firms": lambda: NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY")),
-    "opentripmap": lambda: OpenTripMapProvider(
-        api_key=os.getenv("OPENTRIPMAP_API_KEY")
-    ),
-    "openchargemap": lambda: OpenChargeMapProvider(
-        api_key=os.getenv("OPENCHARGEMAP_API_KEY")
-    ),
-    "nrel": lambda: NRELProvider(api_key=os.getenv("NREL_API_KEY")),
-    "ourairports": OurAirportsProvider,
-    "gtfs_static": GTFSStaticProvider,
-    "gtfs_realtime": GTFSRealtimeProvider,
-    "natural_earth": NaturalEarthProvider,
-    "overture": OvertureProvider,
-    "openaddresses": OpenAddressesProvider,
-    "local_open_data": LocalOpenDataProvider,
-    "transitland": lambda: TransitlandProvider(
-        api_key=os.getenv("TRANSITLAND_API_KEY")
-    ),
-    "nominatim": NominatimProvider,
-    "mapillary": lambda: MapillaryProvider(
-        access_token=os.getenv("MAPILLARY_ACCESS_TOKEN")
-    ),
+    "arcgis": lambda _credential: ArcGISRestProvider(),
+    "census": lambda _credential: CensusProvider(),
+    "gibs": lambda _credential: NASAGIBSProvider(),
+    "eea": lambda _credential: EEAProvider(),
+    "esa": lambda _credential: ESAProvider(),
+    "eurostat": lambda _credential: EurostatProvider(),
+    "gbif": lambda _credential: GBIFProvider(),
+    "rainviewer": lambda _credential: RainViewerProvider(),
+    "openmeteo": lambda _credential: OpenMeteoProvider(),
+    "overpass": lambda _credential: OverpassProvider(),
+    "openaq": lambda credential: OpenAQProvider(api_key=credential),
+    "pvgis": lambda _credential: PVGISProvider(),
+    "tomtom": lambda credential: TomTomProvider(api_key=credential),
+    "windy_webcams": lambda credential: WindyWebcamsProvider(api_key=credential),
+    "usgs": lambda _credential: USGSProvider(),
+    "noaa": lambda _credential: NOAAProvider(),
+    "fema": lambda _credential: FEMAProvider(),
+    "nasa_firms": lambda credential: NASAFIRMSProvider(api_key=credential),
+    "soilgrids": lambda _credential: SoilGridsProvider(),
+    "opentripmap": lambda credential: OpenTripMapProvider(api_key=credential),
+    "openchargemap": lambda credential: OpenChargeMapProvider(api_key=credential),
+    "ourairports": lambda _credential: OurAirportsProvider(),
+    "gtfs_static": lambda _credential: GTFSStaticProvider(),
+    "gtfs_realtime": lambda _credential: GTFSRealtimeProvider(),
+    "natural_earth": lambda _credential: NaturalEarthProvider(),
+    "overture": lambda _credential: OvertureProvider(),
+    "openaddresses": lambda _credential: OpenAddressesProvider(),
+    "local_open_data": lambda _credential: LocalOpenDataProvider(),
+    "mobility_database": lambda _credential: MobilityDatabaseProvider(),
+    "nominatim": lambda _credential: NominatimProvider(),
 }
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class ProviderRegistryError(Exception):
@@ -114,18 +121,33 @@ class ProviderRegistry:
     def __init__(
         self,
         *,
+        catalog_snapshot: GeospatialManifestSnapshot | None = None,
         manifest_loader: GeospatialManifestLoader | None = None,
         providers: list[GeospatialProvider] | None = None,
         execution_policy: ProviderExecutionPolicy | None = None,
+        credential_resolver: GeospatialCredentialResolver | None = None,
+        provider_factories: dict[str, ProviderFactory] | None = None,
     ) -> None:
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_snapshot = (
+            catalog_snapshot
+            or GeospatialManifestSnapshot.from_payload(loader.load_all())
+        )
         self.execution_policy = execution_policy or ProviderExecutionPolicy()
+        self.credential_resolver = credential_resolver or GeospatialCredentialResolver()
+        self.provider_factories = provider_factories or PROVIDER_FACTORIES
         self._providers: dict[str, GeospatialProvider] = {}
         self._failures: dict[str, int] = {}
+        self._circuit_opened_at: dict[str, float] = {}
         self._last_call_at: dict[str, float] = {}
         self._min_call_interval_s: dict[str, float] = {}
         for provider in providers or []:
             self.register(provider)
+        self._manifest_providers_built = False
+        if providers is None and (
+            catalog_snapshot is not None or manifest_loader is None
+        ):
+            self._build_from_catalog_snapshot()
 
     # -------------------------------------------------------------------------
     def register(self, provider: GeospatialProvider) -> None:
@@ -158,9 +180,20 @@ class ProviderRegistry:
         self._min_call_interval_s[normalized] = max(0.0, float(min_call_interval_s))
 
     # -------------------------------------------------------------------------
+    def configure_execution_policy(self, policy: ProviderExecutionPolicy) -> None:
+        """Replace the bounded transport policy used by provider calls."""
+
+        self.execution_policy = policy
+
+    # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
-        payload = self.manifest_loader.load_all()
-        items = []
+        if self._manifest_providers_built:
+            return
+        self._build_from_catalog_snapshot()
+
+    # -------------------------------------------------------------------------
+    def _build_from_catalog_snapshot(self) -> None:
+        items: list[tuple[str, dict[str, Any]]] = []
         for collection_name in (
             "providers",
             "basemaps",
@@ -169,20 +202,17 @@ class ProviderRegistry:
             "transit",
             "tools",
         ):
-            for item in payload.get(collection_name) or []:
-                if isinstance(item, dict):
-                    items.append((collection_name, item))
+            for item in getattr(self.catalog_snapshot, collection_name):
+                items.append((collection_name, dict(item)))
         for collection_name, item in items:
             capability_kind = str(item.get("capabilityKind") or "").strip().lower()
-            if (
-                collection_name != "providers"
-                and capability_kind in {"basemap", "metadata", "metadata-only"}
-            ):
+            if collection_name != "providers" and capability_kind in {
+                "basemap",
+                "metadata",
+                "metadata-only",
+            }:
                 continue
-            fallback_provider_id = (
-                item.get("id") if collection_name == "providers" else ""
-            )
-            provider_id = str(item.get("provider") or fallback_provider_id).strip()
+            provider_id = str(item.get("provider") or "").strip()
             if not provider_id:
                 continue
             if provider_id.lower() in self._providers:
@@ -193,6 +223,7 @@ class ProviderRegistry:
             ):
                 continue
             self.register(self._provider_for_manifest(provider_id.lower(), dict(item)))
+        self._manifest_providers_built = True
 
     # -------------------------------------------------------------------------
     async def fetch(
@@ -202,37 +233,123 @@ class ProviderRegistry:
         provider = self.get(normalized)
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
-        attempts = max(1, int(self.execution_policy.max_attempts))
+        deadline = monotonic() + self._timeout_seconds(normalized)
+        # Provider transport is the only retry owner below the tool boundary.
+        # Keep the external attempt count bounded even if a stale configuration
+        # requests a larger value.
+        attempts = min(10, max(1, int(current_provider_policy(self.execution_policy).max_attempts)))
         last_error: ProviderError | None = None
         for attempt in range(attempts):
-            try:
-                response = await asyncio.wait_for(
-                    self._fetch_provider(provider, request),
-                    timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-                )
-            except ProviderAuthError:
-                raise
-            except TimeoutError as exc:
-                last_error = ProviderTimeoutError(
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                timeout_error = ProviderTimeoutError(
                     f"Provider '{normalized}' timed out."
                 )
                 self._record_failure(normalized)
-                if attempt + 1 >= attempts:
+                raise timeout_error from last_error
+            started = monotonic()
+            LOGGER.debug(
+                "provider_request provider=%s capability=%s attempt=%s bbox=%s zoom=%s time=%s params=%s",
+                normalized,
+                request.capability_id,
+                attempt + 1,
+                request.bbox,
+                request.zoom,
+                request.time.isoformat() if request.time else None,
+                safe_request_params(request.params),
+            )
+            try:
+                with request_timeout_scope(remaining):
+                    response = await asyncio.wait_for(
+                        self._fetch_provider(provider, request),
+                        timeout=remaining,
+                    )
+            except ProviderAuthError:
+                raise
+            except TimeoutError as exc:
+                last_error = ProviderTimeoutError(f"Provider '{normalized}' timed out.")
+                self._record_failure(normalized)
+                if not self._should_retry(attempt, last_error, attempts):
                     raise last_error from exc
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
+            except ProviderRateLimitError as exc:
+                last_error = exc
+                self._record_failure(normalized)
+                if not self._should_retry(attempt, last_error, attempts):
+                    raise
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
             except ProviderUnavailableError as exc:
                 last_error = exc
                 self._record_failure(normalized)
-                if attempt + 1 >= attempts:
+                if not self._should_retry(attempt, last_error, attempts):
                     raise
+                await self._wait_before_retry(attempt, last_error, deadline=deadline)
             except ProviderError:
                 self._record_failure(normalized)
                 raise
             else:
                 self._failures[normalized] = 0
+                self._circuit_opened_at.pop(normalized, None)
+                LOGGER.debug(
+                    "provider_response provider=%s capability=%s attempt=%s status=%s type=%s stale=%s partial=%s elapsed_ms=%s",
+                    normalized,
+                    request.capability_id,
+                    attempt + 1,
+                    response.result_status,
+                    response.result_type,
+                    response.stale,
+                    response.partial,
+                    int((monotonic() - started) * 1000),
+                )
                 return response_without_credentials(response)
         if last_error is not None:
             raise last_error
         raise ProviderUnavailableError(f"Provider '{normalized}' did not return data.")
+
+    # -------------------------------------------------------------------------
+    def _should_retry(
+        self,
+        attempt: int,
+        error: ProviderError,
+        attempts: int,
+    ) -> bool:
+        if attempt + 1 >= attempts:
+            return False
+        return self._retry_delay_seconds(attempt, error) is not None
+
+    # -------------------------------------------------------------------------
+    async def _wait_before_retry(
+        self,
+        attempt: int,
+        error: ProviderError,
+        *,
+        deadline: float | None = None,
+    ) -> None:
+        delay = self._retry_delay_seconds(attempt, error)
+        if delay is not None and deadline is not None:
+            delay = min(delay, max(0.0, deadline - monotonic()))
+        if delay is not None and delay > 0:
+            await asyncio.sleep(delay)
+
+    # -------------------------------------------------------------------------
+    def _retry_delay_seconds(
+        self, attempt: int, error: ProviderError
+    ) -> float | None:
+        maximum = max(0.0, float(current_provider_policy(self.execution_policy).retry_backoff_max_seconds))
+        retry_after = getattr(error, "retry_after_seconds", None)
+        if retry_after is not None:
+            if not isinstance(retry_after, (int, float)) or not math.isfinite(
+                float(retry_after)
+            ):
+                retry_after = None
+            elif retry_after < 0 or retry_after > maximum:
+                # A response asking us to wait longer than the bounded retry
+                # window is terminal for this request.
+                return None
+            else:
+                return float(retry_after)
+        base = max(0.0, float(current_provider_policy(self.execution_policy).retry_backoff_base_seconds))
+        return min(maximum, base * (2**attempt))
 
     # -------------------------------------------------------------------------
     async def list_layers(
@@ -245,18 +362,20 @@ class ProviderRegistry:
     ) -> list[GeospatialProviderLayerDescriptor]:
         normalized = self._normalize_provider_id(provider_id)
         provider = self.get(normalized)
-        list_layers = getattr(provider, "list_layers", None)
+        list_layers = cast(Callable[..., Any], getattr(provider, "list_layers", None))
         if not callable(list_layers):
             raise ProviderUnavailableError(
                 f"Provider '{normalized}' does not support live layer discovery."
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
+        remaining = self._timeout_seconds(normalized)
         try:
-            return await asyncio.wait_for(
-                list_layers(query=query, limit=limit, refresh=refresh),
-                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-            )
+            with request_timeout_scope(remaining):
+                return await asyncio.wait_for(
+                    list_layers(query=query, limit=limit, refresh=refresh),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             self._record_failure(normalized)
             raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc
@@ -271,18 +390,22 @@ class ProviderRegistry:
     ) -> GeospatialProviderLayerDescriptor:
         normalized = self._normalize_provider_id(provider_id)
         provider = self.get(normalized)
-        describe_layer = getattr(provider, "describe_layer", None)
+        describe_layer = cast(
+            Callable[..., Any], getattr(provider, "describe_layer", None)
+        )
         if not callable(describe_layer):
             raise ProviderUnavailableError(
                 f"Provider '{normalized}' does not support live layer discovery."
             )
         self._ensure_circuit_closed(normalized)
         await self._wait_for_rate_limit(normalized)
+        remaining = self._timeout_seconds(normalized)
         try:
-            return await asyncio.wait_for(
-                describe_layer(layer_id, refresh=refresh),
-                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
-            )
+            with request_timeout_scope(remaining):
+                return await asyncio.wait_for(
+                    describe_layer(layer_id, refresh=refresh),
+                    timeout=remaining,
+                )
         except TimeoutError as exc:
             self._record_failure(normalized)
             raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc
@@ -291,7 +414,9 @@ class ProviderRegistry:
     async def _fetch_provider(
         self, provider: GeospatialProvider, request: ProviderRequest
     ) -> ProviderResponse:
-        fetch_features = getattr(provider, "fetch_features", None)
+        fetch_features = cast(
+            Callable[..., Any], getattr(provider, "fetch_features", None)
+        )
         if callable(fetch_features):
             response = await fetch_features(request)
             if isinstance(response, ProviderResponse):
@@ -299,12 +424,26 @@ class ProviderRegistry:
         return await provider.fetch(request)
 
     # -------------------------------------------------------------------------
+    def _timeout_seconds(self, provider_id: str) -> float:
+        """Resolve one transport deadline from the canonical runtime policy."""
+
+        provider_timeout = current_provider_policy(self.execution_policy).provider_timeout_seconds.get(
+            provider_id
+        )
+        return max(
+            0.01,
+            float(current_provider_policy(self.execution_policy).timeout_seconds),
+            float(provider_timeout or 0.0),
+        )
+
+    # -------------------------------------------------------------------------
     def _provider_for_manifest(
         self, provider_id: str, manifest: dict[str, Any]
     ) -> GeospatialProvider:
-        factory = PROVIDER_FACTORIES.get(provider_id)
+        factory = self.provider_factories.get(provider_id)
         if factory is not None:
-            return factory()
+            credential = self.credential_resolver.resolve(provider_id, mark_used=True)
+            return factory(credential)
         capability_id = str(manifest.get("id") or "").strip()
         raise ProviderNotRegisteredError(
             f"Provider '{provider_id}' is not registered for manifest '{capability_id}'."
@@ -315,19 +454,31 @@ class ProviderRegistry:
         normalized = str(provider_id).strip().lower()
         if not normalized:
             raise ProviderNotRegisteredError("Provider id is required.")
-        return normalized
+        return PROVIDER_ID_ALIASES.get(normalized, normalized)
 
     # -------------------------------------------------------------------------
     def _ensure_circuit_closed(self, provider_id: str) -> None:
-        limit = max(1, int(self.execution_policy.circuit_breaker_failures))
+        limit = max(1, int(current_provider_policy(self.execution_policy).circuit_breaker_failures))
         if self._failures.get(provider_id, 0) >= limit:
+            opened_at = self._circuit_opened_at.get(provider_id, monotonic())
+            recovery_seconds = max(
+                0.0, float(current_provider_policy(self.execution_policy).circuit_recovery_seconds)
+            )
+            if monotonic() - opened_at >= recovery_seconds:
+                self._failures[provider_id] = 0
+                self._circuit_opened_at.pop(provider_id, None)
+                return
             raise ProviderCircuitOpenError(
                 f"Provider '{provider_id}' circuit is open after repeated failures."
             )
 
     # -------------------------------------------------------------------------
     def _record_failure(self, provider_id: str) -> None:
-        self._failures[provider_id] = self._failures.get(provider_id, 0) + 1
+        failures = self._failures.get(provider_id, 0) + 1
+        self._failures[provider_id] = failures
+        limit = max(1, int(current_provider_policy(self.execution_policy).circuit_breaker_failures))
+        if failures >= limit:
+            self._circuit_opened_at.setdefault(provider_id, monotonic())
 
     # -------------------------------------------------------------------------
     async def _wait_for_rate_limit(self, provider_id: str) -> None:

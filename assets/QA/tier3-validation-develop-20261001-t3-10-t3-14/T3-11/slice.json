@@ -1,0 +1,51 @@
+{
+  "slice_id": "T3-11",
+  "name": "NOAA coastal water-level stations and CONUS radar (remaining NOAA family)",
+  "date": "2026-10-01",
+  "branch": "validation",
+  "provider_lane": "opencode-go / deepseek-v4.1-flash",
+  "runtime": "isolated runtimes/cache/test-runtime/t3-07-live-* (disposable, port 5079)",
+  "status": "PASS",
+  "scenarios": [
+    {
+      "id": "t3_11_coops_charleston",
+      "prompt": "Show coastal water level stations around Charleston, South Carolina.",
+      "expected_kind": "map",
+      "expected_capability": "noaa_coops_water_levels",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_11_coops_charleston.json"
+    },
+    {
+      "id": "t3_11_radar_houston",
+      "prompt": "Show current radar over Houston, Texas.",
+      "expected_kind": "map",
+      "expected_capability": "noaa_radar",
+      "classification": "map_render_pass",
+      "evidence": "http/VECTOR-POINT-MATRIX-LIVE/t3_11_radar_houston.json"
+    }
+  ],
+  "fixes": [
+    {
+      "id": "noaa-radar-same-origin-proxy",
+      "file": "app/server/services/geospatial/raster_tiles.py",
+      "summary": "Add `noaa` to _BACKEND_RASTER_PROVIDERS so NOAA radar tiles route through the same-origin AEGIS tile proxy instead of a direct upstream browser request, matching the FEMA/ESA/GIBS/RainViewer raster pattern.",
+      "tests": "test_render_descriptors.py::test_catalog_raster_overlays_expose_provider_tile_templates"
+    },
+    {
+      "id": "noaa-radar-wms-manifest-fields",
+      "file": "data/catalog/overlays/noaa_radar.json",
+      "summary": "Declare structured WMS metadata (layer_id, crs, format, wms_version, style, wms_exceptions) with a bare base url_template so the proxy builds a single-parameter WMS GetMap instead of duplicating the hardcoded query.",
+      "tests": "test_render_descriptors.py::test_catalog_raster_overlays_expose_provider_tile_templates"
+    }
+  ],
+  "remaining_limitation": "CO-OPS and radar render with accepted acknowledgements; NOAA CO-OPS endpoint_health is `partial` and radar coverage is CONUS-only by provider design. Valid-empty/stale per-NOAA-response semantics were not separately exercised this run.",
+  "quality": {
+    "backend_unit_passed": true,
+    "focused_backend_passed": true,
+    "frontend_karma_passed": null,
+    "ruff": "pass",
+    "pyright_errors": 0,
+    "strict_manifest_audit": "pass"
+  },
+  "harness": "app/tests/e2e/test_live_vector_point_matrix.py"
+}

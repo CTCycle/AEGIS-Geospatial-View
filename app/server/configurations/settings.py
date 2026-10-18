@@ -1,27 +1,17 @@
 from __future__ import annotations
 
 import os
-import urllib.parse
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
-    DEFAULT_DB_CONNECT_TIMEOUT,
-    DEFAULT_DB_INSERT_BATCH_SIZE,
-    DEFAULT_GIBS_DEFAULT_LAYER,
-    DEFAULT_GIBS_LAYER_SYNC_USER_AGENT,
-    DEFAULT_GIBS_USER_AGENT,
-    DEFAULT_NOMINATIM_USER_AGENT,
-    GIBS_CAPABILITIES_ENDPOINTS,
+    DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
-    GIBS_OWS_NAMESPACES,
-    GIBS_WMS_BASE_ENDPOINTS,
     NASA_ATTRIBUTION,
-    NOMINATIM_SEARCH_URL,
 )
 from server.common.paths import resolve_database_file_path
 
@@ -29,17 +19,7 @@ from server.common.paths import resolve_database_file_path
 @dataclass(frozen=True)
 class DatabaseSettings:
     database_path: str
-    embedded_database: bool
-    engine: str | None
-    host: str | None
-    port: int | None
-    database_name: str | None
-    username: str | None
-    password: str | None
-    ssl: bool
-    ssl_ca: str | None
-    connect_timeout: int
-    insert_batch_size: int
+    sqlite_lock_timeout_seconds: int = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -74,8 +54,44 @@ class JobsSettings:
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
-    parser_certainty_threshold: float
-    parser_max_retries: int
+    application_timezone: str = "UTC"
+
+###############################################################################
+@dataclass(frozen=True)
+class AgentExecutionSettings:
+    initial_run_seconds: float = 90.0
+    simple_seconds: float = 150.0
+    complex_seconds: float = 300.0
+    context_assembly_seconds: float = 5.0
+    native_model_call_seconds: float = 60.0
+    tool_execution_seconds: float = 45.0
+    tool_absolute_seconds: float = 90.0
+    map_assembly_seconds: float = 20.0
+    persistence_seconds: float = 5.0
+    render_ack_seconds: float = 90.0
+    max_tool_result_chars: int = 4096
+    max_iterations: int = 12
+    max_render_attempts: int = 3
+    max_discovery_attempts: int = 2
+    max_no_progress_corrections: int = 2
+    simple_max_model_calls: int = 4
+    complex_max_model_calls: int = 10
+    simple_max_tool_calls: int = 6
+    complex_max_tool_calls: int = 20
+    simple_max_state_transitions: int = 32
+    complex_max_state_transitions: int = 64
+    max_parallel_tool_calls: int = 8
+    max_consecutive_tool_failures: int = 3
+    max_same_failed_fingerprint: int = 2
+    max_route_corrections: int = 1
+    max_validation_corrections: int = 2
+    model_max_attempts: int = 2
+    provider_max_attempts: int = 2
+    retry_backoff_base_seconds: float = 0.25
+    retry_backoff_max_seconds: float = 2.0
+    provider_request_seconds: float = 10.0
+    vision_policy: str = "disabled"
+    vision_max_calls: int = 2
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -143,72 +159,90 @@ class ServerSettings:
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
+    agent_execution: AgentExecutionSettings = AgentExecutionSettings()
 
 ###############################################################################
-class JsonDatabaseSettings(BaseModel):
-    embedded_database: bool = True
-    engine: str = "postgresql+psycopg"
-    host: str | None = None
-    port: int = Field(default=5432, ge=1, le=65535)
-    database_name: str | None = None
-    username: str | None = None
-    password: str | None = None
-    ssl: bool = False
-    ssl_ca: str | None = None
-    connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
-    insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
-
-    # -------------------------------------------------------------------------
-    @field_validator(
-        "host", "database_name", "username", "password", "ssl_ca", mode="before"
-    )
-    @classmethod
-    def normalize_optional_strings(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text or None
-
-    # -------------------------------------------------------------------------
-    @field_validator("engine", mode="before")
-    @classmethod
-    def normalize_engine(cls, value: Any) -> str:
-        text = str(value).strip() if value is not None else ""
-        return text or "postgresql+psycopg"
+class StrictJsonSettings(BaseModel):
+    model_config = SettingsConfigDict(extra="forbid")
 
 ###############################################################################
-class JsonNominatimSettings(BaseModel):
-    base_url: str = NOMINATIM_SEARCH_URL
-    user_agent: str = DEFAULT_NOMINATIM_USER_AGENT
+class JsonNominatimSettings(StrictJsonSettings):
+    base_url: str = "https://nominatim.openstreetmap.org/search"
+    user_agent: str = "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)"
     timeout: float = Field(default=10.0, ge=1.0)
 
 ###############################################################################
-class JsonGeospatialSettings(BaseModel):
-    min_timeline_year: int = 1900
-    max_lat: float = 90.0
-    min_lat: float = -90.0
-    max_lon: float = 180.0
-    min_lon: float = -180.0
-    max_mercator_extent: float = 20037508.3427892
+class JsonGeospatialSettings(StrictJsonSettings):
+    min_timeline_year: int = Field(default=1900, ge=1, le=9999)
+    max_lat: float = Field(default=90.0, ge=-90.0, le=90.0)
+    min_lat: float = Field(default=-90.0, ge=-90.0, le=90.0)
+    max_lon: float = Field(default=180.0, ge=-180.0, le=180.0)
+    min_lon: float = Field(default=-180.0, ge=-180.0, le=180.0)
+    max_mercator_extent: float = Field(default=20037508.3427892, gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> "JsonGeospatialSettings":
+        if self.min_lat > self.max_lat:
+            raise ValueError("min_lat must not exceed max_lat")
+        if self.min_lon > self.max_lon:
+            raise ValueError("min_lon must not exceed max_lon")
+        return self
 
 ###############################################################################
-class JsonMapSettings(BaseModel):
+class JsonMapSettings(StrictJsonSettings):
     default_size_m: float = Field(default=500.0, ge=1.0)
     render_delay_s: float = Field(default=1.0, ge=0.0)
     tiles: str = "OpenStreetMap"
 
 ###############################################################################
-class JsonJobsSettings(BaseModel):
-    polling_interval: float = 1.0
+class JsonJobsSettings(StrictJsonSettings):
+    polling_interval: float = Field(default=1.0, ge=0.1)
 
 ###############################################################################
-class JsonChatRuntimeSettings(BaseModel):
+class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(default=12, ge=1, le=100)
-    parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    parser_max_retries: int = Field(default=2, ge=0, le=5)
+    application_timezone: str = "UTC"
 
 ###############################################################################
-class JsonOpenMeteoSettings(BaseModel):
+class JsonAgentExecutionSettings(StrictJsonSettings):
+    initial_run_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
+    simple_seconds: float = Field(default=150.0, ge=1.0, le=300.0)
+    complex_seconds: float = Field(default=300.0, ge=1.0, le=300.0)
+    context_assembly_seconds: float = Field(default=5.0, ge=0.1)
+    native_model_call_seconds: float = Field(default=60.0, ge=0.1)
+    tool_execution_seconds: float = Field(default=45.0, ge=0.1, le=90.0)
+    tool_absolute_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
+    map_assembly_seconds: float = Field(default=20.0, ge=0.1)
+    persistence_seconds: float = Field(default=5.0, ge=0.1)
+    render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
+    max_tool_result_chars: int = Field(default=4096, ge=128, le=100000)
+    max_iterations: int = Field(default=12, ge=1, le=100)
+    max_render_attempts: int = Field(default=3, ge=1, le=32)
+    max_discovery_attempts: int = Field(default=2, ge=1, le=100)
+    max_no_progress_corrections: int = Field(default=2, ge=0, le=8)
+    simple_max_model_calls: int = Field(default=4, ge=1, le=100)
+    complex_max_model_calls: int = Field(default=10, ge=1, le=100)
+    simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
+    complex_max_tool_calls: int = Field(default=20, ge=1, le=500)
+    simple_max_state_transitions: int = Field(default=32, ge=1, le=500)
+    complex_max_state_transitions: int = Field(default=64, ge=1, le=1000)
+    max_parallel_tool_calls: int = Field(default=8, ge=1, le=32)
+    max_consecutive_tool_failures: int = Field(default=3, ge=1, le=20)
+    max_same_failed_fingerprint: int = Field(default=2, ge=1, le=20)
+    max_route_corrections: int = Field(default=1, ge=0, le=10)
+    max_validation_corrections: int = Field(default=2, ge=0, le=20)
+    model_max_attempts: int = Field(default=2, ge=1, le=10)
+    provider_max_attempts: int = Field(default=2, ge=1, le=10)
+    retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
+    retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
+    provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
+    vision_policy: Literal["disabled", "always", "on_failure", "final_check"] = (
+        "disabled"
+    )
+    vision_max_calls: int = Field(default=2, ge=1, le=8)
+
+###############################################################################
+class JsonOpenMeteoSettings(StrictJsonSettings):
     weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
     air_quality_base_url: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
     user_agent: str = "AEGIS-OpenMeteo/1.0"
@@ -217,7 +251,7 @@ class JsonOpenMeteoSettings(BaseModel):
     min_call_interval_s: float = Field(default=0.15, ge=0.05)
 
 ###############################################################################
-class JsonOverpassSettings(BaseModel):
+class JsonOverpassSettings(StrictJsonSettings):
     base_url: str = "https://overpass-api.de/api/interpreter"
     user_agent: str = "AEGIS-Overpass/1.0"
     timeout: float = Field(default=20.0, ge=1.0)
@@ -227,7 +261,7 @@ class JsonOverpassSettings(BaseModel):
     default_limit: int = Field(default=30, ge=1, le=200)
 
 ###############################################################################
-class JsonRainViewerSettings(BaseModel):
+class JsonRainViewerSettings(StrictJsonSettings):
     metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
     user_agent: str = "AEGIS-RainViewer/1.0"
     timeout: float = Field(default=15.0, ge=1.0)
@@ -238,14 +272,18 @@ class JsonRainViewerSettings(BaseModel):
     tile_snow: int = Field(default=1, ge=0, le=1)
 
 ###############################################################################
-class JsonGIBSSettings(BaseModel):
-    user_agent: str = DEFAULT_GIBS_USER_AGENT
+class JsonGIBSSettings(StrictJsonSettings):
+    user_agent: str = "AEGIS-GIBS/1.0"
     timeout: float = Field(default=20.0, ge=1.0)
-    capabilities_ttl_s: float = Field(default=6 * 60 * 60, ge=60.0)
+    capabilities_ttl_s: float = Field(default=21600.0, ge=60.0)
     max_cache_entries: int = Field(default=24, ge=1)
     bbox_precision: int = Field(default=6, ge=0)
     wms_base_endpoints: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS)
+        default_factory=lambda: {
+            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
+        },
+        min_length=1,
     )
     retry_backoff_s: float = Field(default=2.0, ge=0.1)
     min_visual_radius_m: float = Field(default=20000.0, ge=1000.0)
@@ -259,31 +297,36 @@ class JsonGIBSSettings(BaseModel):
         ge=GIBS_MIN_IMAGE_DIMENSION,
         le=GIBS_MAX_IMAGE_DIMENSION,
     )
-    default_layer: str = DEFAULT_GIBS_DEFAULT_LAYER
+    default_layer: str = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
     capabilities_endpoints: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS)
+        default_factory=lambda: {
+            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
+        },
+        min_length=1,
     )
     ows_namespaces: dict[str, str] = Field(
-        default_factory=lambda: dict(GIBS_OWS_NAMESPACES)
+        default_factory=lambda: {"ows": "http://www.opengis.net/ows/1.1"},
+        min_length=1,
     )
-    layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
+    layer_sync_user_agent: str = "AEGIS-GIBS-LayerSync/1.0"
     layer_sync_timeout: float = Field(default=30.0, ge=1.0)
 
-    # -------------------------------------------------------------------------
-    @field_validator(
-        "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
-    )
-    @classmethod
-    def normalize_string_mapping(cls, value: Any) -> dict[str, str]:
-        if not isinstance(value, dict):
-            return {}
-        normalized: dict[str, str] = {}
-        for key, raw in value.items():
-            k = str(key).strip()
-            v = str(raw).strip() if raw is not None else ""
-            if k and v:
-                normalized[k] = v
-        return normalized
+
+RUNTIME_SETTING_BLOCKS = (
+    "nominatim",
+    "geospatial",
+    "map",
+    "jobs",
+    "chat",
+    "openmeteo",
+    "overpass",
+    "rainviewer",
+    "gibs",
+    "agent_execution",
+)
 
 ###############################################################################
 def _read_env_text(name: str) -> str | None:
@@ -304,96 +347,25 @@ def _read_env_int(name: str) -> int | None:
         raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
 
 ###############################################################################
-def _read_env_bool(name: str) -> bool | None:
-    value = _read_env_text(name)
-    if value is None:
-        return None
-
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise RuntimeError(f"Invalid boolean value for {name}: {value}")
-
-###############################################################################
-def _database_payload_from_url(database_url: str) -> dict[str, Any]:
-    parsed = urllib.parse.urlparse(database_url)
-    scheme = (parsed.scheme or "").strip().lower()
-    if not scheme:
-        raise RuntimeError("DATABASE_URL must include a URL scheme.")
-    if not scheme.startswith("postgresql"):
-        raise RuntimeError(
-            f"Unsupported DATABASE_URL scheme: {parsed.scheme}. Expected PostgreSQL."
-        )
-
-    database_name = parsed.path.lstrip("/") or None
-    return {
-        "engine": "postgresql+psycopg",
-        "host": parsed.hostname,
-        "port": parsed.port,
-        "database_name": database_name,
-        "username": urllib.parse.unquote(parsed.username)
-        if parsed.username is not None
-        else None,
-        "password": urllib.parse.unquote(parsed.password)
-        if parsed.password is not None
-        else None,
-    }
-
-###############################################################################
-def build_database_payload_from_env() -> dict[str, Any]:
-    payload: dict[str, Any] = {}
-
-    database_url = _read_env_text("DATABASE_URL")
-    if database_url is not None:
-        payload.update(_database_payload_from_url(database_url))
-
-    explicit_values: tuple[tuple[str, str, Any], ...] = (
-        ("EMBEDDED_DATABASE", "embedded_database", _read_env_bool("EMBEDDED_DATABASE")),
-        ("DATABASE_ENGINE", "engine", _read_env_text("DATABASE_ENGINE")),
-        ("DATABASE_HOST", "host", _read_env_text("DATABASE_HOST")),
-        ("DATABASE_PORT", "port", _read_env_int("DATABASE_PORT")),
-        ("DATABASE_NAME", "database_name", _read_env_text("DATABASE_NAME")),
-        ("DATABASE_USERNAME", "username", _read_env_text("DATABASE_USERNAME")),
-        ("DATABASE_PASSWORD", "password", _read_env_text("DATABASE_PASSWORD")),
-        ("DATABASE_SSL", "ssl", _read_env_bool("DATABASE_SSL")),
-        ("DATABASE_SSL_CA", "ssl_ca", _read_env_text("DATABASE_SSL_CA")),
-        (
-            "DATABASE_CONNECT_TIMEOUT",
-            "connect_timeout",
-            _read_env_int("DATABASE_CONNECT_TIMEOUT"),
-        ),
-        (
-            "DATABASE_INSERT_BATCH_SIZE",
-            "insert_batch_size",
-            _read_env_int("DATABASE_INSERT_BATCH_SIZE"),
-        ),
-    )
-
-    for _env_name, key, value in explicit_values:
-        if value is not None:
-            payload[key] = value
-
-    return payload
-
-###############################################################################
 def build_database_settings() -> DatabaseSettings:
-    try:
-        db = JsonDatabaseSettings.model_validate(build_database_payload_from_env())
-    except ValidationError as exc:
-        raise RuntimeError(f"Invalid database settings: {exc}") from exc
-    return _to_database_settings(db)
+    timeout_seconds = _read_env_int("SQLITE_LOCK_TIMEOUT")
+    if timeout_seconds is None:
+        timeout_seconds = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
+    if timeout_seconds < 1:
+        raise RuntimeError("SQLITE_LOCK_TIMEOUT must be a positive integer.")
+    return DatabaseSettings(
+        database_path=str(resolve_database_file_path()),
+        sqlite_lock_timeout_seconds=timeout_seconds,
+    )
 
 ###############################################################################
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
         case_sensitive=False,
-        extra="ignore",
+        extra="forbid",
     )
 
-    database: JsonDatabaseSettings = Field(default_factory=JsonDatabaseSettings)
     nominatim: JsonNominatimSettings = Field(default_factory=JsonNominatimSettings)
     geospatial: JsonGeospatialSettings = Field(default_factory=JsonGeospatialSettings)
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
@@ -403,6 +375,9 @@ class AppSettings(BaseSettings):
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
     rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
     gibs: JsonGIBSSettings = Field(default_factory=JsonGIBSSettings)
+    agent_execution: JsonAgentExecutionSettings = Field(
+        default_factory=JsonAgentExecutionSettings
+    )
 
     fastapi_host: str = "127.0.0.1"
     fastapi_port: int = Field(default=8000, ge=1, le=65535)
@@ -419,22 +394,19 @@ class AppSettings(BaseSettings):
         return text or "127.0.0.1"
 
     # -------------------------------------------------------------------------
-    def to_server_settings(self) -> ServerSettings:
+    def to_server_settings(
+        self, database_settings: DatabaseSettings | None = None
+    ) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,
-            fallback=GIBS_WMS_BASE_ENDPOINTS,
         )
         gibs_capabilities_endpoints = _normalize_upper_key_mapping(
             self.gibs.capabilities_endpoints,
-            fallback=GIBS_CAPABILITIES_ENDPOINTS,
         )
-        gibs_namespaces = _normalize_key_mapping(
-            self.gibs.ows_namespaces,
-            fallback=GIBS_OWS_NAMESPACES,
-        )
+        gibs_namespaces = _normalize_key_mapping(self.gibs.ows_namespaces)
 
         return ServerSettings(
-            database=_to_database_settings(self.database),
+            database=database_settings or build_database_settings(),
             nominatim=NominatimSettings(
                 base_url=self.nominatim.base_url,
                 user_agent=self.nominatim.user_agent,
@@ -458,8 +430,42 @@ class AppSettings(BaseSettings):
             ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,
-                parser_certainty_threshold=self.chat.parser_certainty_threshold,
-                parser_max_retries=self.chat.parser_max_retries,
+                application_timezone=self.chat.application_timezone,
+            ),
+            agent_execution=AgentExecutionSettings(
+                initial_run_seconds=self.agent_execution.initial_run_seconds,
+                simple_seconds=self.agent_execution.simple_seconds,
+                complex_seconds=self.agent_execution.complex_seconds,
+                context_assembly_seconds=self.agent_execution.context_assembly_seconds,
+                native_model_call_seconds=self.agent_execution.native_model_call_seconds,
+                tool_execution_seconds=self.agent_execution.tool_execution_seconds,
+                tool_absolute_seconds=self.agent_execution.tool_absolute_seconds,
+                map_assembly_seconds=self.agent_execution.map_assembly_seconds,
+                persistence_seconds=self.agent_execution.persistence_seconds,
+                render_ack_seconds=self.agent_execution.render_ack_seconds,
+                max_tool_result_chars=self.agent_execution.max_tool_result_chars,
+                max_iterations=self.agent_execution.max_iterations,
+                max_render_attempts=self.agent_execution.max_render_attempts,
+                max_discovery_attempts=self.agent_execution.max_discovery_attempts,
+                max_no_progress_corrections=self.agent_execution.max_no_progress_corrections,
+                simple_max_model_calls=self.agent_execution.simple_max_model_calls,
+                complex_max_model_calls=self.agent_execution.complex_max_model_calls,
+                simple_max_tool_calls=self.agent_execution.simple_max_tool_calls,
+                complex_max_tool_calls=self.agent_execution.complex_max_tool_calls,
+                simple_max_state_transitions=self.agent_execution.simple_max_state_transitions,
+                complex_max_state_transitions=self.agent_execution.complex_max_state_transitions,
+                max_parallel_tool_calls=self.agent_execution.max_parallel_tool_calls,
+                max_consecutive_tool_failures=self.agent_execution.max_consecutive_tool_failures,
+                max_same_failed_fingerprint=self.agent_execution.max_same_failed_fingerprint,
+                max_route_corrections=self.agent_execution.max_route_corrections,
+                max_validation_corrections=self.agent_execution.max_validation_corrections,
+                model_max_attempts=self.agent_execution.model_max_attempts,
+                provider_max_attempts=self.agent_execution.provider_max_attempts,
+                retry_backoff_base_seconds=self.agent_execution.retry_backoff_base_seconds,
+                retry_backoff_max_seconds=self.agent_execution.retry_backoff_max_seconds,
+                provider_request_seconds=self.agent_execution.provider_request_seconds,
+                vision_policy=self.agent_execution.vision_policy,
+                vision_max_calls=self.agent_execution.vision_max_calls,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,
@@ -508,45 +514,15 @@ class AppSettings(BaseSettings):
             ),
         )
 
-###############################################################################
-def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
-    database_file_path = resolve_database_file_path()
-    if db.embedded_database:
-        return DatabaseSettings(
-            database_path=str(database_file_path),
-            embedded_database=True,
-            engine=None,
-            host=None,
-            port=None,
-            database_name=None,
-            username=None,
-            password=None,
-            ssl=False,
-            ssl_ca=None,
-            connect_timeout=DEFAULT_DB_CONNECT_TIMEOUT,
-            insert_batch_size=db.insert_batch_size,
-        )
+    def runtime_payload(self) -> dict[str, Any]:
+        """Return only application-editable settings, excluding bootstrap values."""
 
-    return DatabaseSettings(
-        database_path=str(database_file_path),
-        embedded_database=False,
-        engine=db.engine.strip().lower(),
-        host=db.host,
-        port=db.port,
-        database_name=db.database_name,
-        username=db.username,
-        password=db.password,
-        ssl=db.ssl,
-        ssl_ca=db.ssl_ca,
-        connect_timeout=db.connect_timeout,
-        insert_batch_size=db.insert_batch_size,
-    )
+        dumped = self.model_dump(mode="json")
+        return {block: dumped[block] for block in RUNTIME_SETTING_BLOCKS}
 
 ###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
-    *,
-    fallback: dict[str, str],
 ) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in mapping.items():
@@ -554,13 +530,11 @@ def _normalize_upper_key_mapping(
         v = str(value).strip()
         if k and v:
             normalized[k] = v
-    return normalized or dict(fallback)
+    return normalized
 
 ###############################################################################
 def _normalize_key_mapping(
     mapping: dict[str, str],
-    *,
-    fallback: dict[str, str],
 ) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in mapping.items():
@@ -568,4 +542,4 @@ def _normalize_key_mapping(
         v = str(value).strip()
         if k and v:
             normalized[k] = v
-    return normalized or dict(fallback)
+    return normalized

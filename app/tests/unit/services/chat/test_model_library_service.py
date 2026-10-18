@@ -19,6 +19,21 @@ class _DeepSeekProviderStub:
     def list_models(self) -> list[ModelDescriptor]:
         return self.models
 
+
+###############################################################################
+@dataclass
+class _FlakyDynamicProvider:
+    responses: list[list[ModelDescriptor] | Exception]
+    calls: int = 0
+
+    # -------------------------------------------------------------------------
+    def list_models(self) -> list[ModelDescriptor]:
+        response = self.responses[min(self.calls, len(self.responses) - 1)]
+        self.calls += 1
+        if isinstance(response, Exception):
+            raise response
+        return response
+
 ###############################################################################
 class _ProviderFactoryStub:
 
@@ -38,9 +53,16 @@ class _OllamaProviderUnavailableStub:
     calls = 0
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, base_url: str, tool_capability_cache=None) -> None:  # noqa: ANN001
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        tool_capability_cache=None,  # noqa: ANN001
+        transport_policy=None,  # noqa: ANN001
+    ) -> None:
         self.base_url = base_url
         self.tool_capability_cache = tool_capability_cache
+        self.transport_policy = transport_policy
         self.last_list_models_error = "Unable to reach Ollama."
 
     # -------------------------------------------------------------------------
@@ -49,13 +71,33 @@ class _OllamaProviderUnavailableStub:
         return []
 
 ###############################################################################
-def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(monkeypatch) -> None:
+class _ProbeStatusMustNotRun:
+    calls = 0
+
+    # -------------------------------------------------------------------------
+    def latest(self):  # noqa: ANN201
+        type(self).calls += 1
+        raise AssertionError(
+            "structured probe status must be suppressed during context lookup"
+        )
+
+###############################################################################
+def _build_service() -> ChatModelLibraryService:
+    return ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
+        ollama_unavailable_ttl_s=30.0,
+    )
+
+###############################################################################
+def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(
         model_library_module,
         "OllamaProvider",
         _OllamaProviderUnavailableStub,
     )
-    service = ChatModelLibraryService(ollama_unavailable_ttl_s=30.0)
+    service = _build_service()
 
     response = service.list_models(ollama_url="http://localhost:11434")
 
@@ -72,7 +114,7 @@ def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
         "OllamaProvider",
         _OllamaProviderUnavailableStub,
     )
-    service = ChatModelLibraryService(ollama_unavailable_ttl_s=30.0)
+    service = _build_service()
 
     first = service.list_models(ollama_url="http://localhost:11434")
     second = service.list_models(ollama_url="http://localhost:11434")
@@ -104,6 +146,63 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
 
 ###############################################################################
+def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        model_library_module,
+        "OllamaProvider",
+        _OllamaProviderUnavailableStub,
+    )
+    dynamic_provider = _FlakyDynamicProvider(
+        responses=[
+            LLMConfigurationError("Transient catalog failure."),
+            [
+                ModelDescriptor(
+                    name="recovered-model",
+                    description="Recovered model",
+                    provider="deepseek",
+                )
+            ],
+        ]
+    )
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(dynamic_provider),
+    )
+
+    first = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+    second = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+    third = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+
+    assert first["sources"]["deepseek"]["ok"] is False
+    assert second["sources"]["deepseek"]["ok"] is True
+    assert any(item["id"] == "recovered-model" for item in second["cloud"])
+    assert third["sources"]["deepseek"]["ok"] is True
+    assert dynamic_provider.calls == 2
+
+    service.invalidate_dynamic_catalogs()
+    fourth = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+        include_probe_status=False,
+    )
+
+    assert fourth["sources"]["deepseek"]["ok"] is True
+    assert dynamic_provider.calls == 3
+
+###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
     monkeypatch.setattr(
         model_library_module,
@@ -126,7 +225,119 @@ def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -
     except ModelLibrarySourceError as exc:
         assert "DeepSeek credentials" in str(exc)
     else:
-        raise AssertionError("Expected ModelLibrarySourceError for unavailable DeepSeek catalog.")
+        raise AssertionError(
+            "Expected ModelLibrarySourceError for unavailable DeepSeek catalog."
+        )
+
+###############################################################################
+def test_find_model_can_skip_probe_status_for_context_profile_lookup(monkeypatch) -> None:
+    monkeypatch.setattr(
+        model_library_module,
+        "OllamaProvider",
+        _OllamaProviderUnavailableStub,
+    )
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(
+            _DeepSeekProviderStub(
+                [
+                    ModelDescriptor(
+                        name="runtime-model",
+                        description="Runtime model",
+                        provider="deepseek",
+                    )
+                ]
+            )
+        )
+    )
+    _ProbeStatusMustNotRun.calls = 0
+    service.set_structured_probe_service(_ProbeStatusMustNotRun())
+
+    result = service.find_model(
+        provider="deepseek",
+        model_name="runtime-model",
+        ollama_url="http://127.0.0.1:11434",
+        include_probe_status=False,
+    )
+
+    assert result is not None
+    assert result["name"] == "runtime-model"
+    assert _ProbeStatusMustNotRun.calls == 0
+
+###############################################################################
+def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None:
+
+    ###############################################################################
+    class _ProviderThatMustNotBeCalled:
+
+        # -------------------------------------------------------------------------
+        def list_models(self):  # noqa: ANN201
+            raise AssertionError("context lookup must not refresh a provider catalog")
+
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(_ProviderThatMustNotBeCalled()),
+    )
+    service._dynamic_catalog_cache["deepseek"] = model_library_module._CachedModelDescriptors(  # pyright: ignore[reportPrivateUsage]
+        expires_at=10**12,
+        models=[
+            ModelDescriptor(
+                name="cached-model",
+                description="Cached model",
+                provider="deepseek",
+                metadata={"context_window_tokens": 8192},
+            )
+        ],
+        source={"ok": True},
+    )
+
+    result = service.find_cached_model(
+        provider="deepseek",
+        model_name="cached-model",
+        ollama_url="http://127.0.0.1:11434",
+    )
+
+    assert result is not None
+    assert result["name"] == "cached-model"
+
+###############################################################################
+def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
+    service = _build_service()
+
+    assert (
+        service.find_cached_model(
+            provider="opencode-go",
+            model_name="uncached-model",
+            ollama_url="http://127.0.0.1:11434",
+        )
+        is None
+    )
+
+
+###############################################################################
+def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
+    service = ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(
+            LLMConfigurationError("DeepSeek credentials are not configured.")
+        )
+    )
+    service._dynamic_catalog_cache["deepseek"] = model_library_module._CachedModelDescriptors(  # pyright: ignore[reportPrivateUsage]
+        expires_at=0,
+        models=[
+            ModelDescriptor(
+                name="stale-model",
+                description="Stale model",
+                provider="deepseek",
+            )
+        ],
+        source={"ok": True, "stale": False},
+    )
+
+    response = service.list_models(
+        ollama_url="http://127.0.0.1:11434",
+        cloud_provider="deepseek",
+    )
+
+    assert all(item["id"] != "stale-model" for item in response["cloud"])
+    assert response["sources"]["deepseek"]["ok"] is False
 
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:
@@ -134,3 +345,58 @@ def test_normalize_ollama_url_rewrites_localhost() -> None:
         ChatModelLibraryService.normalize_ollama_url("http://localhost:11434")
         == "http://127.0.0.1:11434"
     )
+
+
+###############################################################################
+def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
+    monkeypatch,
+) -> None:
+    class _OllamaProviderWithContext:
+
+        # ---------------------------------------------------------------------
+        def __init__(self, **_kwargs) -> None:  # noqa: ANN003
+            self.last_list_models_error = None
+
+        # ---------------------------------------------------------------------
+        def list_models(self) -> list[ModelDescriptor]:
+            return [
+                ModelDescriptor(
+                    name="local-alias",
+                    description="Local model",
+                    provider="ollama",
+                )
+            ]
+
+        # ---------------------------------------------------------------------
+        def get_model_context_metadata(self, model: str) -> dict[str, object]:
+            assert model == "local-alias"
+            return {
+                "context_window_tokens": 40_960,
+                "context_profile_source": "ollama_show_model_info",
+                "context_metadata_authority": "provider",
+            }
+
+    monkeypatch.setattr(
+        model_library_module, "OllamaProvider", _OllamaProviderWithContext
+    )
+    service = _build_service()
+    ollama_url = "http://127.0.0.1:11434"
+
+    service.list_models(ollama_url=ollama_url, include_probe_status=False)
+    selected = service.find_model(
+        provider="ollama",
+        model_name="local-alias",
+        ollama_url=ollama_url,
+        include_probe_status=False,
+    )
+    cached = service.find_cached_model(
+        provider="ollama",
+        model_name="local-alias",
+        ollama_url=ollama_url,
+    )
+
+    assert selected is not None
+    assert selected["context_window_tokens"] == 40_960
+    assert selected["context_metadata_authority"] == "provider"
+    assert cached is not None
+    assert cached["context_window_tokens"] == 40_960

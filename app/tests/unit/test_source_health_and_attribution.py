@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.geographics import LayerHealthStatus
+from server.contracts.geospatial import LayerHealthStatus
 from server.services.geospatial.attribution import AttributionService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.source_health import SourceHealthMonitor

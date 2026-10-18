@@ -10,8 +10,15 @@ from server.services.geospatial.search_index import (
 def test_geospatial_poi_search_index_matches_labels_categories_and_sources() -> None:
     index = build_feature_search_index(
         [
-            IndexedFeature(id="1", label="Central Museum", category="tourism", source="opentripmap"),
-            IndexedFeature(id="2", label="Fast Charge", category="ev_charging", source="openchargemap"),
+            IndexedFeature(
+                id="1", label="Central Museum", category="tourism", source="opentripmap"
+            ),
+            IndexedFeature(
+                id="2",
+                label="Fast Charge",
+                category="ev_charging",
+                source="openchargemap",
+            ),
         ]
     )
 

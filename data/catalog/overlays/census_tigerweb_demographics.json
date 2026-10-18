@@ -1,0 +1,152 @@
+{
+  "id": "census_tigerweb_demographics",
+  "name": "Census TIGERweb Demographic Boundaries",
+  "provider": "census",
+  "type": "arcgis-geojson",
+  "description": "U.S. Census TIGERweb boundary overlay used as the geometry source for later ACS demographic joins.",
+  "capabilities": [
+    "demographics",
+    "boundaries",
+    "arcgis-geojson",
+    "geojson"
+  ],
+  "coverage": "us",
+  "metadata": {
+    "label": "Census TIGERweb Demographic Boundaries",
+    "default_opacity": 0.35,
+    "requires_key": false,
+    "attribution": "U.S. Census Bureau TIGERweb",
+    "keywords": [
+      "census",
+      "tracts",
+      "demographics",
+      "boundaries",
+      "geojson"
+    ],
+    "action_tags": [
+      "demographics",
+      "population density",
+      "census tracts"
+    ],
+    "task_tags": [
+      "demographic context",
+      "boundary lookup",
+      "regional analysis"
+    ],
+    "human_summary": "Queryable U.S. tract-level geometry for demographic joins and regional context.",
+    "primary_use_cases": [
+      "population density context",
+      "income and age structure joins",
+      "tract boundary inspection"
+    ],
+    "search_examples": [
+      "show census tracts around Chicago",
+      "display demographic boundaries near Phoenix"
+    ],
+    "official_docs_url": "https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html",
+    "source_protocol": "ArcGIS REST GeoJSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "bounded",
+    "last_validated": "2026-04-27",
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "choropleth",
+  "sourceOfficialDocs": [
+    "https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html"
+  ],
+  "license": {
+    "name": "U.S. Census Bureau TIGERweb",
+    "url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "demographics",
+      "population density",
+      "census tracts",
+      "demographic context",
+      "boundary lookup",
+      "regional analysis",
+      "census",
+      "tracts",
+      "boundaries",
+      "geojson"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-08-27",
+    "knownLimitations": [
+      "Boundary layer and vintage selection are discovered from live TIGERweb metadata.",
+      "This capability supplies geometry only; ACS values require the demographic-join capability."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "polygon"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "inspect"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [
+      "static_current_service"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "coverage": "us",
+    "limitations": [
+      "Boundary layer and vintage selection are discovered from live TIGERweb metadata.",
+      "This capability supplies geometry only; ACS values require the demographic-join capability."
+    ],
+    "fallback_ids": []
+  }
+}

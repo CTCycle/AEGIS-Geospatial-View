@@ -1,0 +1,117 @@
+{
+  "gate_status": {
+    "T3-16": "PASS",
+    "T4-04": "PASS",
+    "T4-03": "PARTIAL",
+    "T4-05": "PARTIAL",
+    "ROUTE-LIVE": "PARTIAL",
+    "GEO-FOCUS-16": "PARTIAL",
+    "RASTER-LIVE": "PARTIAL",
+    "MATRIX-22": "PARTIAL"
+  },
+  "feature_exists": true,
+  "feature_exercised": true,
+  "feature_passed": true,
+  "feature_fully_passed": {
+    "T3-16": true,
+    "T4-04": true,
+    "broader_partial_components": false
+  },
+  "branch": "validation",
+  "base_sha": "7faf0c1e778c7cf19f6f55177002e079f29a9733",
+  "source_sha256": {
+    "app\\server\\services\\agent_runs\\render_completion.py": "6ebe810090e6a7d1ebfc9f5cd5eff944c90d30605799082779d77a9ad411a595",
+    "app\\server\\services\\geospatial\\live_validator.py": "2600ffdce7407c2de28830804ea83bff21178466ce46bf338ce77275a4a25f33",
+    "app\\tests\\unit\\services\\test_render_completion.py": "66fa775b9b994aa60914421e1343bcc070a50d316a6819b0cbaa8274f702451b",
+    "app\\tests\\unit\\test_geospatial_live_validator.py": "0fe91aeeda2d0b4904f1a10569ad6e6668e3eac4687a35d09db8b3fdae225f9f"
+  },
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "fallback": false,
+  "backend_port": 5079,
+  "owned_runtime": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\runtimes\\cache\\test-runtime\\t3-07-live-20261017T111227Z",
+  "protected_sha256_before_cleanup": {
+    "settings\\.env": "7278133add9d891805619ccfac9741e8da4f23b2ff5b4cd4653b1cf609399034",
+    "data\\database.db": "bd7e139d4f0a9662a730618ac4c117b43febc038f36264a4b046744cbdceb0d3"
+  },
+  "build_marker": {
+    "schemaVersion": 1,
+    "inputSha256": "2c17b1052913dfacd3bc82c6b57c6475095fe5c0553aa52f246b200b840e1030",
+    "outputSha256": "41d64232dc24bdaf9ac04e4a3eb64fc6be7aa82503c222d4b84ca215bb0b8fe8",
+    "nodeVersion": "v22.23.1"
+  },
+  "verification": {
+    "backend_unit_passed": 1088,
+    "warnings": 2,
+    "ruff_changed_files": "PASS",
+    "pyright": {
+      "errors": 0,
+      "warnings": 0,
+      "informations": 0
+    },
+    "frontend_build_state": "Current",
+    "hosted_ci": "UNRUN"
+  },
+  "browser": {
+    "surface": "Codex in-app Browser",
+    "run_count": 12,
+    "final_tool_buffer_warnings_errors": 0,
+    "independent_har_export": false
+  },
+  "campaign_rollup": {
+    "PASS": 43,
+    "PARTIAL": 2,
+    "BLOCKED": 2,
+    "UNRUN": 21,
+    "total": 68
+  },
+  "cleanup": {
+    "complete": true,
+    "backend_port_listening": false,
+    "owned_runtime_removed": true,
+    "task_pytest_temp_removed": true,
+    "task_browser_tab_closed": true,
+    "protected_files_unchanged_during_cleanup": true,
+    "obsolete_root_ruff_cache_removed": true,
+    "initial_runtime_removed": true
+  },
+  "protected_sha256_after_cleanup": {
+    "settings\\.env": "7278133add9d891805619ccfac9741e8da4f23b2ff5b4cd4653b1cf609399034",
+    "data\\database.db": "bd7e139d4f0a9662a730618ac4c117b43febc038f36264a4b046744cbdceb0d3"
+  },
+  "artifacts_sha256": {
+    "backend-unit-final.log": "def9a946154be0ef28540deea22d5f40aa15a478bc9af476961ea7110c3e89e1",
+    "capture_runs.py": "61c258328caa1855b8613a84e6bc494f20fdf2b39a845b63ae89cdf2d26ebd4b",
+    "eea-proxy-probe.json": "6123d5242015f0c730b945dccb356adcca48f03ad6d75ee3a8c68b0abe1705ea",
+    "live-runtime.json": "257d7793e902d829b8e94ce5fd30f8858d26750a91cadadf60889c48864a15ab",
+    "partial-ingestion-probe.json": "a334eeb5888e4f17a6cbebd56c5a240af11d196947b54acaeed7266b197de517",
+    "probe_partial_ingestion.py": "24764fbb81f798280e0ce4c01c33a1ba6a594c134032c7a1a6628d58557f4621",
+    "pyright.log": "48f3e9ae0be7de9f90d3bef5c7af625de32555de060bb5f8d9aeeec688fb6408",
+    "report.md": "d39477b400f815451b06d64b930be5d9a3ff21edb2bb30b795ec782e85474056",
+    "ruff.log": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+    "run-evidence.json": "9da2643e3ce6c833fcd4edf60faee72de84224ac55fe8a06dcfc93befd60e8fb",
+    "screenshots\\census-partial.png": "32af158a651aa0ff2b8e51892116d61b1da46e8cd2ad2776a799be876b51f8e9",
+    "screenshots\\elevation-partial.png": "450f69d21cc7ce0791e265fcfc95c22bbb23dbf85c86aa4a6fe3d195967112bd",
+    "screenshots\\imagery-partial.png": "3e3d7d151ca064f07be405c849b6e0aa6bee34f21df2e96f8b699db5136595ef",
+    "screenshots\\liberty.png": "4b96bb2cd2873d875a3d9c611444f29165bf02cf90415e126903b6a71c77303d",
+    "screenshots\\new-chat-default.png": "3b3b7de9a1f9675fea566d107b4087ce0e802fe679ffa5ea8250dc8a6476b019",
+    "screenshots\\positron-atmosphere.png": "549db87eae64c6014ee4980253724b86b918204bd88e50a923c86ab4127f8ea2",
+    "screenshots\\positron-milan.png": "df8914c8ec9a7ad3d4a3d17c1cb8b396ae59d2ba27f2103ab1d2796451831bb2",
+    "screenshots\\positron-removed.png": "f3a9ecbfc60d48dd2bcdf78a9beba9a506bcb792d64797d6c0361ae93fbf0106",
+    "screenshots\\positron.png": "36fd8246071d2959d264821cdd2ac31969f08e88a845c3bd5a4d956c2a9588f8",
+    "screenshots\\reload-default.png": "01cf354d3c750fba5d0c6e89c767b40eb634861888e77dd5d33ac92ba9184292",
+    "screenshots\\rome-before.png": "ff70071add2bc6cc2e184f39ec01f6a6ae5d7d98e7504f65843d02c1bc7c0265",
+    "screenshots\\satellite-colosseum.png": "9a0bd5bf64e5b56730990c8de5fd61edc6689c1a430b10c7da01fe92073ca62d",
+    "screenshots\\satellite-identity.png": "90a41b438a404414724c5ed4f4581b3cf69f29c7c78de57cd21e0468fd8c2836"
+  },
+  "commit_curation": {
+    "excluded_raw_runtime_artifacts": [
+      "live\\live-runtime.json",
+      "logs\\backend.log",
+      "logs\\backend.stderr.log",
+      "live\\logs\\backend.log",
+      "live\\logs\\backend.stderr.log"
+    ],
+    "note": "Retained public evidence only; trimmed quality-log trailing whitespace and refreshed retained artifact hashes."
+  }
+}

@@ -14,8 +14,16 @@ def _get(api_context: APIRequestContext, path: str):
     return api_context.get(path)
 
 ###############################################################################
-def _put(api_context: APIRequestContext, path: str, payload: dict):
-    return api_context.put(path, data=payload)
+def _patch(api_context: APIRequestContext, path: str, payload: dict):
+    return api_context.patch(path, data=payload)
+
+###############################################################################
+def _create_conversation(api_context: APIRequestContext, title: str) -> str:
+    response = _post(api_context, "/api/conversations", {"title": title})
+    assert response.status == 201, response.text()
+    conversation_id = response.json().get("conversation_id")
+    assert isinstance(conversation_id, str) and conversation_id
+    return conversation_id
 
 ###############################################################################
 def _require_provider_or_skip(response) -> None:  # noqa: ANN001
@@ -23,10 +31,15 @@ def _require_provider_or_skip(response) -> None:  # noqa: ANN001
         pytest.skip(f"Providers unavailable for this check ({response.status}).")
 
 ###############################################################################
-def _require_agent_extraction_or_skip(body: dict) -> None:
+def _require_agent_or_skip(body: dict) -> None:
     assistant_text = str(body.get("assistant_message") or "").lower()
-    if "configured agent model" in assistant_text and "structured extraction" in assistant_text:
-        pytest.skip("Configured agent model cannot perform structured extraction for this check.")
+    if (
+        "configured agent model" in assistant_text
+        and ("tool" in assistant_text or "agent" in assistant_text)
+    ):
+        pytest.skip(
+            "Configured agent model cannot run the native agent for this check."
+        )
 
 ###############################################################################
 def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) -> None:
@@ -48,23 +61,23 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
         "ollama_url": base_body.get("ollama_url", "http://localhost:11434"),
         "credentials": {"openai": {"api_key": "sk-test-value"}},
     }
-    updated = _put(api_context, "/api/chat/settings", update_payload)
+    updated = _patch(api_context, "/api/chat/settings", update_payload)
     if updated.status == 422:
         pytest.skip("Requested local agent model is unavailable for this check.")
     assert updated.ok
     updated_body = updated.json()
     assert updated_body["credentials"]["openai"]["api_key"] is True
 
-    parity_update = _put(api_context, "/api/chat/settings", update_payload)
+    parity_update = _patch(api_context, "/api/chat/settings", update_payload)
     assert parity_update.ok
     assert set(updated_body.keys()) == set(parity_update.json().keys())
 
-    restored = _put(api_context, "/api/chat/settings", base_body)
+    restored = _patch(api_context, "/api/chat/settings", base_body)
     assert restored.ok
 
 ###############################################################################
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
-    response = _put(
+    response = _patch(
         api_context,
         "/api/chat/settings",
         {"active_provider_mode": 1, "credentials": "bad"},
@@ -91,20 +104,22 @@ def test_chat_models_with_prefix_parity(
 def test_chat_turn_stream_event_order_and_contract_parity(
     api_context: APIRequestContext,
 ) -> None:
-    turn_response = _post(
-        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
-    )
+    conversation_id = _create_conversation(api_context, "chat API contract")
+    turn_payload = {
+        "conversation_id": conversation_id,
+        "message": "show map at 41.9028, 12.4964",
+    }
+    turn_response = _post(api_context, "/api/chat/turn", turn_payload)
     _require_provider_or_skip(turn_response)
     assert turn_response.ok
     turn_body = turn_response.json()
     assert "assistant_message" in turn_body
-    assert "session_id" in turn_body
-    assert "turn_contract" in turn_body
-    assert "decision" in turn_body
+    assert turn_body["conversation_id"] == conversation_id
+    assert "operation" in turn_body
+    assert "route" in turn_body
+    assert "completion_contract" in turn_body
 
-    prefixed_turn = _post(
-        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
-    )
+    prefixed_turn = _post(api_context, "/api/chat/turn", turn_payload)
     _require_provider_or_skip(prefixed_turn)
     assert prefixed_turn.ok
     assert set(turn_body.keys()) == set(prefixed_turn.json().keys())
@@ -113,7 +128,7 @@ def test_chat_turn_stream_event_order_and_contract_parity(
         api_context,
         "/api/chat/stream",
         {
-            "session_id": turn_body["session_id"],
+            "conversation_id": conversation_id,
             "message": "show map at 41.9028, 12.4964",
         },
     )
@@ -126,11 +141,11 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     assert event_names[0] == "status"
     assert event_names[-1] in {"final", "error"}
     if event_names[-1] == "final":
-        assert "parsed" in event_names
-        assert "policy" in event_names
         if "tool_call_started" in event_names:
             assert "tool_call_completed" in event_names
-            assert event_names.index("tool_call_started") < event_names.index("tool_call_completed")
+            assert event_names.index("tool_call_started") < event_names.index(
+                "tool_call_completed"
+            )
         if "map_session_created" in event_names:
             assert event_names.index("map_session_created") < event_names.index("final")
 
@@ -138,7 +153,7 @@ def test_chat_turn_stream_event_order_and_contract_parity(
         api_context,
         "/api/chat/stream",
         {
-            "session_id": turn_body["session_id"],
+            "conversation_id": conversation_id,
             "message": "show map at 41.9028, 12.4964",
         },
     )
@@ -149,15 +164,19 @@ def test_chat_turn_stream_event_order_and_contract_parity(
 def test_chat_turn_coordinate_lookup_and_follow_up(
     api_context: APIRequestContext,
 ) -> None:
+    conversation_id = _create_conversation(api_context, "coordinate lookup")
     geocode_response = _post(
         api_context,
         "/api/chat/turn",
-        {"message": "Give me the coordinates of Rome, Italy"},
+        {
+            "conversation_id": conversation_id,
+            "message": "Give me the coordinates of Rome, Italy",
+        },
     )
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
     geocode_body = geocode_response.json()
-    _require_agent_extraction_or_skip(geocode_body)
+    _require_agent_or_skip(geocode_body)
     assert geocode_body.get("map_session") is None
     assistant_text = str(geocode_body.get("assistant_message") or "").lower()
     assert (
@@ -170,13 +189,16 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     unsupported = _post(
         api_context,
         "/api/chat/turn",
-        {"message": "Find the absolute best weather area in Europe"},
+        {
+            "conversation_id": conversation_id,
+            "message": "Find the absolute best weather area in Europe",
+        },
     )
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
-    _require_agent_extraction_or_skip(unsupported_body)
-    if unsupported_body.get("decision", {}).get("plan", {}).get("state") == "clarify":
+    _require_agent_or_skip(unsupported_body)
+    if unsupported_body.get("operation", {}).get("kind") == "clarification":
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()
     assert "weather" in assistant or "forecast" in assistant or "clarify" in assistant

@@ -1,11 +1,6 @@
 <div class="map-canvas">
   <div class="map-content">
-    @if (isLoading) {
-      <div class="spinner-container">
-        <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
-        <p class="loading-text">Rendering map...</p>
-      </div>
-    } @else if (!payload?.map_session) {
+    @if (!payload?.map_session) {
       <div class="empty-state empty-state--operations">
         <div class="empty-state__card">
           <p class="empty-state__eyebrow">Map Workspace</p>
@@ -23,7 +18,41 @@
       </div>
     } @else {
       <div class="maplibre-wrap">
-        <div #mapContainer class="maplibre-container"></div>
+        <div #mapContainer class="maplibre-container" tabindex="0" aria-label="Interactive map"></div>
+
+        @if (availableBasemaps.length) {
+          <label class="basemap-selector">
+            <span>Basemap</span>
+            <select
+              [value]="mapSession?.basemap_id || ''"
+              aria-label="Select map basemap"
+              (change)="onBasemapSelection($any($event.target).value)"
+            >
+              @for (basemap of availableBasemaps; track basemap.id) {
+                <option
+                  [value]="basemap.id"
+                  [selected]="basemap.id === mapSession?.basemap_id"
+                  [disabled]="basemap.render?.status === 'unavailable'"
+                >
+                  {{ basemap.name }}
+                </option>
+              }
+            </select>
+          </label>
+        }
+
+        @if (isLoading) {
+          <div class="map-render-progress" role="status" aria-live="polite">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+            <p class="loading-text">Keeping the current map while the update renders…</p>
+          </div>
+        }
+
+        @if (!mapSession?.basemap || mapSession?.basemap?.render_status === 'unavailable') {
+          <div class="metadata-panel metadata-panel--errors" role="status" aria-live="polite">
+            <p><strong>Basemap unavailable.</strong> The geographic data cannot be shown on a verified base layer.</p>
+          </div>
+        }
 
         <div class="map-zoom-controls" aria-label="Map zoom controls">
           <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
@@ -38,21 +67,27 @@
             [overlayRenderStatuses]="overlayRenderStatuses"
             (overlayVisibilityChange)="onOverlayVisibilityChange($event)"
             (overlayOpacityChange)="onOverlayOpacityChange($event)"
+            (overlayOrderChange)="onOverlayOrderChange($event)"
           ></app-overlay-controls>
-        }
-
-        @if (complianceWarnings.length) {
-          <div class="compliance-panel">
-            @for (warning of complianceWarnings; track warning) {
-              <p>{{ warning }}</p>
-            }
-          </div>
         }
 
         @if (metadataOnlyOverlays.length) {
           <div class="metadata-panel" aria-label="Metadata-only layers">
             @for (overlay of metadataOnlyOverlays; track overlay.id) {
-              <p><strong>{{ overlay.label }}</strong> is available as metadata or setup context only.</p>
+              <p>
+                <strong>{{ overlay.label }}</strong> is available as metadata or setup context only.
+                @if (overlay.inspections?.[0]; as inspection) {
+                  <button type="button" class="metadata-panel__action" (click)="openInspection(inspection)">Inspect</button>
+                }
+              </p>
+            }
+          </div>
+        }
+
+        @if (noResultsOverlays.length) {
+          <div class="metadata-panel metadata-panel--no-results" role="status" aria-live="polite" aria-label="No results">
+            @for (overlay of noResultsOverlays; track overlay.id) {
+              <p><strong>{{ overlay.label }}</strong> has no results in the requested area or time window.</p>
             }
           </div>
         }
@@ -68,23 +103,76 @@
         @if (legendEntries.length) {
           <div class="legend-panel" aria-label="Layer legend">
             @for (entry of legendEntries; track entry.id) {
-              <p><span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span></p>
+              <p>
+                <span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span>
+                @if (inspectionForOverlayId(entry.id); as inspection) {
+                  <button type="button" class="metadata-panel__action" (click)="openInspection(inspection)">Inspect</button>
+                }
+              </p>
             }
           </div>
         }
 
-        @if (attributionEntries.length) {
-          <div class="attribution-panel" aria-label="Map attribution">
-            @for (entry of attributionEntries; track entry) {
-              <span>{{ entry }}</span>
+        @if (complianceWarnings.length || restoreNotice || attributionEntries.length) {
+          <div class="map-bottom-bar">
+            @if (complianceWarnings.length || restoreNotice) {
+              <div class="compliance-panel" role="status" aria-live="polite">
+                @for (warning of complianceWarnings; track warning) {
+                  <p>{{ warning }}</p>
+                }
+                @if (restoreNotice) {
+                  <p>{{ restoreNotice }}</p>
+                }
+              </div>
+            }
+
+            @if (attributionEntries.length) {
+              <div class="attribution-panel" aria-label="Map attribution">
+                @for (entry of attributionEntries; track entry.label + (entry.url || '')) {
+                  @if (entry.url) {
+                    <a [href]="entry.url" target="_blank" rel="noopener noreferrer">{{ entry.label }}</a>
+                  } @else {
+                    <span>{{ entry.label }}</span>
+                  }
+                }
+              </div>
             }
           </div>
         }
 
-        @if (restoreNotice) {
-          <div class="compliance-panel" role="status" aria-live="polite">
-            <p>{{ restoreNotice }}</p>
-          </div>
+        @if (selectedInspection) {
+          <aside
+            #inspectionPanel
+            class="map-inspection-panel"
+            role="dialog"
+            aria-labelledby="map-inspection-panel-title"
+            tabindex="-1"
+          >
+            <header class="map-inspection-panel__header">
+              <div>
+                <p class="map-inspection-panel__eyebrow">{{ selectedInspection.association }}</p>
+                <h2 id="map-inspection-panel-title">{{ selectedInspection.title }}</h2>
+              </div>
+              <button type="button" class="map-inspection-panel__close" aria-label="Close details" title="Close details" (click)="closeInspection()">×</button>
+            </header>
+            @if (selectedInspection.stale) {
+              <p class="map-inspection-panel__stale">Stale provider metadata</p>
+            }
+            <dl>
+              @for (field of selectedInspection.fields; track field.key) {
+                <div>
+                  <dt>{{ field.label }}</dt>
+                  <dd>{{ field.value ?? '—' }}{{ field.unit ? ' ' + field.unit : '' }}</dd>
+                </div>
+              }
+            </dl>
+            @if (selectedInspection.source_url && isSafeInspectionUrl(selectedInspection.source_url)) {
+              <a class="map-inspection-panel__source" [href]="selectedInspection.source_url" target="_blank" rel="noopener noreferrer">Open approved source</a>
+            }
+            @for (warning of selectedInspection.warnings || []; track warning) {
+              <p class="map-inspection-panel__warning">{{ warning }}</p>
+            }
+          </aside>
         }
       </div>
     }

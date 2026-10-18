@@ -3,6 +3,7 @@ import {
   buildAgentModelSelectionPayload,
   buildSelectedAgentModelSummary,
   canSelectAgentModel,
+  ensureSelectedModelVisible,
   enrichInstalledOllamaModel,
   mergeModelCard,
   mergeModelCards,
@@ -19,6 +20,13 @@ const baseSettings = (): ModelSettingsResponse => ({
   google_base_url: null,
   deepseek_base_url: null,
   credentials: {},
+  selected_model_context: {
+    provider: 'google',
+    model: 'gemini-2.5-flash',
+    context_window_tokens: 1048576,
+    maximum_output_tokens: 65536,
+    context_profile_source: 'google_models_api',
+  },
 });
 
 const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescriptor => ({
@@ -91,6 +99,12 @@ describe('model-selection', () => {
     expect(agentSelectionDisabledReason(model({ supports_tools: false }))).toBe('Agent model requires native tool calling.');
     expect(canSelectAgentModel(model({ supports_structured_output: false }))).toBeFalse();
     expect(agentSelectionDisabledReason(model({ supports_structured_output: false }))).toBe('Agent model requires structured output.');
+    expect(agentSelectionDisabledReason(model({
+      protocol: 'anthropic-messages',
+      supports_tools: false,
+      supports_structured_output: false,
+      agent_selection_disabled_reason: 'OpenCode Messages transport is not supported.',
+    }))).toBe('OpenCode Messages transport is not supported.');
   });
 
   it('builds a single selected-agent payload', () => {
@@ -129,6 +143,21 @@ describe('model-selection', () => {
       toolSupportSource: 'ollama_probe',
     }));
     expect(summary?.capabilities).toEqual(['tools', 'json']);
+  });
+
+  it('keeps a saved model visible when the live catalog no longer contains it', () => {
+    const settings = baseSettings();
+    settings.agent_model_provider = 'deepseek';
+    settings.agent_model_name = 'deepseek-chat';
+
+    const visible = ensureSelectedModelVisible(settings, [model({ provider: 'openai' })]);
+    const saved = visible.find((entry) => entry.provider === 'deepseek');
+
+    expect(saved).toBeDefined();
+    expect(saved?.name).toBe('deepseek-chat');
+    expect(saved?.metadata['invalid_configuration']).toBeTrue();
+    expect(canSelectAgentModel(saved!)).toBeFalse();
+    expect(agentSelectionDisabledReason(saved!)).toContain('not present in the live provider catalog');
   });
 
   it('formats provider and provider-group labels consistently', () => {

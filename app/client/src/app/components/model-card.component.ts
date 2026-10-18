@@ -1,12 +1,15 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { ModelCardDescriptor } from '../core/types';
+import { formatCompactTokenCount } from '../core/token-format';
 
 @Component({
   selector: 'article[appModelCard]',
   standalone: true,
+  imports: [],
   templateUrl: './model-card.component.html',
   styleUrl: './model-card.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   host: {
     class: 'model-card',
     '[class.model-card--local]': 'isLocal',
@@ -24,6 +27,10 @@ export class ModelCardComponent {
 
   @Output() modelSelected = new EventEmitter<ModelCardDescriptor>();
   @Output() pullRequested = new EventEmitter<ModelCardDescriptor>();
+
+  formatContextWindow(value: number | null | undefined): string {
+    return formatCompactTokenCount(value);
+  }
 
   onCardSelected(): void {
     if (this.disabledReason) {

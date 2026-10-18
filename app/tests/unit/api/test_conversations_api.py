@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import json
-import asyncio
-from collections.abc import AsyncIterator
-
 import pytest
 import sqlalchemy
 from fastapi import FastAPI
@@ -13,28 +9,17 @@ from sqlalchemy.pool import StaticPool
 
 from server.api.conversations import router as conversations_router
 from server.common.paths import FASTAPI_API_PREFIX
-from server.domain.run_events import RunEventType
-from server.repositories import agent_run_events as event_repo_module
-from server.repositories import agent_runs as run_repo_module
-from server.repositories import agent_steering as steering_repo_module
-from server.repositories import conversations as conversation_repo_module
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
-from server.repositories.agent_steering import AgentSteeringRepository
+from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.schemas.models import Base
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
-from server.services.agent_runs.steering import RunSteeringService
-from server.services.agent_runs.streaming import RunEventStreamService
-
-###############################################################################
-class _DatabaseHandle:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, backend: object) -> None:
-        self.backend = backend
+from server.services.chat.conversation_snapshot import ConversationSnapshotService
+from server.services.chat.history_service import ChatHistoryService
+from server.domain.agent.conversation import ConversationState
 
 ###############################################################################
 class _InMemoryBackend:
@@ -51,156 +36,180 @@ class _InMemoryBackend:
         self.session = sessionmaker(bind=self.engine, future=True)
 
 ###############################################################################
-class _FakeRunOrchestrator:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, run_repository: AgentRunRepository, publisher: RunEventPublisher) -> None:
-        self.started: list[str] = []
-        self.run_repository = run_repository
-        self.publisher = publisher
-
-    # -------------------------------------------------------------------------
-    async def execute_run(self, run_id: str) -> None:
-        self.started.append(run_id)
-        run = self.run_repository.get_run(run_id)
-        await self.publisher.publish(
-            conversation_id=run.conversation_id,
-            run_id=run.run_id,
-            run_version=run.active_run_version,
-            type=RunEventType.PROGRESS,
-            payload={
-                "stage": "understanding_request",
-                "label": "Understanding the request",
-            },
-        )
-
-###############################################################################
-async def _read_first_sse_event(stream: AsyncIterator[str]) -> dict:
-    frame = await stream.__anext__()
-    await stream.aclose()
-    data_line = next(line for line in frame.splitlines() if line.startswith("data: "))
-    return json.loads(data_line.removeprefix("data: "))
-
-###############################################################################
 @pytest.fixture()
-def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, FastAPI]:
+def conversations_api_client() -> TestClient:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
-    database = _DatabaseHandle(backend)
-    monkeypatch.setattr(conversation_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(run_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(steering_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(event_repo_module, "get_database", lambda: database)
-
-    publisher = RunEventPublisher(AgentRunEventRepository())
-    run_repository = AgentRunRepository()
-    aggregation = AggregatedRequestService()
+    run_repository = AgentRunRepository(backend)
+    conversation_repository = ConversationRepository(backend)
+    history_service = ChatHistoryService(ChatHistoryRepository(backend))
+    publisher = RunEventPublisher(AgentRunEventRepository(backend))
     app = FastAPI()
     app.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
     app.state.run_lifecycle_service = RunLifecycleService(
-        conversation_repository=ConversationRepository(),
+        conversation_repository=conversation_repository,
         run_repository=run_repository,
-        aggregation_service=aggregation,
+        aggregation_service=AggregatedRequestService(),
         event_publisher=publisher,
-        run_orchestrator=_FakeRunOrchestrator(run_repository, publisher),  # type: ignore[arg-type]
+        run_orchestrator=object(),  # type: ignore[arg-type]
     )
-    app.state.run_steering_service = RunSteeringService(
+    app.state.conversation_snapshot_service = ConversationSnapshotService(
+        conversation_repository=conversation_repository,
+        history_service=history_service,
         run_repository=run_repository,
-        steering_repository=AgentSteeringRepository(),
-        aggregation_service=aggregation,
-        event_publisher=publisher,
     )
-    app.state.run_event_stream_service = RunEventStreamService(
-        publisher,
-        run_repository=run_repository,
-        keep_alive_seconds=0.05,
-    )
-
     client = TestClient(app)
-    yield client, app
+    yield client
     client.close()
 
 ###############################################################################
-def test_conversation_http_run_stream_and_steering_reach_same_agent_run(
-    conversations_api_client: tuple[TestClient, FastAPI],
+def test_create_conversation_returns_persisted_conversation(
+    conversations_api_client: TestClient,
 ) -> None:
-    client, app = conversations_api_client
-    conversation_response = client.post(
+    response = conversations_api_client.post(
         "/api/conversations",
         json={"title": "Rome map"},
     )
-    assert conversation_response.status_code == 201
-    conversation_id = conversation_response.json()["conversation_id"]
 
-    run_response = client.post(
-        f"/api/conversations/{conversation_id}/runs",
-        json={"message": "Map Rome."},
-    )
-    assert run_response.status_code == 202
-    run_payload = run_response.json()
-    run_id = run_payload["run_id"]
-    assert run_payload["stream_url"] == (
-        f"/api/conversations/{conversation_id}/runs/{run_id}/events"
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["conversation_id"]
+    assert payload["title"] == "Rome map"
+
+    snapshot = conversations_api_client.get(
+        f"/api/conversations/{payload['conversation_id']}"
     )
 
-    first_event = asyncio.run(
-        _read_first_sse_event(
-            app.state.run_event_stream_service.stream_sse(run_id, after_event_id=None),
-        )
+    assert snapshot.status_code == 200
+    snapshot_payload = snapshot.json()
+    assert snapshot_payload["conversation_id"] == payload["conversation_id"]
+    assert snapshot_payload["title"] == "Rome map"
+    assert snapshot_payload["context_revision"] == 1
+    assert snapshot_payload["messages"] == []
+    assert (
+        snapshot_payload["conversation_state"]["conversation_id"]
+        == payload["conversation_id"]
     )
-
-    assert first_event["type"] == "progress"
-    assert first_event["payload"]["stage"] == "understanding_request"
-
-    steering_response = client.post(
-        f"/api/conversations/{conversation_id}/runs/{run_id}/steering",
-        json={
-            "message": "Focus on public transport stops.",
-            "client_mutation_id": "mutation-1",
-        },
-    )
-    assert steering_response.status_code == 200
-    steering_payload = steering_response.json()
-    assert steering_payload["run_id"] == run_id
-    assert steering_payload["run_version"] == 2
-    assert "Map Rome." in steering_payload["aggregated_request"]
-    assert "Focus on public transport stops." in steering_payload["aggregated_request"]
-
-    update_event = asyncio.run(
-        _read_first_sse_event(
-            app.state.run_event_stream_service.stream_sse(
-                run_id,
-                after_event_id=first_event["event_id"],
-            )
-        )
-    )
-
-    assert update_event["type"] == "request_updated"
-    assert update_event["run_id"] == run_id
-    assert update_event["run_version"] == 2
-    assert "public transport stops" in update_event["payload"]["aggregated_request"]
+    assert snapshot_payload["memory_snapshot"] == {}
+    assert snapshot_payload["map_session"] is None
+    assert snapshot_payload["active_run"] is None
 
 ###############################################################################
-def test_conversation_stream_rejects_run_from_different_conversation(
-    conversations_api_client: tuple[TestClient, FastAPI],
+def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
+    conversations_api_client: TestClient,
 ) -> None:
-    client, _app = conversations_api_client
-    first = client.post("/api/conversations", json={"title": "First"})
-    second = client.post("/api/conversations", json={"title": "Second"})
-    assert first.status_code == 201
-    assert second.status_code == 201
-    first_id = first.json()["conversation_id"]
-    second_id = second.json()["conversation_id"]
+    response = conversations_api_client.get("/api/conversations/missing")
 
-    run_response = client.post(
-        f"/api/conversations/{first_id}/runs",
-        json={"message": "Map Rome."},
+    assert response.status_code == 404
+
+###############################################################################
+def test_terminal_assistant_message_and_state_rollback_together() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Atomic persistence")
+
+    committed_state = ConversationState.empty(conversation.id, revision=2).model_dump(
+        mode="json"
     )
-    assert run_response.status_code == 202
-    run_id = run_response.json()["run_id"]
-
-    stream_response = client.get(
-        f"/api/conversations/{second_id}/runs/{run_id}/events"
+    _message, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state=committed_state,
+        content="First response",
+        request_id="request-1",
     )
 
-    assert stream_response.status_code == 404
+    assert revision == 2
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        history.append_assistant_message_with_state(
+            conversation_id=conversation.id,
+            expected_revision=2,
+            conversation_state=ConversationState.empty(
+                conversation.id, revision=3
+            ).model_dump(mode="json"),
+            content="Duplicate response",
+            request_id="request-1",
+        )
+
+    persisted = conversations.get_conversation(conversation.id)
+    assert persisted is not None
+    assert persisted.context_revision == 2
+    assert persisted.next_message_sequence == 1
+    assert persisted.conversation_state == committed_state
+    assert [
+        item["content"]
+        for item in history.list_messages(conversation_id=conversation.id)
+    ] == ["First response"]
+
+
+###############################################################################
+def test_native_provisional_assistant_is_upserted_on_resume() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Resumable map")
+
+    first, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state=ConversationState.empty(
+            conversation.id, revision=2
+        ).model_dump(mode="json"),
+        content="Data prepared; the map is loading.",
+        request_id="run-1",
+        structured_payload={
+            "native": True,
+            "presentation_status": "prepared",
+        },
+    )
+    second, resumed_revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=revision,
+        conversation_state=ConversationState.empty(
+            conversation.id, revision=3
+        ).model_dump(mode="json"),
+        content="The map is ready.",
+        request_id="run-1",
+        structured_payload={
+            "native": True,
+            "presentation_status": "ready",
+        },
+    )
+
+    assert resumed_revision == revision + 1
+    assert second.id == first.id
+    assert [
+        item["content"]
+        for item in history.list_messages(conversation_id=conversation.id)
+    ] == ["The map is ready."]
+
+
+###############################################################################
+def test_assistant_state_write_migrates_legacy_clarification() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Legacy assistant state")
+
+    _message, revision = history.append_assistant_message_with_state(
+        conversation_id=conversation.id,
+        expected_revision=1,
+        conversation_state={
+            "schema_version": 1,
+            "conversation_id": conversation.id,
+            "unresolved_questions": ["Which country contains Lake Bracciano?"],
+        },
+        content="Which country contains Lake Bracciano?",
+        request_id="legacy-state-request",
+    )
+
+    assert revision == 2
+    persisted = conversations.read_state(conversation.id)["conversation_state"]
+    assert persisted["schema_version"] == 2
+    assert persisted["revision"] == 2
+    assert "unresolved_questions" not in persisted
+    assert persisted["pending_clarification"]["status"] == "active"

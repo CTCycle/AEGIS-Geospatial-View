@@ -10,13 +10,23 @@ from typing import Any
 from PIL import Image, ImageChops
 from playwright.sync_api import Page, Route, expect
 
-from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+from tests.e2e.helpers.chat_stub_payloads import (
+    _native_conversation_state,
+    _native_goal,
+    _native_route,
+    geospatial_catalog_payload,
+    map_overlay_instance,
+    model_settings_payload,
+)
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
-DIFF_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "visual_diffs"
+DIFF_ROOT = (
+    Path(__file__).resolve().parents[3] / "assets" / "QA" / "e2e" / "visual_diffs"
+)
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
@@ -32,42 +42,60 @@ def _models_payload() -> dict[str, Any]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "tool_support_source": "fixture",
+                "context_profile_source": "fixture",
                 "metadata": {},
             }
         ],
         "local": [],
+        "sources": {},
     }
 
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
     return {
         "request_id": "visual-regression-7901",
-        "session_id": 7901,
+        "conversation_id": "conversation-e2e",
         "assistant_message": "Loaded visual regression fixture.",
-        "turn_contract": {
-            "user_text": "show fixture map",
-            "task_class": "map_search",
-            "location_signals": [],
-            "normalized_action": {
-                "action_id": "visual_fixture_map",
-                "action_label": "Visual fixture map",
-                "task_tags": ["map"],
-                "action_tags": ["geospatial"],
-                "requires_location": True,
-            },
-            "temporal_signal": {"mode": "none"},
-            "ambiguities": [],
-            "parser_confidence": 0.95,
-        },
-        "decision": {
-            "plan": {
-                "state": "map_search",
-                "action_id": "visual_fixture_map",
-                "basemap_id": "osm_default",
-                "overlay_ids": ["visual_fixture_points"],
-            }
+        "context_revision": 1,
+        "route": _native_route(
+            task_mode="execute",
+            presentation="map",
+            operation="render",
+            requires_location=True,
+            capability_query="visual_fixture_map",
+            target_refs=["location:rome"],
+        ),
+        "goal": _native_goal(
+            task_mode="execute",
+            presentation="map",
+            operation="render",
+            requires_location=True,
+            goal="show fixture map",
+        ),
+        "completion_contract": {
+            "operation": "render",
+            "requirements": ["answer_provided", "map_prepared"],
+            "location_required": True,
+            "evidence_required": False,
+            "map_preparation_required": True,
+            "temporal_scope_required": False,
+            "spatial_scope_required": True,
         },
         "map_session": {
+            "session_id": "visual-fixture-map",
+            "resolved_location": {
+                "label": "Rome, Italy",
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+            },
+            "basemap_id": "osm_default",
+            "viewport": {
+                "center_latitude": 41.9028,
+                "center_longitude": 12.4964,
+                "radius_m": 2500.0,
+            },
+            "payload": {},
             "center": {"latitude": 41.9028, "longitude": 12.4964},
             "bounds": [12.492, 41.899, 12.500, 41.906],
             "basemap": {
@@ -79,20 +107,31 @@ def _turn_payload() -> dict[str, Any]:
                 "requires_key": False,
                 "attribution": "OpenStreetMap contributors",
             },
-            "overlays": [
-                {
-                    "id": "visual_fixture_points",
-                    "label": "Visual fixture points",
-                    "provider": "fixture",
-                    "type": "geojson",
-                    "rendering_mode": "clustered-points",
-                    "data_format": "GeoJSON",
-                    "geometry_type": "Point",
-                    "url": "/api/geospatial/layers/visual_fixture_points/geojson",
-                    "attribution": "AEGIS fixture",
-                    "default_opacity": 0.8,
-                }
-            ],
+            "overlay_collection": {
+                "collection_id": "visual-fixture-overlays",
+                "revision": 1,
+                "instances": [
+                    map_overlay_instance(
+                        instance_id="visual_fixture_points",
+                        capability_id="visual_fixture_points",
+                        label="Visual fixture points",
+                        provider="fixture",
+                        overlay_type="geojson",
+                        rendering_mode="clustered-points",
+                        opacity=0.8,
+                        descriptor={
+                            "layer_id": "visual_fixture_points",
+                            "provider": "fixture",
+                            "rendering_mode": "clustered-points",
+                            "source_protocol": "geojson",
+                            "data_format": "GeoJSON",
+                            "geometry_type": "Point",
+                            "url": "/api/geospatial/layers/visual_fixture_points/geojson",
+                            "attribution": ["AEGIS fixture"],
+                        },
+                    )
+                ],
+            },
             "compliance_warnings": [
                 "Fixture warning for deterministic visual snapshot coverage."
             ],
@@ -101,13 +140,16 @@ def _turn_payload() -> dict[str, Any]:
             "execution": "map_search",
             "selected_overlay_ids": ["visual_fixture_points"],
         },
+        "memory_snapshot": {},
+        "presentation_status": "prepared",
+        "tool_results": [],
+        "conversation_state": _native_conversation_state(1),
+        "execution_trace": {"stopped_reason": "goal_satisfied"},
     }
 
 ###############################################################################
 def _setup_stubs(page: Page) -> None:
-    page.route(
-        re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
-    )
+    register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),
@@ -118,12 +160,16 @@ def _setup_stubs(page: Page) -> None:
     )
     page.route(
         re.compile(r".*/api/geospatial/capabilities$"),
+        lambda route: _json_ok(route, geospatial_catalog_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations$"),
         lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
+            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
         ),
     )
     page.route(
-        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"),
+        "**/api/geospatial/tiles/osm_default/**",
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),
@@ -195,10 +241,12 @@ def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     _setup_stubs(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show fixture map")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
-    map_canvas = page.locator(".maplibregl-canvas")
+    map_canvas = page.locator(".maplibregl-canvas:visible").last
     expect(map_canvas).to_be_visible(timeout=15000)
+    page.wait_for_timeout(500)
+    map_canvas = page.locator(".maplibregl-canvas:visible").last
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
 
 ###############################################################################
@@ -206,7 +254,7 @@ def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> Non
     _setup_stubs(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show fixture map")
-    page.get_by_role("button", name="Send").click()
+    page.get_by_role("button", name="Send message").click()
 
     page_root = page.locator("body")
     _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png")

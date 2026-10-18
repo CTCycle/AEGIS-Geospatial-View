@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -9,10 +10,14 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
+    JSON,
     String,
     Text,
     UniqueConstraint,
     func,
+    CheckConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -36,6 +41,15 @@ class ReferenceCountryRecord(Base):
 
     iso2: Mapped[str] = mapped_column(String(2), primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name_key: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True, default=""
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "length(iso2) = 2 AND iso2 = upper(iso2)", name="ck_reference_country_iso2"
+        ),
+    )
 
 ###############################################################################
 class ReferenceCountryAliasRecord(Base):
@@ -75,7 +89,9 @@ class ReferenceGeospatialLayerAliasRecord(Base):
         nullable=False,
     )
 
-    __table_args__ = (Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),)
+    __table_args__ = (
+        Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),
+    )
 
 ###############################################################################
 class ReferenceGeospatialLayerKeywordRecord(Base):
@@ -103,6 +119,11 @@ class ReferenceGibsTileMatrixSetRecord(Base):
 
     tile_matrix_set_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     meters_per_pixel: Mapped[float] = mapped_column(Float, nullable=False)
+    __table_args__ = (
+        CheckConstraint(
+            "meters_per_pixel > 0", name="ck_gibs_meters_per_pixel_positive"
+        ),
+    )
 
 ###############################################################################
 class ReferenceGibsLayerDefaultRecord(Base):
@@ -126,14 +147,6 @@ class ModelProviderSettingsRecord(Base):
     openai_base_url: Mapped[str | None] = mapped_column(String(400))
     google_base_url: Mapped[str | None] = mapped_column(String(400))
     deepseek_base_url: Mapped[str | None] = mapped_column(String(400))
-    capabilities_json: Mapped[str | None] = mapped_column(Text)
-    supports_tools: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    supports_structured_output: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
-    tool_support_source: Mapped[str] = mapped_column(
-        String(40), nullable=False, default="unknown"
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -150,11 +163,24 @@ class CredentialEncryptionMaterial(Base):
     key_version: Mapped[int] = mapped_column(Integer, nullable=False)
     key_material: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    active_slot: Mapped[int | None] = mapped_column(Integer)
     seeded_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
     activated_at: Mapped[datetime | None] = mapped_column(DateTime)
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (
+        UniqueConstraint(
+            "key_purpose", "key_version", name="ux_credential_material_version"
+        ),
+        UniqueConstraint(
+            "key_purpose", "active_slot", name="ux_credential_material_active_slot"
+        ),
+        CheckConstraint(
+            "active_slot IS NULL OR active_slot = 1",
+            name="ck_credential_material_active_slot",
+        ),
+    )
 
 ###############################################################################
 class ModelCredentialRecord(Base):
@@ -163,8 +189,12 @@ class ModelCredentialRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
+    label_key: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
     key_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    encryption_material_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("credential_encryption_materials.id", ondelete="RESTRICT")
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -173,40 +203,54 @@ class ModelCredentialRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
-
-###############################################################################
-class ChatSessionRecord(Base):
-    __tablename__ = "chat_sessions"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    title: Mapped[str | None] = mapped_column(String(200))
-    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
+    __table_args__ = (
+        UniqueConstraint(
+            "provider", "label_key", name="ux_model_credentials_logical_key"
+        ),
+        Index(
+            "ix_model_credentials_active_provider_label",
+            "is_active",
+            "provider",
+            "label_key",
+        ),
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-    last_map_session_json: Mapped[str | None] = mapped_column(Text)
 
 ###############################################################################
 class ChatMessageRecord(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+    conversation_id: Mapped[str] = mapped_column(
+        String(80),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
     turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String(160))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    structured_payload_json: Mapped[str | None] = mapped_column(Text)
-    tool_payload_json: Mapped[str | None] = mapped_column(Text)
-    map_session_json: Mapped[str | None] = mapped_column(Text)
+    structured_payload: Mapped[object | None] = mapped_column(JSON)
+    tool_payload: Mapped[object | None] = mapped_column(JSON)
+    map_session: Mapped[object | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
+    )
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id", "turn_index", name="ux_chat_messages_sequence"
+        ),
+        UniqueConstraint(
+            "conversation_id", "role", "request_id", name="ux_chat_messages_request"
+        ),
+        Index(
+            "ix_chat_messages_conversation_role_sequence",
+            "conversation_id",
+            "role",
+            "turn_index",
+        ),
+        CheckConstraint(
+            "turn_index >= 0", name="ck_chat_messages_sequence_nonnegative"
+        ),
     )
 
 ###############################################################################
@@ -216,12 +260,68 @@ class ConversationRecord(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     owner_user_id: Mapped[str | None] = mapped_column(String(120))
     title: Mapped[str | None] = mapped_column(String(200))
-    active_run_id: Mapped[str | None] = mapped_column(String(80))
+    context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    conversation_state: Mapped[object | None] = mapped_column(JSON)
+    next_message_sequence: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
+class ApplicationRuntimeSettingsRecord(Base):
+    __tablename__ = "application_runtime_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
+class AgentEvidenceRecord(Base):
+    """Compressed, conversation-scoped payload owned by the evidence store."""
+
+    __tablename__ = "agent_evidence"
+
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        String(80), ForeignKey("agent_runs.id", ondelete="SET NULL")
+    )
+    kind: Mapped[str] = mapped_column(String(48), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    provenance_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    payload_blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    uncompressed_byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    parent_evidence_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_agent_evidence_conversation_created", "conversation_id", "created_at"),
+        Index("ix_agent_evidence_run_id", "run_id"),
+        CheckConstraint(
+            "status IN ('available', 'partial', 'valid_empty', 'failed', 'superseded')",
+            name="ck_agent_evidence_status",
+        ),
+        CheckConstraint(
+            "uncompressed_byte_size >= 0", name="ck_agent_evidence_size_nonnegative"
+        ),
     )
 
 ###############################################################################
@@ -232,11 +332,17 @@ class AgentRunRecord(Base):
     conversation_id: Mapped[str] = mapped_column(
         String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
     )
+    client_request_id: Mapped[str | None] = mapped_column(String(160))
+    request_timezone: Mapped[str | None] = mapped_column(String(64))
     original_request: Mapped[str] = mapped_column(Text, nullable=False)
     aggregated_request: Mapped[str] = mapped_column(Text, nullable=False)
     active_run_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     state: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
-    observed_by_worker_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    observed_by_worker_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    active_slot: Mapped[int | None] = mapped_column(Integer)
+    next_event_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -245,8 +351,33 @@ class AgentRunRecord(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     error_code: Mapped[str | None] = mapped_column(String(120))
     error_message: Mapped[str | None] = mapped_column(Text)
+    presentation_status: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="not_required",
+        server_default=text("'not_required'"),
+    )
+    # Presentation is a versioned object with a fixed top-level shape.  Keep
+    # the JSON column typed as an object so repository code can validate nested
+    # values at the boundary instead of propagating ``dict[Unknown, Unknown]``
+    # through the run lifecycle.
+    presentation_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # The render deadline starts when a candidate enters the awaiting-render
+    # state, not when the run was created or when model/tool work began.
+    render_prepared_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    __table_args__ = (Index("ix_agent_runs_conversation_id", "conversation_id"),)
+    __table_args__ = (
+        Index("ix_agent_runs_conversation_id", "conversation_id"),
+        UniqueConstraint(
+            "conversation_id", "client_request_id", name="ux_agent_runs_client_request"
+        ),
+        UniqueConstraint(
+            "conversation_id", "active_slot", name="ux_agent_runs_active_slot"
+        ),
+        CheckConstraint(
+            "active_slot IS NULL OR active_slot = 1", name="ck_agent_runs_active_slot"
+        ),
+    )
 
 ###############################################################################
 class AgentSteeringMessageRecord(Base):
@@ -259,13 +390,19 @@ class AgentSteeringMessageRecord(Base):
     run_version: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     client_mutation_id: Mapped[str | None] = mapped_column(String(160))
+    state_delta_applied: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
 
     __table_args__ = (
         Index("ix_agent_steering_messages_run_id", "run_id"),
-        UniqueConstraint("run_id", "client_mutation_id", name="ux_agent_steering_mutation"),
+        UniqueConstraint(
+            "run_id", "client_mutation_id", name="ux_agent_steering_mutation"
+        ),
+        UniqueConstraint("run_id", "run_version", name="ux_agent_steering_version"),
     )
 
 ###############################################################################
@@ -283,7 +420,7 @@ class AgentRunEventRecord(Base):
     run_version: Mapped[int] = mapped_column(Integer, nullable=False)
     type: Mapped[str] = mapped_column(String(60), nullable=False)
     visibility: Mapped[str] = mapped_column(String(20), nullable=False)
-    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_json: Mapped[object] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -292,4 +429,3 @@ class AgentRunEventRecord(Base):
         UniqueConstraint("run_id", "sequence", name="ux_agent_run_events_sequence"),
         Index("ix_agent_run_events_run_id_sequence", "run_id", "sequence"),
     )
-

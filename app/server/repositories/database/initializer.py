@@ -1,60 +1,60 @@
 from __future__ import annotations
 
-import sqlalchemy
+from collections.abc import Callable
+from pathlib import Path
 
 from server.common.logger import logger
-from server.configurations import DatabaseSettings, get_server_settings
-from server.repositories.catalog.reference_seeder import (
-    ReferenceCatalogSeeder,
-    ReferenceSeedResult,
+from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
+from server.repositories.credential_material import (
+    CredentialEncryptionMaterialRepository,
+    seed_credential_encryption_material,
 )
-from server.repositories.database.contracts import DatabaseBackend
-from server.repositories.database.postgres import PostgresRepository
+from server.repositories.database.migration_runner import (
+    MigrationResult,
+    synchronize_database,
+)
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.schemas import Base
-from server.services.catalog.loader import load_reference_catalog
+from server.repositories.model_settings import ModelSettingsRepository
+from server.repositories.runtime_settings import RuntimeSettingsRepository
+from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
+
 
 ###############################################################################
-def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None:
-    resolved_settings = settings or get_server_settings().database
-    repository = SQLiteRepository(resolved_settings)
-    Base.metadata.create_all(repository.engine)
-    logger.info("Ensured local SQLite schema at %s", repository.db_path)
-
-###############################################################################
-def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
-    resolved_settings = settings or get_server_settings().database
-    repository = PostgresRepository(resolved_settings)
-    existing = set(sqlalchemy.inspect(repository.engine).get_table_names())
-    required = set(Base.metadata.tables.keys())
-    missing = sorted(required - existing)
-    if missing:
-        raise ValueError(
-            "PostgreSQL schema is missing required tables. "
-            f"Missing: {', '.join(missing)}"
-        )
+def required_seed_data_missing(database: SQLiteRepository) -> bool:
+    return (
+        CredentialEncryptionMaterialRepository(database).get_active_material() is None
+        or not ModelSettingsRepository(database).has_required()
+        or database.count_records(ApplicationRuntimeSettingsRecord) == 0
+        or ReferenceCatalogSeeder(database).needs_seed()
+    )
 
 ###############################################################################
 def initialize_database(
-    database: DatabaseBackend | DatabaseSettings | None = None,
-) -> None:
-    if database is None or isinstance(database, DatabaseSettings):
-        resolved_settings = database or get_server_settings().database
-        if resolved_settings.embedded_database:
-            initialize_sqlite_database(resolved_settings)
-            return
-        repository = PostgresRepository(resolved_settings)
-        Base.metadata.create_all(repository.engine)
-        logger.info(
-            "Ensured PostgreSQL schema in %s",
-            resolved_settings.database_name,
+    database: SQLiteRepository,
+    *,
+    on_ready: Callable[[], None] | None = None,
+    legacy_settings_path: Path | None = None,
+) -> MigrationResult:
+    def seed_required_data() -> None:
+        seed_credential_encryption_material(database)
+        ModelSettingsRepository(database).seed_required()
+        RuntimeSettingsRepository(database).seed_required(
+            legacy_path=legacy_settings_path
         )
-        return
+        if on_ready is not None:
+            on_ready()
 
-    Base.metadata.create_all(database.engine)
-    logger.info("Ensured relational schema using active database backend.")
+    result = synchronize_database(
+        database,
+        on_ready=seed_required_data,
+        on_ready_required=lambda: required_seed_data_missing(database),
+    )
+    logger.info(
+        "SQLite database is ready: fresh=%s, migrations_applied=%s",
+        result.fresh_database,
+        result.migrations_applied,
+    )
+    return result
+
 
 ###############################################################################
-def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:
-    catalog = load_reference_catalog()
-    return ReferenceCatalogSeeder(database).seed_if_needed(catalog)

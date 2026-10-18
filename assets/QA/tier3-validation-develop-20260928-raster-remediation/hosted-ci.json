@@ -1,0 +1,35 @@
+{
+  "workflow": "CI",
+  "run_id": 36447036544,
+  "url": "https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/36447036544",
+  "event": "push",
+  "status": "completed",
+  "conclusion": "success",
+  "head_sha": "51f94d2bc82e8510df1b70730b3b722ca272b64e",
+  "started_at": "2026-09-28T15:53:45Z",
+  "completed_at": "2026-09-28T15:55:13Z",
+  "jobs": [
+    {
+      "name": "backend-unit-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "capability-contract-validation",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "persistence-conformance",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "frontend-build-and-tests",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "tested_application_source": "develop@be61298ddf4ae1c0b6900810b046c10d97e4993a",
+  "note": "The workflow tested the exact pushed evidence commit. The final gate-ledger reconciliation is a subsequent documentation-only commit."
+}

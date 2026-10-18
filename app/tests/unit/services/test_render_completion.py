@@ -1,0 +1,1013 @@
+from __future__ import annotations
+
+import pytest
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from tests.conftest import run_async_in_thread
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    OverlayInstance,
+    ViewportPolicy,
+)
+from server.contracts.events import RunEventType
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.capability_route import AgentGoal, AgentRunState, CapabilityRoute, CompletionContract
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.realtime import RealtimeRenderAckPayload
+from server.repositories.agent_run_events import AgentRunEventRepository
+from server.repositories.agent_runs import AgentRunRepository
+from server.repositories.schemas.models import Base, ConversationRecord
+from server.services.agent.completion import CompletionEvaluator
+from server.services.agent_runs.events import RunEventPublisher
+from server.services.agent_runs.render_completion import (
+    RenderAcknowledgementError,
+    RenderCompletionService,
+)
+def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_context) -> None:
+    repository, publisher, _, run_id = render_context
+    state = AgentRunState(request_id="request", conversation_id="conversation", user_message="Show data", phase="update_state")
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute", presentation="map", requires_location=False, explicit_capability_ids=["missing"])
+    state.completion_contract = CompletionContract(operation="show", evidence_required=True,
+        requirements=["required_data_retrieved"])
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
+        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
+        "map_session": candidate.model_dump(mode="json"),
+        "completion_contract": state.completion_contract.model_dump(mode="json"),
+"execution_trace": {"checkpoint": state.checkpoint()}})
+    requirement = next(item for item in presentation["completion_requirements"] if item["name"] == "required_data_retrieved")
+    assert requirement["status"] == "pending"
+
+###############################################################################
+def test_presentation_carries_vision_capture_requested_from_execution_trace(render_context) -> None:
+    repository, publisher, _, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
+        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    base_payload = {
+        "map_session": candidate.model_dump(mode="json"),
+        "execution_trace": {"checkpoint": AgentRunState(
+            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
+        ).checkpoint()},
+    }
+    disabled, _ = service.prepare(run_id=run_id, run_version=1, response_payload=base_payload)
+    assert disabled["vision_capture_requested"] is False
+
+    enabled_payload = dict(base_payload)
+    enabled_payload["execution_trace"] = {
+        "vision_capture_requested": True,
+        "checkpoint": AgentRunState(
+            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
+        ).checkpoint(),
+    }
+    enabled, _ = service.prepare(run_id=run_id, run_version=2, response_payload=enabled_payload)
+    assert enabled["vision_capture_requested"] is True
+
+###############################################################################
+class _EventPublisher:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, object]]] = []
+
+    # -------------------------------------------------------------------------
+    async def publish(
+        self,
+        *,
+        type: object,
+        payload: dict[str, object],
+        **_kwargs: object,
+    ) -> None:
+        self.events.append((str(type), dict(payload)))
+
+###############################################################################
+class _InMemoryBackend:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.engine = sqlalchemy.create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            future=True,
+        )
+        self.session = sessionmaker(bind=self.engine, future=True)
+
+###############################################################################
+@pytest.fixture()
+def render_context() -> tuple[AgentRunRepository, _EventPublisher, str, str]:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversation_id = "conversation-render"
+    with backend.session() as session:
+        session.add(ConversationRecord(id=conversation_id, title="Render"))
+        session.commit()
+    repository = AgentRunRepository(backend)
+    run = repository.create_run(
+        conversation_id,
+        "Show Rome",
+        "Show Rome",
+        client_request_id="render-request-1",
+    )
+    publisher = _EventPublisher()
+    return repository, publisher, conversation_id, run.run_id
+
+###############################################################################
+def _session(
+    *instances: OverlayInstance,
+    bounds: list[float] | None = None,
+    payload: dict[str, object] | None = None,
+) -> MapSession:
+    location = ResolvedLocation(
+        label="Rome, Italy",
+        latitude=41.9028,
+        longitude=12.4964,
+        location_type="city",
+        bbox=[12.3, 41.7, 12.7, 42.1],
+    )
+    return MapSession(
+        session_id="map-session-1",
+        resolved_location=location,
+        basemap_id="osm_standard",
+        viewport=ViewportPolicy(
+            center_latitude=location.latitude,
+            center_longitude=location.longitude,
+            radius_m=25_000,
+            bbox=bounds or location.bbox,
+        ),
+        bounds=bounds or location.bbox,
+        payload=dict(payload or {}),
+        overlay_collection=OverlayCollectionState(
+            collection_id="active-map",
+            revision=4,
+            instances=list(instances),
+        ),
+    )
+
+###############################################################################
+def _contract(*requirements: str) -> CompletionContract:
+    return CompletionContract(
+        operation="geospatial_data_retrieval",
+        requirements=list(requirements),
+        map_preparation_required=True,
+    )
+
+
+###############################################################################
+def _goal(
+    *,
+    temporal_scope: dict[str, object] | None = None,
+    spatial_scope: list[dict[str, object]] | None = None,
+) -> AgentGoal:
+    return AgentGoal(
+        goal="Show geospatial data in Rome",
+        task_mode="execute",
+        presentation="map",
+        operation="geospatial_data_retrieval",
+        requires_location=True,
+        target_ids=["target-rome"],
+        temporal_scope=temporal_scope or {},
+        spatial_scope=spatial_scope or [],
+    )
+
+###############################################################################
+def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
+    metadata = OverlayInstance(
+        instance_id="weather-1",
+        capability_id="openmeteo_weather_forecast",
+        label="Weather",
+        provider="open-meteo",
+        overlay_type="metadata",
+        rendering_mode="metadata-only",
+        descriptor={"result_type": "metadata"},
+    )
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract(),
+        goal=_goal(),
+        map_session=_session(metadata),
+    )
+
+    map_candidate = next(item for item in requirements if item.name == "map_candidate_prepared")
+    assert map_candidate.status == "satisfied"
+    assert RenderCompletionService.requires_browser_ack(_session(metadata)) is False
+
+###############################################################################
+def test_location_only_map_still_requires_browser_ack() -> None:
+    assert RenderCompletionService.requires_browser_ack(_session()) is True
+
+###############################################################################
+@pytest.mark.parametrize("evidence_required", [False, True])
+def test_spatial_render_requirement_uses_viewport_only_for_location_requests(
+    render_context, evidence_required: bool,
+) -> None:
+    repository, publisher, _, run_id = render_context
+    goal = _goal(spatial_scope=[{"kind": "point"}])
+    contract = CompletionContract(
+        operation="show_location" if not evidence_required else "show_data",
+        evidence_required=evidence_required,
+        spatial_scope_required=True,
+        requirements=["spatial_scope_applied"],
+    )
+    state = AgentRunState(
+        request_id="request", conversation_id="conversation",
+        user_message="Show Rome", phase="update_state",
+        goal=goal, completion_contract=contract,
+    )
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    presentation, _ = service.prepare(
+        run_id=run_id, run_version=1,
+        response_payload={
+            "map_session": _session().model_dump(mode="json"),
+            "goal": goal.model_dump(mode="json"),
+            "completion_contract": contract.model_dump(mode="json"),
+            "execution_trace": {"checkpoint": state.checkpoint()},
+        },
+    )
+    spatial = next(
+        item for item in presentation["completion_requirements"]
+        if item["name"] == "spatial_scope_applied"
+    )
+    assert spatial["status"] == ("pending" if evidence_required else "satisfied")
+
+###############################################################################
+def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
+    unavailable = OverlayInstance(
+        instance_id="fires-1",
+        capability_id="nasa_firms_active_fires",
+        label="Active fires",
+        provider="nasa-firms",
+        overlay_type="geojson",
+        rendering_mode="metadata-only",
+        descriptor={"result_status": "unavailable", "result_type": "features"},
+    )
+    candidate = _session(unavailable)
+    assert RenderCompletionService.requires_browser_ack(candidate) is False
+    assert RenderCompletionService.has_blocking_data_failure(candidate) is True
+
+    render_unavailable = candidate.model_copy(deep=True)
+    render_unavailable.overlay_collection.instances[0].rendering_mode = "geojson"
+    render_unavailable.overlay_collection.instances[0].descriptor = {
+        "render_status": "unavailable",
+        "result_type": "features",
+    }
+    assert RenderCompletionService.requires_browser_ack(render_unavailable) is True
+    assert RenderCompletionService.has_blocking_data_failure(render_unavailable) is True
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract("required_data_retrieved"),
+        goal=_goal(),
+        map_session=render_unavailable,
+    )
+    assert next(
+        item for item in requirements if item.name == "required_data_retrieved"
+    ).status == "failed"
+
+###############################################################################
+def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract(),
+        goal=_goal(),
+        map_session=_session(payload={"result_status": "valid_empty"}),
+    )
+
+    renderable = next(item for item in requirements if item.name == "map_candidate_prepared")
+    assert renderable.status == "satisfied"
+
+###############################################################################
+def test_valid_empty_result_satisfies_explicit_data_and_time_checks() -> None:
+    goal = _goal(
+        temporal_scope={"mode": "current", "reference_time_iso": "2026-09-20T07:00:00Z"},
+        spatial_scope=[{"kind": "bbox", "relationship": "within"}],
+    )
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract(
+            "required_data_retrieved",
+            "temporal_scope_applied",
+            "spatial_scope_applied",
+        ),
+        goal=goal,
+        map_session=_session(payload={"result_status": "valid_empty"}),
+    )
+
+    statuses = {item.name: item.status for item in requirements}
+    assert statuses["required_data_retrieved"] == "satisfied"
+    assert statuses["temporal_scope_applied"] == "satisfied"
+    assert statuses["spatial_scope_applied"] == "satisfied"
+
+###############################################################################
+def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
+    goal = _goal(
+        temporal_scope={
+            "mode": "historical",
+            "start_time_iso": "2026-08-01T00:00:00+00:00",
+            "end_time_iso": "2026-08-02T00:00:00+00:00",
+        },
+        spatial_scope=[
+            {
+                "kind": "radius",
+                "relationship": "within_distance",
+                "target_refs": ["target-rome"],
+                "distance_m": 5_000,
+            }
+        ],
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="earthquake-rome",
+            capability_id="usgs_earthquakes",
+            label="Earthquakes",
+            provider="usgs",
+            overlay_type="geojson",
+            rendering_mode="geojson",
+            descriptor={
+                "result_type": "feature_collection",
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [12.5, 41.9],
+                            },
+                        }
+                    ],
+                },
+            },
+        )
+    )
+
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"),
+        goal=goal,
+        map_session=candidate,
+    )
+    assert next(item for item in requirements if item.name == "spatial_scope_applied").status == "pending"
+
+    candidate.overlay_collection.instances[0].descriptor.update(
+        {
+            "analysis_scope": "radius",
+            "temporal_mode": "historical",
+        }
+    )
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"),
+        goal=goal,
+        map_session=candidate,
+    )
+    assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
+
+###############################################################################
+def test_temporal_scope_ignores_static_overlay_retained_during_current_update() -> None:
+    goal = _goal(temporal_scope={"mode": "current"})
+    static_overlay = OverlayInstance(
+        instance_id="hydrography-seattle",
+        capability_id="census_tigerweb_hydrography",
+        label="Hydrography",
+        provider="census",
+        overlay_type="geojson",
+        rendering_mode="geojson",
+        descriptor={"result_type": "features"},
+    )
+    current_overlay = OverlayInstance(
+        instance_id="gauges-seattle",
+        capability_id="usgs_water_gauges",
+        label="Water gauges",
+        provider="usgs",
+        overlay_type="geojson",
+        rendering_mode="clustered-points",
+        descriptor={"result_type": "features", "temporal_mode": "current"},
+    )
+
+    requirements = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied"),
+        goal=goal,
+        map_session=_session(static_overlay, current_overlay),
+    )
+
+    assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
+
+###############################################################################
+def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
+    payload = RealtimeRenderAckPayload(
+        run_id="run-1",
+        run_version=1,
+        map_session_id="map-session-1",
+        collection_revision=4,
+        status="ready",
+        viewport_bounds=[12.3, 41.7, 12.7, 42.1],
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+    )
+    assert payload.viewport_bounds == [12.3, 41.7, 12.7, 42.1]
+
+    raster_payload = RealtimeRenderAckPayload(
+        run_id="run-raster",
+        run_version=1,
+        map_session_id="map-session-raster",
+        collection_revision=0,
+        status="ready",
+        viewport_bounds=[-105.2, 39.5, -104.7, 40.1],
+        overlay_results=[
+            {
+                "overlay_id": "noaa-radar-denver",
+                "capability_id": "noaa_radar",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "metadata_only": False,
+                "visibility_matches": True,
+                "style_valid": True,
+                "zoom_range_valid": True,
+                "rendered_feature_count": None,
+            }
+        ],
+    )
+    assert raster_payload.overlay_results[0]["rendered_feature_count"] is None
+
+    with pytest.raises(ValueError):
+        RealtimeRenderAckPayload(
+            run_id="run-1",
+            run_version=1,
+            map_session_id="map-session-1",
+            collection_revision=4,
+            status="ready",
+            viewport_bounds=[12.3, 42.0, 12.7, 41.0],
+        )
+
+    with pytest.raises(ValueError):
+        RealtimeRenderAckPayload(
+            run_id="run-1",
+            run_version=1,
+            map_session_id="map-session-1",
+            collection_revision=4,
+            status="ready",
+            checks={
+                "required_sources_loaded": True,
+                "required_layers_present": True,
+                "viewport_valid": True,
+            },
+        )
+
+###############################################################################
+def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    candidate = _session(
+        OverlayInstance(
+            instance_id="earthquake-rome",
+            capability_id="usgs_earthquakes",
+            label="Earthquakes",
+            provider="usgs",
+            overlay_type="geojson",
+            rendering_mode="geojson",
+            descriptor={
+                "result_type": "feature_collection",
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": "quake-1",
+                            "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
+                            "properties": {"magnitude": 4.2},
+                        }
+                    ],
+                },
+            },
+        )
+    )
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+    )
+    presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "assistant_message": "Data prepared; the map is loading.",
+            "map_session": candidate.model_dump(mode="json"),
+            "memory_snapshot": {},
+            "conversation_state": {
+                "conversation_id": conversation_id,
+                "revision": 0,
+            },
+        },
+    )
+    assert prepared is True
+    assert presentation["status"] == "pending"
+
+    acknowledgment = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "earthquake-rome",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "rendered_feature_count": 1,
+            }
+        ],
+    )
+    first = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
+    assert first.duplicate is False
+    assert first.state == "completed"
+    assert first.presentation_status == "ready"
+    assert [event[0] for event in publisher.events].count("completed") == 1
+
+    second = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
+    assert second.duplicate is True
+    assert [event[0] for event in publisher.events].count("completed") == 1
+
+    with pytest.raises(ValueError, match="different render acknowledgment"):
+        run_async_in_thread(
+            service.acknowledge(
+                conversation_id,
+                acknowledgment.model_copy(update={"checks": {"viewport_valid": False}}),
+            )
+        )
+
+###############################################################################
+def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    candidate = _session(
+        OverlayInstance(
+            instance_id="earthquake-rome",
+            capability_id="usgs_earthquakes",
+            label="Earthquakes",
+            provider="usgs",
+            overlay_type="geojson",
+            rendering_mode="geojson",
+            descriptor={
+                "result_type": "feature_collection",
+                "data": {"type": "FeatureCollection", "features": [{"type": "Feature"}]},
+            },
+        )
+    )
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+    )
+    presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={"map_session": candidate.model_dump(mode="json")},
+    )
+    assert prepared is True
+    assert presentation["required_overlay_ids"] == ["earthquake-rome"]
+    base_ack = {
+        "run_id": run_id,
+        "run_version": 1,
+        "map_session_id": candidate.session_id,
+        "collection_revision": candidate.overlay_collection.revision,
+        "status": "ready",
+        "viewport_bounds": candidate.bounds,
+        "checks": {
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        "overlay_results": [
+            {
+                "overlay_id": "earthquake-rome",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "rendered_feature_count": 0,
+            }
+        ],
+    }
+    with pytest.raises(RenderAcknowledgementError, match="does not match") as error:
+        run_async_in_thread(
+            service.acknowledge(
+                conversation_id,
+                RealtimeRenderAckPayload(
+                    **{**base_ack, "collection_revision": candidate.overlay_collection.revision + 1}
+                ),
+            )
+        )
+    assert error.value.code == "render_ack_mismatch"
+    assert error.value.details["expected"] == {
+        "run_id": run_id,
+        "run_version": 1,
+        "map_session_id": candidate.session_id,
+        "collection_revision": candidate.overlay_collection.revision,
+    }
+    assert error.value.details["observed"]["collection_revision"] == (
+        candidate.overlay_collection.revision + 1
+    )
+    with pytest.raises(ValueError, match="visible"):
+        run_async_in_thread(
+            service.acknowledge(
+                conversation_id,
+                RealtimeRenderAckPayload(**base_ack),
+            )
+        )
+
+###############################################################################
+def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    candidate = _session()
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "goal": AgentGoal(
+                goal="Show earthquake data in Rome",
+                task_mode="execute",
+                presentation="map",
+                operation="geospatial_data_retrieval",
+                requires_location=True,
+                target_ids=["target-rome"],
+            ).model_dump(mode="json"),
+            "completion_contract": _contract(
+                "required_data_retrieved"
+            ).model_dump(mode="json"),
+        },
+    )
+    assert prepared is True
+    with pytest.raises(ValueError, match="required_data_retrieved"):
+        run_async_in_thread(
+            service.acknowledge(
+                conversation_id,
+                RealtimeRenderAckPayload(
+                    run_id=run_id,
+                    run_version=1,
+                    map_session_id=candidate.session_id,
+                    collection_revision=candidate.overlay_collection.revision,
+                    status="ready",
+                    viewport_bounds=candidate.bounds,
+                    checks={
+                        "required_sources_loaded": True,
+                        "required_layers_present": True,
+                        "viewport_valid": True,
+                    },
+                ),
+            )
+        )
+
+###############################################################################
+def test_production_render_ack_persists_terminal_events_atomically() -> None:
+    backend = _InMemoryBackend()
+    Base.metadata.create_all(backend.engine)
+    conversation_id = "conversation-render-atomic"
+    with backend.session() as session:
+        session.add(ConversationRecord(id=conversation_id, title="Render atomic"))
+        session.commit()
+
+    event_repository = AgentRunEventRepository(backend)
+    repository = AgentRunRepository(backend, event_repository=event_repository)
+    publisher = RunEventPublisher(event_repository)
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,
+    )
+    run = repository.create_run(
+        conversation_id,
+        "Show Rome",
+        "Show Rome",
+        client_request_id="render-atomic-1",
+    )
+    candidate = _session()
+    _presentation, prepared = service.prepare(
+        run_id=run.run_id,
+        run_version=run.active_run_version,
+        response_payload={
+            "assistant_message": "Data prepared; the map is loading.",
+            "map_session": candidate.model_dump(mode="json"),
+            "memory_snapshot": {},
+            "conversation_state": {
+                "conversation_id": conversation_id,
+                "revision": 0,
+            },
+        },
+    )
+    assert prepared is True
+
+    acknowledgment = RealtimeRenderAckPayload(
+        run_id=run.run_id,
+        run_version=run.active_run_version,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+    )
+    result = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
+
+    assert result.presentation_status == "ready"
+    events = event_repository.list_events(run.run_id)
+    assert [event.type for event in events] == [
+        RunEventType.PROGRESS,
+        RunEventType.ASSISTANT_TEXT_COMPLETED,
+        RunEventType.COMPLETED,
+    ]
+    snapshot = repository.get_run(run.run_id)
+    assert snapshot is not None
+    assert snapshot.presentation_status == "ready"
+    presentation = snapshot.presentation or {}
+    assert presentation["status"] == "ready"
+    assert "pending_response" not in presentation
+    assert len(presentation.get("durable_event_ids", [])) == 3
+
+
+###############################################################################
+def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+        resume_mode=True,
+        max_render_attempts=3,
+    )
+    first_candidate = _session()
+    checkpoint = {
+        "render_attempts": 0,
+        "render_observations": [],
+        "prepared_map_action_fingerprint": "map-action-1",
+        "budget_snapshot": {},
+    }
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "assistant_message": "Data prepared; the map is loading.",
+            "map_session": first_candidate.model_dump(mode="json"),
+            "conversation_state": {"conversation_id": conversation_id, "revision": 0},
+            "execution_trace": {"checkpoint": checkpoint},
+        },
+    )
+    assert prepared is True
+
+    failed_ack = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=first_candidate.session_id,
+        collection_revision=first_candidate.overlay_collection.revision,
+        status="failed",
+        checks={"required_layers_present": False},
+        failure_code="missing_layer",
+        failure_stage="maplibre",
+        failure_summary="The expected layer was not registered.",
+    )
+    failed = run_async_in_thread(service.acknowledge(conversation_id, failed_ack))
+    assert failed.resume_required is True
+    assert failed.duplicate is False
+    assert failed.state == "pending"
+    assert failed.presentation_status == "pending"
+    assert failed.observation is not None
+    assert failed.observation.attempt == 1
+    assert failed.observation.action_fingerprint == "map-action-1"
+
+    after_failure = repository.get_run(run_id)
+    assert after_failure is not None
+    assert (after_failure.presentation or {}).get("render_attempts") == 1
+
+    second_candidate = first_candidate.model_copy(
+        update={"session_id": "map-session-2"}, deep=True
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "assistant_message": "I revised the map.",
+            "map_session": second_candidate.model_dump(mode="json"),
+            "conversation_state": {"conversation_id": conversation_id, "revision": 0},
+            "execution_trace": {
+                "checkpoint": {
+                    **checkpoint,
+                    "render_attempts": 1,
+                    "render_observations": [failed.observation.model_dump(mode="json")],
+                }
+            },
+        },
+    )
+    assert prepared is True
+
+    ready_ack = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=second_candidate.session_id,
+        collection_revision=second_candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=second_candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+    )
+    ready = run_async_in_thread(service.acknowledge(conversation_id, ready_ack))
+    assert ready.resume_required is True
+    assert ready.state == "pending"
+    assert ready.presentation_status == "ready"
+    assert ready.observation is not None
+    assert ready.observation.attempt == 2
+    assert any(str(event[0]) == "render_observed" for event in publisher.events)
+
+    duplicate = run_async_in_thread(service.acknowledge(conversation_id, ready_ack))
+    assert duplicate.duplicate is True
+    assert duplicate.resume_required is False
+
+
+###############################################################################
+def test_resumable_ready_check_rejection_becomes_render_failure_observation(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,  # type: ignore[arg-type]
+        resume_mode=True,
+        max_render_attempts=3,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="vector-overlay",
+            capability_id="test-overlay",
+            label="Test overlay",
+            provider="test",
+            overlay_type="geojson",
+            rendering_mode="geojson",
+            descriptor={
+                "result_type": "feature_collection",
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": [{"type": "Feature", "geometry": {"type": "Point"}}],
+                },
+            },
+        )
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "execution_trace": {
+                "checkpoint": {
+                    "render_attempts": 0,
+                    "render_observations": [],
+                    "prepared_map_action_fingerprint": "map-action-validation",
+                    "budget_snapshot": {},
+                }
+            },
+        },
+    )
+    assert prepared is True
+
+    rejected_ready = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "vector-overlay",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "rendered_feature_count": 0,
+            }
+        ],
+    )
+
+    result = run_async_in_thread(
+        service.acknowledge(conversation_id, rejected_ready)
+    )
+
+    assert result.resume_required is True
+    assert result.presentation_status == "pending"
+    assert result.observation is not None
+    assert result.observation.status == "failed"
+    assert result.observation.failure_code == "render_validation_failed"
+    assert result.observation.failure_stage == "backend_validation"
+    assert result.observation.recovery == "revise_map"
+    assert any(str(event[0]) == "render_observed" for event in publisher.events)
+
+@pytest.mark.parametrize('rendering_mode', ['raster-tile', 'tile', 'xyz', 'wms', 'wmts'])
+@pytest.mark.parametrize('visible', [None, False])
+def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(
+    render_context, rendering_mode, visible
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher,
+        resume_mode=True, max_render_attempts=3)
+    candidate = _session(OverlayInstance(instance_id='raster', capability_id='raster', label='Raster',
+        provider='test', overlay_type='tile', rendering_mode=rendering_mode, descriptor={'result_type': 'raster'}))
+    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
+        'map_session': candidate.model_dump(mode='json'),
+        'execution_trace': {'checkpoint': {'render_attempts': 0, 'budget_snapshot': {},
+            'execution_policy': {'max_render_attempts': 1, 'render_ack_seconds': 7}}}})
+    assert presentation['max_render_attempts'] == 1
+    assert presentation['render_ack_timeout_seconds'] == 7
+    ack = RealtimeRenderAckPayload(run_id=run_id, run_version=1, map_session_id=candidate.session_id,
+        collection_revision=4, status='ready', viewport_bounds=candidate.bounds,
+        checks={'required_sources_loaded': True, 'required_layers_present': True, 'viewport_valid': True},
+        overlay_results=[{'overlay_id': 'raster', 'source_present': True, 'layer_present': True,
+            'loaded': True, 'visibility_matches': True, 'result_visible': visible}])
+    result = run_async_in_thread(service.acknowledge(conversation_id, ack))
+    assert result.observation.status == 'failed'
+    assert result.observation.recovery == 'terminal'
+    duplicate = run_async_in_thread(service.acknowledge(conversation_id, ack))
+    assert duplicate.duplicate is True
+
+
+def test_valid_empty_raster_does_not_require_visible_pixels(render_context) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="empty-raster",
+            capability_id="empty-raster",
+            label="Empty raster",
+            provider="fixture",
+            overlay_type="raster-tile",
+            rendering_mode="raster-tile",
+            descriptor={
+                "result_type": "raster",
+                "result_status": "valid_empty",
+            },
+        )
+    )
+    _presentation, prepared = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={"map_session": candidate.model_dump(mode="json")},
+    )
+    assert prepared is True
+    acknowledgment = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "empty-raster",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "result_visible": False,
+                "raster_tile_intersects_viewport": True,
+                "raster_nontransparent_pixel_count": 0,
+            }
+        ],
+    )
+
+    result = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
+
+    assert result.state == "completed"
+    assert result.presentation_status == "ready"

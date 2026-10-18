@@ -40,4 +40,22 @@ describe('SettingsModalShellComponent', () => {
     component.onBackdropClick({ target, currentTarget: target } as unknown as MouseEvent);
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('emits close when Escape is pressed', () => {
+    const spy = jasmine.createSpy('close');
+    const preventDefault = jasmine.createSpy('preventDefault');
+    component.requestClose.subscribe(spy);
+
+    component.onDocumentKeydown({ key: 'Escape', preventDefault } as unknown as KeyboardEvent);
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('moves initial focus inside the dialog', async () => {
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.settings-modal__close'));
+  });
 });

@@ -1,0 +1,175 @@
+{
+  "id": "google_maps",
+  "name": "Google Maps Platform",
+  "provider": "google_maps",
+  "type": "credentialed-provider",
+  "description": "Credential-gated provider metadata for Google Maps Platform integrations.",
+  "capabilities": [
+    "places",
+    "commercial-poi",
+    "geocoding"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Google Maps Platform",
+    "requires_key": true,
+    "attribution": "Google Maps Platform",
+    "keywords": [
+      "google maps",
+      "places",
+      "commercial poi",
+      "geocoding"
+    ],
+    "action_tags": [
+      "places",
+      "commercial-poi",
+      "geocoding"
+    ],
+    "task_tags": [
+      "poi",
+      "geospatial-discovery"
+    ],
+    "temporal_behavior": "current",
+    "dataset_time_reference": "Provider live API response time",
+    "source_freshness": "Provider-managed live index",
+    "query_mode": "credentialed-api",
+    "integration_requirements": [
+      "Requires Google Maps Platform API key configured in Access"
+    ],
+    "official_docs_url": "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "point",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Google Maps Platform",
+      "find Google Maps Platform near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing"
+  ],
+  "license": {
+    "name": "Google Maps Platform",
+    "url": "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "google_maps",
+    "required": true,
+    "accessPageProviderId": "google_maps"
+  },
+  "account_setup": {
+    "mode": "manual",
+    "automation_supported": false,
+    "automation_reason": "Third-party provider signup and key retrieval require external account, billing, MFA, CAPTCHA, or portal flows that are not stable product APIs.",
+    "account_url": "https://console.cloud.google.com",
+    "dashboard_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+    "documentation_url": "https://developers.google.com/maps/documentation/javascript/get-api-key",
+    "credential_fields": [
+      {
+        "name": "api_key",
+        "label": "API key",
+        "secret": true,
+        "required": true
+      }
+    ],
+    "steps": [
+      {
+        "id": "create_account",
+        "title": "Create or sign in to the provider account",
+        "description": "Open the provider account page and complete signup or sign in."
+      },
+      {
+        "id": "create_project",
+        "title": "Create or select a project",
+        "description": "Create a project or application in the provider dashboard if required."
+      },
+      {
+        "id": "create_key",
+        "title": "Create an API key",
+        "description": "Generate an API key for the required geospatial APIs."
+      },
+      {
+        "id": "restrict_key",
+        "title": "Restrict the API key",
+        "description": "Apply provider-supported restrictions before saving the key."
+      },
+      {
+        "id": "save_and_validate",
+        "title": "Save and validate in AEGIS",
+        "description": "Paste the key into AEGIS and run validation."
+      }
+    ],
+    "automation": {
+      "support": "manual_only",
+      "signup_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+      "developer_portal_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+      "docs_url": "https://developers.google.com/maps/documentation/javascript/get-api-key",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Create or select a Google Cloud project, enable required APIs, configure billing, and restrict the key in Google Cloud.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback.",
+        "Google Maps Platform production API-key setup requires the user to complete Google Cloud account, project, API, and billing setup manually."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "places",
+      "commercial-poi",
+      "geocoding",
+      "poi",
+      "geospatial-discovery",
+      "google maps",
+      "commercial poi"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

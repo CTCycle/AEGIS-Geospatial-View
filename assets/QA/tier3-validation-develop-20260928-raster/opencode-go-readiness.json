@@ -1,0 +1,48 @@
+{
+  "campaign": "AEGIS exact provider readiness",
+  "slice_id": "PROVIDER-READY-20260928",
+  "scope": "OpenCode Go catalog, model selection, native structured probe, and relocated SQLite data-root alignment",
+  "status": "PASS",
+  "verification_date": "2026-09-28",
+  "tested_source": "develop@3de5619b",
+  "runtime": {
+    "data_root": "app/resources",
+    "database": "app/resources/database.db",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "fallback_used": false
+  },
+  "evidence": {
+    "database_integrity": "ok",
+    "database_revision": "202609210001",
+    "database_size_bytes": 504471552,
+    "catalog": {
+      "ok": true,
+      "reachable": true,
+      "model_count": 30,
+      "selected_model_present": true,
+      "protocol": "openai-chat-completions",
+      "supports_tools": true,
+      "supports_structured_output": true
+    },
+    "structured_probe": {
+      "status": "passed",
+      "parse_status": "complete",
+      "message": "Native tool probe passed."
+    },
+    "focused_tests": "62 passed, 1 existing dependency deprecation warning",
+    "ruff": "passed"
+  },
+  "diagnosis": {
+    "initial_stored_credential": "different from supplied credential",
+    "initial_catalog_http_status": 401,
+    "credential_update": "accepted through PATCH /api/chat/settings; secret not recorded",
+    "final_stored_credential": "matches supplied credential",
+    "final_catalog_http_status": 200
+  },
+  "limits": [
+    "This is provider/catalog/native-probe readiness, not fresh live MapLibre raster rendering.",
+    "FEMA/ESA source/layer visibility and map.render_ack remain separate incomplete browser gates.",
+    "A process-level AEGIS_DATA_DIR override can intentionally select another database and therefore another credential state."
+  ]
+}

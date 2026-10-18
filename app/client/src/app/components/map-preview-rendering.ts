@@ -1,4 +1,5 @@
 import { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
+import type { GeoJSON } from 'geojson';
 
 import {
   DEFAULT_BASE_ATTRIBUTION,
@@ -12,11 +13,60 @@ import {
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
 } from '../core/constants';
+import { mapOverlayEntryFromInstance } from '../core/api-parsers';
 import { MapOverlayEntry, MapSession, OverlayRenderStatus } from '../core/types';
 import { isFiniteNumber } from '../core/type-guards';
 
 export type OverlayEntry = MapOverlayEntry;
 type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
+type ClusterGeoJsonSource = {
+  type: 'geojson';
+  getClusterExpansionZoom: (
+    clusterId: number,
+    callback: (error: Error | null, zoom: number) => void,
+  ) => void;
+};
+
+export const mapSessionOverlayEntries = (mapSession?: MapSession): OverlayEntry[] => (
+  mapSession?.overlay_collection?.instances.flatMap((instance) => {
+    const entry = mapOverlayEntryFromInstance(instance);
+    return entry ? [entry] : [];
+  }) || []
+);
+
+export const reconcileOverlayOrder = (
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): string[] => {
+  const availableIds = new Set(overlays.map((overlay) => overlay.id));
+  const seenIds = new Set<string>();
+  const order: string[] = [];
+  for (const id of preferredOrder) {
+    if (availableIds.has(id) && !seenIds.has(id)) {
+      seenIds.add(id);
+      order.push(id);
+    }
+  }
+  for (const overlay of overlays) {
+    if (!seenIds.has(overlay.id)) {
+      seenIds.add(overlay.id);
+      order.push(overlay.id);
+    }
+  }
+  return order;
+};
+
+export const orderOverlayEntries = (
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): OverlayEntry[] => {
+  const order = reconcileOverlayOrder(overlays, preferredOrder);
+  const positionById = new globalThis.Map(order.map((id, index) => [id, index]));
+  return [...overlays].sort((left, right) => (
+    (positionById.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+    - (positionById.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+  ));
+};
 
 const toMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) {
@@ -27,6 +77,16 @@ const toMessage = (error: unknown): string => {
   }
   return 'Overlay rendering failed.';
 };
+
+const noResultsStatus = (overlay: OverlayEntry): OverlayRenderStatus => (
+  String(overlay.result_status || '').toLowerCase() === 'valid_empty'
+    ? {
+      overlayId: overlay.id,
+      status: 'no-results',
+      message: 'No results in the requested area or time window.',
+    }
+    : { overlayId: overlay.id, status: 'loaded' }
+);
 
 export const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const aKeys = Object.keys(a);
@@ -63,6 +123,16 @@ const isFiniteBoundsTuple = (value: unknown): value is [number, number, number, 
   Array.isArray(value)
   && value.length === 4
   && value.every(isFiniteNumber)
+  && value[0] >= -180
+  && value[0] <= 180
+  && value[1] >= -90
+  && value[1] <= 90
+  && value[2] >= -180
+  && value[2] <= 180
+  && value[3] >= -90
+  && value[3] <= 90
+  && value[1] <= value[3]
+  && !(value[0] > value[2] && (value[0] < 150 || value[2] > -150))
 );
 
 const normalizeOverlayBounds = (
@@ -84,8 +154,8 @@ const buildWmsTileUrl = (
     return null;
   }
   const layers = 'layers' in descriptor && descriptor.layers ? descriptor.layers : descriptor.layer_id || DEFAULT_WMS_LAYER_ID;
-  const version = 'wms_version' in descriptor && descriptor.wms_version ? descriptor.wms_version : DEFAULT_WMS_VERSION;
-  const exceptions = 'wms_exceptions' in descriptor && descriptor.wms_exceptions ? descriptor.wms_exceptions : DEFAULT_WMS_EXCEPTIONS;
+  const version = DEFAULT_WMS_VERSION;
+  const exceptions = DEFAULT_WMS_EXCEPTIONS;
   const crs = descriptor.crs || 'EPSG:3857';
   const format = descriptor.format || 'image/png';
   const style = descriptor.style || '';
@@ -119,8 +189,8 @@ const buildWmtsTileUrl = (
   }
   const layerId = descriptor.layer_id || ('layers' in descriptor ? descriptor.layers : undefined) || DEFAULT_WMS_LAYER_ID;
   const matrixSet = descriptor.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
-  const format = descriptor.format || ('wmts_format' in descriptor ? descriptor.wmts_format : undefined) || DEFAULT_WMTS_FORMAT;
-  const style = descriptor.style || ('wmts_style' in descriptor ? descriptor.wmts_style : undefined) || 'default';
+  const format = descriptor.format || DEFAULT_WMTS_FORMAT;
+  const style = descriptor.style || 'default';
   const query = [
     'service=WMTS',
     'request=GetTile',
@@ -137,9 +207,16 @@ const buildWmtsTileUrl = (
   return appendQuery(descriptor.url, query);
 };
 
-const buildBasemapTileUrl = (mapSession?: MapSession): string => {
+const buildBasemapTileUrl = (mapSession?: MapSession): string | null => {
   const basemap = mapSession?.basemap;
-  const tileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
+  if (mapSession && (!basemap || basemap.render_status === 'unavailable')) {
+    return null;
+  }
+  const basemapId = mapSession?.basemap_id || basemap?.id || 'osm_default';
+  const tileUrl = basemap?.tile_url || (basemapId === 'osm_default' ? DEFAULT_BASE_TILE_URL : null);
+  if (!tileUrl) {
+    return null;
+  }
   if (tileUrl === DEFAULT_BASE_TILE_URL) {
     return DEFAULT_BASE_TILE_PROXY_URL;
   }
@@ -169,7 +246,7 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
     sources: {
       basemap: {
         type: 'raster',
-        tiles: [baseTileUrl],
+        tiles: baseTileUrl ? [baseTileUrl] : [],
         tileSize: 256,
         maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
         attribution: basemap?.attribution || DEFAULT_BASE_ATTRIBUTION,
@@ -189,18 +266,27 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
 };
 
 export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRenderStatus[] => {
-  const overlays = mapSession?.overlays || [];
+  const overlays = mapSessionOverlayEntries(mapSession);
   const statuses: OverlayRenderStatus[] = [];
 
   overlays.forEach((overlay, index) => {
     const sourceId = `overlay-source-${overlay.id}`;
     const layerId = `overlay-layer-${overlay.id}`;
+    const layerIds = getOverlayLayerIds(overlay);
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
     const renderingMode = String(
       overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
     ).toLowerCase();
     try {
+      if (
+        typeof map.getLayer === 'function'
+        && typeof map.getSource === 'function'
+        && layerIds.some((id) => map.getLayer(id))
+      ) {
+        statuses.push(noResultsStatus(overlay));
+        return;
+      }
       if (renderingMode === 'metadata-only' || overlay.type === 'metadata-only') {
         statuses.push({
           overlayId: overlay.id,
@@ -214,7 +300,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
         ['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
         && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)
       ) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
@@ -222,12 +308,12 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
         ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
         && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
       ) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
       if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
@@ -264,7 +350,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
             'circle-stroke-color': '#111827',
           },
         });
-        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        statuses.push(noResultsStatus(overlay));
         return;
       }
 
@@ -281,6 +367,69 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
   return statuses;
 };
 
+export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => {
+  const keep = new Set(mapSessionOverlayEntries(mapSession).flatMap(getOverlayLayerIds));
+  const sourcesToRemove = new Set<string>();
+  const styleLayers = typeof map.getStyle === 'function' ? map.getStyle()?.layers || [] : [];
+  for (const layer of styleLayers) {
+    if (!layer.id.startsWith('overlay-layer-') || keep.has(layer.id)) {
+      continue;
+    }
+    if (map.getLayer(layer.id)) {
+      map.removeLayer(layer.id);
+    }
+    const source = (layer as unknown as { source?: unknown }).source;
+    sourcesToRemove.add(
+      typeof source === 'string'
+        ? source
+        : `overlay-source-${layer.id.slice('overlay-layer-'.length)}`,
+    );
+  }
+  for (const sourceId of sourcesToRemove) {
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+    }
+  }
+};
+
+export const getOverlayLayerIds = (overlay: OverlayEntry): string[] => {
+  const layerId = `overlay-layer-${overlay.id}`;
+  const renderingMode = String(
+    overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
+  ).toLowerCase();
+  if (renderingMode === 'clustered-points') {
+    return [
+      `${layerId}-clusters`,
+      `${layerId}-cluster-count`,
+      `${layerId}-points`,
+    ];
+  }
+  return [layerId];
+};
+
+export const applyOverlayLayerOrder = (
+  map: Map,
+  overlays: readonly OverlayEntry[],
+  preferredOrder: readonly string[] = [],
+): void => {
+  const overlaysById = new globalThis.Map(overlays.map((overlay) => [overlay.id, overlay]));
+  const order = reconcileOverlayOrder(overlays, preferredOrder);
+
+  // The control list is front-to-back. MapLibre appends moved layers to the
+  // top, so apply the order from back to front and keep clustered layers grouped.
+  for (const overlayId of [...order].reverse()) {
+    const overlay = overlaysById.get(overlayId);
+    if (!overlay) {
+      continue;
+    }
+    for (const layerId of getOverlayLayerIds(overlay)) {
+      if (map.getLayer(layerId)) {
+        map.moveLayer(layerId);
+      }
+    }
+  }
+};
+
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
   const overlayType = overlay.type.toLowerCase();
   const renderingMode = String(overlay.rendering_mode || '').toLowerCase();
@@ -294,13 +443,27 @@ export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
     'camera-points',
   ]);
   return Boolean(
-    overlay.url
+    (overlay.url || overlay.data)
     && (overlayType === 'geojson'
       || overlayType === 'arcgis-geojson'
       || geoJsonRenderingModes.has(renderingMode)
       || format.includes('geojson')
       || protocol.includes('geojson')),
   );
+};
+
+const mapHasGlyphs = (map: Map): boolean => {
+  if (typeof map.getStyle !== 'function') {
+    // Keep lightweight map doubles useful in unit tests. Real MapLibre maps
+    // always expose getStyle(), so an absent glyphs URL is handled below.
+    return true;
+  }
+  try {
+    const glyphs = map.getStyle()?.glyphs;
+    return typeof glyphs === 'string' && glyphs.trim().length > 0;
+  } catch {
+    return false;
+  }
 };
 
 const addGeoJsonOverlayLayer = (
@@ -310,14 +473,17 @@ const addGeoJsonOverlayLayer = (
   layerId: string,
   opacity: number,
 ): boolean => {
-  if (!isGeoJsonOverlay(overlay) || !overlay.url) {
+  if (!isGeoJsonOverlay(overlay) || (!overlay.url && !overlay.data)) {
     return false;
   }
+  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   map.addSource(sourceId, {
     type: 'geojson',
-    data: overlay.url,
+    data: (overlay.data || overlay.url!) as unknown as GeoJSON,
+    ...(renderingMode === 'clustered-points'
+      ? { cluster: true, clusterMaxZoom: 14, clusterRadius: 50 }
+      : {}),
   });
-  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   const geometryType = overlay.geometry_type?.toLowerCase() || '';
   if (renderingMode === 'camera-points') {
     map.addLayer({
@@ -334,7 +500,96 @@ const addGeoJsonOverlayLayer = (
     });
     return true;
   }
-  if (geometryType.includes('point') || renderingMode === 'clustered-points') {
+  if (renderingMode === 'clustered-points') {
+    const baseLayerId = `overlay-layer-${overlay.id}`;
+    map.addLayer({
+      id: `${baseLayerId}-clusters`,
+      source: sourceId,
+      type: 'circle',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step',
+          ['get', 'point_count'],
+          '#51bbd6',
+          100,
+          '#f1f075',
+          750,
+          '#f28cb1',
+        ],
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          16,
+          100,
+          20,
+          750,
+          24,
+        ],
+        'circle-opacity': opacity,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#164e63',
+      },
+    });
+    if (mapHasGlyphs(map)) {
+      map.addLayer({
+        id: `${baseLayerId}-cluster-count`,
+        source: sourceId,
+        type: 'symbol',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': ['get', 'point_count_abbreviated'],
+          'text-size': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#164e63',
+          'text-halo-width': 1,
+          'text-opacity': opacity,
+        },
+      });
+    }
+    map.addLayer({
+      id: `${baseLayerId}-points`,
+      source: sourceId,
+      type: 'circle',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-radius': 5,
+        'circle-color': '#0ea5e9',
+        'circle-opacity': opacity,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#082f49',
+      },
+    });
+    if (typeof map.on === 'function') {
+      map.on('click', `${baseLayerId}-clusters`, (event) => {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: [`${baseLayerId}-clusters`],
+        });
+        const clusterId = features[0]?.properties?.['cluster_id'];
+        if (!isFiniteNumber(clusterId)) {
+          return;
+        }
+        const source = map.getSource(sourceId) as unknown as ClusterGeoJsonSource | undefined;
+        if (
+          !source
+          || source.type !== 'geojson'
+          || typeof source.getClusterExpansionZoom !== 'function'
+        ) {
+          return;
+        }
+        source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+          if (error || !isFiniteNumber(zoom)) {
+            return;
+          }
+          map.easeTo({ center: [event.lngLat.lng, event.lngLat.lat], zoom });
+        });
+      });
+    }
+    return true;
+  }
+  if (geometryType.includes('point')) {
     map.addLayer({
       id: layerId,
       source: sourceId,
@@ -408,7 +663,7 @@ const addVectorTileOverlayLayer = (
   return true;
 };
 
-const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
+export const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
   const render = overlay.render;
   if (render?.tile_url_template) {
     return [applyTimeIfNeeded(render.tile_url_template, render)];
@@ -462,8 +717,8 @@ const addRasterOverlayLayer = (
     tiles,
     tileSize: overlay.render?.tile_size || overlay.tile_size || 256,
   };
-  const minZoom = overlay.render?.min_zoom ?? overlay.min_zoom ?? overlay.minzoom;
-  const maxZoom = overlay.render?.max_zoom ?? overlay.max_zoom ?? overlay.maxzoom;
+  const minZoom = overlay.render?.min_zoom ?? overlay.min_zoom;
+  const maxZoom = overlay.render?.max_zoom ?? overlay.max_zoom;
   if (typeof minZoom === 'number') {
     (rasterSource as { minzoom?: number }).minzoom = minZoom;
   }

@@ -1,31 +1,81 @@
 <div class="overlay-controls">
-  @for (overlay of overlays; track trackOverlay($index, overlay)) {
-    <div class="overlay-control-row">
-      <label [attr.data-render-status]="getRenderStatus(overlay.id)">
-        <input
-          type="checkbox"
-          [checked]="overlayVisibility[overlay.id]"
-          (change)="onOverlayVisibilityChange(overlay.id, $event)"
-        />
-        {{ overlay.label }}
-      </label>
-      <input
-        #opacityInput
-        type="range"
-        min="0"
-        max="100"
-        [value]="getOpacityPercent(overlay)"
-        [disabled]="isOpacityDisabled(overlay.id)"
-        (input)="onOpacityChange(overlay.id, opacityInput.value)"
-      />
-      @if (getRenderStatus(overlay.id) !== 'loaded') {
-        <p class="overlay-render-note">
-          {{ getRenderStatus(overlay.id) }}
-          @if (getRenderMessage(overlay.id)) {
-            : {{ getRenderMessage(overlay.id) }}
-          }
-        </p>
-      }
+  <header class="overlay-controls__header">
+    <div>
+      <h2>Layers</h2>
+      <p>{{ visibleOverlayCount }} of {{ overlays.length }} visible</p>
     </div>
-  }
+    <button
+      type="button"
+      class="overlay-controls__toggle"
+      aria-controls="map-layers-panel"
+      [attr.aria-expanded]="isExpanded"
+      (click)="toggleExpanded()"
+    >
+      {{ isExpanded ? 'Collapse' : 'Expand' }}
+    </button>
+  </header>
+  <div id="map-layers-panel" class="overlay-controls__list" [hidden]="!isExpanded">
+      @for (overlay of overlays; track trackOverlay($index, overlay)) {
+        <div class="overlay-control-row">
+          <label [attr.data-render-status]="getRenderStatus(overlay.id)">
+            <input
+              type="checkbox"
+              [checked]="overlayVisibility[overlay.id]"
+              [attr.aria-label]="'Show ' + overlay.label + ' layer'"
+              (change)="onOverlayVisibilityChange(overlay.id, $event)"
+            />
+            <span>{{ overlay.label }}</span>
+          </label>
+          <label class="overlay-control-row__opacity">
+            <span class="sr-only">{{ getOpacityLabel(overlay) }}</span>
+            <input
+              #opacityInput
+              type="range"
+              min="0"
+              max="100"
+              [value]="getOpacityPercent(overlay)"
+              [disabled]="isOpacityDisabled(overlay.id)"
+              [attr.aria-label]="'Opacity for ' + overlay.label"
+              [attr.aria-valuetext]="getOpacityLabel(overlay)"
+              (input)="onOpacityChange(overlay.id, opacityInput.value)"
+            />
+          </label>
+          <div class="overlay-control-row__order" role="group" aria-label="Layer order controls">
+            <button
+              type="button"
+              class="overlay-control-row__order-button"
+              [disabled]="$first"
+              [attr.aria-label]="'Move ' + overlay.label + ' up'"
+              [title]="'Move ' + overlay.label + ' up'"
+              (click)="moveOverlay(overlay.id, -1)"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="overlay-control-row__order-button"
+              [disabled]="$last"
+              [attr.aria-label]="'Move ' + overlay.label + ' down'"
+              [title]="'Move ' + overlay.label + ' down'"
+              (click)="moveOverlay(overlay.id, 1)"
+            >
+              ↓
+            </button>
+          </div>
+          @if (getRenderStatus(overlay.id) !== 'loaded') {
+            <p
+              class="overlay-render-note"
+              [attr.role]="getRenderStatus(overlay.id) === 'no-results' ? 'status' : null"
+              [attr.aria-live]="getRenderStatus(overlay.id) === 'no-results' ? 'polite' : null"
+            >
+              {{ getRenderStatus(overlay.id) }}
+              @if (getRenderMessage(overlay.id)) {
+                : {{ getRenderMessage(overlay.id) }}
+              }
+            </p>
+          }
+        </div>
+      }
+      <p class="sr-only" aria-live="polite">{{ reorderAnnouncement }}</p>
+  </div>
 </div>

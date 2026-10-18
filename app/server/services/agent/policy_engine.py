@@ -1,163 +1,100 @@
+"""Native policy boundary for typed tool execution."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from server.domain.agent.decision import (
-    ClarificationRequest,
-    DecisionTrace,
-    ExecutionPlan,
-    PolicyDecision,
-)
-from server.domain.agent.policies import (
-    AgentPolicyConstraints,
-    ToolAuthorizationResult,
-    ToolValidationResult,
-)
-from server.domain.extraction.models import TurnParseResult
-from server.services.agent.location_resolver import LocationResolver
+from pydantic import BaseModel
+
+from server.common.typing import is_json_array
+from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.policies import ToolAuthorizationResult
+from server.domain.agent.tools import RegisteredTool
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class PolicyEngine:
+    """Authorize model actions after route and schema validation.
+
+    The model may select a semantic action, but this boundary owns catalog
+    membership, runtime access, route domains, provider allowlists, and
+    geography coverage checks.
+    """
 
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
-        location_resolver: LocationResolver,
         capability_registry: CapabilityRegistry | None = None,
         runtime_registry: RuntimeRegistry | None = None,
+        location_resolver: Any | None = None,
         **_: Any,
     ) -> None:
-        self.location_resolver = location_resolver
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
+        self.location_resolver = location_resolver
 
     # -------------------------------------------------------------------------
-    def evaluate_preflight(self, turn: TurnParseResult) -> PolicyDecision | None:
-        trace = DecisionTrace(steps=["1.validate_task_class"])
-        task_validation = self._validate_task_class(turn)
-        if task_validation is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=task_validation,
-                trace=trace,
-            )
-        trace.steps.append("2.enforce_location_requirement")
-        location_policy = self._enforce_location_policy(turn)
-        if location_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="clarify",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=location_policy,
-                trace=trace,
-            )
-        trace.steps.append("3.enforce_safety_policy")
-        safety_policy = self._enforce_safety_policy(turn)
-        if safety_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn.normalized_action.action_id,
-                ),
-                clarification=safety_policy,
-                trace=trace,
-            )
-        return None
-
-    # -------------------------------------------------------------------------
-    def build_agent_constraints(
+    def authorize(
         self,
-        parsed_request: TurnParseResult,
-        map_state: dict[str, Any] | None = None,
-    ) -> AgentPolicyConstraints:
-        actionable_patterns = self._actionable_disallowed_patterns(parsed_request)
-        provider_ids = [
-            item.strip().lower()
-            for item in parsed_request.required_data_sources
-            if item.strip()
-        ]
-        allowed_tools = [
-            "list_geospatial_capabilities",
-            "describe_geospatial_capability",
-            "execute_geospatial_capability",
-        ]
+        tool: RegisteredTool,
+        arguments: BaseModel,
+        state: AgentRunState,
+    ) -> ToolAuthorizationResult:
+        constraints = state.policy_constraints
+        if constraints.get("blocked_patterns"):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Request contains blocked policy patterns.",
+                metadata={"code": "policy_rejection"},
+            )
+
+        allowed_tools = constraints.get("allowed_tool_names")
         if (
-            parsed_request.required_tool_category == "provider_native_discovery"
-            and provider_ids
+            is_json_array(allowed_tools)
+            and allowed_tools
+            and tool.definition.name not in {str(item) for item in allowed_tools}
         ):
-            allowed_tools.append("fetch_geospatial_provider_layers")
-            allowed_tools.append("render_geospatial_provider_layer")
-        if any(":" in layer for layer in parsed_request.requested_layers):
-            allowed_tools.append("render_geospatial_provider_layer")
-        return AgentPolicyConstraints(
-            requires_location=parsed_request.normalized_action.requires_location,
-            blocked_patterns=[item.pattern_id for item in actionable_patterns],
-            allowed_tool_names=allowed_tools,
-            metadata={
-                "map_state": map_state or {},
-                "allowed_provider_ids": provider_ids,
-            },
-        )
-
-    # -------------------------------------------------------------------------
-    def authorize_tool_call(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: Any,
-    ) -> ToolAuthorizationResult:
-        _ = arguments
-        constraints = getattr(context, "policy_constraints", {}) or {}
-        blocked_patterns = constraints.get("blocked_patterns")
-        if blocked_patterns:
             return ToolAuthorizationResult(
                 allowed=False,
-                reason="Request contains blocked policy patterns.",
+                reason=f"Tool '{tool.definition.name}' is not allowed by the run policy.",
+                metadata={"code": "tool_not_allowed"},
             )
-        allowed = constraints.get("allowed_tool_names")
-        if isinstance(allowed, list) and allowed and tool_name not in set(map(str, allowed)):
+
+        route = state.route
+        if route is None:
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Tool '{tool_name}' is not allowed by policy constraints.",
+                reason="A validated capability route is required.",
+                metadata={"code": "route_required"},
             )
-        return ToolAuthorizationResult(allowed=True)
 
-    # -------------------------------------------------------------------------
-    def validate_tool_result(
-        self,
-        tool_name: str,
-        result: Any,
-        context: Any,
-    ) -> ToolValidationResult:
-        _ = tool_name, context
-        if isinstance(result, dict) and result.get("ok") is False:
-            error = result.get("error")
-            reason = error.get("message") if isinstance(error, dict) else "Tool failed."
-            return ToolValidationResult(valid=False, reason=str(reason))
-        return ToolValidationResult(valid=True)
-
-    # -------------------------------------------------------------------------
-    def authorize_capability_execution(
-        self,
-        capability_id: str,
-        arguments: dict[str, Any],
-        parsed_request: TurnParseResult,
-        context: Any,
-    ) -> ToolAuthorizationResult:
-        constraints = getattr(context, "policy_constraints", {}) or {}
-        blocked_patterns = constraints.get("blocked_patterns")
-        if blocked_patterns:
+        if not self._route_allows_tool(tool, route):
             return ToolAuthorizationResult(
                 allowed=False,
-                reason="Request contains blocked policy patterns.",
-                metadata={"code": "tool_rejected"},
+                reason="Tool is outside the validated capability route.",
+                metadata={"code": "route_domain_mismatch"},
+            )
+
+        capability_id = str(getattr(arguments, "capability_id", "") or "").strip()
+        if not capability_id:
+            return ToolAuthorizationResult(allowed=True)
+
+        if capability_id in state.excluded_capability_ids:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability was excluded after a failed attempt in this run.",
+                metadata={"code": "capability_excluded"},
+            )
+
+        if state.capability_ids and capability_id not in state.capability_ids:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability is outside the validated shortlist.",
+                metadata={"code": "capability_not_shortlisted"},
             )
 
         capability = (
@@ -168,181 +105,103 @@ class PolicyEngine:
         if capability is None:
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Unknown geospatial capability '{capability_id}'.",
-                metadata={"code": "unsupported_capability"},
+                reason="Capability is not present in the catalog.",
+                metadata={"code": "unknown_capability"},
             )
 
-        allowed_capability_ids = constraints.get("allowed_capability_ids")
+        if self.runtime_registry is not None:
+            if not self.runtime_registry.is_enabled(capability_id):
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason="Capability is disabled.",
+                    metadata={"code": "capability_disabled"},
+                )
+            if not self.runtime_registry.access_available(capability_id):
+                reason = (
+                    self.runtime_registry.access_reason(capability_id)
+                    if callable(getattr(self.runtime_registry, "access_reason", None))
+                    else None
+                )
+                return ToolAuthorizationResult(
+                    allowed=False,
+                    reason=reason or "Capability access is unavailable.",
+                    metadata={"code": "capability_unavailable"},
+                )
+
+        coverage = str(capability.get("coverage") or "").strip().casefold()
+        location = self._location_for_arguments(arguments, state)
+        country = str(getattr(location, "country", "") or "").strip().casefold()
+        if coverage == "united-states" and country and country not in {
+            "us",
+            "usa",
+            "united states",
+            "united states of america",
+        }:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Capability is outside its declared geographic coverage.",
+                metadata={
+                    "code": "unavailable_coverage",
+                    "coverage": coverage,
+                    "country": country,
+                },
+            )
+
+        allowed_provider_ids = constraints.get("allowed_provider_ids")
+        provider_id = str(capability.get("providerId") or capability.get("provider_id") or "")
         if (
-            isinstance(allowed_capability_ids, list)
-            and allowed_capability_ids
-            and capability_id not in set(map(str, allowed_capability_ids))
+            is_json_array(allowed_provider_ids)
+            and allowed_provider_ids
+            and provider_id
+            and provider_id.casefold()
+            not in {str(item).casefold() for item in allowed_provider_ids}
         ):
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=f"Capability '{capability_id}' is outside the routed specialist scope.",
-                metadata={"code": "tool_rejected"},
-            )
-
-        runtime_registry = self.runtime_registry
-        if runtime_registry is None:
-            return ToolAuthorizationResult(allowed=True)
-
-        provider_health = runtime_registry.provider_health(capability_id)
-        if provider_health == "disabled":
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=f"Capability '{capability_id}' is disabled.",
-                metadata={"code": "unsupported_capability", "provider_health": provider_health},
-            )
-        if provider_health == "missing_credentials":
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=f"Capability '{capability_id}' requires provider credentials.",
-                metadata={"code": "missing_credentials", "provider_health": provider_health},
-            )
-
-        requested_mode = self._requested_capability_mode(parsed_request)
-        if requested_mode is not None and not runtime_registry.supports_mode(capability_id, requested_mode):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason=(
-                    f"Capability '{capability_id}' does not support the requested "
-                    f"{'map' if requested_mode == 'map' else 'direct text'} mode."
-                ),
-                metadata={"code": "unsupported_capability", "requested_mode": requested_mode},
-            )
-
-        if self._requires_location_for_capability(parsed_request, capability) and not self._has_location_context(
-            arguments=arguments,
-            parsed_request=parsed_request,
-        ):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason="Location is required for this capability execution.",
-                metadata={"code": "invalid_arguments", "missing_fields": ["location"]},
-            )
-
-        bbox = arguments.get("bbox")
-        if bbox is not None and not self._is_sane_bbox(bbox):
-            return ToolAuthorizationResult(
-                allowed=False,
-                reason="Bounding box must contain four numeric values in valid longitude/latitude ranges.",
-                metadata={"code": "invalid_arguments", "field": "bbox"},
+                reason="Capability provider is outside the validated provider allowlist.",
+                metadata={"code": "provider_not_allowed"},
             )
 
         return ToolAuthorizationResult(allowed=True)
 
     # -------------------------------------------------------------------------
-    def _validate_task_class(self, turn: TurnParseResult) -> ClarificationRequest | None:
-        if turn.task_class in {"map_search", "direct_query", "general_question"}:
-            return None
-        return ClarificationRequest(
-            question="Can you clarify whether you want a map search or a direct answer?",
-            reason="Task class is unclear.",
-            missing_fields=["task"],
-        )
+    @staticmethod
+    def _route_allows_tool(tool: RegisteredTool, route: Any) -> bool:
+        if tool.definition.name == "execute_geospatial_capability":
+            route_domains = {route.primary_domain, *route.secondary_domains}
+            if route.primary_domain is CapabilityDomain.MAP_STATE or not (
+                route_domains
+                & {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
+            ):
+                return False
+        if not tool.domains or CapabilityDomain.MIXED in tool.domains:
+            return True
+        route_domains = {route.primary_domain, *route.secondary_domains}
+        special_tools = {
+            "resolve_geospatial_location",
+            "inspect_evidence",
+            "transform_evidence",
+        }
+        if tool.definition.name in special_tools:
+            return True
+        if tool.definition.name == "apply_map_plan":
+            return route.presentation in {"map", "both"}
+        return bool(tool.domains.intersection(route_domains))
 
     # -------------------------------------------------------------------------
-    def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
-        if "deictic_without_memory" in turn.ambiguities:
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="The request refers to a previous location, but no active location is available.",
-                missing_fields=["location"],
-            )
-        if (
-            any(signal.signal_type == "deictic" for signal in turn.location_signals)
-            and not turn.conversation_context.memory_snapshot.get("active_location")
-        ):
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="The request refers to a previous location, but no active location is available.",
-                missing_fields=["location"],
-            )
-        if (
-            turn.normalized_action.requires_location
-            and not turn.location_signals
-            and not turn.conversation_context.memory_snapshot.get("active_location")
-        ):
-            return ClarificationRequest(
-                question="Which location should I use?",
-                reason="Location is required for this action.",
-                missing_fields=["location"],
-            )
+    @staticmethod
+    def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> Any | None:
+        location_ref = str(getattr(arguments, "location_ref", "") or "").strip()
+        if location_ref:
+            for key, location in state.location_refs.items():
+                if str(key).casefold() == location_ref.casefold():
+                    return location
+            return None
+        if len(state.location_refs) == 1:
+            return next(iter(state.location_refs.values()))
+        if state.active_map_session is not None:
+            return state.active_map_session.resolved_location
         return None
 
-    # -------------------------------------------------------------------------
-    def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
-        actionable_patterns = self._actionable_disallowed_patterns(turn)
-        if not actionable_patterns:
-            return None
-        return ClarificationRequest(
-            question="I cannot execute this request with the current policy constraints.",
-            reason="; ".join(item.reason for item in actionable_patterns if item.reason),
-            missing_fields=[],
-        )
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _requested_capability_mode(parsed_request: TurnParseResult) -> str | None:
-        if parsed_request.task_class == "map_search":
-            return "map"
-        if parsed_request.task_class == "direct_query":
-            return "direct_text"
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _requires_location_for_capability(parsed_request: TurnParseResult, capability: dict[str, Any]) -> bool:
-        if parsed_request.normalized_action.requires_location:
-            return True
-        geometry_type = str((capability.get("metadata") or {}).get("geometry_type") or "").strip().lower()
-        return geometry_type not in {"", "not-applicable", "global"}
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _has_location_context(
-        *,
-        arguments: dict[str, Any],
-        parsed_request: TurnParseResult,
-    ) -> bool:
-        if any(key in arguments for key in ("location", "latitude", "longitude", "bbox")):
-            return True
-        if parsed_request.location_signals:
-            return True
-        active_location = parsed_request.conversation_context.memory_snapshot.get("active_location")
-        return isinstance(active_location, dict) and bool(active_location.get("label"))
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_sane_bbox(value: Any) -> bool:
-        if not isinstance(value, list) or len(value) != 4:
-            return False
-        if not all(isinstance(item, (int, float)) for item in value):
-            return False
-        min_lon, min_lat, max_lon, max_lat = [float(item) for item in value]
-        return (
-            -180.0 <= min_lon <= 180.0
-            and -180.0 <= max_lon <= 180.0
-            and -90.0 <= min_lat <= 90.0
-            and -90.0 <= max_lat <= 90.0
-            and min_lon < max_lon
-            and min_lat < max_lat
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _actionable_disallowed_patterns(turn: TurnParseResult):
-        return [
-            item
-            for item in turn.disallowed_patterns
-            if item.pattern_id.strip().lower()
-            not in {
-                "overlay_exclusion",
-                "overlay_prohibition",
-                "overlay_restriction",
-                "no_overlay",
-                "no_overlays",
-            }
-        ]
+__all__ = ["PolicyEngine"]

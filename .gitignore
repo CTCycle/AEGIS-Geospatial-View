@@ -1,30 +1,20 @@
 # Project-specific generated/runtime artifacts
 runtimes/**
-app/resources/logs/**
-app/resources/vectors/**
+!runtimes/cache/
+!runtimes/cache/.gitkeep
+data/logs/**
+!data/logs/.gitkeep
+data/vectors/**
+!data/vectors/.gitkeep
 app/client/node_modules/
 app/client/dist/
 app/client/dist-ssr/
 app/client/logs/
-app/client/.angular/
-app/src-tauri/target/
-app/src-tauri/bundle/
-app/src-tauri/bundle-src/
-app/src-tauri/gen/
-app/src-tauri/**/*.exe
-app/src-tauri/**/*.msi
-app/src-tauri/**/*.dmg
-app/src-tauri/**/*.AppImage
-app/src-tauri/**/*.deb
-app/src-tauri/**/*.rpm
-app/src-tauri/**/*.zip
-app/src-tauri/**/*.7z
-app/src-tauri/**/*.tar.gz
-release/windows/
 assets/QA/**
 .playwright-mcp/
 
 # Environment files (keep templates)
+settings/.env
 app/client/*.local
 
 # Python
@@ -33,14 +23,8 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-.pytest_cache/
-.tmp_pytest/
-.mypy_cache/
-.ruff_cache/
 dist/
 build/
-.coverage
-htmlcov/
 app/server/uv.lock
 
 # Node / JS
@@ -54,7 +38,6 @@ pnpm-debug.log*
 lerna-debug.log*
 **/package-lock.json
 yarn.lock
-.angular/**
 
 # IDE / OS
 !.vscode/extensions.json
@@ -66,20 +49,19 @@ Thumbs.db
 .tmp_logs/
 *.lock
 *.log
+
+# Alembic and migration runtime artifacts
+*.mako
+*.migration-backup-*.db
+*.migration.lock
 *.db
+*.db-shm
+*.db-wal
 *.sqlite*
 *.exe
 
-!app/src-tauri/
-!app/src-tauri/Cargo.toml
-!app/src-tauri/Cargo.lock
-!app/src-tauri/build.rs
-!app/src-tauri/tauri.conf.json
-!app/src-tauri/src/
-!app/src-tauri/src/**
-!app/src-tauri/capabilities/
-!app/src-tauri/capabilities/**
-!app/src-tauri/icons/
-!app/src-tauri/icons/**
-
 !.gitkeep
+
+# Commit dependency lockfiles for reproducible CI installs.
+!app/server/uv.lock
+!app/client/package-lock.json

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.provider_registry import (
     ProviderExecutionPolicy,
     ProviderNotRegisteredError,
     ProviderRegistry,
 )
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderCircuitOpenError,
     ProviderRequest,
+    ProviderRateLimitError,
     ProviderResponse,
     ProviderTimeoutError,
     ProviderUnavailableError,
@@ -28,12 +32,31 @@ class _Provider:
             payload={"ok": True},
         )
 
+
+class _LayerProvider:
+    provider_id = "gibs"
+
+    async def list_layers(
+        self,
+        *,
+        query: str | None = None,
+        limit: int = 100,
+        refresh: bool = False,
+    ) -> list[object]:
+        del query, limit, refresh
+        return []
+
 ###############################################################################
 class _TimeoutProvider:
     provider_id = "slow"
 
     # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        self.calls += 1
         await asyncio.sleep(1.0)
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -74,10 +97,56 @@ class _AuthProvider:
         raise ProviderAuthError("missing key")
 
 ###############################################################################
+class _RateLimitedProvider:
+    provider_id = "rate-limited"
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
+    async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        self.calls += 1
+        if self.calls == 1:
+            raise ProviderRateLimitError(
+                "slow down", retry_after_seconds=0.0
+            )
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload={"attempts": self.calls},
+        )
+
+###############################################################################
+class _SavedCredentialRepository:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.mark_used_calls: list[tuple[str, str]] = []
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN201
+        if provider == "tomtom" and label == "api_key":
+            return SimpleNamespace(encrypted_value="encrypted-tomtom-key")
+        return None
+
+    # -------------------------------------------------------------------------
+    def mark_used(self, *, provider: str, label: str) -> None:
+        self.mark_used_calls.append((provider, label))
+
+###############################################################################
+class _CredentialDecryptor:
+
+    # -------------------------------------------------------------------------
+    def decrypt(self, encrypted_value: str) -> str:
+        assert encrypted_value == "encrypted-tomtom-key"
+        return "database-only-tomtom-key"
+
+###############################################################################
 def test_provider_registry_registers_and_fetches_provider() -> None:
     registry = ProviderRegistry(providers=[_Provider()])
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         registry.fetch("example", ProviderRequest(capability_id="capability"))
     )
 
@@ -96,16 +165,66 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         raise AssertionError("Missing provider unexpectedly resolved.")
 
 ###############################################################################
+def test_provider_registry_accepts_nasa_gibs_discovery_alias() -> None:
+    registry = ProviderRegistry(providers=[_LayerProvider()])
+
+    layers = run_async_in_thread(
+        registry.list_layers("nasa_gibs", query="SRTM", limit=20, refresh=False)
+    )
+
+    assert layers == []
+
+###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:
     registry = ProviderRegistry()
 
     registry.build_from_manifests()
 
     assert "gibs" in registry.list_provider_ids()
+    assert "mapillary" not in registry.list_provider_ids()
     assert "rainviewer" in registry.list_provider_ids()
     assert "fallback" not in registry.list_provider_ids()
     assert "osm" not in registry.list_provider_ids()
     assert "gibs" in registry.list_provider_ids()
+
+###############################################################################
+def test_provider_registry_rejects_provider_entries_without_canonical_provider_id() -> None:
+
+    ###############################################################################
+    class _Loader:
+
+        # -------------------------------------------------------------------------
+        def load_all(self) -> dict[str, list[dict[str, object]]]:
+            return {
+                "providers": [{"id": "gibs", "name": "GIBS"}],
+                "basemaps": [],
+                "overlays": [],
+                "cameras": [],
+                "transit": [],
+                "tools": [],
+                "runtime_profiles": [],
+            }
+
+    registry = ProviderRegistry(manifest_loader=_Loader())  # type: ignore[arg-type]
+
+    registry.build_from_manifests()
+
+    assert "gibs" not in registry.list_provider_ids()
+
+###############################################################################
+def test_provider_registry_passes_database_only_credentials_to_provider() -> None:
+    repository = _SavedCredentialRepository()
+    resolver = GeospatialCredentialResolver(
+        credentials_repo=repository,  # type: ignore[arg-type]
+        crypto_service=_CredentialDecryptor(),
+    )
+    registry = ProviderRegistry(credential_resolver=resolver)
+
+    registry.build_from_manifests()
+
+    provider = registry.get("tomtom")
+    assert getattr(provider, "api_key") == "database-only-tomtom-key"
+    assert repository.mark_used_calls == [("tomtom", "api_key")]
 
 ###############################################################################
 def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
@@ -156,7 +275,9 @@ def test_provider_registry_times_out_slow_provider() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(
+            registry.fetch("slow", ProviderRequest(capability_id="slow_layer"))
+        )
     except ProviderTimeoutError as exc:
         assert "slow" in str(exc)
     else:
@@ -170,8 +291,62 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
         execution_policy=ProviderExecutionPolicy(max_attempts=2),
     )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+    )
+
+    assert response.payload == {"attempts": 2}
+
+###############################################################################
+def test_provider_registry_does_not_retry_after_deadline_expires() -> None:
+    provider = _TimeoutProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            timeout_seconds=0.01,
+            max_attempts=2,
+            retry_backoff_base_seconds=0.0,
+            retry_backoff_max_seconds=0.0,
+        ),
+    )
+
+    try:
+        run_async_in_thread(
+            registry.fetch("slow", ProviderRequest(capability_id="slow_layer"))
+        )
+    except ProviderTimeoutError:
+        pass
+    else:
+        raise AssertionError("Slow provider unexpectedly succeeded.")
+    assert provider.calls == 1
+
+###############################################################################
+def test_provider_registry_preserves_provider_specific_timeout_floor() -> None:
+    registry = ProviderRegistry(
+        providers=[_TimeoutProvider()],
+        execution_policy=ProviderExecutionPolicy(
+            timeout_seconds=0.01,
+            provider_timeout_seconds={"slow": 0.05},
+        ),
+    )
+
+    assert registry._timeout_seconds("slow") == 0.05  # pyright: ignore[reportPrivateUsage]
+    assert registry._timeout_seconds("other") == 0.01  # pyright: ignore[reportPrivateUsage]
+
+###############################################################################
+def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:
+    provider = _RateLimitedProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            max_attempts=2,
+            retry_backoff_base_seconds=0.0,
+            retry_backoff_max_seconds=0.0,
+        ),
+    )
+
+    response = run_async_in_thread(
+        registry.fetch("rate-limited", ProviderRequest(capability_id="limited"))
     )
 
     assert response.payload == {"attempts": 2}
@@ -185,7 +360,9 @@ def test_provider_registry_does_not_retry_auth_errors() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("auth", ProviderRequest(capability_id="secure")))
+        run_async_in_thread(
+            registry.fetch("auth", ProviderRequest(capability_id="secure"))
+        )
     except ProviderAuthError:
         pass
     else:
@@ -203,15 +380,46 @@ def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(
+            registry.fetch("slow", ProviderRequest(capability_id="slow_layer"))
+        )
     except ProviderTimeoutError:
         pass
     else:
         raise AssertionError("Slow provider unexpectedly succeeded.")
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(
+            registry.fetch("slow", ProviderRequest(capability_id="slow_layer"))
+        )
     except ProviderCircuitOpenError:
         pass
     else:
         raise AssertionError("Open circuit did not reject the provider.")
+
+###############################################################################
+def test_provider_registry_recovers_circuit_after_recovery_window() -> None:
+    provider = _FlakyProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            max_attempts=1,
+            circuit_breaker_failures=1,
+            circuit_recovery_seconds=0,
+        ),
+    )
+
+    try:
+        run_async_in_thread(
+            registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+        )
+    except ProviderUnavailableError:
+        pass
+    else:
+        raise AssertionError("Flaky provider unexpectedly succeeded on first call.")
+
+    response = run_async_in_thread(
+        registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+    )
+
+    assert response.payload == {"attempts": 2}

@@ -1,9 +1,10 @@
 # AEGIS Geospatial View
-[![Release](https://img.shields.io/github/v/release/CTCycle/AEGIS-geographics?display_name=tag)](https://github.com/CTCycle/AEGIS-geographics/releases)
+[![Release](https://img.shields.io/github/v/release/CTCycle/AEGIS-Geospatial-View?display_name=tag)](https://github.com/CTCycle/AEGIS-Geospatial-View/releases)
 [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./app/server/pyproject.toml)
-[![Angular](https://img.shields.io/badge/Angular-19.2-red?logo=angular&logoColor=white)](./app/client/package.json)
-[![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
-[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml?query=branch%3Adevelop)
+[![Angular](https://img.shields.io/badge/Angular-22-red?logo=angular&logoColor=white)](./app/client/package.json)
+[![License](https://img.shields.io/github/license/CTCycle/AEGIS-Geospatial-View)](./LICENSE)
+[![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
+[![CI](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/workflows/ci.yml?query=branch%3Adevelop)
 
 
 AEGIS Geospatial View is a place-focused workspace built around conversation.
@@ -17,7 +18,15 @@ The app is most useful when you want to:
 - zoom in or narrow a previous result
 - explore available geospatial layers
 - manage access for external map-related services
-- adjust which models or assistants the app should use
+- adjust which models, runtime limits, and provider endpoints the app should use
+
+## Desktop Browser Requirement
+
+AEGIS is a desktop workbench delivered through web technologies. Use a desktop
+or laptop browser window at least `1024px` wide. Windows tablet devices are
+supported only when they behave like a normal desktop browser and can display
+the full desktop interface. Smaller windows show a minimum-size notice instead
+of a mobile layout.
 
 ## What You Can Do
 
@@ -27,7 +36,7 @@ The app is intentionally broad, but the everyday workflow is simple.
 - Add extra detail such as imagery, overlays, or a specific focus.
 - Review the response and the map area that comes with it.
 - Refine the result with follow-up messages instead of starting over.
-- Switch to the geodata, access, or settings pages when you need more control.
+- Switch to the Geodata or Settings pages when you need more control.
 
 Common examples include:
 
@@ -43,8 +52,10 @@ The app is organized around a few main places. Each one has a clear purpose.
 
 - `Workspace` is the main place to ask questions and review results.
 - `Geodata` is where you can browse the available map and data capabilities.
-- `Access configurations` is where optional provider access is managed.
-- `Model settings` is where you choose how the assistant should behave.
+- `Settings` is where you choose how the assistant should behave and manage
+  optional provider access. Use the persistent sidebar for Models, Model
+  Providers, Geospatial Access, Application, Map & Search, Data Sources, and
+  Agent Runtime.
 
 The top navigation bar is the quickest way to move between these areas. If you are unsure where something lives, start in the workspace and use the top-level navigation from there.
 
@@ -105,7 +116,7 @@ Depending on the request and the available data, the app can provide different k
 
 The exact result depends on what kind of request you make and what sources are available at the time.
 
-## Geodata, Access, And Settings
+## Geodata And Settings
 
 These pages are there for when you want more control than the workspace alone provides.
 
@@ -113,24 +124,30 @@ These pages are there for when you want more control than the workspace alone pr
 
 Use this page to understand what kinds of geospatial capabilities are available. It is useful when you want to know what the app can work with before you ask for it in chat.
 
-### Access Configurations
+### Settings
 
-Use this page if you need optional provider access for certain geospatial services. The default workflow is still usable without extra provider keys, so this page is mainly for cases where you want broader coverage or specific provider features.
-
-### Model Settings
-
-Use this page to choose how the assistant should operate.
+Use this page to choose how the assistant should operate and configure optional
+provider access. Runtime blocks are saved to SQLite through the runtime settings
+API; `.env` remains for bootstrap and deployment values. Settings is organized
+into Models, Model Providers, Geospatial Access, Application, Map & Search,
+Data Sources, and Agent Runtime sections.
 
 Typical tasks here include:
 
 - switching between cloud and local mode
 - searching for available models
-- selecting one agent model for structured extraction, orchestration, tool calling, and chat
+- selecting one agent model for native routing, orchestration, tool calling, and chat
 - checking local model connectivity
 - refreshing available local models
 - pulling a model when needed
+- saving or clearing masked model-provider credentials
+- adding optional geospatial provider keys or opening their setup guidance
+- changing application, map/search, data-source, or agent-runtime limits; saved
+  changes show when a restart is required
 
-If you are not sure what to change, keep the defaults and return to the workspace. Most users only need this page when they want to change behavior or connect a local model.
+If you are not sure what to change, keep the defaults and return to the
+workspace. Most users only need Settings when they want to change behavior or
+connect a local model/provider.
 
 ## Good Ways To Work
 
@@ -148,8 +165,9 @@ This approach is usually better than trying to specify everything in the first m
 The most common issues are straightforward.
 
 - If nothing happens, make sure the app is actually running.
-- If local model behavior looks wrong, check the model settings page.
-- If an external provider is not available, review the access configuration.
+- If local model behavior looks wrong, check Settings → Models and the Ollama
+  controls in Settings → Model Providers.
+- If an external provider is not available, review Settings → Geospatial Access.
 - If the app seems to be holding onto an old result, start a fresh request in the workspace.
 
 For more help, see:
@@ -157,19 +175,30 @@ For more help, see:
 - [Quick Start](./assets/docs/user/quick_start.md)
 - [Workflows](./assets/docs/user/workflows.md)
 - [Troubleshooting](./assets/docs/user/troubleshooting.md)
+- [Architecture overview](./assets/docs/architecture/system_overview.md)
 
 ## For Local Setup
 
-If you are setting the project up locally, the repository includes platform-specific startup and packaging scripts.
+If you are setting the project up locally, the repository includes a Windows launcher for setup, maintenance, and startup.
 
 The shortest path on Windows is:
 
-```cmd
-copy /Y settings\.env.local.example settings\.env
-start_on_windows.bat
+```powershell
+.\start_on_windows.ps1
 ```
 
-For other platforms and for packaging details, use the startup and maintenance scripts already included in the repository. The technical documentation under `assets/docs` covers the deeper setup and runtime behavior.
+On first application launch, `settings/.env` is created from
+`settings/.env.example` only when it is missing. The launcher reads the
+example to provide first-run process settings until the application creates
+the local file. The technical documentation under `assets/docs` covers manual
+setup and deeper runtime behavior.
+
+Database schema changes are managed by Alembic. Startup and launcher option 4
+create the SQLite database when needed, apply migrations to the current head,
+and seed required reference data idempotently. A populated SQLite file without
+an Alembic revision is rejected without stamping or deleting data. See [the
+startup and Alembic workflow](./assets/docs/runtime/startup.md) for operator
+and development commands.
 
 ## Project Contents
 
@@ -177,16 +206,9 @@ The repository is split into a few broad areas:
 
 - `app/server` for the backend
 - `app/client` for the frontend webapp
-- `app/src-tauri` for the desktop shell and packaging config
-- `app/resources` for local data and supporting files
+- `data` for local data and supporting files
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration
-
-## Desktop Artifact Hygiene
-
-`app/src-tauri` is a versioned source area. Keep source code, Tauri configuration, Cargo metadata, capabilities, and icons there. Do not commit generated desktop build output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, or `app/src-tauri/gen`.
-
-Windows installers, portable `.exe` exports, and other packaged desktop artifacts belong in `release/windows` only as generated release output. They should be published through GitHub release artifacts and workflow uploads, not tracked in Git.
 
 ## License
 

@@ -1,0 +1,13 @@
+{
+  "source_commit": "be61298ddf4ae1c0b6900810b046c10d97e4993a",
+  "checked_at": "2026-09-28T14:52:31.576093Z",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "status": "passed",
+  "parse_status": "complete",
+  "protocol": "openai-chat-completions",
+  "duration_ms": 3121,
+  "message": "Native tool probe passed.",
+  "fallback_used": null,
+  "note": "The UI showed the exact selected lane and Agent model Verified. The probe response fallback_used property was null; no alternate model was observed."
+}

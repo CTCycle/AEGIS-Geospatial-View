@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-07-03
+Last updated: 2026-09-21
 
 ## Route-Level Pages
 
@@ -9,28 +9,42 @@ Last updated: 2026-07-03
 - `CapabilitiesPageComponent` at `/geodata`
   Manifest-backed geodata catalog.
 - `SettingsPageComponent` at `/settings`
-  Model, provider, and credential management.
-- `AccessConfigurationsPageComponent` at `/access-configurations`
-  Optional geospatial provider credential management.
+  Persistent left navigation for Models, Model Providers, Geospatial Access,
+  Application, Map & Search, Data Sources, and Agent Runtime. The public query
+  contract remains `tab=<section-id>` for deep links; omitted or invalid values
+  resolve to `models`.
 
 ## Core Frontend Boundaries
 
 - API client request execution: `app/client/src/app/core/api.ts`
 - API response normalization and parsing: `app/client/src/app/core/api-parsers.ts`
+- Realtime envelope, run-event, and terminal-payload parsing: `core/realtime-parsers.ts`
 - Persisted app/view state: `core/app-state.ts` and store service
 - Shared runtime guards: `core/type-guards.ts`
 - Shared contracts: `core/types.ts`
 - Error presentation: `core/user-facing-error.service.ts`
 - Model selection and model list utilities: `core/model-selection.ts`
+- Dynamic-provider narrowing and model-library merging: `core/model-library.ts`
 - Selected agent readiness checks: `core/agent-readiness.service.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
+- Runtime settings API and typed response parsing: `core/api.ts`,
+  `core/api-parsers.ts`, and `core/types.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
+- Map inspection normalization and display: `MapInspection` contracts in
+  `core/types.ts`, feature popups, and the keyboard-dismissible details panel
+  in `components/map-preview.component.*`
 
 ## Agent Run Interaction
 
-`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, creates one active run, and opens an `EventSource` stream. Additional composer submissions while the run is active are sent as steering updates and rendered as compact refinements rather than independent tasks.
+`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, opens the versioned realtime WebSocket, and sends an idempotent `run.start` command. Additional composer submissions while the run is active are sent as `run.steer` updates and rendered as compact refinements rather than independent tasks.
 
-The page tracks the last run event ID and ignores duplicate event IDs so reconnect replay can be applied without duplicating assistant or progress output.
+`RealtimeService` owns the socket lifecycle, subprotocol negotiation, heartbeat,
+stale-connection detection, full-jitter exponential backoff, and command replay.
+`core/realtime-parsers.ts` validates the wire envelope, run-event discriminator,
+sequence/version fields, visibility, and JSON payload boundary before the page
+receives a message. The page persists the last durable event sequence and
+ignores duplicate event IDs so reconnect replay can be applied without
+duplicating assistant or progress output.
 
 Clarification runs terminate with `clarification_needed`. The event may include a
 partial validated map update, allowing a basemap or layer correction before the
@@ -40,6 +54,13 @@ The agent is presented as continuously ready for the chat session. Per-run
 progress begins with request understanding and is separate from the persistent
 availability state.
 
+Run events are applied by type: progress labels update the activity indicator,
+assistant completion updates the transcript, clarification-needed preserves any
+partial map update, and completed payloads apply normalized operation, task,
+memory, visualization, and context-revision state together. Invalid optional
+terminal fields are ignored rather than replacing the last valid value.
+Replayed event IDs are ignored after reconnect.
+
 Assistant message strings are rendered as GitHub-style Markdown through the
 shared chat-message component and Angular HTML sanitization. User messages
 remain escaped plain text.
@@ -47,6 +68,26 @@ remain escaped plain text.
 ## Map Rendering
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
+
+The map preview host and its internal frame are explicit full-size layout surfaces. A `ResizeObserver` resizes MapLibre after grid, sidebar, or viewport changes so the rendered canvas remains aligned with the available canvas.
+
+The backend `overlay_collection.instances` is authoritative for overlay
+identity, descriptors, inspections, and revisions. The component derives its
+render entries from those instances, uses stable instance IDs for
+visibility/opacity state, and drops stale presentation entries when instances
+disappear. Feature-backed layers bind click listeners only for the current map
+instance; listeners are removed when the map or overlay set changes. Safe text
+nodes, bounded fields, approved HTTP(S) links, focus handoff, and Escape
+dismissal protect the inspection UI.
+
+Basemap changes are prepared in candidate containers. A generation token and
+destroyed guard dispose pending candidates and ignore late load/error or queued
+callbacks, preserving the active last-known-good map when a replacement fails.
+
+Provider-native layer discovery is rendered through the same normalized overlay
+descriptor path as curated catalog capabilities. The frontend does not assemble
+provider-specific WMS/WMTS requests or treat provider errors as successful map
+layers.
 
 ## Component Patterns
 
@@ -57,10 +98,32 @@ Reusable component examples include:
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
+- `settings-warning-banner.component.ts` (attribute selector on the existing
+  `<section>` host so settings warning markup and CSS remain stable)
 - `selected-model-summary.component.*`
 - `capability-status-list.component.*`
 
 Settings uses card-level model selection for one selected agent model.
+The single Settings page shell owns the authoritative model response and the
+typed runtime-settings draft. Credential updates reuse the existing encrypted
+repository; runtime blocks use `/api/settings/runtime` and are persisted by
+SQLite. Child sections do not create a second settings store.
+
+The Search workspace keeps context usage in a separate compact progress row
+below the composer. The chat transcript contains only user and assistant
+conversation messages; tool progress, run failures, retries, trace events, and
+other operational diagnostics are presented outside the transcript.
+
+A compact full-width workspace footer spans the chat and map panes and exposes
+Agent model, Satellite, Optional Keys, and a reusable Tool activity control.
+Tool activity opens bounded execution details for the active or latest run,
+including sanitized task, tool, timing, error-summary, and trace information.
+Raw provider payloads and model reasoning are not rendered there. Optional Keys
+opens `/settings?tab=geospatial-access` and Agent model opens `/settings`.
+
+The map canvas header uses a stable two-column layout: progress or location
+status occupies the truncating left column, while chat visibility and Alerts
+remain fixed icon actions in the right column.
 
 ## Routing Rule
 

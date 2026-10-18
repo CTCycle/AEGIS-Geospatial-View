@@ -24,8 +24,9 @@ class PVGISProvider(GeospatialProvider):
             payload = await self.service.get_point_estimate(latitude, longitude)
         except (PVGISError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        warnings = []
-        if payload.get("error"):
+        warnings: list[str] = []
+        has_error = bool(payload.get("error"))
+        if has_error:
             warnings.append(str(payload["error"]))
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -35,13 +36,14 @@ class PVGISProvider(GeospatialProvider):
                 "provider": self.provider_id,
                 "latitude": payload.get("latitude", latitude),
                 "longitude": payload.get("longitude", longitude),
-                "yearlyKwhPerKwpEstimate": payload.get(
-                    "yearly_kwh_per_kwp_estimate"
-                ),
+                "yearlyKwhPerKwpEstimate": payload.get("yearly_kwh_per_kwp_estimate"),
                 "raw": payload.get("raw") or {},
             },
             attribution=[
                 str(payload.get("attribution") or "PVGIS (European Commission JRC)")
             ],
             warnings=warnings,
+            result_status="partial" if has_error else "ok",
+            result_type="metadata",
+            partial=has_error,
         )

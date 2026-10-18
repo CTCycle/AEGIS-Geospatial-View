@@ -8,7 +8,9 @@ import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
-import { CameraFeature, ChatTurnResponse } from '../core/types';
+import { FakeRealtimeService } from '../core/realtime.test-support';
+import { RealtimeService } from '../core/realtime.service';
+import { CameraFeature, ChatTurnResponse, JsonValue, MapSession } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from '../pages/geospatial-page.component';
 
@@ -17,7 +19,7 @@ describe('e2e/geospatial browser smoke', () => {
   // Keep this catalog aligned with the production manifest audit's required browser scenarios.
   const documentedBrowserCoverageIds = [
     'esri_world_imagery',
-    'geoapify_osm',
+    'openfreemap_liberty',
     'osm_dark',
     'osm_terrain',
     'census_cartographic_boundaries',
@@ -31,6 +33,7 @@ describe('e2e/geospatial browser smoke', () => {
   ];
   let fixture: ComponentFixture<GeospatialPageComponent>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
+  let realtime: FakeRealtimeService;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let fakeMap: {
     addSource: jasmine.Spy;
@@ -40,52 +43,32 @@ describe('e2e/geospatial browser smoke', () => {
     getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    moveLayer: jasmine.Spy;
     zoomIn: jasmine.Spy;
     zoomOut: jasmine.Spy;
     resize: jasmine.Spy;
     remove: jasmine.Spy;
   };
 
-  const mockedMapResponse: ChatTurnResponse = {
+  const mockedMapResponse: ChatTurnResponse = ({
+    conversation_id: 'conv-browser-smoke',
     request_id: 'browser-smoke-1',
-    session_id: 101,
     assistant_message: 'Rendered a mocked geospatial session.',
-    turn_contract: {
-      user_text: 'show mocked map',
-      task_class: 'map_search',
-      location_signals: [],
-      normalized_action: {
-        action_id: 'mocked_map',
-        action_label: 'Mocked map',
-        task_tags: ['map'],
-        action_tags: ['geospatial'],
-        requires_location: true,
-      },
-      temporal_signal: { mode: 'none' },
-      ambiguities: [],
-      parser_confidence: 0.95,
-    },
-    decision: {
-      plan: {
-        state: 'map_search',
-        action_id: 'mocked_map',
-        basemap_id: 'osm_default',
-        overlay_ids: [
-          'mock_clustered_points',
-          'rainviewer_precipitation_radar_stale',
-          'tomtom_traffic_flow_mocked',
-          'tomtom_traffic_incidents_mocked',
-          'eea_noise_wms',
-          'esa_worldcover_wmts',
-          'eurostat_metadata_only',
-          'eurostat_join_required',
-          'gtfs_stops_routes_alerts_vehicles',
-          'overpass_poi_amenities_1000_clustered',
-          'geospatial_5000_feature_performance',
-          'windy_webcams_missing_key',
-          'metadata_context',
-        ],
-      },
+    context_revision: 1,
+    route: {
+      primary_domain: 'geospatial',
+      secondary_domains: [],
+      task_mode: 'execute',
+      presentation: 'map',
+      requires_location: true,
+      capability_queries: ['mocked_map'],
+      explicit_capability_ids: [],
+      clarification_question: null,
+      operation: 'render',
+      target_refs: ['location:mock-city'],
+      temporal_scope: { mode: 'none', granularity: 'none', aggregation: 'none' },
+      spatial_scope: { kind: 'point', relationship: 'at', target_refs: ['location:mock-city'] },
+      filters: {},
     },
     operation: {
       kind: 'map_session',
@@ -94,6 +77,9 @@ describe('e2e/geospatial browser smoke', () => {
       warnings: [],
     },
     memory_snapshot: { provider_secret_sample: forbiddenSecret },
+    presentation_status: 'prepared_unverified',
+    tool_results: [],
+    execution_trace: { stopped_reason: 'goal_satisfied' },
     map_session: {
       session_id: 'mock-map-session',
       resolved_location: { label: 'Mock City', latitude: 41.9, longitude: 12.5 },
@@ -244,6 +230,14 @@ describe('e2e/geospatial browser smoke', () => {
           default_opacity: 0.5,
         },
         {
+          id: 'windy_webcams_missing_key',
+          label: 'Windy Webcams credentials are missing',
+          provider: 'windy',
+          type: 'metadata-only',
+          rendering_mode: 'metadata-only',
+          attribution: 'Windy webcams',
+        },
+        {
           id: 'metadata_context',
           label: 'Metadata setup layer',
           provider: 'mock_metadata',
@@ -253,6 +247,58 @@ describe('e2e/geospatial browser smoke', () => {
         },
       ],
     },
+  } as unknown as ChatTurnResponse);
+
+  const canonicalizeMockedMapSession = (raw: Record<string, unknown>): MapSession => {
+    const descriptors = Array.isArray(raw.overlays)
+      ? raw.overlays.filter((item): item is Record<string, unknown> => (
+        item !== null && typeof item === 'object'
+      ))
+      : [];
+    const instances = descriptors.map((descriptor) => {
+      const id = String(descriptor.id ?? 'overlay');
+      return {
+        instance_id: id,
+        capability_id: id,
+        label: String(descriptor.label ?? id),
+        provider: String(descriptor.provider ?? 'fixture'),
+        overlay_type: String(descriptor.type ?? 'overlay'),
+        rendering_mode: String(descriptor.rendering_mode ?? descriptor.type ?? 'metadata-only'),
+        scope_key: 'global',
+        scope: { kind: 'global' },
+        visible: descriptor.visible !== false,
+        opacity: typeof descriptor.default_opacity === 'number' ? descriptor.default_opacity : 1,
+        render_variant: {},
+        descriptor: descriptor as unknown as Record<string, JsonValue>,
+        inspections: [],
+      };
+    });
+    return {
+      session_id: String(raw.session_id),
+      resolved_location: raw.resolved_location as MapSession['resolved_location'],
+      basemap_id: String(raw.basemap_id),
+      viewport: raw.viewport as MapSession['viewport'],
+      center: raw.center as MapSession['center'],
+      bounds: raw.bounds as MapSession['bounds'],
+      basemap: raw.basemap as MapSession['basemap'],
+      compliance_warnings: Array.isArray(raw.compliance_warnings)
+        ? raw.compliance_warnings.filter((item): item is string => typeof item === 'string')
+        : [],
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 0,
+        instances,
+      },
+    };
+  };
+
+  const canonicalMockedMapResponse: ChatTurnResponse = {
+    ...mockedMapResponse,
+    map_session: mockedMapResponse.map_session
+      ? canonicalizeMockedMapSession(
+        mockedMapResponse.map_session as unknown as Record<string, unknown>,
+      )
+      : null,
   };
 
   beforeEach(async () => {
@@ -264,6 +310,7 @@ describe('e2e/geospatial browser smoke', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      moveLayer: jasmine.createSpy('moveLayer'),
       zoomIn: jasmine.createSpy('zoomIn'),
       zoomOut: jasmine.createSpy('zoomOut'),
       resize: jasmine.createSpy('resize'),
@@ -271,9 +318,16 @@ describe('e2e/geospatial browser smoke', () => {
     };
     spyOn(maplibregl, 'Map').and.returnValue(fakeMap as never);
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn', 'fetchCatalog']);
-    apiClient.sendChatTurn.and.resolveTo(mockedMapResponse);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
+      'createConversation',
+      'fetchConversationSnapshot',
+      'sendChatTurn',
+      'fetchCatalog',
+    ]);
+    apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-browser-smoke', title: 'show mocked map' });
+    apiClient.sendChatTurn.and.resolveTo(canonicalMockedMapResponse);
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+    realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
 
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', [
       'getChatPage',
@@ -287,6 +341,7 @@ describe('e2e/geospatial browser smoke', () => {
       providers: [
         provideRouter([]),
         { provide: ApiClientService, useValue: apiClient },
+        { provide: RealtimeService, useValue: realtime },
         { provide: AppStateStoreService, useValue: store },
         {
           provide: UserFacingErrorService,
@@ -317,7 +372,7 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapPreview).withContext('map preview should render in the real browser DOM').not.toBeNull();
 
     expect(apiClient.sendChatTurn).toHaveBeenCalledWith({
-      session_id: undefined,
+      conversation_id: 'conv-browser-smoke',
       message: 'show mocked map',
     });
     expect(maplibregl.Map).toHaveBeenCalled();
@@ -325,14 +380,22 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapOptions.style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
 
     const geoJsonSource = fakeMap.addSource.calls.allArgs()
-      .map((args) => args[1] as { type?: string; data?: string; tiles?: string[] })
+      .map((args) => args[1] as { type?: string; data?: string; tiles?: string[]; cluster?: boolean })
       .find((source) => source.type === 'geojson');
     expect(geoJsonSource?.data).toContain('/api/geospatial/layers/mock_clustered_points/geojson');
+    expect(geoJsonSource?.cluster).toBeTrue();
 
     const clusteredLayer = fakeMap.addLayer.calls.allArgs()
-      .map((args) => args[0] as { type?: string; paint?: Record<string, unknown> })
-      .find((layer) => layer.type === 'circle');
-    expect(clusteredLayer?.paint?.['circle-color']).toBe('#0ea5e9');
+      .map((args) => args[0] as { id?: string; type?: string; paint?: Record<string, unknown> })
+      .find((layer) => layer.id?.endsWith('-clusters'));
+    expect(clusteredLayer?.type).toBe('circle');
+    expect(Array.isArray(clusteredLayer?.paint?.['circle-color'])).toBeTrue();
+
+    const unclusteredLayer = fakeMap.addLayer.calls.allArgs()
+      .map((args) => args[0] as { id?: string; type?: string; paint?: Record<string, unknown> })
+      .find((layer) => layer.id?.endsWith('-points'));
+    expect(unclusteredLayer?.type).toBe('circle');
+    expect(unclusteredLayer?.paint?.['circle-color']).toBe('#0ea5e9');
 
     expect(pageElement.textContent).toContain('Metadata setup layer');
     expect(pageElement.textContent).toContain('credentials are missing');
@@ -348,6 +411,95 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapRequestInputs).not.toContain(forbiddenSecret);
     expect(mapRequestInputs).not.toContain('api_key=');
     expect(mapRequestInputs).not.toContain('x-windy-api-key');
+  });
+
+  it('reorders layers with accessible controls and updates the active map state', async () => {
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show mocked map';
+    await component.sendMessage();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pageElement: HTMLElement = fixture.nativeElement;
+    const expandButton = pageElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
+    expect(expandButton).not.toBeNull();
+    expandButton?.click();
+    fixture.detectChanges();
+
+    const moveUp = pageElement.querySelector(
+      'button[aria-label="Move RainViewer stale radar up"]',
+    ) as HTMLButtonElement | null;
+    expect(moveUp).not.toBeNull();
+    expect(moveUp?.disabled).toBeFalse();
+    fakeMap.moveLayer.calls.reset();
+    moveUp?.click();
+    fixture.detectChanges();
+
+    expect(component.mapState.overlayOrder[0]).toBe('rainviewer_precipitation_radar_stale');
+    expect(pageElement.querySelector('#map-layers-panel .overlay-control-row label span')?.textContent)
+      .toContain('RainViewer stale radar');
+    expect(fakeMap.moveLayer).toHaveBeenCalled();
+    expect(store.updateChatPage).toHaveBeenCalled();
+  });
+
+  it('renders a bounded valid-empty layer as an explicit no-results state', async () => {
+    const emptyOverlayId = 'empty_flood_zones';
+    const emptyMapSession: MapSession = {
+      ...canonicalMockedMapResponse.map_session!,
+      session_id: 'empty-map-session',
+      bounds: [12.45, 41.86, 12.55, 41.94],
+      overlay_collection: {
+        collection_id: 'active-map',
+        revision: 1,
+        instances: [{
+          instance_id: emptyOverlayId,
+          capability_id: 'fema_nfhl_flood_zones',
+          label: 'Flood Zones',
+          provider: 'fixture',
+          overlay_type: 'geojson',
+          rendering_mode: 'choropleth',
+          scope_key: 'global',
+          scope: { kind: 'global' },
+          visible: true,
+          opacity: 1,
+          render_variant: {},
+          descriptor: {
+            id: emptyOverlayId,
+            label: 'Flood Zones',
+            provider: 'fixture',
+            type: 'geojson',
+            rendering_mode: 'choropleth',
+            data_format: 'GeoJSON',
+            geometry_type: 'Polygon',
+            result_status: 'valid_empty',
+            data: { type: 'FeatureCollection', features: [] },
+          },
+          inspections: [],
+        }],
+      },
+    };
+    apiClient.sendChatTurn.and.resolveTo({
+      ...canonicalMockedMapResponse,
+      assistant_message: 'Map ready. No results for the Flood Zones overlay.',
+      map_session: emptyMapSession,
+    });
+
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show flood zones';
+
+    await component.sendMessage();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Flood Zones');
+    expect(fixture.nativeElement.textContent).toContain('no results in the requested area or time window');
+    expect(fixture.nativeElement.querySelector('[aria-label="No results"]')?.getAttribute('role')).toBe('status');
+    expect(fixture.nativeElement.textContent).not.toContain('Unavailable overlays:');
+    const descriptor = fixture.componentInstance.payload?.map_session?.overlay_collection.instances[0]
+      ?.descriptor as Record<string, unknown> | undefined;
+    expect(descriptor?.['result_status']).toBe('valid_empty');
   });
 
   it('renders mocked provider families with attribution, stale state, and backend-only URLs', async () => {
@@ -391,7 +543,8 @@ describe('e2e/geospatial browser smoke', () => {
     await component.sendMessage();
     fixture.detectChanges();
 
-    expect(component.payload?.map_session?.overlay_ids).toContain('windy_webcams_missing_key');
+    expect(component.payload?.map_session?.overlay_collection.instances.map((instance) => instance.capability_id))
+      .toContain('windy_webcams_missing_key');
     expect(fixture.nativeElement.textContent).toContain('Windy Webcams credentials are missing');
   });
 

@@ -1,19 +1,47 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
+import asyncio
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from typing import Any
 
+import httpx
 from openai import OpenAI
 
-from server.services.llm.base import LLMProvider
+from server.services.llm.base import (
+    LLMProvider,
+    normalize_native_tool_name,
+    parse_native_tool_arguments,
+)
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.context_budget import compute_context_usage
+from server.services.llm.context_budget import (
+    apply_reported_usage,
+    compute_context_usage,
+    prepare_request,
+)
+from server.services.llm.multimodal import (
+    content_has_image,
+    normalize_image_content_for_openai_responses,
+)
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.response_serialization import dump_response_payload
+from server.services.llm.request_deadline import remaining_request_seconds
+from server.services.llm.transport import (
+    LLMTransportPolicy,
+    close_sync_client,
+)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMStructuredOutput,
+    LLMTextStream,
     LLMToolCall,
     LLMToolDefinition,
     ModelDescriptor,
@@ -24,14 +52,80 @@ class OpenAIProvider(LLMProvider):
     provider_name = "openai"
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str | None = None,
+        transport_policy: LLMTransportPolicy | None = None,
+    ) -> None:
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
-        self.last_context_usage: dict[str, Any] | None = None
+        self.transport_policy = transport_policy or LLMTransportPolicy()
 
     # -------------------------------------------------------------------------
-    def _client(self) -> Any:
-        return OpenAI(api_key=self.api_key, base_url=self.base_url)
+    def _request_headers(self, request: LLMRequest | None = None) -> dict[str, str]:
+        _ = request
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _client(
+        self,
+        request: LLMRequest | None = None,
+        *,
+        stage: str = "chat",
+    ) -> Any:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "timeout": self.transport_policy.timeout_for(stage),
+            "max_retries": 0,
+            "http_client": httpx.Client(
+                **self.transport_policy.httpx_options(stage)
+            ),
+        }
+        headers = self._request_headers(request)
+        if headers:
+            kwargs["default_headers"] = headers
+        return OpenAI(**kwargs)
+
+    # -------------------------------------------------------------------------
+    def _client_for_request(
+        self, request: LLMRequest, *, stage: str = "chat"
+    ) -> Any:
+        client = self._client(request, stage=stage)
+        remaining = remaining_request_seconds(request)
+        if remaining is None:
+            return client
+        if remaining <= 0:
+            raise TimeoutError("The bounded LLM request deadline has expired.")
+        with_options = getattr(client, "with_options", None)
+        if callable(with_options):
+            return with_options(timeout=remaining)
+        return client
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return await asyncio.to_thread(
+            self.chat,
+            request,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_json_schema=response_json_schema,
+        )
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.structured_output, request, schema)
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -40,64 +134,190 @@ class OpenAIProvider(LLMProvider):
         ]
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self._capabilities_for_model(model)
+    def supports_tools(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "tools" in entry.capabilities
+        return None
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
-        capabilities = self._capabilities_for_model(model)
-        return "structured" in capabilities or "structured_output" in capabilities
+    def supports_structured_output(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return bool(
+                    {"structured", "structured_output"} & set(entry.capabilities)
+                )
+        return None
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "vision" in entry.capabilities or bool(
+                    entry.metadata.get("supports_vision")
+                )
+        return None
 
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         for entry in self.list_models():
             if entry.name == model:
                 return set(entry.capabilities)
-        return {"chat", "stream", "structured", "structured_output", "tools"}
+        return {"chat", "stream"}
+
+    # -------------------------------------------------------------------------
+    def _catalog_metadata_for_model(self, model: str) -> dict[str, Any]:
+        for entry in get_cloud_model_catalog():
+            if entry.provider == self.provider_name and entry.name == model:
+                return dict(entry.metadata)
+        return {}
+
+    # -------------------------------------------------------------------------
+    def _temperature_kwargs(self, request: LLMRequest) -> dict[str, Any]:
+        supports_temperature = request.metadata.get("supports_temperature")
+        if not isinstance(supports_temperature, bool):
+            supports_temperature = self._catalog_metadata_for_model(
+                request.model
+            ).get("supports_temperature")
+        return (
+            {"temperature": request.temperature}
+            if supports_temperature is not False
+            else {}
+        )
+
+    # -------------------------------------------------------------------------
+    def _request_max_output_tokens(self, request: LLMRequest) -> int | None:
+        def positive_int(value: object) -> int | None:
+            if isinstance(value, bool):
+                return None
+            try:
+                parsed = int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            return parsed if parsed > 0 else None
+
+        metadata = request.metadata
+        configured = positive_int(
+            metadata.get("max_output_tokens")
+            or metadata.get("max_tokens")
+            or metadata.get("max_completion_tokens")
+        )
+        catalog_metadata = self._catalog_metadata_for_model(request.model)
+        maximum = positive_int(
+            metadata.get("maximum_output_tokens")
+            or catalog_metadata.get("maximum_output_tokens")
+        )
+        if configured is None:
+            return None
+        return min(configured, maximum) if maximum is not None else configured
 
     # -------------------------------------------------------------------------
     @staticmethod
     def tool_to_openai_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
             "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters_json_schema,
-            },
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": OpenAIProvider._strict_parameters(
+                tool.parameters_json_schema
+            ),
+            "strict": True,
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _strict_parameters(schema: dict[str, Any]) -> dict[str, Any]:
+        """Normalize JSON Schema for Responses strict function tools."""
+
+        normalized = dict(schema)
+        if normalized.get("type") == "object" or "properties" in normalized:
+            properties = normalized.get("properties")
+            if is_json_object(properties):
+                normalized["properties"] = {
+                    key: OpenAIProvider._strict_parameters(value)
+                    if is_json_object(value)
+                    else value
+                    for key, value in properties.items()
+                }
+                normalized["required"] = list(properties.keys())
+                normalized["additionalProperties"] = False
+        if is_json_object(normalized.get("items")):
+            normalized["items"] = OpenAIProvider._strict_parameters(normalized["items"])
+        return normalized
 
     # -------------------------------------------------------------------------
     @staticmethod
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for message in messages:
+            if message.get("type") in {
+                "function_call",
+                "function_call_output",
+                "reasoning",
+            }:
+                normalized.append(message)
+                continue
+            if message.get("type") == "message":
+                content = message.get("content")
+                if is_json_array(content):
+                    text_parts = [
+                        str(item.get("text") or "")
+                        for raw_item in content
+                        for item in [json_object(raw_item)]
+                        if item and item.get("text") is not None
+                    ]
+                    normalized.append(
+                        {
+                            "role": str(message.get("role") or "assistant"),
+                            "content": "".join(text_parts),
+                        }
+                    )
+                    continue
             role = str(message.get("role") or "")
-            if role == "assistant" and isinstance(message.get("tool_calls"), list):
-                normalized.append(
-                    {
-                        "role": "assistant",
-                        "content": message.get("content"),
-                        "tool_calls": [
-                            {
-                                "id": call.get("id"),
-                                "type": "function",
-                                "function": {
-                                    "name": call.get("name"),
-                                    "arguments": json.dumps(call.get("arguments") or {}),
-                                },
-                            }
-                            for call in message["tool_calls"]
-                            if isinstance(call, dict)
-                        ],
-                    }
-                )
+            if role == "assistant" and is_json_array(message.get("tool_calls")):
+                for raw_call in json_array(message.get("tool_calls")):
+                    call = json_object(raw_call)
+                    if not call:
+                        continue
+                    call_id = str(call.get("id") or "")
+                    normalized.append(
+                        {
+                            "type": "function_call",
+                            "id": call_id or None,
+                            "call_id": call_id,
+                            "name": str(call.get("name") or ""),
+                            "arguments": json.dumps(
+                                call.get("arguments") or {}, separators=(",", ":")
+                            ),
+                        }
+                    )
                 continue
             if role == "tool":
                 normalized.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": message.get("tool_call_id"),
+                        "type": "function_call_output",
+                        "call_id": message.get("tool_call_id"),
+                        "output": str(message.get("content") or ""),
+                    }
+                )
+                continue
+            if role in {"system", "developer", "user", "assistant"}:
+                content = message.get("content")
+                if content_has_image(content):
+                    response_items = normalize_image_content_for_openai_responses(
+                        content
+                    )
+                    if response_items is not None:
+                        normalized.append(
+                            {
+                                "role": role,
+                                "content": response_items,
+                            }
+                        )
+                        continue
+                normalized.append(
+                    {
+                        "role": role,
                         "content": str(message.get("content") or ""),
                     }
                 )
@@ -109,20 +329,20 @@ class OpenAIProvider(LLMProvider):
     @staticmethod
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
-        for item in raw.get("output", []) if isinstance(raw.get("output"), list) else []:
-            if not isinstance(item, dict) or item.get("type") != "function_call":
+        for raw_item in json_array(raw.get("output")):
+            item = json_object(raw_item)
+            if not item or item.get("type") != "function_call":
                 continue
-            args = item.get("arguments") or {}
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    args = {}
+            args, parse_error = parse_native_tool_arguments(item.get("arguments"))
+            name, parse_error = normalize_native_tool_name(
+                item.get("name"), parse_error
+            )
             calls.append(
                 LLMToolCall(
                     id=item.get("call_id") or item.get("id"),
-                    name=str(item.get("name") or ""),
-                    arguments=args if isinstance(args, dict) else {},
+                    name=name,
+                    arguments=args,
+                    parse_error=parse_error,
                 )
             )
         return calls
@@ -136,9 +356,6 @@ class OpenAIProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
         effective_request = replace(
@@ -146,10 +363,23 @@ class OpenAIProvider(LLMProvider):
             tools=native_tools or None,
             response_json_schema=schema,
         )
-        self._validate_request_capabilities(effective_request)
+        effective_request = prepare_request(
+            effective_request, provider=self.provider_name
+        )
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(effective_request)
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
         kwargs: dict[str, Any] = {}
+        max_output_tokens = self._request_max_output_tokens(effective_request)
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
         if native_tools:
-            kwargs["tools"] = [self.tool_to_openai_schema(tool) for tool in native_tools]
+            kwargs["tools"] = [
+                self.tool_to_openai_schema(tool) for tool in native_tools
+            ]
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
             kwargs["text"] = {
@@ -160,81 +390,230 @@ class OpenAIProvider(LLMProvider):
                     "strict": True,
                 }
             }
-        response = self._client().responses.create(
-            model=request.model,
-            input=self.normalize_tool_messages(request.messages),
-            temperature=request.temperature,
-            **kwargs,
-        )
+        client: Any | None = None
+        try:
+            client = self._client_for_request(effective_request, stage="chat")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
+            response = client.responses.create(
+                model=effective_request.model,
+                input=self.normalize_tool_messages(effective_request.messages),
+                **self._temperature_kwargs(effective_request),
+                **kwargs,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="chat",
+                context_usage=usage.to_dict(),
+            ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
         return LLMResult(
             content=str(getattr(response, "output_text", "") or ""),
             raw=raw,
             tool_calls=self._parse_tool_calls(raw),
-            finish_reason=raw.get("finish_reason") if isinstance(raw, dict) else None,
+            finish_reason=raw.get("finish_reason") if is_json_object(raw) else None,
+            context_usage=usage.to_dict(),
         )
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
-        stream = self._client().responses.create(
-            model=request.model,
-            input=request.messages,
-            temperature=request.temperature,
-            stream=True,
-        )
-        for event in stream:
-            if getattr(event, "type", None) != "response.output_text.delta":
-                continue
-            delta = getattr(event, "delta", "")
-            if delta:
-                yield str(delta)
+        request = prepare_request(request, provider=self.provider_name)
+        usage = compute_context_usage(request, provider=self.provider_name)
+        stream: LLMTextStream
+
+        def iterate() -> Iterable[str]:
+            nonlocal usage
+            client: Any | None = None
+            try:
+                client = self._client_for_request(request, stage="stream")
+                if client is None:
+                    raise RuntimeError("OpenAI client was not initialized.")
+                response_stream = client.responses.create(
+                    model=request.model,
+                    input=request.messages,
+                    stream=True,
+                    **self._temperature_kwargs(request),
+                    **(
+                        {"max_output_tokens": max_output_tokens}
+                        if (max_output_tokens := self._request_max_output_tokens(request))
+                        is not None
+                        else {}
+                    ),
+                )
+                for event in response_stream:
+                    remaining = remaining_request_seconds(request)
+                    if remaining is not None and remaining <= 0:
+                        raise TimeoutError(
+                            "The bounded LLM request deadline has expired."
+                        )
+                    usage = apply_reported_usage(
+                        usage,
+                        dump_response_payload(event),
+                    )
+                    stream.context_usage = usage.to_dict()
+                    if getattr(event, "type", None) != "response.output_text.delta":
+                        continue
+                    delta = getattr(event, "delta", "")
+                    if delta:
+                        yield str(delta)
+            except LLMProviderRequestError:
+                raise
+            except Exception as exc:
+                raise LLMProviderRequestError.from_exception(
+                    exc,
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="stream",
+                    context_usage=usage.to_dict(),
+                ) from exc
+            finally:
+                if client is not None:
+                    close_sync_client(client)
+
+        stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
+        return stream
 
     # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
-        self.last_context_usage = compute_context_usage(
-            request, provider=self.provider_name
-        ).to_dict()
         schema_dump = getattr(schema, "model_json_schema", None)
-        request_schema = schema_dump() if callable(schema_dump) else {}
-        self._validate_request_capabilities(
-            replace(request, response_json_schema=request_schema)
+        request_schema = json_object(schema_dump()) if callable(schema_dump) else {}
+        request = prepare_request(
+            replace(request, response_json_schema=request_schema),
+            provider=self.provider_name,
         )
-        response = self._client().responses.parse(
-            model=request.model,
-            input=request.messages,
-            temperature=request.temperature,
-            text_format=schema,
-        )
+        usage = compute_context_usage(request, provider=self.provider_name)
+        try:
+            self._validate_request_capabilities(
+                replace(request, response_json_schema=request_schema)
+            )
+        except LLMStructuredOutputError as exc:
+            exc.context_usage = usage.to_dict()
+            raise
+        client: Any | None = None
+        try:
+            client = self._client_for_request(request, stage="structured_output")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
+            response = client.responses.parse(
+                model=request.model,
+                input=request.messages,
+                text_format=schema,
+                **self._temperature_kwargs(request),
+                **(
+                    {"max_output_tokens": max_output_tokens}
+                    if (max_output_tokens := self._request_max_output_tokens(request))
+                    is not None
+                    else {}
+                ),
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                context_usage=usage.to_dict(),
+            ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
+        raw = dump_response_payload(response)
+        usage = apply_reported_usage(usage, raw)
         parsed = getattr(response, "output_parsed", None)
-        if isinstance(parsed, dict):
-            return parsed
+        if is_json_object(parsed):
+            return LLMStructuredOutput(
+                parsed,
+                context_usage=usage.to_dict(),
+                provided_fields=parsed.keys(),
+            )
         model_dump = getattr(parsed, "model_dump", None)
         if callable(model_dump):
             dumped = model_dump(mode="json")
-            return dumped if isinstance(dumped, dict) else {}
+            return LLMStructuredOutput(
+                json_object(dumped),
+                context_usage=usage.to_dict(),
+                provided_fields=getattr(parsed, "model_fields_set", None),
+            )
         output_text = str(getattr(response, "output_text", "") or "")
         if output_text:
-            loaded = json.loads(output_text)
-            return loaded if isinstance(loaded, dict) else {}
-        return {}
+            try:
+                loaded = json.loads(output_text)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    detail="The provider returned invalid JSON for the structured native response.",
+                    context_usage=usage.to_dict(),
+                ) from exc
+            if not is_json_object(loaded):
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    detail="The provider returned a JSON value instead of an object.",
+                    context_usage=usage.to_dict(),
+                )
+            return LLMStructuredOutput(
+                loaded,
+                context_usage=usage.to_dict(),
+                provided_fields=loaded.keys(),
+            )
+        return LLMStructuredOutput({}, context_usage=usage.to_dict(), provided_fields=())
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        response = self._client().embeddings.create(model=model, input=input_text)
+        client: Any | None = None
+        try:
+            client = self._client(stage="embeddings")
+            if client is None:
+                raise RuntimeError("OpenAI client was not initialized.")
+            response = client.embeddings.create(model=model, input=input_text)
+        except LLMProviderRequestError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+            ) from exc
+        finally:
+            if client is not None:
+                close_sync_client(client)
         data = getattr(response, "data", None)
         if not data:
-            return []
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         embedding = getattr(data[0], "embedding", None)
-        if not isinstance(embedding, list):
-            return []
+        if not is_json_array(embedding):
+            raise LLMProviderRequestError(
+                provider=self.provider_name,
+                model=model,
+                stage="embeddings",
+                code="provider_invalid_response",
+                retryable=False,
+            )
         return [float(value) for value in embedding if isinstance(value, (int, float))]
 
     # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
-

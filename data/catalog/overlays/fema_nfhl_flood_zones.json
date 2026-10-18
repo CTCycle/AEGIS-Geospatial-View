@@ -1,0 +1,135 @@
+{
+  "id": "fema_nfhl_flood_zones",
+  "name": "FEMA NFHL Flood Zones",
+  "provider": "fema",
+  "type": "raster-overlay",
+  "description": "FEMA National Flood Hazard Layer map service for flood-zone context.",
+  "capabilities": [
+    "flood",
+    "hazard",
+    "risk",
+    "fema"
+  ],
+  "coverage": "united-states",
+  "metadata": {
+    "label": "FEMA Flood Zones",
+    "requires_key": false,
+    "attribution": "Federal Emergency Management Agency",
+    "keywords": [
+      "flood",
+      "flood zone",
+      "hazard",
+      "risk"
+    ],
+    "action_tags": [
+      "flood",
+      "hazard",
+      "risk"
+    ],
+    "task_tags": [
+      "flood zone map",
+      "route safety",
+      "site risk"
+    ],
+    "source_protocol": "ArcGIS REST export",
+    "data_format": "PNG",
+    "geometry_type": "Raster",
+    "url_template": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&layers=show:28&f=image",
+    "relay": {
+      "base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy",
+      "required_headers": {
+        "Origin": "https://hazards-fema.maps.arcgis.com",
+        "Referer": "https://hazards-fema.maps.arcgis.com/apps/webappviewer/index.html?id=8b0adb51996444d4879338b5529aa9cd"
+      }
+    },
+    "layer_id": "28",
+    "layers": "show:28",
+    "min_zoom": 14,
+    "max_zoom": 22,
+    "fit_max_zoom": 18,
+    "scale_visibility": "NFHL layer 28 is scale-dependent and only draws at zoom 14 or higher; the map preview zooms to the layer's minimum zoom so the flood-zone pixels are visible.",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "reachable-via-official-relay",
+    "auth_mode": "none",
+    "official_docs_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
+    "last_validated": "2026-10-01",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy. hazards.fema.gov is US-egress restricted; route through the official hazards-fema.maps.arcgis.com relay with the declared Origin/Referer headers."
+  },
+  "version": 3,
+  "last_modified": "2026-10-01T00:00:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "raster-tile",
+  "sourceOfficialDocs": [
+    "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
+    "https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS"
+  ],
+  "license": {
+    "name": "FEMA public data",
+    "url": "https://www.fema.gov/about/openfema/terms-conditions",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": ["data_retrieval", "map_rendering"],
+    "plannerHints": [
+      "flood",
+      "flood zone",
+      "hazard",
+      "risk"
+    ],
+    "requiredUserAction": [
+      "flood",
+      "hazard",
+      "risk"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-10-01",
+    "knownLimitations": [
+      "Authoritative interpretation requires FEMA source context and local regulation checks.",
+      "Layer 28 is scale-dependent and must be requested explicitly.",
+      "hazards.fema.gov is restricted to US egress networks; AEGIS routes the upstream through FEMA's official hazards-fema.maps.arcgis.com relay proxy, which is internationally reachable."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
+  "normalization": {
+    "geometryPath": "MapServer/export",
+    "idPath": "NFHL",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "Raster"
+  },
+  "executionContract": {
+    "supported_operations": ["show", "overlay", "inspect", "in"],
+    "supported_scope_kinds": ["bbox", "administrative_geometry", "viewport"],
+    "temporal_modes": ["current"],
+    "temporal_windows": ["static_current_service"],
+    "required_inputs": ["location", "analysis_scope"],
+    "output_geometry_type": "Raster",
+    "render_support": "raster",
+    "coverage": "united-states",
+    "limitations": [
+      "This is flood-zone context, not a current flooding observation.",
+      "Layer 28 is scale-dependent and must be requested explicitly.",
+      "The upstream hazards.fema.gov host is US-egress restricted; AEGIS fetches through the official FEMA ArcGIS Online relay, so rendered FEMA pixels require the relay path to be available."
+    ],
+    "fallback_ids": []
+  }
+}

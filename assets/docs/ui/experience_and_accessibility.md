@@ -1,13 +1,14 @@
 # Experience And Accessibility
 
-Last updated: 2026-06-25
+Last updated: 2026-09-21
 
 ## Core User Journeys
 
 - Ask a geospatial question, receive an assistant response, and inspect map session output.
 - Review geodata to understand layers, tools, providers, and access constraints.
-- Open Access configurations to add optional provider keys.
-- Open model settings to choose the agent model and manage provider credentials.
+- Open Settings → Geospatial Access to add optional provider keys.
+- Open Settings → Models to choose the agent model and Settings → Model
+  Providers to manage model credentials and Ollama.
 
 ## Interaction Rules
 
@@ -21,18 +22,27 @@ Last updated: 2026-06-25
 - Workspace shows welcome or idle content before the first successful turn.
 - Settings shows explicit empty-state UI when no filtered model results exist.
 
-## Responsiveness
+## Desktop Usability
 
-- The app must remain usable on desktop and narrow widths.
-- Workspace supports collapsing toolbar and constrained resize behavior.
-- Settings adapts from multi-column to narrow layouts.
-- Avoid fixed heights that break small-screen scrolling.
+- The supported viewport is a standard desktop or laptop browser window at
+  least `1024px` wide.
+- Below that width, the application shows a blocking minimum-size notice and
+  preserves the desktop interface behind an inert shell.
+- Workspace collapsing and constrained mouse resizing remain available.
+- Prefer information density, horizontal space, and stable desktop navigation
+  over mobile-specific stacking or touch-first interactions.
 
 ## Accessibility
 
 - Maintain keyboard navigability for all controls.
 - Preserve `:focus-visible` outlines.
 - Maintain semantic containers and labels for form elements.
+- Settings uses a persistent semantic navigation landmark with
+  `aria-current="page"` on the active section. The `tab` query parameter keeps
+  deep links and browser history stable without using tab-panel semantics for
+  page-level settings sections.
+- Keep exactly one `main` landmark in the routed application shell.
+- Modal dialogs must receive focus on open, trap Tab and Shift+Tab, close with Escape, and restore focus to the invoking control.
 - Do not encode status solely by color.
 - Respect reduced-motion preferences.
 

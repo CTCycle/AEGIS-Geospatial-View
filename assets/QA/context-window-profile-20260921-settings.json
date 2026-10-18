@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-21",
+  "endpoint": "/api/chat/settings",
+  "credentials": "omitted",
+  "snapshots": [
+    {
+      "scenario": "exact static catalog profile",
+      "agent_model_provider": "openai",
+      "agent_model_name": "gpt-4.1",
+      "selected_model_context": {
+        "provider": "openai",
+        "model": "gpt-4.1",
+        "context_window_tokens": 1047576,
+        "maximum_output_tokens": 32768,
+        "context_profile_source": "openai_model_catalog",
+        "context_metadata_authority": "configured"
+      }
+    },
+    {
+      "scenario": "restored configured OpenCode selection",
+      "agent_model_provider": "opencode-go",
+      "agent_model_name": "deepseek-v4.1-flash",
+      "selected_model_context": {
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash",
+        "context_window_tokens": null,
+        "maximum_output_tokens": null,
+        "context_profile_source": "unknown",
+        "context_metadata_authority": "unknown"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "tested_at": "2026-09-28",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "probe_status": "failed",
+  "parse_status": "failed",
+  "message": "Native tool probe failed.",
+  "credential_refresh": {
+    "status": "rejected",
+    "http_status": 401,
+    "secret_recorded": false
+  },
+  "fallback_used": false
+}

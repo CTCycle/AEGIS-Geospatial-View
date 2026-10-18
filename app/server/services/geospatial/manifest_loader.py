@@ -1,15 +1,69 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
-from server.common.paths import PROJECT_DIR, ROOT_DIR
-from server.domain.geographics import CapabilityManifestV2
+from server.common.paths import DATA_PATH, ROOT_DIR
+from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
+RuntimeAccessMode = Literal[
+    "public",
+    "credential",
+    "credential_or_local_source",
+    "configured_source",
+]
+
+###############################################################################
+class CatalogIndex(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    providers_dir: str
+    basemaps_dir: str
+    overlays_dir: str
+    cameras_dir: str
+    transit_dir: str
+    tools_dir: str
+    runtime_profiles_file: str
+    manifest_schema_version: int
+    source_catalog_version: str
+    capability_groups: list[str]
+    health_summary: dict[str, int]
+
+###############################################################################
+class RuntimeProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str
+    enabled_by_default: bool
+    credential_provider: str | None
+    supports_map: bool
+    supports_direct_text: bool
+    coverage_policy: str
+    health_policy: str
+    handler_name: str | None
+    capability_kind: str
+    rendering_mode: str
+    health_status: str
+    planner_hints: list[str]
+    manual_toggle: bool
+    auth_required: bool
+    availability_mode: RuntimeAccessMode | None = None
+    local_source_env: str | None = None
+
+###############################################################################
+class RuntimeProfilesDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    profiles: list[RuntimeProfile]
+    routing_profiles: list[str]
 
 ###############################################################################
 class ManifestValidationError(ValueError):
@@ -40,11 +94,12 @@ class GeospatialManifestLoader:
         "cachePolicy",
         "normalization",
     }
+    RUNTIME_PROFILE_FRAGMENTS_DIR = "runtime_profiles.d"
 
     # -------------------------------------------------------------------------
     def __init__(self, root_path: str | Path | None = None) -> None:
         if root_path is None:
-            base_path = PROJECT_DIR / "resources" / "catalog"
+            base_path = DATA_PATH / "catalog"
         else:
             candidate = Path(root_path)
             base_path = candidate if candidate.is_absolute() else ROOT_DIR / candidate
@@ -60,13 +115,23 @@ class GeospatialManifestLoader:
     # -------------------------------------------------------------------------
     def load_index(self) -> JsonDict:
         payload = self._load_json(self.index_path)
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ManifestValidationError("Manifest index must be an object.")
-        return payload
+        try:
+            return CatalogIndex.model_validate(payload).model_dump()
+        except ValidationError as exc:
+            raise ManifestValidationError(
+                f"Manifest index failed validation: {exc}"
+            ) from exc
 
     # -------------------------------------------------------------------------
     def _validate_entry(
-        self, entry: JsonDict, *, source: str, source_path: str | Path | None = None
+        self,
+        entry: JsonDict,
+        *,
+        source: str,
+        source_path: str | Path | None = None,
+        require_agentic_domains: bool = False,
     ) -> JsonDict:
         missing = [
             field
@@ -83,6 +148,17 @@ class GeospatialManifestLoader:
             raise ManifestValidationError(
                 f"Manifest '{source}' entry '{entry.get('id')}' failed schema v2 validation: {exc}"
             ) from exc
+        if require_agentic_domains:
+            agentic_use = json_object(entry.get("agenticUse"))
+            domains = agentic_use.get("domains")
+            if not is_json_array(domains) or not domains:
+                raise ManifestValidationError(
+                    f"Manifest '{source}' entry '{entry.get('id')}' must declare at least one agenticUse domain."
+                )
+            if not is_json_object(entry.get("executionContract")):
+                raise ManifestValidationError(
+                    f"Manifest '{source}' entry '{entry.get('id')}' must declare executionContract."
+                )
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
         normalized["metadata"] = dict(entry.get("metadata") or {})
@@ -92,65 +168,109 @@ class GeospatialManifestLoader:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _load_directory_entries(self, relative_dir: str) -> list[JsonDict]:
+    def _load_directory_entries(
+        self, relative_dir: str, *, require_agentic_domains: bool = False
+    ) -> list[JsonDict]:
         folder = Path(self.root_path) / relative_dir
         if not folder.is_dir():
-            return []
+            raise ManifestValidationError(
+                f"Manifest directory '{folder}' does not exist."
+            )
         entries: list[JsonDict] = []
         for path in sorted(folder.iterdir()):
             if path.suffix.lower() != ".json":
                 continue
             payload = self._load_json(path)
-            if not isinstance(payload, dict):
+            if not is_json_object(payload):
                 raise ManifestValidationError(
                     f"Manifest document '{path}' must be an object."
                 )
             entries.append(
-                self._validate_entry(payload, source=path.name, source_path=path)
+                self._validate_entry(
+                    payload,
+                    source=path.name,
+                    source_path=path,
+                    require_agentic_domains=require_agentic_domains,
+                )
             )
         return entries
+
+    # -------------------------------------------------------------------------
+    def _load_runtime_profile_fragments(self) -> list[JsonDict]:
+        folder = Path(self.root_path) / self.RUNTIME_PROFILE_FRAGMENTS_DIR
+        if not folder.exists():
+            return []
+        if not folder.is_dir():
+            raise ManifestValidationError(
+                f"Runtime profile fragments path '{folder}' must be a directory."
+            )
+        profiles: list[JsonDict] = []
+        for path in sorted(folder.iterdir()):
+            if path.suffix.lower() != ".json":
+                continue
+            payload = self._load_json(path)
+            if not is_json_object(payload):
+                raise ManifestValidationError(
+                    f"Runtime profile fragment '{path}' must be an object."
+                )
+            try:
+                profile = RuntimeProfile.model_validate(payload)
+            except ValidationError as exc:
+                raise ManifestValidationError(
+                    f"Runtime profile fragment '{path.name}' failed validation: {exc}"
+                ) from exc
+            profiles.append(profile.model_dump())
+        return profiles
 
     # -------------------------------------------------------------------------
     def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
         path = Path(self.root_path) / filename
         payload = self._load_json(path)
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ManifestValidationError("Runtime profiles must be an object.")
-        profiles = payload.get("profiles")
-        if not isinstance(profiles, list):
-            raise ManifestValidationError("Runtime profiles must contain a profiles list.")
-        normalized: list[JsonDict] = []
-        for item in profiles:
-            if not isinstance(item, dict):
-                raise ManifestValidationError("Runtime profile entries must be objects.")
-            capability_id = str(item.get("capability_id") or "").strip()
-            if not capability_id:
-                raise ManifestValidationError("Runtime profile entry missing capability_id.")
-            normalized.append(dict(item))
-        return normalized
+        try:
+            document = RuntimeProfilesDocument.model_validate(payload)
+        except ValidationError as exc:
+            raise ManifestValidationError(
+                f"Runtime profiles failed validation: {exc}"
+            ) from exc
+
+        profiles = [profile.model_dump() for profile in document.profiles]
+        profiles.extend(self._load_runtime_profile_fragments())
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for profile in profiles:
+            capability_id = str(profile.get("capability_id") or "").strip()
+            if capability_id in seen:
+                duplicates.add(capability_id)
+            seen.add(capability_id)
+        if duplicates:
+            raise ManifestValidationError(
+                "Duplicate runtime profile capability ids: "
+                + ", ".join(sorted(duplicates))
+            )
+        return profiles
 
     # -------------------------------------------------------------------------
     def load_all(self) -> JsonDict:
         index = self.load_index()
-        providers = self._load_directory_entries(
-            str(index.get("providers_dir") or "providers")
-        )
+        providers = self._load_directory_entries(index["providers_dir"])
         basemaps = self._load_directory_entries(
-            str(index.get("basemaps_dir") or "basemaps")
+            index["basemaps_dir"], require_agentic_domains=True
         )
         overlays = self._load_directory_entries(
-            str(index.get("overlays_dir") or "overlays")
+            index["overlays_dir"], require_agentic_domains=True
         )
-        tools = self._load_directory_entries(str(index.get("tools_dir") or "tools"))
+        tools = self._load_directory_entries(
+            index["tools_dir"], require_agentic_domains=True
+        )
         cameras = self._load_directory_entries(
-            str(index.get("cameras_dir") or "cameras")
+            index["cameras_dir"], require_agentic_domains=True
         )
         transit = self._load_directory_entries(
-            str(index.get("transit_dir") or "transit")
+            index["transit_dir"], require_agentic_domains=True
         )
-        runtime_profiles = self._load_runtime_profiles(
-            str(index.get("runtime_profiles_file") or "runtime_profiles.json")
-        )
+        runtime_profiles = self._load_runtime_profiles(index["runtime_profiles_file"])
         return {
             "providers": providers,
             "basemaps": basemaps,

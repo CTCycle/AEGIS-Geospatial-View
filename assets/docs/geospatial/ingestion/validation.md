@@ -1,6 +1,13 @@
 # Validation
 
-Last updated: 2026-06-12
+Last updated: 2026-09-21
+
+The ordered long-term campaign is documented in the
+[comprehensive validation strategy](../../validation/strategy.md). The current
+application-foundations hand-off is the
+[Tier 1 QA package](../../../QA/tier1-application-foundations-20260921/report.md);
+its statuses are intentionally separate from this document's provider and
+ingestion contracts.
 
 ## Static Validation
 
@@ -54,6 +61,7 @@ CI should run:
 - focused geospatial unit contracts
 - client build and test suite
 - geospatial browser-smoke command
+- frontend E2E/browser renderer checks under `app/client/src/app/e2e`
 
 Live-provider validation should run outside deterministic CI when network access is available:
 
@@ -62,3 +70,15 @@ cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict --include-credentialed
 ```
+
+The validator is the canonical provider smoke matrix. It contains exactly one
+declarative case for every provider factory entry and classifies each case as
+public, credentialed, configured-source, or configuration-dependent. Missing
+credentials or sources are `SKIP`; transport failures, provider error payloads,
+and malformed semantic payloads are `FAIL`. Reports should be written to
+`assets/QA/` and retained by the scheduled workflow without including secrets.
+
+Live validation classifies upstream timeouts, rate limits, malformed responses,
+and missing credentials as provider availability failures. A failed provider
+probe is not a successful POI, layer, or map-render result; retain the last
+known-good map state and report the actionable warning.

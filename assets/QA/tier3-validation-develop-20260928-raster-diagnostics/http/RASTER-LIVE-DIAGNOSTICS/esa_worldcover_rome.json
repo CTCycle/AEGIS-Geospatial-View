@@ -1,0 +1,218 @@
+{
+  "scenario_id": "esa_worldcover_rome",
+  "prompt": "Show standalone ESA WorldCover for Rome, Italy.",
+  "assistant_response_visible": true,
+  "maplibre_map_count": 0,
+  "maplibre_canvas_count": 0,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show standalone ESA WorldCover for Rome, Italy. I've hit a wall with the ESA WorldCover layer. Let me summarize the situation honestly. Outcome: the map could not be rendered. What succeeded: Location resolved: Rome, Roma Capitale, Lazio, Italy (bbox 12.2344–12.8558 E, 41.6556–42.1410 N). Data retrieved: ESA WorldCover returned a valid, renderable raster result (attribution: © ESA WorldCover / Terrascope), with a valid evidence reference. What failed: A map candidate was prepared (OSM default basemap + the ESA WorldCover overlay), but browser render verification failed: the ESA WorldCover raster source could not be loaded (source_present: false, layer not rendered). The recovery guidance was to revise the map. My revision attempts did not produce a verified render: A basemap-swap + viewport plan was rejected as semantically invalid (a data-bearing plan must include the evidence layer). A rebuilt plan (Esri World Imagery basemap + the ESA WorldCover evidence layer + fit-to-evidence viewport) was rejected with viewport_bounds_unavailable — the viewport could not be derived from validated state. Bottom line: The ESA WorldCover data itself is valid and available, but the standalone layer repeatedly fails to load in the browser renderer, and I could not construct a map plan that both includes the evidence layer and yields a derivable viewport. I have no supported recovery left within this turn, so I'm stopping rather than repeating the same failing action. If you'd like, I can retry with a different basemap or a location-only map (no overlay) to confirm the basemap renders — but I can't currently guarantee the ESA WorldCover overlay will display. Previous map render failed (render_failed) during maplibre: A map data source could not be loaded. Check provider availability and try again. The last-known-good map was left unchanged. Send message Context Unavailable Ready for a location or data request Hide chat Alerts MAP WORKSPACE Ask for a location or map data to load the workspace. Agent model Needs attention Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "raster_events": [
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "request",
+      "method": "GET",
+      "resource_type": "fetch",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=548&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=380&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=548&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=547&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=546&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=381&tilecol=549&format=image%2Fpng"
+    },
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "resource_type": "fetch",
+      "failure": "net::ERR_HTTP2_PROTOCOL_ERROR",
+      "url": "https://services.terrascope.be/wmts/v2?service=WMTS&request=GetTile&version=1.0.0&layer=WORLDCOVER_2021_MAP&style=default&tilematrixset=EPSG%3A3857&tilematrix=EPSG%3A3857%3A10&tilerow=379&tilecol=548&format=image%2Fpng"
+    }
+  ],
+  "console": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR"
+    }
+  ],
+  "page_errors": [],
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\tier3-validation-develop-20260928-raster-diagnostics\\screenshots\\RASTER-LIVE-DIAGNOSTICS\\esa_worldcover_rome.png"
+}

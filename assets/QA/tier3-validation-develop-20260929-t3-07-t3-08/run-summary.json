@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-29",
+  "branch": "develop",
+  "tested_commit": "411adb4fc0c1-dirty",
+  "commands": [
+    {
+      "name": "scoped_backend_after_proxy_fix",
+      "result": "passed",
+      "detail": "91 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "focused_backend_before_proxy_fix",
+      "result": "passed",
+      "detail": "71 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "full_backend_unit_before_proxy_fix",
+      "result": "passed",
+      "detail": "971 passed, 2 dependency deprecation warnings"
+    },
+    {
+      "name": "frontend_build",
+      "result": "passed"
+    },
+    {
+      "name": "frontend_karma",
+      "result": "passed",
+      "detail": "254 SUCCESS"
+    },
+    {
+      "name": "geospatial_browser_smoke",
+      "result": "passed",
+      "detail": "6 SUCCESS"
+    },
+    {
+      "name": "strict_manifest_audit",
+      "result": "passed",
+      "detail": "86 manifests; 0 errors; 0 warnings"
+    },
+    {
+      "name": "live_fema_esa_diagnostic",
+      "result": "passed",
+      "detail": "Exact lane verified; 113 proxy requests, 95 proxy responses, 0 direct-upstream requests, 12 provider 502 responses; no acknowledged provider raster."
+    },
+    {
+      "name": "live_gibs_matrix",
+      "result": "passed",
+      "detail": "12 browser cases executed; all reached the assistant execution limit before a raster route, so T3-08 remains UNRUN."
+    }
+  ],
+  "cleanup": {
+    "backend_port_7059_listening": false,
+    "frontend_port_4512_listening": false,
+    "isolated_database_integrity": "ok",
+    "isolated_runtime_removed_after_recording": true
+  }
+}

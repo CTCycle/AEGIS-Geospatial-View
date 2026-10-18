@@ -1,20 +1,100 @@
 import {
   API_BASE_URL,
   API_CHAT_TURN_PATH,
+  API_CONVERSATION_PATH,
+  API_CONVERSATION_RUN_STATUS_PATH,
 } from './constants';
 import {
   ApiRequestError,
   buildApiError,
+  executeApiRequest,
+  fetchConversationSnapshot,
+  fetchConversationRunStatus,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
 } from './api';
 import {
   buildModelDescription,
+  normalizeMapOverlayEntry,
+  normalizeMapSession,
   parseCatalogResponse,
   parseChatTurnResponse,
+  parseChatTurnApiResponse,
+  parseAgentRunAcceptedResponse,
+  parseConversationSnapshotResponse,
+  parseGeospatialProviderPayload,
   parseModelSettingsResponse,
 } from './api-parsers';
+
+const catalogEntry = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: 'entry',
+  name: 'Entry',
+  kind: 'overlay',
+  type: 'overlay',
+  description: 'A catalog entry.',
+  provider: 'provider',
+  requires_credentials: false,
+  is_available: true,
+  supports_map: true,
+  supports_direct_text: false,
+  coverage: 'global',
+  action_tags: [],
+  task_tags: [],
+  source_protocol: 'provider-api',
+  data_format: 'geojson',
+  geometry_type: 'mixed',
+  queryable: true,
+  endpoint_health: 'functional',
+  auth_mode: 'none',
+  official_docs_url: 'https://example.test/docs',
+  capability_kind: 'vector-overlay',
+  rendering_mode: 'geojson',
+  reliability: {
+    status: 'functional',
+    last_audited: '2026-08-31',
+    known_limitations: [],
+  },
+  auth: {
+    type: 'none',
+    required: false,
+    provider_key: null,
+    access_page_provider_id: null,
+  },
+  metadata: {},
+  ...overrides,
+});
+
+const nativeRoute = {
+  primary_domain: 'data_retrieval',
+  secondary_domains: [],
+  task_mode: 'execute',
+  presentation: 'text',
+  requires_location: false,
+  capability_queries: ['evidence'],
+  explicit_capability_ids: [],
+  clarification_question: null,
+  operation: 'retrieve',
+  target_refs: [],
+  temporal_scope: { mode: 'none', granularity: 'none', aggregation: 'none' },
+  spatial_scope: null,
+  filters: {},
+};
+
+const nativeConversationState = (conversationId: string) => ({
+  schema_version: 2,
+  conversation_id: conversationId,
+  revision: 1,
+  active_directives: [],
+  summary: null,
+  goal: null,
+  route: null,
+  constraints: {},
+  resolved_locations: {},
+  evidence_refs: [],
+  committed_map_session: null,
+  pending_clarification: null,
+});
 
 describe('core/api', () => {
   afterEach(() => {
@@ -24,29 +104,30 @@ describe('core/api', () => {
   it('parseCatalogResponse normalizes entries', () => {
     const parsed = parseCatalogResponse({
       capabilities: [
-        { id: 'b1', kind: 'basemap' },
+        catalogEntry({ id: 'b1', name: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' }),
       ],
       basemaps: [
-        { id: 'b1', kind: 'basemap' },
+        catalogEntry({ id: 'b1', name: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' }),
       ],
       overlays: [
-        {
+        catalogEntry({
           id: 'o1',
+          name: 'o1',
           kind: 'overlay',
-          capabilityKind: 'raster-overlay',
-          renderingMode: 'wmts',
+          capability_kind: 'raster-overlay',
+          rendering_mode: 'wmts',
           reliability: {
             status: 'partial',
-            lastAudited: '2026-05-11',
-            knownLimitations: ['time dimension'],
+            last_audited: '2026-05-11',
+            known_limitations: ['time dimension'],
           },
           auth: {
             type: 'api-key',
             required: true,
-            providerKey: 'tomtom',
-            accessPageProviderId: 'tomtom',
+            provider_key: 'tomtom',
+            access_page_provider_id: 'tomtom',
           },
-        },
+        }),
       ],
       providers: [],
       cameras: [],
@@ -65,16 +146,37 @@ describe('core/api', () => {
 
   it('parseCatalogResponse does not reconstruct grouped arrays from capabilities', () => {
     const parsed = parseCatalogResponse({
-      capabilities: [{ id: 'b1', kind: 'basemap' }],
+      capabilities: [catalogEntry({ id: 'b1', kind: 'basemap', type: 'basemap', capability_kind: 'basemap' })],
+      providers: [],
+      basemaps: [],
+      overlays: [],
+      cameras: [],
+      transit: [],
+      tools: [],
     });
     expect(parsed.capabilities.length).toBe(1);
     expect(parsed.basemaps?.length ?? 0).toBe(0);
     expect(parsed.overlays?.length ?? 0).toBe(0);
   });
 
-  it('parseModelSettingsResponse defaults correctly', () => {
+  it('parseModelSettingsResponse accepts the current contract', () => {
     const parsed = parseModelSettingsResponse({
+      active_provider_mode: 'cloud',
+      agent_model_provider: '',
+      agent_model_name: '',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
       credential_health: { openai: { api_key: 'unreadable' } },
+      selected_model_context: {
+        provider: '',
+        model: '',
+        context_window_tokens: null,
+        maximum_output_tokens: null,
+        context_profile_source: 'unknown',
+      },
     });
     expect(parsed.active_provider_mode).toBe('cloud');
     expect(parsed.agent_model_provider).toBe('');
@@ -84,29 +186,37 @@ describe('core/api', () => {
     expect(parsed.deepseek_base_url).toBeNull();
   });
 
+  it('parseModelSettingsResponse rejects missing current fields', () => {
+    expect(() => parseModelSettingsResponse({ credential_health: {} })).toThrowError(/Invalid model settings API response/);
+  });
+
+  it('parseModelSettingsResponse rejects noncanonical provider IDs', () => {
+    expect(() => parseModelSettingsResponse({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'OpenAI',
+      agent_model_name: 'gpt-4.1-mini',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
+      credential_health: {},
+      selected_model_context: {
+        provider: 'OpenAI',
+        model: 'gpt-4.1-mini',
+        context_window_tokens: null,
+        maximum_output_tokens: null,
+        context_profile_source: 'unknown',
+      },
+    })).toThrowError(/canonical registered provider ID/);
+  });
+
   it('parseChatTurnResponse accepts valid backend response', () => {
     const parsed = parseChatTurnResponse({
+      conversation_id: 'conv-abc',
       request_id: 'chat-abc',
-      session_id: 12,
       assistant_message: 'done',
-      turn_contract: {
-        user_text: 'show weather',
-        task_class: 'direct_query',
-        location_signals: [],
-        normalized_action: {
-          action_id: 'weather',
-          action_label: 'Weather',
-          task_tags: [],
-          action_tags: [],
-          requires_location: false,
-        },
-        temporal_signal: { mode: 'none' },
-        ambiguities: [],
-        parser_confidence: 0.9,
-      },
-      decision: {
-        plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
-      },
+      memory_snapshot: {},
       operation: {
         kind: 'direct_answer',
         status: 'success',
@@ -120,47 +230,275 @@ describe('core/api', () => {
         usage_percent: 4.9,
         provider: 'ollama',
         model: 'llama3.2',
+        usage_source: 'provider_reported',
       },
+      context_revision: 1,
+      route: { ...nativeRoute, primary_domain: 'weather', capability_queries: ['weather'] },
+      presentation_status: 'prepared_unverified',
+      tool_results: [{
+        call_id: 'call-1',
+        tool_name: 'execute_geospatial_capability',
+        status: 'success',
+        summary: 'Weather fetched.',
+        evidence_refs: ['evidence-1'],
+        map_candidate_id: null,
+        error: null,
+      }],
+      execution_trace: { phases: ['route_request', 'execute_tool'] },
     });
     expect(parsed.request_id).toBe('chat-abc');
-    expect(parsed.session_id).toBe(12);
+    expect(parsed.conversation_id).toBe('conv-abc');
     expect(parsed.assistant_message).toBe('done');
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
+    expect(parsed.context_usage?.usage_source).toBe('provider_reported');
+    expect(parsed.route?.primary_domain).toBe('weather');
+    expect(parsed.presentation_status).toBe('prepared_unverified');
+    expect(parsed.tool_results?.[0].call_id).toBe('call-1');
+    const executionTrace = parsed.execution_trace as Record<string, unknown> | null | undefined;
+    expect(executionTrace?.phases).toEqual(['route_request', 'execute_tool']);
+  });
+
+  it('rejects malformed native presentation metadata', () => {
+    expect(() => parseChatTurnResponse({
+      conversation_id: 'conv-abc',
+      request_id: 'chat-abc',
+      assistant_message: 'done',
+      memory_snapshot: {},
+      presentation_status: 'pending',
+    })).toThrowError(/Invalid chat turn API response/);
+  });
+
+  it('parses an accepted active chat run without treating it as a terminal response', () => {
+    const parsed = parseChatTurnApiResponse({
+      conversation_id: 'conv-abc',
+      run_id: 'run-abc',
+      run_version: 1,
+      state: 'running',
+      presentation_status: 'not_required',
+      status_url: '/api/conversations/conv-abc/runs/run-abc',
+      realtime_url: '/api/conversations/conv-abc/realtime',
+      terminal: false,
+    });
+
+    expect('status_url' in parsed).toBeTrue();
+    if ('status_url' in parsed) {
+      expect(parsed.run_id).toBe('run-abc');
+      expect(parsed.state).toBe('running');
+      expect(parsed.terminal).toBeFalse();
+    }
+    expect(() => parseAgentRunAcceptedResponse({
+      conversation_id: 'conv-abc',
+      run_id: 'run-abc',
+      run_version: 0,
+      state: 'running',
+      presentation_status: 'not_required',
+      status_url: '/status',
+      terminal: false,
+    })).toThrowError(/positive integer/);
+  });
+
+  it('fetches an accepted run status from the canonical polling route', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        conversation_id: 'conv-abc',
+        run_id: 'run-abc',
+        original_request: 'Show weather in Rome',
+        aggregated_request: 'Show weather in Rome',
+        active_run_version: 1,
+        state: 'running',
+        created_at: '2026-09-18T09:00:00Z',
+        request_timezone: null,
+        started_at: null,
+        completed_at: null,
+        cancel_requested_at: null,
+        error_code: null,
+        error_message: null,
+        presentation_status: 'not_required',
+        presentation: null,
+        response: null,
+        current_iteration: 1,
+        task_state: null,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    const parsed = await fetchConversationRunStatus('conv-abc', 'run-abc');
+
+    expect(parsed.state).toBe('running');
+    expect(fetchSpy.calls.mostRecent().args[0] as string)
+      .toBe(`${API_BASE_URL}${API_CONVERSATION_RUN_STATUS_PATH('conv-abc', 'run-abc')}`);
+  });
+
+  it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {
+    const parsed = parseGeospatialProviderPayload({
+      status: 'ok',
+      provider: 'openmeteo',
+      result_status: 'ok',
+      result_type: 'weather_current',
+      fetched_at: '2026-09-01T00:00:00Z',
+      observation_time: '2026-09-01T00:00:00Z',
+      coverage: { kind: 'point', latitude: 41.9, longitude: 12.5 },
+      spatial_resolution: 'point forecast',
+      units: { temperature: '°C', precipitation: 'mm' },
+      source_url: 'https://api.open-meteo.com/v1/forecast',
+      partial: false,
+      payload: { temperature: 20 },
+    });
+
+    expect(parsed.result_status).toBe('ok');
+    expect(parsed.result_type).toBe('weather_current');
+    expect(parsed.fetched_at).toBe('2026-09-01T00:00:00Z');
+    expect((parsed.coverage as Record<string, unknown> | null | undefined)?.kind).toBe('point');
+    expect(parsed.units).toEqual({ temperature: '°C', precipitation: 'mm' });
+    expect(parsed.source_url).toBe('https://api.open-meteo.com/v1/forecast');
+  });
+
+  it('rejects map payloads that lack a verified basemap or contain invalid geographic data', () => {
+    const validSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      basemap: {
+        id: 'osm_default',
+        label: 'OpenStreetMap',
+        provider: 'openstreetmap',
+        tile_url: '/api/geospatial/tiles/osm_default/{z}/{x}/{y}.png',
+        render_status: 'available',
+      },
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      center: { latitude: 41.9, longitude: 12.5 },
+      bounds: [12.4, 41.8, 12.6, 42],
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
+    };
+
+    expect(normalizeMapSession(validSession)?.basemap?.id).toBe('osm_default');
+    expect(normalizeMapSession({ ...validSession, bounds: null })?.center).toEqual({ latitude: 41.9, longitude: 12.5 });
+    expect(normalizeMapSession({ ...validSession, basemap: undefined })).toBeNull();
+    expect(normalizeMapSession({
+      ...validSession,
+      resolved_location: { label: 'Rome', latitude: 141.9, longitude: 12.5 },
+    })).toBeNull();
+    expect(normalizeMapSession({ ...validSession, bounds: [12.6, 41.8, 12.4, 42] })).toBeNull();
+    expect(normalizeMapOverlayEntry({
+      id: 'broken',
+      label: 'Broken',
+      provider: 'fixture',
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [181, 41] },
+          properties: {},
+        }],
+      },
+    })).toBeNull();
+  });
+
+  it('parseConversationSnapshotResponse accepts the current durable contract', () => {
+    const parsed = parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      title: 'Rome map',
+      context_revision: 4,
+      messages: [
+        { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:00:00Z' },
+        { role: 'assistant', content: 'Done', created_at: '2026-08-31T10:00:01Z' },
+      ],
+      memory_snapshot: { location_slots: [] },
+      conversation_state: nativeConversationState('conv-abc'),
+      map_session: null,
+      active_run: {
+        run_id: 'run-1',
+        run_version: 2,
+        state: 'running',
+      },
+    });
+
+    expect(parsed.conversation_id).toBe('conv-abc');
+    expect(parsed.messages.length).toBe(2);
+    expect(parsed.messages[1].kind).toBe('normal');
+    expect(parsed.active_run?.run_id).toBe('run-1');
+  });
+
+  it('parseConversationSnapshotResponse rejects legacy or malformed durable state', () => {
+    expect(() => parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      context_revision: 1,
+      messages: [{ role: 'assistant', content: 'missing timestamp' }],
+      memory_snapshot: {},
+    })).toThrow();
+    expect(() => parseConversationSnapshotResponse({
+      conversation_id: 'conv-abc',
+      context_revision: 1,
+      messages: [],
+      memory_snapshot: {},
+      conversation_state: { schema_version: 2 },
+    })).toThrow();
+  });
+
+  it('fetchConversationSnapshot uses the encoded conversation route', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        conversation_id: 'conv/abc',
+        title: null,
+        context_revision: 0,
+        messages: [],
+        memory_snapshot: {},
+        conversation_state: nativeConversationState('conv/abc'),
+        map_session: null,
+        active_run: null,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await fetchConversationSnapshot('conv/abc');
+
+    expect(fetchSpy.calls.mostRecent().args[0]).toBe(
+      `${API_BASE_URL}${API_CONVERSATION_PATH('conv/abc')}`,
+    );
   });
 
   [
     {
       label: 'request_id',
       payload: {
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
-        turn_contract: {},
-        decision: {},
-      },
-    },
-    {
-      label: 'turn_contract',
-      payload: {
-        request_id: 'chat-1',
-        session_id: 1,
-        assistant_message: 'ok',
-        decision: {},
-      },
-    },
-    {
-      label: 'decision',
-      payload: {
-        request_id: 'chat-1',
-        session_id: 1,
-        assistant_message: 'ok',
-        turn_contract: {},
       },
     },
   ].forEach(({ label, payload }) => {
     it(`parseChatTurnResponse rejects missing ${label}`, () => {
       expect(() => parseChatTurnResponse(payload)).toThrow();
     });
+  });
+
+  it('accepts canonical native responses without parser or policy projections', () => {
+    const parsed = parseChatTurnResponse({
+      conversation_id: 'conv-native',
+      request_id: 'chat-native',
+      assistant_message: 'The evidence is ready.',
+      memory_snapshot: {},
+      context_revision: 0,
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'The evidence is ready.',
+        warnings: [],
+      },
+      route: nativeRoute,
+      presentation_status: 'not_requested',
+      tool_results: [],
+      execution_trace: { stopped_reason: 'goal_satisfied' },
+    });
+
+    expect(parsed.route?.task_mode).toBe('execute');
   });
 
   it('buildApiError builds ApiRequestError', async () => {
@@ -175,23 +513,40 @@ describe('core/api', () => {
     expect(err.status).toBe(400);
   });
 
+  it('aborts a request at the endpoint timeout boundary', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.callFake(
+      (_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await expectAsync(executeApiRequest('/api/chat/turn', { method: 'POST' }, 1))
+      .toBeRejectedWithError(ApiRequestError, 'Request timed out before completion.');
+  });
+
   it('base URL route construction uses API_BASE_URL', async () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
       new Response(JSON.stringify({
         request_id: 'chat-1',
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
-        turn_contract: {},
-        decision: {},
         operation: { kind: 'direct_answer', status: 'success', message: 'ok' },
         memory_snapshot: {},
+        context_revision: 0,
+        presentation_status: 'not_requested',
+        tool_results: [],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
     (window.fetch as unknown) = fetchSpy;
-    await sendChatTurn({ message: 'hello' });
+    await sendChatTurn({ conversation_id: 'conv-1', message: 'hello' });
     expect(fetchSpy).toHaveBeenCalled();
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toBe(`${API_BASE_URL}${API_CHAT_TURN_PATH}`);

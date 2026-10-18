@@ -3,10 +3,21 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
 from pydantic import BaseModel
 
+from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.google_provider import GoogleProvider
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.opencode_provider import (
+    OPENCODE_GO_PROVIDER,
+    OPENCODE_PROVIDER,
+    OpenCodeProvider,
+)
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMResult
 
@@ -76,7 +87,10 @@ class _FakeOpenAIResponse:
     output_text = "chat-ok"
 
     # -------------------------------------------------------------------------
-    def model_dump(self, *, mode: str) -> dict[str, object]:
+    def model_dump(
+        self, *, mode: str, warnings: bool = False
+    ) -> dict[str, object]:
+        _ = warnings
         return {"mode": mode, "id": "resp-test"}
 
 ###############################################################################
@@ -95,6 +109,10 @@ class _FakeOpenAIResponses:
                 SimpleNamespace(type="response.output_text.delta", delta="chunk-1"),
                 SimpleNamespace(type="response.created", delta="ignored"),
                 SimpleNamespace(type="response.output_text.delta", delta="chunk-2"),
+                SimpleNamespace(
+                    type="response.completed",
+                    usage=SimpleNamespace(input_tokens=8, output_tokens=2),
+                ),
             ]
         return _FakeOpenAIResponse()
 
@@ -144,19 +162,30 @@ class _FakeGoogleModels:
         config = kwargs.get("config")
         if isinstance(config, dict) and config.get("response_mime_type"):
             return SimpleNamespace(text=json.dumps({"answer": "structured"}))
-        return SimpleNamespace(text="chat-ok", model_dump=lambda mode: {"mode": mode})
+        return SimpleNamespace(
+            text="chat-ok",
+            model_dump=lambda *, mode, warnings=False: {"mode": mode},
+        )
 
     # -------------------------------------------------------------------------
     def generate_content_stream(self, **kwargs):  # noqa: ANN001, ANN202
         self.generate_content_stream_calls.append(kwargs)
-        return [SimpleNamespace(text="chunk-1"), SimpleNamespace(text="chunk-2")]
+        return [
+            SimpleNamespace(text="chunk-1"),
+            SimpleNamespace(text="chunk-2"),
+            SimpleNamespace(
+                text="",
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=8,
+                    candidates_token_count=2,
+                ),
+            ),
+        ]
 
     # -------------------------------------------------------------------------
     def embed_content(self, **kwargs):  # noqa: ANN001, ANN202
         self.embed_content_calls.append(kwargs)
-        return SimpleNamespace(
-            embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])]
-        )
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])])
 
 ###############################################################################
 class _FakeGoogleClient:
@@ -194,7 +223,10 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -205,20 +237,51 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     ]
 
     first_client = _FakeOpenAIClient.instances[0]
-    assert first_client.kwargs == {
-        "api_key": "k",
-        "base_url": "https://api.openai.test/v1",
-    }
+    assert first_client.kwargs["api_key"] == "k"
+    assert first_client.kwargs["base_url"] == "https://api.openai.test/v1"
+    assert first_client.kwargs["timeout"] == 30.0
+    assert first_client.kwargs["max_retries"] == 0
+    assert first_client.kwargs["http_client"].trust_env is False
     assert first_client.responses.create_calls[0]["model"] == "test-model"
     assert first_client.responses.create_calls[0]["input"] == _request().messages
-    assert _FakeOpenAIClient.instances[2].responses.parse_calls[0]["text_format"] is _StructuredPayload
+    assert (
+        _FakeOpenAIClient.instances[2].responses.parse_calls[0]["text_format"]
+        is _StructuredPayload
+    )
     assert _FakeOpenAIClient.instances[3].embeddings.create_calls[0] == {
         "model": "embed-model",
         "input": "hello",
     }
 
 ###############################################################################
-def test_openai_structured_output_rejects_unsupported_model_before_api_call(monkeypatch) -> None:
+def test_openai_reasoning_catalog_policy_omits_temperature_and_caps_output(
+    monkeypatch,
+) -> None:
+    _FakeOpenAIClient.instances = []
+    monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
+    provider = OpenAIProvider(api_key="k")
+    request = LLMRequest(
+        model="gpt-5.2",
+        messages=[{"role": "user", "content": "Extract"}],
+        temperature=0.9,
+        metadata={"max_tokens": 200_000},
+    )
+
+    provider.chat(request)
+    provider.structured_output(request, schema=_StructuredPayload)
+
+    client = _FakeOpenAIClient.instances[0]
+    chat_call = client.responses.create_calls[0]
+    parse_call = _FakeOpenAIClient.instances[1].responses.parse_calls[0]
+    assert "temperature" not in chat_call
+    assert chat_call["max_output_tokens"] == 128_000
+    assert "temperature" not in parse_call
+    assert parse_call["max_output_tokens"] == 128_000
+
+###############################################################################
+def test_openai_structured_output_rejects_unsupported_model_before_api_call(
+    monkeypatch,
+) -> None:
     _FakeOpenAIClient.instances = []
     monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
     provider = OpenAIProvider(api_key="k")
@@ -230,7 +293,8 @@ def test_openai_structured_output_rejects_unsupported_model_before_api_call(monk
     request = LLMRequest(model="chat-only", messages=_request().messages)
     try:
         provider.structured_output(request, schema=_StructuredPayload)
-    except ValueError as exc:
+    except LLMStructuredOutputError as exc:
+        assert exc.category == "model_capability"
         assert "does not support structured output" in str(exc)
     else:
         raise AssertionError("structured_output should reject unsupported models")
@@ -240,7 +304,9 @@ def test_openai_structured_output_rejects_unsupported_model_before_api_call(monk
 ###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     _FakeGoogleClient.instances = []
-    monkeypatch.setattr("server.services.llm.google_provider.genai.Client", _FakeGoogleClient)
+    monkeypatch.setattr(
+        "server.services.llm.google_provider.genai.Client", _FakeGoogleClient
+    )
     monkeypatch.setattr(
         "server.services.llm.google_provider.genai_types.HttpOptions",
         _FakeHttpOptions,
@@ -250,7 +316,10 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -262,10 +331,12 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
 
     first_client = _FakeGoogleClient.instances[0]
     assert first_client.kwargs["api_key"] == "k"
-    assert first_client.kwargs["http_options"].kwargs == {
-        "baseUrl": "https://google.example/v1beta",
-        "apiVersion": "v1beta",
-    }
+    http_options = first_client.kwargs["http_options"].kwargs
+    assert http_options["baseUrl"] == "https://google.example/v1beta"
+    assert http_options["apiVersion"] == "v1beta"
+    assert http_options["timeout"] == 30_000
+    assert http_options["retryOptions"].attempts == 1
+    assert http_options["clientArgs"]["trust_env"] is False
     chat_call = first_client.models.generate_content_calls[0]
     assert chat_call["model"] == "test-model"
     assert chat_call["contents"] == [
@@ -301,7 +372,12 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
         return iter(
             [
                 {"message": {"content": "chunk-1"}},
-                {"message": {"content": "chunk-2"}, "done": True},
+                {
+                    "message": {"content": "chunk-2"},
+                    "done": True,
+                    "prompt_eval_count": 8,
+                    "eval_count": 2,
+                },
             ]
         )
 
@@ -312,7 +388,10 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     response = provider.chat(_request())
     assert isinstance(response, LLMResult)
     assert response.content == "chat-ok"
-    assert list(provider.stream_chat(_request())) == ["chunk-1", "chunk-2"]
+    stream = provider.stream_chat(_request())
+    assert list(stream) == ["chunk-1", "chunk-2"]
+    assert stream.context_usage is not None
+    assert stream.context_usage["reported_input_tokens"] == 8
     assert provider.structured_output(_request(), schema=_StructuredPayload) == {
         "answer": "structured"
     }
@@ -321,8 +400,77 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
         0.2,
         0.3,
     ]
-    assert post_calls[0][0] == "/api/chat"
+    assert post_calls[0][0] == "/api/show"
+    chat_payload = next(payload for path, payload in post_calls if path == "/api/chat")
     assert stream_calls[0][0] == "/api/chat"
-    assert post_calls[0][1]["options"]["num_ctx"] >= 2048
-    assert provider.last_context_usage is not None
-    assert provider.last_context_usage["provider"] == "ollama"
+    assert "num_ctx" not in chat_payload.get("options", {})
+    structured_payload = next(
+        payload for _, payload in post_calls if payload.get("format")
+    )
+    assert "think" not in structured_payload
+    assert response.context_usage is not None
+    assert response.context_usage["provider"] == "ollama"
+
+###############################################################################
+def test_ollama_thinking_control_uses_exact_show_metadata(monkeypatch) -> None:
+    payloads: list[dict[str, object]] = []
+
+    def fake_post(self, path, payload):  # noqa: ANN001
+        if path == "/api/show":
+            if payload["name"] == "gpt-oss-local":
+                return {"details": {"family": "gpt-oss"}}
+            return {"details": {"family": "qwen3"}, "capabilities": ["thinking"]}
+        payloads.append(payload)
+        return {"message": {"content": json.dumps({"answer": "ok"})}}
+
+    monkeypatch.setattr(OllamaProvider, "_post_json", fake_post)
+    provider = OllamaProvider(base_url="http://localhost:11434")
+
+    provider.structured_output(
+        LLMRequest(model="gpt-oss-local", messages=[{"role": "user", "content": "x"}]),
+        schema=_StructuredPayload,
+    )
+    provider.structured_output(
+        LLMRequest(model="qwen-local", messages=[{"role": "user", "content": "x"}]),
+        schema=_StructuredPayload,
+    )
+
+    structured_payloads = [payload for payload in payloads if payload.get("format")]
+    assert structured_payloads[0]["think"] == "low"
+    assert structured_payloads[1]["think"] is False
+
+###############################################################################
+def test_all_llm_adapters_normalize_transport_setup_timeouts(monkeypatch) -> None:
+    providers = [
+        OpenAIProvider(api_key="secret"),
+        GoogleProvider(api_key="secret"),
+        DeepSeekProvider(api_key="secret"),
+        OpenCodeProvider(api_key="secret", provider_name=OPENCODE_PROVIDER),
+        OpenCodeProvider(api_key="secret", provider_name=OPENCODE_GO_PROVIDER),
+        OllamaProvider(base_url="http://ollama.test"),
+    ]
+
+    def fail(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise TimeoutError("provider transport setup timed out")
+
+    for provider in providers:
+        request = LLMRequest(
+            model=(
+                "deepseek-v4-flash"
+                if provider.provider_name in {"deepseek", "opencode", "opencode-go"}
+                else "test-model"
+            ),
+            messages=[{"role": "user", "content": "hello"}],
+            provider_session_id="conversation-test",
+        )
+        if isinstance(provider, OllamaProvider):
+            monkeypatch.setattr(provider, "_post_json_for_request", fail)
+        else:
+            monkeypatch.setattr(provider, "_client_for_request", fail)
+
+        with pytest.raises(LLMProviderRequestError) as error:
+            provider.chat(request)
+
+        assert error.value.provider == provider.provider_name
+        assert error.value.code == "provider_timeout"
+        assert error.value.timeout_origin == "provider_transport"
