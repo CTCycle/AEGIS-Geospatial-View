@@ -706,6 +706,8 @@ def _operation_candidates(operation: str) -> set[str]:
         "map": {"show", "overlay"},
         "render": {"show", "overlay"},
         "retrieve": {"search", "show", "inspect", "overlay", "forecast"},
+        # Comparing places is a retrieval per target; no manifest declares it.
+        "compare": {"search", "show", "inspect", "overlay", "forecast"},
         "estimate": {"show", "inspect"},
         "visualize": {"show", "overlay"},
         "weather": {"forecast", "show", "inspect"},
@@ -884,7 +886,9 @@ def _avoid_when_conflicts(
         # otherwise valid candidates before that prerequisite could run.
         if "no geographic context" in phrase and location is None:
             continue
-        if phrase_tokens.intersection(query_tokens):
+        # The condition is the whole phrase: "satellite infrared imagery" must
+        # not veto "rain radar imagery" on the shared word "imagery".
+        if phrase_tokens.issubset(query_tokens):
             return True
     return False
 
@@ -990,6 +994,10 @@ def _routing_variant_matches(
     for value in values:
         terms, recognized = _routing_query_terms([value])
         if not recognized:
+            # A plain subject query ("pharmacies") is a variant as well; it
+            # matches when the catalog names that subject.
+            if terms.intersection(searchable):
+                return True
             continue
         required = terms.intersection(_ROUTING_CANONICAL_TERMS)
         unmapped = terms.difference(_ROUTING_CANONICAL_TERMS)

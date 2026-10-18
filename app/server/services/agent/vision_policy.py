@@ -103,7 +103,9 @@ class VisionPolicyEngine:
 
         if not self.vision_supported or self.policy_enum == VisionPolicy.DISABLED:
             return False
-        if not self.meaningful_map_rendered(state):
+        # The request travels with the render handshake, before any browser
+        # observation exists; the browser only captures a ready render.
+        if state.prepared_map_session is None and not self.meaningful_map_rendered(state):
             return False
         vision_state = state.vision_state
         if vision_state is not None and vision_state.vision_calls >= self.max_vision_calls:

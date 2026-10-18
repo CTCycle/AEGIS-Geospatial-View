@@ -81,6 +81,10 @@ class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
 
 ###############################################################################
+class GeospatialCapabilityDisabledError(GeospatialApiServiceError):
+    """Raised when a manifest capability is disabled for this deployment."""
+
+###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
     """Raised when query parameters cannot be parsed safely."""
 
@@ -370,6 +374,11 @@ class GeospatialApiService:
         incidents: bool,
     ) -> dict[str, Any]:
         manifest = self._manifest_by_id(layer_id)
+        if not self.runtime_registry.is_enabled(layer_id):
+            raise GeospatialCapabilityDisabledError(
+                self.runtime_registry.availability_reason(layer_id)
+                or "Capability is disabled."
+            )
         provider_id = str(manifest.get("provider") or "")
         params: dict[str, Any] = {}
         metadata = json_object(manifest.get("metadata"))
@@ -839,7 +848,9 @@ class GeospatialApiService:
                 image_format=render.format or "image/png",
                 style=render.style or "",
                 version="1.3.0",
-                exceptions="application/vnd.ogc.se_inimage",
+                # 1.3.0 exception formats are XML/INIMAGE/BLANK.  XML keeps an
+                # upstream error from passing as a rendered PNG tile.
+                exceptions="XML",
                 z=z,
                 x=x,
                 y=y,

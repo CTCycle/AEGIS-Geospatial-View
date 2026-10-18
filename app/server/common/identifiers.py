@@ -17,4 +17,15 @@ def normalize_target_key(value: str) -> str:
     return " ".join(ascii_text.casefold().split())
 
 
-__all__ = ["normalize_target_key"]
+###############################################################################
+def location_ref_matches(requested: str, key: str, label: str | None) -> bool:
+    """A resolved location answers to its reference key and its resolved label."""
+
+    target = normalize_target_key(requested)
+    return bool(target) and target in {
+        normalize_target_key(key),
+        normalize_target_key(label or ""),
+    }
+
+
+__all__ = ["location_ref_matches", "normalize_target_key"]

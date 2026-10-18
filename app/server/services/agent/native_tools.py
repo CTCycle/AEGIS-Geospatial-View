@@ -50,7 +50,7 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.agent.decision import ResolvedLocation
-from server.common.identifiers import normalize_target_key
+from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.contracts.geospatial import ExecutionExtent
 
 
@@ -572,6 +572,27 @@ def _lower_execution_extent(
     )
 
 ###############################################################################
+def _names_goal_target(
+    requested: str, state: AgentRunState, goal_targets: set[str]
+) -> bool:
+    """Accept a goal target named directly or through its resolved location.
+
+    A follow-up goal may spell a place by its resolved label while the model
+    passes that location's reference key, or the other way round.
+    """
+
+    if requested in goal_targets:
+        return True
+    return any(
+        location_ref_matches(requested, str(key), location.label)
+        and bool(
+            {normalize_target_key(str(key)), normalize_target_key(location.label)}
+            & goal_targets
+        )
+        for key, location in state.location_refs.items()
+    )
+
+###############################################################################
 def _location_for_request(
     request: ExecuteCapabilityInput, state: AgentRunState
 ) -> ResolvedLocation | None:
@@ -581,11 +602,11 @@ def _location_for_request(
         for item in (state.goal.target_ids if state.goal is not None else [])
         if normalize_target_key(str(item))
     }
-    if goal_targets and requested not in goal_targets:
+    if goal_targets and not _names_goal_target(requested, state, goal_targets):
         return None
     if requested:
         for key, location in state.location_refs.items():
-            if normalize_target_key(str(key)) == requested:
+            if location_ref_matches(requested, str(key), location.label):
                 return location
         return None
     if len(state.location_refs) > 1:
@@ -704,7 +725,11 @@ def _capability_semantic_validator(
         if normalize_target_key(str(item))
     }
     requested_target = normalize_target_key(str(request.location_ref or ""))
-    if requested_target and goal_targets and requested_target not in goal_targets:
+    if (
+        requested_target
+        and goal_targets
+        and not _names_goal_target(requested_target, state, goal_targets)
+    ):
         errors.append(
             "location_ref must match an exact target in the validated goal; "
             "another geography will not be substituted."

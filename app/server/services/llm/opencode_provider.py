@@ -99,6 +99,14 @@ OPENCODE_PROTOCOL_REGISTRY: dict[str, dict[str, str]] = {
     },
 }
 
+# The live /models response carries no modality metadata either. Models listed
+# here accepted and correctly described a real image request on that endpoint;
+# any other model is vision-capable only through an explicit "vision" suffix.
+OPENCODE_VERIFIED_VISION_MODELS: dict[str, frozenset[str]] = {
+    OPENCODE_PROVIDER: frozenset(),
+    OPENCODE_GO_PROVIDER: frozenset({"deepseek-v4.1-flash"}),
+}
+
 OPENCODE_COMPATIBLE_MODELS: dict[str, frozenset[str]] = {
     provider: frozenset(
         model
@@ -255,7 +263,11 @@ class OpenCodeProvider(DeepSeekProvider):
     def supports_vision(self, model: str) -> bool | None:
         if self.protocol_for_model(model) not in SUPPORTED_OPENCODE_PROTOCOLS:
             return False
-        return "vision" in model.strip().lower()
+        normalized = model.strip().lower()
+        return (
+            "vision" in normalized
+            or normalized in OPENCODE_VERIFIED_VISION_MODELS[self.provider_name]
+        )
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -398,6 +410,7 @@ class OpenCodeProvider(DeepSeekProvider):
             ]
         else:
             capabilities = ["chat", "stream"]
+        metadata["supports_vision"] = self.supports_vision(model_id)
         return ModelDescriptor(
             name=model_id,
             description=self._description_for_model(model_id),

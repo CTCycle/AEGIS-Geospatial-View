@@ -96,6 +96,41 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     assert response.json()["status"] in {"missing-credential", "ok"}
 
 ###############################################################################
+@pytest.mark.parametrize("endpoint", ["features", "geojson"])
+def test_geospatial_direct_layer_endpoints_refuse_disabled_capabilities(
+    endpoint: str,
+) -> None:
+    fetched: list[str] = []
+
+    ###############################################################################
+    class RecordingRegistry:
+
+        # -------------------------------------------------------------------------
+        def build_from_manifests(self) -> None:
+            return None
+
+        # -------------------------------------------------------------------------
+        async def fetch(self, provider_id, request):  # noqa: ANN001, ANN201
+            del request
+            fetched.append(provider_id)
+            raise AssertionError("A disabled capability must not reach its provider.")
+
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        _build_api_service(RecordingRegistry())
+    )
+
+    # Open-Meteo elevation is a restricted-use source that stays disabled until
+    # the deployment opts in, exactly as the agent and catalog report it.
+    response = client.get(
+        f"/api/geospatial/layers/openmeteo_elevation/{endpoint}?bbox=12.4,41.8,12.6,41.98"
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Capability is disabled."
+    assert fetched == []
+
+###############################################################################
 def test_geospatial_features_render_contract_still_uses_provider_envelope() -> None:
     client = create_started_client()
 
@@ -685,6 +720,9 @@ def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> 
     assert query["layers"] == ["MODIS_Combined_Thermal_Anomalies_All"]
     assert query["crs"] == ["EPSG:3857"]
     assert query["version"] == ["1.3.0"]
+    # WMS 1.3.0 names its exception formats XML/INIMAGE/BLANK; GIBS paints the
+    # 1.1.1 MIME type into a 200 PNG error tile.  XML keeps errors non-image.
+    assert query["exceptions"] == ["XML"]
     assert query["format"] == ["image/png"]
     assert query["transparent"] == ["true"]
     assert query["width"] == ["256"]

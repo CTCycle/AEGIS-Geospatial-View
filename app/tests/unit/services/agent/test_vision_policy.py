@@ -182,6 +182,35 @@ def test_capture_ref_falls_back_to_prepared_map_session() -> None:
 
 
 ###############################################################################
+def test_capture_is_requested_when_the_loop_suspends_for_a_new_render() -> None:
+    # The capture request rides on the render handshake, so it is decided
+    # before the browser has observed anything; the browser itself only
+    # captures a ready render.
+    prepared = SimpleNamespace(
+        render_verified=False,
+        prepared_map_session=SimpleNamespace(
+            session_id="candidate-1",
+            overlay_collection=SimpleNamespace(revision=1),
+        ),
+        render_observations=[],
+        tool_results=[],
+        vision_state=None,
+    )
+    retry_after_failure = SimpleNamespace(
+        **{**vars(prepared), "render_observations": [
+            SimpleNamespace(map_session_id="candidate-0", collection_revision=1, attempt=1, status="failed")
+        ]}
+    )
+    nothing_prepared = SimpleNamespace(**{**vars(prepared), "prepared_map_session": None})
+
+    assert _engine(VisionPolicy.ALWAYS.value).should_capture(prepared) is True
+    assert _engine(VisionPolicy.FINAL_CHECK.value).should_capture(prepared) is True
+    assert _engine(VisionPolicy.ON_FAILURE.value).should_capture(prepared) is False
+    assert _engine(VisionPolicy.ON_FAILURE.value).should_capture(retry_after_failure) is True
+    assert _engine(VisionPolicy.ALWAYS.value).should_capture(nothing_prepared) is False
+
+
+###############################################################################
 def test_vision_calls_cap_limits_further_attachments() -> None:
     state = _state(vision_state=VisionState(attached_capture_ref="map-1:1", vision_calls=2))
     engine = _engine(VisionPolicy.ALWAYS.value, max_vision_calls=2)

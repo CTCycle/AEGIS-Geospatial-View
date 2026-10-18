@@ -225,6 +225,58 @@ class _AdmissionEvidenceRepository(FakeEvidenceRepository):
         return summary, json.dumps({"features": [{"id": "hospital-1"}]}).encode()
 
 ###############################################################################
+class _TwoCityEvidenceRepository(FakeEvidenceRepository):
+    """One point result per compared city, as a per-target retrieval returns."""
+
+    POINTS = {
+        "evidence:zurich": (8.5410422, 47.3744489),
+        "evidence:lisbon": (-9.1365919, 38.7077507),
+    }
+
+    # -------------------------------------------------------------------------
+    def get_summary(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AgentEvidenceSummary | None:
+        point = self.POINTS.get(evidence_id)
+        if point is None:
+            return None
+        return AgentEvidenceSummary(
+            evidence_id=evidence_id,
+            kind="vector",
+            media_type="application/geo+json",
+            status="available",
+            summary={"feature_count": 1, "bbox": [*point, *point]},
+            map_eligibility="renderable",
+        )
+
+    # -------------------------------------------------------------------------
+    def get_payload(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
+        summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+        if summary is None:
+            return None
+        longitude, latitude = self.POINTS[evidence_id]
+        return summary, json.dumps(
+            {
+                "features": [
+                    {
+                        "id": f"{evidence_id}:point",
+                        "name": "Forecast point",
+                        "latitude": latitude,
+                        "longitude": longitude,
+                    }
+                ]
+            }
+        ).encode()
+
+###############################################################################
 def _state(
     *,
     active_map_session: MapSession | None = None,
@@ -446,6 +498,53 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
         "render_status": "awaiting_render",
     }
     assert "features" not in result.model_dump(mode="json")
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view() -> None:
+    state = _state()
+    state.evidence_refs = ["evidence:zurich", "evidence:lisbon"]
+    service = MapPlanService(
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        evidence_repository=_TwoCityEvidenceRepository(),
+    )
+
+    result = await service.apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref=ref,
+                    capability_id="places:hospitals",
+                )
+                for ref in state.evidence_refs
+            ]
+            + [
+                SetViewportAction(
+                    action="set_viewport",
+                    strategy="fit_evidence",
+                    evidence_refs=list(state.evidence_refs),
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    evidence_layers = [
+        instance.descriptor["evidence_ref"]
+        for instance in state.prepared_map_session.overlay_collection.instances
+    ]
+    assert evidence_layers == ["evidence:zurich", "evidence:lisbon"]
+    assert state.prepared_map_session.viewport.bbox == [
+        -9.1365919,
+        38.7077507,
+        8.5410422,
+        47.3744489,
+    ]
 
 ###############################################################################
 @pytest.mark.asyncio

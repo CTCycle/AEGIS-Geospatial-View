@@ -66,6 +66,11 @@ from server.services.llm.multimodal import attach_image, messages_contain_image
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.transport import LLMTransportPolicy
 
+# Failures caused by the external source rather than by the call itself.
+_PROVIDER_FAILURE_TYPES = frozenset(
+    {"timeout", "rate_limit", "provider_unavailable", "provider_malformed_response"}
+)
+
 ###############################################################################
 class AgentProvider(Protocol):
 
@@ -2492,6 +2497,14 @@ class AgentLoop:
                     and state.goal.operation == "discover_available_map_data"
                 )
             ):
+                failure = AgentLoop._last_provider_failure(state)
+                if failure is not None and failure.error is not None:
+                    return (
+                        "insufficient_evidence",
+                        f"The {failure.metadata.provider_id} provider "
+                        f"{AgentLoop._provider_failure_clause(failure.error.message)}, "
+                        "and no alternative capability matched the request after discovery.",
+                    )
                 return (
                     "insufficient_evidence",
                     "No supported capability matched the request after discovery.",
@@ -2504,6 +2517,31 @@ class AgentLoop:
                 return None
             return "failed", "The requested tool could not complete successfully."
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _last_provider_failure(state: AgentRunState) -> ToolResult | None:
+        return next(
+            (
+                result
+                for result in reversed(state.tool_results)
+                if result.status == "failed"
+                and result.error is not None
+                and result.error.error_type in _PROVIDER_FAILURE_TYPES
+                and result.metadata.provider_id
+            ),
+            None,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _provider_failure_clause(message: str) -> str:
+        # "The provider did not respond ..." -> "did not respond ..."
+        clause = message.strip().rstrip(".")
+        prefix = "The provider "
+        if clause.startswith(prefix):
+            return clause[len(prefix) :]
+        return f"failed ({clause})"
 
     # -------------------------------------------------------------------------
     @staticmethod

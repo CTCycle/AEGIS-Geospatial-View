@@ -488,7 +488,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.status = 'Agent ready';
     this.isLoading = false;
     this.assistantDraft = '';
-    this.composerDraft = '';
+    this.setComposerDraft('');
     this.transcriptScrollTop = 0;
     this.mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] };
     this.progressPercent = 0;
@@ -904,12 +904,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (await this.tryHandleLocalCommand(message)) {
       return;
     }
-    this.composerDraft = '';
+    this.setComposerDraft('');
     if (this.isLoading && this.conversationId && this.progressStage !== 'awaiting_render') {
       if (this.activeRunId) {
         await this.sendSteeringMessage(message);
       } else {
-        this.composerDraft = message;
+        this.setComposerDraft(message);
         this.syncState();
       }
       return;
@@ -1827,7 +1827,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (result.assistantMessage) {
       this.messages = [...this.messages, { role: 'assistant', content: result.assistantMessage }];
     }
-    this.composerDraft = '';
+    this.setComposerDraft('');
     this.status = 'Agent ready';
     this.syncState();
     this.queueTranscriptScroll();
@@ -2290,6 +2290,18 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.status = `Switching to ${descriptor.name}`;
     this.syncState();
     this.changeDetectorRef.detectChanges();
+  }
+
+  // The [value] binding only repaints values it has rendered before. Enter or a
+  // paste can reach sendMessage before the zoneless scheduler renders the typed
+  // text, so programmatic draft changes also update the textarea directly.
+  private setComposerDraft(value: string): void {
+    this.composerDraft = value;
+    const element = this.composerInputRef?.nativeElement;
+    if (element && element.value !== value) {
+      element.value = value;
+      this.resizeComposer(element);
+    }
   }
 
   private resizeComposer(target?: HTMLTextAreaElement | null): void {

@@ -1292,6 +1292,12 @@ class OverlayCollectionService:
         left: OverlayInstance,
         right: OverlayInstance,
     ) -> bool:
+        left_extent = left.descriptor.get("evidence_bbox")
+        right_extent = right.descriptor.get("evidence_bbox")
+        if left_extent and right_extent and left_extent != right_extent:
+            # Results for different places share the session location but
+            # not their extent; only a refresh of the same place replaces.
+            return False
         left_location = left.resolved_location
         right_location = right.resolved_location
         if left_location is None or right_location is None:
