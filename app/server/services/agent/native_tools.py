@@ -414,7 +414,8 @@ def _bind_execute_request(
         # but the native agent must obtain the bounded payload needed for
         # completion, inspection, and map rendering.
         "arguments": {**_user_arguments(request.arguments), "live": True},
-        "filters": {**goal.filters, **request.filters},
+        # Task-owned route filters win; the model may only add new keys.
+        "filters": {**request.filters, **goal.filters},
         "bbox": None,
     }
     temporal = goal.temporal_scope

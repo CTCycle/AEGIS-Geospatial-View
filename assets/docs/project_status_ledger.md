@@ -1,6 +1,6 @@
 # Project Status Ledger
 
-Last updated: 2026-10-17
+Last updated: 2026-10-18
 
 The [2026-10-17 follow-up](../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16`
 basemap rendering/preferences and advances `T4-04` to `PASS` for configured live
@@ -374,6 +374,7 @@ regression is observed.
 | `HIST-006` `agent.data-bearing-map-policy` | Data-bearing map routes could be rejected by the map-only policy boundary. | WorldCover and Overpass route/policy fixes passed focused regression coverage and reached their correct provider/render boundaries. | Capability domains, policy, or route compilation changes. |
 | `HIST-007` `quality.pyright-strict` | The repository strict gate reported 46 diagnostics and `PYRIGHT-STRICT` was `FAIL`. | T0-01 explicitly narrowed the invalid-coordinate branch, the full `app/server/pyproject.toml` run reports 0 errors, and the related regression file passes 9 tests. See the [T0-01 static-quality report](../QA/t0-01-static-quality-20260922/report.md). | Python typing, project configuration, or source changes. |
 | `HIST-008` `ui.settings-provider-access.credential-lifecycle` | Controlled unreadable-credential and API-failure states were unverified; the exploratory model-card check used a stale selected-model context and did not wait for completion. | The [T1-10 report](../QA/tier1-validation-develop-20260923/T1-10/report.md) records passing masked save/clear, blank/invalid draft, unreadable-key, failed-update, and selected-model browser checks plus 38 backend and 33 Angular tests. A missing success-path UI refresh was repaired. | Settings credential display/save/clear behavior, selected-model response parsing, or model-selection UI changes. |
+| `HIST-009` `backend.agent.native-loop.tool-boundary` | Excluded capabilities could be re-executed; truncated tool batches left call IDs unanswered or mis-paired; cancellation left sibling tool handlers running; model filters overrode route filters; embedded observations were not marked untrusted. | The [2026-10-18 runtime audit](../QA/agent-runtime-audit-20261018/report.md) records in-memory reproductions, fixes, failing-before/passing-after regressions, 1,091 backend unit tests, Ruff, and strict Pyright passing. Unit/synthetic only; no live-provider or browser gate is promoted. | Agent loop, policy engine, tool binding, or native prompt changes. |
 | `ISSUE-003` (closed 2026-09-23) `backend.api.sync-chat-turn` | Historical live timing evidence recorded 409 while a chat turn was running; a valid completed event also failed strict response hydration. | The [T1-06 report](../QA/tier1-validation-develop-20260923/T1-06/report.md) records live `200/202/409/404/503`, a genuine active-run conflict, 404 preflight with no run, safe 503 detail, and the terminal-hydration regression repair. | `/api/chat/turn`, run lifecycle, or terminal-event serialization changes. |
 
 ## Validation debt

@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-09-19
+Last updated: 2026-10-18
 
 ## Summary
 
@@ -216,7 +216,12 @@ Recovery is semantic rather than a blind repeat:
 - `terminal` ends the run.
 
 Equivalent successful calls are replay-protected, and repeated failing
-fingerprints are suppressed. Tool timeouts normally become observations so an
+fingerprints are suppressed. A capability excluded after an alternate-source or
+replan failure is rejected by policy for the rest of the run. Calls beyond the
+per-step batch limit are not executed and receive a typed
+`tool_call_not_executed` observation, so every model call ID is answered. A
+terminal signal during a parallel batch cancels the sibling calls. Route
+filters are task-owned; model filters may add keys but not override them. Tool timeouts normally become observations so an
 alternate source can be selected; only the run deadline necessarily terminates
 the whole run.
 

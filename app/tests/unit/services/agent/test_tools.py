@@ -381,7 +381,8 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
                 "start_time_iso": "1900-01-01T00:00:00Z",
                 "category": "hospital",
             },
-            filters={"emergency": True},
+            # A conflicting model filter cannot override the task-owned one.
+            filters={"emergency": True, "amenity": "school"},
         ),
         state,
     )

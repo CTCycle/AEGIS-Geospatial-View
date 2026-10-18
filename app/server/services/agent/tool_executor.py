@@ -561,6 +561,8 @@ class ToolExecutor:
             ):
                 return False, "Tool is outside the validated capability route."
         capability_id = getattr(arguments, "capability_id", None)
+        if capability_id and capability_id in state.excluded_capability_ids:
+            return False, "Capability was excluded after a failed attempt in this run."
         if capability_id and state.capability_ids and capability_id not in state.capability_ids:
             return False, "Capability is outside the validated shortlist."
         return True, None

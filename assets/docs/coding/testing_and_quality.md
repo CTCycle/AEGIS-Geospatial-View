@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-09-28
+Last updated: 2026-10-18
 
 ## Python Quality Gates
 
@@ -22,7 +22,7 @@ The bounded backend validation sequence is:
 
 ```text
 cd app/server
-ruff check server ../tests
+ruff check . ../tests
 pyright --project pyproject.toml
 python -m pytest -c pyproject.toml ../tests/unit -q
 ```

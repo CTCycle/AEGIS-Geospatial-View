@@ -2105,6 +2105,17 @@ class AgentLoop:
         if remaining_tool_calls <= 0:
             raise ExecutionBudgetExceeded("tool_budget_exhausted", "tool_call")
         bounded_calls = calls[: min(request.max_parallel_tool_calls, remaining_tool_calls)]
+        for skipped in calls[len(bounded_calls):]:
+            if len(state.tool_trace) < 128:
+                state.tool_trace.append(
+                    {
+                        "call_id": skipped.id or "skipped-call",
+                        "tool": skipped.name,
+                        "status": "failed",
+                        "error_code": "tool_call_not_executed",
+                        "boundary": "loop_batch_limit",
+                    }
+                )
         semaphore = asyncio.Semaphore(max(1, request.max_parallel_tool_calls))
         if any(call.name == "discover_geospatial_capabilities" for call in bounded_calls):
             state.discovery_attempts += sum(
@@ -2191,7 +2202,16 @@ class AgentLoop:
             for call in bounded_calls:
                 results.append(await execute(call))
         else:
-            results = await asyncio.gather(*(execute(call) for call in bounded_calls))
+            tasks = [asyncio.create_task(execute(call)) for call in bounded_calls]
+            try:
+                results = list(await asyncio.gather(*tasks))
+            except BaseException:
+                # A terminal signal (cancel, supersession, budget) in one call
+                # must not leave sibling handlers writing after the run ends.
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
         self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
         for call, result in zip(bounded_calls, results, strict=False):
             self._ensure_run_control(request)
@@ -3057,17 +3077,36 @@ class AgentLoop:
         *,
         max_chars: int = 4096,
     ) -> list[dict[str, Any]]:
-        return [
-            {
-                "role": "tool",
-                "tool_call_id": call.id,
-                "name": call.name,
-                "content": ModelObservation.from_tool_result(
-                    result, max_chars=max_chars
-                ).model_dump_json(exclude_none=True),
-            }
-            for call, result in zip(calls, results, strict=False)
-        ]
+        # Every model call needs exactly its own result.  Results may also
+        # carry server-issued calls (discovery refresh, map recovery), and a
+        # batch can be truncated by the per-step limit, so pair by call id.
+        results_by_id = {result.call_id: result for result in results}
+        messages: list[dict[str, Any]] = []
+        for index, call in enumerate(calls):
+            result = (
+                results_by_id.get(call.id)
+                if call.id
+                else results[index] if index < len(results) else None
+            )
+            if result is None:
+                result = AgentLoop._failure_result(
+                    call,
+                    "tool_call_not_executed",
+                    "This tool call was not executed because the step exceeded "
+                    "its tool-call limit. Issue it again only if still needed.",
+                    recovery="replan",
+                )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "name": call.name,
+                    "content": ModelObservation.from_tool_result(
+                        result, max_chars=max_chars
+                    ).model_dump_json(exclude_none=True),
+                }
+            )
+        return messages
 
     # -------------------------------------------------------------------------
     @staticmethod
