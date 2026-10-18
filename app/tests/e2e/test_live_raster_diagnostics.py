@@ -14,7 +14,9 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 import pytest
-from playwright.sync_api import ConsoleMessage, Page, expect
+from playwright.sync_api import Browser, ConsoleMessage, Page, expect
+
+from tests.e2e.helpers.network_capture import NetworkCapture, observed_page
 
 from tests.e2e.helpers.artifacts import (
     ensure_test_artifact_dirs,
@@ -27,6 +29,8 @@ TEST_ID = "RASTER-LIVE-DIAGNOSTICS"
 MAX_EVENTS = 512
 MAX_TEXT = 8000
 RASTER_HOSTS = {
+    "noise.discomap.eea.europa.eu",
+    "hazards-fema.maps.arcgis.com",
     "hazards.fema.gov",
     "services.terrascope.be",
     "titiler.terrascope.be",
@@ -69,7 +73,10 @@ TARGET_LABEL_HINTS: dict[str, tuple[str, ...]] = {
     "MODIS_Terra_NDVI_8Day": ("ndvi", "vegetation index"),
     "OMPS_Ozone_Total_Column": ("ozone",),
     "SRTM_Color_Index": ("srtm", "color index"),
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": ("true color", "corrected reflectance"),
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": (
+        "true color",
+        "corrected reflectance",
+    ),
     "VIIRS_SNPP_DayNightBand_ENCC": (
         "day-night",
         "day night",
@@ -96,10 +103,10 @@ def _sanitize_url(raw_url: str) -> str:
 
 def _raster_transport(url: str) -> str | None:
     parsed = urlsplit(url)
-    if parsed.path.startswith("/api/geospatial/tiles/"):
-        return "aegis_proxy"
     if (parsed.hostname or "").casefold() in RASTER_HOSTS:
         return "direct_upstream"
+    if parsed.path.startswith("/api/geospatial/tiles/"):
+        return "aegis_proxy"
     return None
 
 
@@ -135,15 +142,8 @@ def _safe_trace_int(value: Any) -> int:
         return 0
 
 
-class _RasterCapture:
-    def __init__(self) -> None:
-        self.events: list[dict[str, Any]] = []
-        self.console: list[dict[str, str]] = []
-        self.page_errors: list[str] = []
-
-    def _append(self, event: dict[str, Any]) -> None:
-        if len(self.events) < MAX_EVENTS:
-            self.events.append(event)
+class _RasterCapture(NetworkCapture):
+    upstream_hosts = frozenset(RASTER_HOSTS)
 
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
@@ -200,9 +200,9 @@ class _RasterCapture:
             if len(self.page_errors) < MAX_EVENTS:
                 self.page_errors.append(_bounded_text(str(error)))
 
-        page.on("request", on_request)
-        page.on("response", on_response)
-        page.on("requestfailed", on_request_failed)
+        page.context.on("request", on_request)
+        page.context.on("response", on_response)
+        page.context.on("requestfailed", on_request_failed)
         page.on("console", on_console)
         page.on("pageerror", on_page_error)
 
@@ -258,7 +258,10 @@ def _read_latest_run_trace(
         timeout=30_000,
     )
     if snapshot_response.status != 200:
-        return {"status": "snapshot_unavailable", "http_status": snapshot_response.status}
+        return {
+            "status": "snapshot_unavailable",
+            "http_status": snapshot_response.status,
+        }
     try:
         snapshot = snapshot_response.json()
     except (TypeError, ValueError):
@@ -443,7 +446,11 @@ def _summarize_run_trace(
                     model_call_count = max(model_call_count, _safe_trace_int(item))
                 elif key in {"tool_calls", "tool_call_count"}:
                     tool_call_count = max(tool_call_count, _safe_trace_int(item))
-                elif key in {"transitions", "state_transitions", "state_transition_count"}:
+                elif key in {
+                    "transitions",
+                    "state_transitions",
+                    "state_transition_count",
+                }:
                     state_transition_count = max(
                         state_transition_count, _safe_trace_int(item)
                     )
@@ -521,6 +528,11 @@ def _summarize_run_trace(
             render_preparation.append(
                 {
                     "kind": kind,
+                    "event_sequence": event.get("sequence"),
+                    "map_session_id": render_payload.get("map_session_id"),
+                    "collection_revision": render_payload.get("collection_revision"),
+                    "viewport_bounds": render_payload.get("viewport_bounds"),
+                    "overlay_results": render_payload.get("overlay_results", []),
                     "iteration": iteration,
                     "render_verified": payload.get("render_verified"),
                     "render_status": (
@@ -647,7 +659,9 @@ def _map_evidence(page: Page, expected_capability_id: str | None) -> dict[str, A
         ),
         "attribution": {
             "present": attribution.count() > 0,
-            "text": _bounded_text(attribution.inner_text()) if attribution.count() else "",
+            "text": _bounded_text(attribution.inner_text())
+            if attribution.count()
+            else "",
         },
         "render_ack": "unobserved",
     }
@@ -678,11 +692,6 @@ def _scenario_result(
     target_proxy_failures = [
         event for event in target_proxy_events if event.get("kind") == "requestfailed"
     ]
-    direct_upstream_events = [
-        event
-        for event in capture.events
-        if event.get("transport") == "direct_upstream"
-    ]
     target_image_responses = [
         event
         for event in target_proxy_responses
@@ -698,10 +707,7 @@ def _scenario_result(
             for item in render_preparation
         ):
             map_evidence["render_ack"] = "render_observed"
-        elif any(
-            item.get("kind") == "render_observed"
-            for item in render_preparation
-        ):
+        elif any(item.get("kind") == "render_observed" for item in render_preparation):
             map_evidence["render_ack"] = "render_failed"
         elif any(item.get("render_verified") is True for item in render_preparation):
             map_evidence["render_ack"] = "verified_in_trace"
@@ -735,7 +741,9 @@ def _scenario_result(
         classification = "upstream_request_failure"
     elif not target_image_responses:
         classification = "invalid_image_payload"
-    elif "render_ack" in body_text.casefold() or "render failed" in body_text.casefold():
+    elif (
+        "render_ack" in body_text.casefold() or "render failed" in body_text.casefold()
+    ):
         classification = "acknowledgement_or_maplibre_failure"
     elif (
         map_evidence["source_state"] == "target_overlay_status_loaded"
@@ -756,6 +764,7 @@ def _scenario_result(
         "maplibre_canvas_count": page.locator(".maplibregl-canvas").count(),
         "ui_text": body_text,
         "raster_events": capture.events,
+        "observation": capture.summary(),
         "console": capture.console,
         "page_errors": capture.page_errors,
         "classification": classification,
@@ -767,17 +776,21 @@ def _scenario_result(
                 if event.get("capability_id")
             }
         ),
-        "proxy_request_count": len(
-            [event for event in target_proxy_events if event.get("kind") == "request"]
+        "proxy_request_count": (
+            capture.proxy_requests_by_capability[expected_capability_id]
+            if expected_capability_id
+            else capture.requests_by_transport["aegis_proxy"]
         ),
-        "proxy_response_statuses": [event.get("status") for event in target_proxy_responses],
+        "proxy_response_statuses": [
+            event.get("status") for event in target_proxy_responses
+        ],
         "proxy_response_content_types": [
             event.get("content_type") for event in target_proxy_responses
         ],
         "target_image_response_count": len(target_image_responses),
-        "direct_upstream_browser_request_count": len(
-            [event for event in direct_upstream_events if event.get("kind") == "request"]
-        ),
+        "direct_upstream_browser_request_count": capture.requests_by_transport[
+            "direct_upstream"
+        ],
         "map_evidence": map_evidence,
         "temporal_evidence": {
             "trace": (
@@ -793,7 +806,7 @@ def _scenario_result(
 
 
 def test_live_public_raster_request_diagnostics(
-    page: Page,
+    browser: Browser,
     base_url: str,
     api_base_url: str,
     artifact_root: Path,
@@ -802,7 +815,8 @@ def test_live_public_raster_request_diagnostics(
     """Persist exact public-raster network evidence without changing map gates."""
 
     dirs = ensure_test_artifact_dirs(artifact_root, TEST_ID)
-    preflight = _provider_probe(page, api_base_url)
+    with browser.new_context() as probe_context:
+        preflight = _provider_probe(probe_context.new_page(), api_base_url)
     ready = (
         preflight["http_status"] == 200
         and preflight["status"] == "passed"
@@ -817,51 +831,59 @@ def test_live_public_raster_request_diagnostics(
         pytest.skip(f"Exact live provider lane was not ready: {preflight}")
 
     results: list[dict[str, Any]] = []
-    for scenario_id, prompt in SCENARIOS:
-        page.goto(base_url)
-        page.get_by_role("button", name="Start new chat").click()
-        expect(page.locator(".chat-message--assistant")).to_have_count(0)
+    scenarios = SCENARIOS
+    only = os.environ.get("APP_TEST_SCENARIO_FILTER", "").strip()
+    if only:
+        allowed = {token.strip() for token in only.split(",") if token.strip()}
+        scenarios = tuple(item for item in SCENARIOS if item[0] in allowed)
+        assert scenarios, "APP_TEST_SCENARIO_FILTER matched no raster scenarios"
+    for scenario_id, prompt in scenarios:
         capture = _RasterCapture()
-        capture.attach(page)
-        page.get_by_label("Chat message").fill(prompt)
-        page.get_by_role("button", name="Send message").click()
-        expect(page.get_by_text(prompt, exact=True)).to_be_visible(timeout=15_000)
-        expect(page.locator(".chat-message--assistant").last).to_be_visible(
-            timeout=90_000
-        )
-        stop_button = page.get_by_role("button", name="Stop generating")
-        if stop_button.count():
-            expect(stop_button).not_to_be_visible(timeout=90_000)
-        page.wait_for_timeout(5_000)
-        _expand_overlay_controls(page)
-        screenshot = write_snapshot(page, dirs["screenshots"], scenario_id)
-        conversation_id = _read_conversation_id(page)
-        run_trace = _read_latest_run_trace(page, api_base_url, conversation_id)
-        result = _scenario_result(
-            page,
-            capture,
-            scenario_id,
-            prompt,
-            screenshot,
-            expected_capability_id=SCENARIO_CAPABILITIES.get(scenario_id),
-            run_trace=run_trace,
-        )
-        backend_tail = read_backend_log_tail(500)
-        raster_diagnostics = [
-            line
-            for line in backend_tail.splitlines()
-            if "geospatial_tile_proxy" in line
-        ][-64:]
-        result["backend_raster_diagnostics"] = raster_diagnostics
-        write_log_tail(
-            dirs["logs"],
-            f"{TEST_ID}-{scenario_id}",
-            "\n".join(raster_diagnostics),
-        )
-        results.append(result)
-        (dirs["http"] / f"{scenario_id}.json").write_text(
-            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        with observed_page(
+            browser, capture, dirs["http"] / f"{scenario_id}-capture.json"
+        ) as page:
+            page.goto(base_url)
+            page.get_by_role("button", name="Start new chat").click()
+            expect(page.locator(".chat-message--assistant")).to_have_count(0)
+            page.get_by_label("Chat message").fill(prompt)
+            page.get_by_role("button", name="Send message").click()
+            expect(page.get_by_text(prompt, exact=True)).to_be_visible(timeout=15_000)
+            expect(page.locator(".chat-message--assistant").last).to_be_visible(
+                timeout=90_000
+            )
+            stop_button = page.get_by_role("button", name="Stop generating")
+            if stop_button.count():
+                expect(stop_button).not_to_be_visible(timeout=90_000)
+            page.wait_for_timeout(5_000)
+            _expand_overlay_controls(page)
+            screenshot = write_snapshot(page, dirs["screenshots"], scenario_id)
+            conversation_id = _read_conversation_id(page)
+            run_trace = _read_latest_run_trace(page, api_base_url, conversation_id)
+            result = _scenario_result(
+                page,
+                capture,
+                scenario_id,
+                prompt,
+                screenshot,
+                expected_capability_id=SCENARIO_CAPABILITIES.get(scenario_id),
+                run_trace=run_trace,
+            )
+            backend_tail = read_backend_log_tail(500)
+            raster_diagnostics = [
+                line
+                for line in backend_tail.splitlines()
+                if "geospatial_tile_proxy" in line
+            ][-64:]
+            result["backend_raster_diagnostics"] = raster_diagnostics
+            write_log_tail(
+                dirs["logs"],
+                f"{TEST_ID}-{scenario_id}",
+                "\n".join(raster_diagnostics),
+            )
+            results.append(result)
+            (dirs["http"] / f"{scenario_id}.json").write_text(
+                json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
 
     report = {
         "test_id": TEST_ID,

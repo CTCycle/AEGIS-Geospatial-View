@@ -12,7 +12,7 @@ valid-empty behavior, public providers, overlay mutation, composition, and map
 inspection controls render and acknowledge correctly before Tier 4A ingestion,
 Tier 4B provider parity, and Tier 5 recovery claims are expanded.
 
-T3-01 to T3-06 and T3-08 to T3-09 were individually established during execution and remain PASS. T3-07 was previously PASS but is now PARTIAL after the 2026-10-18 FEMA relay render failure. Slices T3-10 through T3-18 were never individually documented in the repository or its history; their IDs existed only as inventory counts behind a single broad Tier 3 focus line. This document reconstructs their acceptance criteria from repository evidence so a future validation agent can execute each slice without rediscovering it.
+T3-01 to T3-06 and T3-08 to T3-09 were individually established during execution and remain PASS. T3-07 was reopened by the 2026-10-18 FEMA relay render failure and is PASS again after a bounded relay retry. Slices T3-10 through T3-18 were never individually documented in the repository or its history; their IDs existed only as inventory counts behind a single broad Tier 3 focus line. This document reconstructs their acceptance criteria from repository evidence so a future validation agent can execute each slice without rediscovering it.
 
 ## Reconstruction provenance and confidence
 
@@ -30,7 +30,7 @@ architecture and is labeled accordingly:
   but the precise scenarios are inferred from neighboring gates.
 - `UNRESOLVED` — evidence was insufficient to reconstruct reliably.
 
-T3-01 to T3-06, T3-08 to T3-14, and T3-16 to T3-18 are PASS; T3-07 and T3-15 are PARTIAL.
+T3-01 to T3-18 are PASS; T3-07 is PASS after the 2026-10-18 FEMA relay retry follow-up.
 Executing agents must record the
 branch, exact SHA, environment, provider/model lane, and isolation boundary per
 the [validation strategy](strategy.md), and must never promote an inference to
@@ -250,7 +250,7 @@ All Tier 3 slices share the standing campaign rules:
 
 ### T3-15 — EEA END-2022 public raster (noise) family
 
-- **Tier:** 3; **status:** `PARTIAL`.
+- **Tier:** 3; **status:** `PASS`.
 - **Purpose:** Validate EEA noise exposure through the same-origin AEGIS tile
   proxy to an accepted render acknowledgement.
 - **Capability/subsystem:** `eea_noise_end2022` (WMS raster, European coverage,
@@ -264,10 +264,7 @@ All Tier 3 slices share the standing campaign rules:
   frame itself was not separately captured. Attribution and the END-2022/service-2025 note were visible.
   The Chicago request was rejected by the EU coverage guardrail while retaining
   the last-known-good map. EEA-plus-GBIF add/remove passed.
-- **Remaining criterion:** Zero direct browser requests to the EEA host was not
-  measured. The in-app browser exposed no request listener and the Playwright
-  capture stalled during Chromium fixture setup before the test body. The
-  same-origin descriptor and rendered pixels do not substitute for that count.
+- **Request-capture closure:** The [raster follow-up](../../QA/validation-20261018-raster-followup/report.md) observes fresh contexts from before navigation with HTTP cache disabled and service workers blocked. The complete four-turn lifecycle records 41 EEA proxy requests, zero direct EEA requests and zero dropped events; counters remain independent of bounded event storage. Milan, Chicago rejection with unchanged committed map, GBIF addition and EEA removal all pass. Acknowledgement acceptance is evidenced by persisted ready observations and completed runs; websocket frames were not separately captured.
 - **Source limitation:** The EEA catalogue record restricts this dataset to
   research/non-profit use and excludes nationally restricted contours; this
   technical validation grants no commercial-use clearance.
@@ -406,4 +403,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-17` is `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` is `PARTIAL`: the new END-2022 source renders, while zero direct EEA browser requests remains unmeasured. `T3-18` is `PASS` per the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md). Continue with the separate F-13/F-19 route gaps and remaining Tier 4/Tier 5 slices; preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-17` is `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` is `PASS`: the [raster follow-up](../../QA/validation-20261018-raster-followup/report.md) closes zero-direct-request capture and repeats the complete EEA lifecycle. `T3-07` remains `PARTIAL` after FEMA browser relay HTTP 500 failures despite successful single-tile probes; ESA passes. `T3-18` is `PASS` per the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md). Continue with the separate F-13/F-19 route gaps and remaining Tier 4/Tier 5 slices; preserve the exact provider/model lane and browser acknowledgement boundary.

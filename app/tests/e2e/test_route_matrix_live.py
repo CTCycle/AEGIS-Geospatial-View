@@ -18,7 +18,9 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 import pytest
-from playwright.sync_api import ConsoleMessage, Page, expect
+from playwright.sync_api import Browser, ConsoleMessage, Page, expect
+
+from tests.e2e.helpers.network_capture import NetworkCapture, observed_page
 
 from tests.e2e.helpers.artifacts import (
     ensure_test_artifact_dirs,
@@ -46,6 +48,7 @@ ROUTE_UPSTREAM_HOSTS = {
     "mapproxy.terrascope.be",
     "titiler.terrascope.be",
     "hazards.fema.gov",
+    "hazards-fema.maps.arcgis.com",
     "gibs.earthdata.nasa.gov",
     "server.arcgisonline.com",
 }
@@ -112,10 +115,10 @@ SCENARIOS = (
 
 def _raster_transport(url: str) -> str | None:
     parsed = urlsplit(url)
-    if parsed.path.startswith("/api/geospatial/tiles/"):
-        return "aegis_proxy"
     if (parsed.hostname or "").casefold() in ROUTE_UPSTREAM_HOSTS:
         return "direct_upstream"
+    if parsed.path.startswith("/api/geospatial/tiles/"):
+        return "aegis_proxy"
     return None
 
 
@@ -131,15 +134,8 @@ def _proxy_capability_id(url: str) -> str | None:
     return capability_id or None
 
 
-class _RouteCapture:
-    def __init__(self) -> None:
-        self.events: list[dict[str, Any]] = []
-        self.console: list[dict[str, str]] = []
-        self.page_errors: list[str] = []
-
-    def _append(self, event: dict[str, Any]) -> None:
-        if len(self.events) < MAX_EVENTS:
-            self.events.append(event)
+class _RouteCapture(NetworkCapture):
+    upstream_hosts = frozenset(ROUTE_UPSTREAM_HOSTS)
 
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
@@ -201,9 +197,9 @@ class _RouteCapture:
             if len(self.page_errors) < MAX_EVENTS:
                 self.page_errors.append(_bounded_text(str(error)))
 
-        page.on("request", on_request)
-        page.on("response", on_response)
-        page.on("requestfailed", on_request_failed)
+        page.context.on("request", on_request)
+        page.context.on("response", on_response)
+        page.context.on("requestfailed", on_request_failed)
         page.on("console", on_console)
         page.on("pageerror", on_page_error)
 
@@ -299,11 +295,6 @@ def _scenario_result(
     proxy_events = [
         event for event in capture.events if event.get("transport") == "aegis_proxy"
     ]
-    direct_upstream_events = [
-        event
-        for event in capture.events
-        if event.get("transport") == "direct_upstream"
-    ]
     proxy_capabilities = sorted(
         {
             str(event.get("capability_id"))
@@ -320,13 +311,7 @@ def _scenario_result(
         map_evidence,
         run_trace,
         selected_capability_ids,
-        len(
-            [
-                event
-                for event in direct_upstream_events
-                if event.get("kind") == "request"
-            ]
-        ),
+        capture.requests_by_transport["direct_upstream"],
     )
     return {
         "scenario_id": scenario_id,
@@ -338,20 +323,19 @@ def _scenario_result(
         "ui_text": body_text,
         "map_evidence": map_evidence,
         "network": {
-            "proxy_request_count": len(
-                [event for event in proxy_events if event.get("kind") == "request"]
-            ),
+            "proxy_request_count": capture.requests_by_transport["aegis_proxy"],
             "proxy_response_statuses": [
                 event.get("status")
                 for event in proxy_events
                 if event.get("kind") == "response"
             ],
             "proxy_capabilities_seen": proxy_capabilities,
-            "direct_upstream_browser_request_count": len(
-                [event for event in direct_upstream_events if event.get("kind") == "request"]
-            ),
+            "direct_upstream_browser_request_count": capture.requests_by_transport[
+                "direct_upstream"
+            ],
             "events": capture.events,
         },
+        "observation": capture.summary(),
         "console": capture.console,
         "page_errors": capture.page_errors,
         "run_trace": run_trace,
@@ -360,7 +344,7 @@ def _scenario_result(
 
 
 def test_route_matrix_live_diagnostics(
-    page: Page,
+    browser: Browser,
     base_url: str,
     api_base_url: str,
     artifact_root: Path,
@@ -369,7 +353,8 @@ def test_route_matrix_live_diagnostics(
     """Persist exact-lane route-matrix and EEA raster evidence."""
 
     dirs = ensure_test_artifact_dirs(artifact_root, TEST_ID)
-    preflight = _provider_probe(page, api_base_url)
+    with browser.new_context() as probe_context:
+        preflight = _provider_probe(probe_context.new_page(), api_base_url)
     ready = (
         preflight["http_status"] == 200
         and preflight["status"] == "passed"
@@ -389,51 +374,54 @@ def test_route_matrix_live_diagnostics(
     if only:
         allowed = {token.strip() for token in only.split(",") if token.strip()}
         scenarios = tuple(item for item in SCENARIOS if item[0] in allowed)
+        assert scenarios, "APP_TEST_SCENARIO_FILTER matched no route scenarios"
     for scenario_id, prompt, expected_kind, hints in scenarios:
-        page.goto(base_url)
-        page.get_by_role("button", name="Start new chat").click()
-        expect(page.locator(".chat-message--assistant")).to_have_count(0)
         capture = _RouteCapture()
-        capture.attach(page)
-        page.get_by_label("Chat message").fill(prompt)
-        page.get_by_role("button", name="Send message").click()
-        expect(page.get_by_text(prompt, exact=True)).to_be_visible(timeout=15_000)
-        expect(page.locator(".chat-message--assistant").last).to_be_visible(
-            timeout=90_000
-        )
-        stop_button = page.get_by_role("button", name="Stop generating")
-        if stop_button.count():
-            expect(stop_button).not_to_be_visible(timeout=90_000)
-        page.wait_for_timeout(4_000)
-        screenshot = write_snapshot(page, dirs["screenshots"], scenario_id)
-        conversation_id = _read_conversation_id(page)
-        run_trace = _read_latest_run_trace(page, api_base_url, conversation_id)
-        result = _scenario_result(
-            page,
-            capture,
-            scenario_id,
-            prompt,
-            expected_kind,
-            hints,
-            screenshot,
-            run_trace,
-        )
-        backend_tail = read_backend_log_tail(500)
-        routed_lines = [
-            line
-            for line in backend_tail.splitlines()
-            if "geospatial_tile_proxy" in line or "route" in line
-        ][-64:]
-        result["backend_routed_diagnostics"] = routed_lines
-        write_log_tail(
-            dirs["logs"],
-            f"{TEST_ID}-{scenario_id}",
-            "\n".join(routed_lines),
-        )
-        results.append(result)
-        (dirs["http"] / f"{scenario_id}.json").write_text(
-            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        with observed_page(
+            browser, capture, dirs["http"] / f"{scenario_id}-capture.json"
+        ) as page:
+            page.goto(base_url)
+            page.get_by_role("button", name="Start new chat").click()
+            expect(page.locator(".chat-message--assistant")).to_have_count(0)
+            page.get_by_label("Chat message").fill(prompt)
+            page.get_by_role("button", name="Send message").click()
+            expect(page.get_by_text(prompt, exact=True)).to_be_visible(timeout=15_000)
+            expect(page.locator(".chat-message--assistant").last).to_be_visible(
+                timeout=90_000
+            )
+            stop_button = page.get_by_role("button", name="Stop generating")
+            if stop_button.count():
+                expect(stop_button).not_to_be_visible(timeout=90_000)
+            page.wait_for_timeout(4_000)
+            screenshot = write_snapshot(page, dirs["screenshots"], scenario_id)
+            conversation_id = _read_conversation_id(page)
+            run_trace = _read_latest_run_trace(page, api_base_url, conversation_id)
+            result = _scenario_result(
+                page,
+                capture,
+                scenario_id,
+                prompt,
+                expected_kind,
+                hints,
+                screenshot,
+                run_trace,
+            )
+            backend_tail = read_backend_log_tail(500)
+            routed_lines = [
+                line
+                for line in backend_tail.splitlines()
+                if "geospatial_tile_proxy" in line or "route" in line
+            ][-64:]
+            result["backend_routed_diagnostics"] = routed_lines
+            write_log_tail(
+                dirs["logs"],
+                f"{TEST_ID}-{scenario_id}",
+                "\n".join(routed_lines),
+            )
+            results.append(result)
+            (dirs["http"] / f"{scenario_id}.json").write_text(
+                json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
 
     report = {
         "test_id": TEST_ID,
