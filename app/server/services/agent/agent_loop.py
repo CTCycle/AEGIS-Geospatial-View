@@ -1642,18 +1642,18 @@ class AgentLoop:
                 map_session_id,
                 collection_revision,
             )
-        if not engine.should_attach(
+        # Judge the policy as if the capture existed, so ``capture_missing``
+        # is recorded only when an image was wanted but never arrived.
+        if capture_ref is None or not engine.should_attach(
             state,
             capture_ref=capture_ref,
-            capture_present=capture is not None,
+            capture_present=True,
             call_kind=call_kind,
         ):
-            if capture_ref and capture is None and call_kind == TERMINAL_CALL_KIND:
-                await self._emit_vision_trace(request, "capture_missing", capture_ref)
             return model_messages
         if capture is None:
-            return model_messages
-        if capture_ref is None:
+            if call_kind == TERMINAL_CALL_KIND:
+                await self._emit_vision_trace(request, "capture_missing", capture_ref)
             return model_messages
         caption = self._vision_caption(state, capture_ref)
         model_messages = attach_image(
@@ -2470,17 +2470,22 @@ class AgentLoop:
             }
             for result in results
         )
-        if any(
-            result.error is not None
-            and result.error.recovery == "request_user_input"
-            for result in results
-        ):
-            question = next(
+        # A coverage rejection asks the user only when nothing else in the
+        # batch succeeded; otherwise an in-coverage alternative is in hand.
+        alternative_succeeded = any(result.status != "failed" for result in results)
+        question = next(
+            (
                 result.error.message
                 for result in results
                 if result.error is not None
                 and result.error.recovery == "request_user_input"
-            )
+                and not (
+                    result.error.code == "policy_rejection" and alternative_succeeded
+                )
+            ),
+            None,
+        )
+        if question is not None:
             return "clarification_required", question
         if AgentLoop._render_recovery_requires_map_action(state, results):
             return (
