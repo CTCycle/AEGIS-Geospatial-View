@@ -1,6 +1,6 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-10-17
+Last updated: 2026-10-18
 
 The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16`
 basemap rendering/preferences and advances `T4-04` to `PASS` for configured live
@@ -84,7 +84,7 @@ trusting downstream feature evidence.
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Requires the lower-tier contracts and exact-head evidence to be stable. |
 
-The current roll-up is 43 `PASS`, 3 `PARTIAL`, 2 `BLOCKED`, and 20 `UNRUN`.
+The current roll-up is 45 `PASS`, 2 `PARTIAL`, 2 `BLOCKED`, and 19 `UNRUN`. The 2026-10-18 reconciliation counts `T3-17` (passed 2026-10-17 but still listed as partial) and `T3-18` (passed in the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md)).
 
 ### Campaign inventory reconciliation
 
@@ -92,10 +92,10 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-14`, `T3-16`, `T4-01`, `T4-02`, `T4-04`, `T4-08` | 43 |
-| `PARTIAL` | `T3-17`, `T4-03`, `T4-05` | 3 |
+| `PASS` | `T0-01`–`T0-05`, `T1-01`–`T1-12`, `T2-01`–`T2-07`, `T3-01`–`T3-14`, `T3-16`–`T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08` | 45 |
+| `PARTIAL` | `T4-03`, `T4-05` | 2 |
 | `BLOCKED` | `T4-06`, `T4-07` | 2 |
-| `UNRUN` | `T3-15`, `T3-18`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 20 |
+| `UNRUN` | `T3-15`, `T4-09`–`T4-13`, `T5-01`–`T5-13` | 19 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
 descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
@@ -106,7 +106,7 @@ and `T4-06`/`T4-07` are `BLOCKED` on missing configured camera sources and
 approved credentials respectively. These classifications do not claim browser transit rendering, cross-agency
 schedule matching, complete agent routing, or credentialed-provider behavior.
 
-`T3-15`, `T3-18` remain explicit `UNRUN` inventory entries (`T3-10`–`T3-14` are
+`T3-15` remains an explicit `UNRUN` inventory entry (`T3-10`–`T3-14` are
 `PASS` per the [T3-10](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md),
 [T3-11](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-11/report.md),
 [T3-12](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md),

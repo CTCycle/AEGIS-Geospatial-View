@@ -1,6 +1,6 @@
 # Agent Catalog Contract
 
-Last updated: 2026-09-19
+Last updated: 2026-10-18
 
 ## Stable native boundary
 
@@ -13,6 +13,7 @@ The model-visible names are:
 - `route_request` (internal route bootstrap)
 - `resolve_geospatial_location`
 - `discover_geospatial_capabilities`
+- `discover_geospatial_provider_layers` (provider-discovery routes only)
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `inspect_evidence`
@@ -23,10 +24,12 @@ The model-visible names are:
 The evidence transformation tool is `transform_evidence`.
 
 `discover_geospatial_capabilities` is the single generic model-facing
-capability-discovery responsibility. The separately registered
-`discover_geospatial_provider_layers` handler is internal and may enrich the
-generic result for an explicit provider-discovery route; it is not presented as
-an interchangeable discovery alternative.
+capability-discovery responsibility. `discover_geospatial_provider_layers` is
+also model-facing, but only on an explicit provider-discovery route (its
+`provider_discovery_route` prerequisite); it is not an interchangeable
+discovery alternative. A request to add a named provider's layer to the map
+("add the RainViewer radar") is normalized to a data-bearing map route, so it
+uses `execute_geospatial_capability` rather than provider-layer listing.
 
 ## Progressive exposure
 
