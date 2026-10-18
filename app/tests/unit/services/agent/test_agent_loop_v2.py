@@ -916,6 +916,53 @@ def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
 
 
 ###############################################################################
+def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> None:
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        requires_location=True,
+        operation="show_on_map",
+    )
+    coverage = "Capability is outside its declared geographic coverage."
+    rejected = ToolResult(
+        call_id="describe-noaa",
+        tool_name="describe_geospatial_capability",
+        status="failed",
+        summary=coverage,
+        error=ToolExecutionError(
+            error_type="policy_rejection",
+            code="policy_rejection",
+            message=coverage,
+            retryable=False,
+            recovery="request_user_input",
+        ),
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+    described = ToolResult(
+        call_id="describe-rainviewer",
+        tool_name="describe_geospatial_capability",
+        status="success",
+        summary="Described geospatial capability rainviewer_precipitation_radar.",
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+
+    def _stop(results: list[ToolResult]) -> tuple[str, str] | None:
+        return AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+            state,
+            route,
+            results,
+            max_consecutive_tool_failures=3,
+            max_validation_corrections=3,
+            max_discovery_attempts=2,
+        )
+
+    assert _stop([rejected]) == ("clarification_required", coverage)
+    assert _stop([rejected, described]) is None
+
+
+###############################################################################
 def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -2231,6 +2278,40 @@ async def test_missing_capture_degrades_to_non_vision_without_failing() -> None:
 
     assert _image_parts(provider.requests[0]["request"]) == []
     assert state.vision_state is None
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("policy", "expected"),
+    [("always", ["capture_missing"]), ("on_failure", []), ("disabled", [])],
+)
+async def test_capture_missing_is_traced_only_when_an_image_was_wanted(
+    policy: str, expected: list[str]
+) -> None:
+    provider = VisionFakeProvider([LLMResult(content="ok")])
+    state = _vision_state()
+    loop = _loop(provider, capture_store=RenderCaptureStore())
+    traced: list[str] = []
+
+    async def _record(request: Any, kind: str, *args: Any) -> None:
+        traced.append(kind)
+
+    loop._emit_vision_trace = _record  # type: ignore[method-assign]
+    request = AgentLoopRequest(
+        provider="fake",
+        model="vision-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        vision_policy=policy,
+        vision_max_calls=2,
+    )
+    await loop._model_step(
+        request, provider, [], [], call_kind=TERMINAL_CALL_KIND
+    )  # pyright: ignore[reportPrivateUsage]
+
+    assert traced == expected
+    assert _image_parts(provider.requests[0]["request"]) == []
 
 
 ###############################################################################
