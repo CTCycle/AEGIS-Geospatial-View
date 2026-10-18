@@ -573,18 +573,18 @@ def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() ->
         service
     )
 
-    response = client.get("/api/geospatial/tiles/eea_noise_2019/4/5/6.png")
+    response = client.get("/api/geospatial/tiles/eea_noise_end2022/4/5/6.png")
 
     assert response.status_code == 200
     parsed = urlsplit(captured["url"])
     query = parse_qs(parsed.query)
     assert parsed.netloc == "noise.discomap.eea.europa.eu"
     assert parsed.path == (
-        "/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer"
+        "/arcgis/services/noiseStoryMap/Noise_exposure_2025/MapServer/WMSServer"
     )
     assert query["service"] == ["WMS"]
     assert query["request"] == ["GetMap"]
-    assert query["layers"] == ["0"]
+    assert query["layers"] == ["0,17,34,51"]
     assert query["srs"] == ["EPSG:3857"]
     assert query["version"] == ["1.1.1"]
     assert query["format"] == ["image/png"]
@@ -595,7 +595,7 @@ def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() ->
     assert query["bbox"] == [
         ",".join(str(value) for value in web_mercator_tile_bbox(4, 5, 6))
     ]
-    assert query["exceptions"] == ["application/vnd.ogc.se_inimage"]
+    assert query["exceptions"] == ["application/vnd.ogc.se_xml"]
     assert "tilematrix" not in query
 
 ###############################################################################

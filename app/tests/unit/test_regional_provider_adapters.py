@@ -17,11 +17,13 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     response = run_async_in_thread(
         EEAProvider().fetch(
             ProviderRequest(
-                capability_id="eea_noise_2019",
+                capability_id="eea_noise_end2022",
                 params={
                     "metadata": {
                         "url": "https://example.test/wms",
-                        "layers": "0",
+                        "layers": "0,17,34,51",
+                        "wms_version": "1.1.1",
+                        "wms_exceptions": "application/vnd.ogc.se_xml",
                         "attribution": "EEA",
                     }
                 },
@@ -31,7 +33,12 @@ def test_eea_provider_returns_wms_descriptor() -> None:
 
     assert response.payload["renderingMode"] == "wms"
     assert response.payload["serviceUrl"] == "https://example.test/wms"
-    assert response.payload["layers"] == ["0"]
+    assert response.payload["layers"] == ["0,17,34,51"]
+    assert response.payload["version"] == "1.1.1"
+    assert response.payload["exceptions"] == "application/vnd.ogc.se_xml"
+    assert response.payload["freshnessLabel"] == (
+        "END-2022 reporting vintage; service updated 2025"
+    )
     assert response.result_type == "raster"
     assert response.attribution == ["EEA"]
 
@@ -52,7 +59,7 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
         stale_while_revalidate_seconds=10,
     )
     request = ProviderRequest(
-        capability_id="eea_noise_2019",
+        capability_id="eea_noise_end2022",
         params={"live_validate": True, "metadata": {"url": "https://example.test/wms"}},
     )
     first = run_async_in_thread(provider.fetch(request))
@@ -78,7 +85,7 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
         run_async_in_thread(
             EEAProvider(fetcher=malformed_fetcher).fetch(
                 ProviderRequest(
-                    capability_id="eea_noise_2019",
+                    capability_id="eea_noise_end2022",
                     params={
                         "live_validate": True,
                         "metadata": {"url": "https://example.test/wms"},

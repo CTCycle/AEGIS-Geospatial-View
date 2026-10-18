@@ -74,8 +74,16 @@ Use for global land-cover context.
 
 Use for EU or EEA environmental noise layers.
 
-- No API key is required for public services.
-- Verify service availability and licensing before operational use.
+- `eea_noise_end2022` serves the END-2022 noise contours through EEA's
+  [Noise_exposure_2025 WMS](https://noise.discomap.eea.europa.eu/arcgis/rest/services/noiseStoryMap/Noise_exposure_2025/MapServer)
+  (service metadata reports a 2025 data update). The overlay requests Industry,
+  Road Transport, Rail Transport, and Aviation groups.
+- The [EEA dataset record](https://sdi.eea.europa.eu/catalogue/eea-statistical-data/api/records/853e72e4-4642-47d1-8556-2cc231bd43e0?language=eng)
+  identifies the END-2022 reporting round, a 2021 temporal extent, submissions
+  through 2024-11-18, and March 2026 publication. No API key is required. The
+  record limits use to research and non-profit purposes and excludes nationally
+  restricted contours; preserve source attribution and do not infer broader
+  usage rights.
 
 ### NOAA Radar
 

@@ -1,18 +1,10 @@
 # Tier 3 rendering and geospatial feature families
 
-Last updated: 2026-10-17
+Last updated: 2026-10-18
 
-The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16`
-basemap rendering/preferences and advances `T4-04` to `PASS` for configured live
-GTFS static/realtime validation. Location-only spatial completion and the
-realtime-validator contract were repaired; 1,088 backend unit tests, changed-file
-Ruff, and full strict Pyright pass. Census now reaches execution but times out,
-numeric elevation remains disabled, imagery temporal completion fails, and EEA
-still returns upstream 404. Manual preference persists visually but backend
-narration can name OSM incorrectly. Those broader components remain PARTIAL;
-VISION-INSPECT remains UNRUN.
+The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and `T4-04` configured live GTFS. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT had not yet run. Later EEA and vision follow-ups supersede those statuses; Census, elevation, imagery, and narration limitations remain.
 
-The [2026-10-17 T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes the gate as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready browser render acknowledgements, keyboard-accessible ordering with visible stack changes, independent opacity, both selective-removal directions, and retained order across map updates. The exact provider/model lane passed its isolated runtime probe. `T3-18` remains `UNRUN`.
+The [2026-10-17 T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes `T3-17` as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready render acknowledgements, keyboard ordering, independent opacity, selective removal, and retention across map updates. `T3-18` subsequently passed on 2026-10-18.
 
 Tier 3 is the rendering and geospatial feature-family gate. It must establish
 browser-authoritative evidence that basemaps, vector/raster families,
@@ -20,12 +12,7 @@ valid-empty behavior, public providers, overlay mutation, composition, and map
 inspection controls render and acknowledge correctly before Tier 4A ingestion,
 Tier 4B provider parity, and Tier 5 recovery claims are expanded.
 
-The first nine slices (`T3-01` through `T3-09`) were individually established
-during execution and are `PASS`. Slices `T3-10` through `T3-18` were never
-individually documented in the repository or its history; their IDs existed
-only as inventory counts behind a single broad Tier 3 focus line. This document
-reconstructs their acceptance criteria from repository evidence so a future
-validation agent can execute each slice without rediscovering them.
+T3-01 to T3-06 and T3-08 to T3-09 were individually established during execution and remain PASS. T3-07 was previously PASS but is now PARTIAL after the 2026-10-18 FEMA relay render failure. Slices T3-10 through T3-18 were never individually documented in the repository or its history; their IDs existed only as inventory counts behind a single broad Tier 3 focus line. This document reconstructs their acceptance criteria from repository evidence so a future validation agent can execute each slice without rediscovering it.
 
 ## Reconstruction provenance and confidence
 
@@ -43,7 +30,7 @@ architecture and is labeled accordingly:
   but the precise scenarios are inferred from neighboring gates.
 - `UNRESOLVED` — evidence was insufficient to reconstruct reliably.
 
-T3-01–T3-14 and T3-16–T3-17 are PASS; T3-15/T3-18 remain UNRUN.
+T3-01 to T3-06, T3-08 to T3-14, and T3-16 to T3-18 are PASS; T3-07 and T3-15 are PARTIAL.
 Executing agents must record the
 branch, exact SHA, environment, provider/model lane, and isolation boundary per
 the [validation strategy](strategy.md), and must never promote an inference to
@@ -58,7 +45,7 @@ historical fact in evidence.
 | `T3-12` | `overpass_residential_buildings`, `overpass_poi_amenities` | Overpass building-footprint polygon and POI-amenity overlays | MEDIUM | Ledger "Residential buildings"; `providers/overpass.py`; manifests; `T2-03`/`T2-05` precedent |
 | `T3-13` | `openmeteo_pressure_humidity_wind` | Open-Meteo atmospheric point family and numeric-insight-vs-map boundary | MEDIUM | Ledger "atmospheric points"; `providers/openmeteo.py`; manifest; route-matrix alias rows |
 | `T3-14` | `gbif_species_occurrences` | GBIF biodiversity occurrence point-insight overlay with provenance/citation semantics | MEDIUM | `geospatial/providers/gbif.md`; manifest (keyless, clustered-points) |
-| `T3-15` | `eea_noise_2019` | EEA public raster through the same-origin proxy to an accepted render acknowledgement | MEDIUM | `RASTER-LIVE`/`GEO-FOCUS-16` gate rows; route-matrix `eea_noise_milan`; `raster_tiles.py` |
+| `T3-15` | `eea_noise_end2022` | EEA END-2022 public raster through the same-origin proxy; visible render and acknowledged lifecycle | MEDIUM | `RASTER-LIVE`/`GEO-FOCUS-16` rows; 2026-10-18 exact-lane evidence |
 | `T3-16` | `esri_world_imagery`, `openfreemap_liberty`, `openfreemap_positron` | Remaining basemap families and manual-preference persistence | LOW–MEDIUM | 2026-09-18/2026-09-19 diaries; basemap catalog enumeration; `T3-01`/`T3-03` pattern |
 | `T3-17` | Mixed raster+vector overlay lifecycle | Raster+vector three-layer composition, opacity, ordering, selective removal, retain-across-change | LOW | 2026-09-18 deferred "raster-plus-vector three-layer stack"; `T3-06` pattern; `overlay-controls.component.*` |
 | `T3-18` | `MapInspectionService`, overlay controls, evidence inspection, valid-empty recovery | Map inspection controls and family-wide valid-empty / non-renderable recovery | LOW | Tier 3 focus line "map inspection controls"; `app/server/services/geospatial/inspection.py`; `overlay-controls.component.*`; `T2-07`/`T3-04` precedent |
@@ -261,37 +248,36 @@ All Tier 3 slices share the standing campaign rules:
 - **Reconstruction confidence:** MEDIUM (not listed in the explicit "remaining
   paths" sentence, so not HIGH).
 
-### T3-15 — EEA public raster (noise) family
+### T3-15 — EEA END-2022 public raster (noise) family
 
-- **Tier:** 3.
-- **Purpose:** Validate the last remaining public raster provider family (EEA
-  noise) through the same-origin AEGIS tile proxy to an accepted render
-  acknowledgement.
-- **Capability/subsystem:** `eea_noise_2019` (WMS raster, EU-EEA coverage,
-  keyless, manual-toggle; upstream **retired** — `noise.discomap.eea.europa.eu`
-  2019 WMS returns 404).
-- **Preconditions:** **manifest re-pointed** to the current EEA noise service
-  (`noise.eea.europa.eu` / `portal.discomap.eea.europa.eu`, END-2022) — a
-  recorded data-maintenance/product decision; the proxy already includes `eea`;
-  exact lane.
-- **Validation scenarios:**
-  1. `Show noise exposure in Milan.` → route → provider retrieval →
-     same-origin proxy transport (`direct_upstream_browser_request_count=0`) →
-     render → accepted ack.
-  2. EU-coverage guardrail: a non-EU request is rejected, not partially
-     rendered.
-- **Expected behavior:** proxy `200 image/png`, MapLibre source/layer/pixels,
-  EEA attribution, accepted ack.
-- **BLOCKED (current):** upstream retirement; record as `BLOCKED` until the
-  manifest is re-pointed, exactly as `RASTER-LIVE`/`GEO-FOCUS-16` do today.
+- **Tier:** 3; **status:** `PARTIAL`.
+- **Purpose:** Validate EEA noise exposure through the same-origin AEGIS tile
+  proxy to an accepted render acknowledgement.
+- **Capability/subsystem:** `eea_noise_end2022` (WMS raster, European coverage,
+  keyless, manual-toggle). The official Noise_exposure_2025 service supplies
+  the END-2022 reporting vintage and was updated in 2025.
+- **Validation completed 2026-10-18:** Milan routing and spatial scope passed;
+  the proxy descriptor used WMS 1.1.1, layer groups `0,17,34,51`, and XML
+  exceptions. MapLibre reported the source/layer visible, an intersecting tile,
+  1,584 non-transparent pixels, and a backend-accepted `map.render_ack` evidenced by the matching
+  `render_observed=ready` before run completion. The realtime acknowledgement
+  frame itself was not separately captured. Attribution and the END-2022/service-2025 note were visible.
+  The Chicago request was rejected by the EU coverage guardrail while retaining
+  the last-known-good map. EEA-plus-GBIF add/remove passed.
+- **Remaining criterion:** Zero direct browser requests to the EEA host was not
+  measured. The in-app browser exposed no request listener and the Playwright
+  capture stalled during Chromium fixture setup before the test body. The
+  same-origin descriptor and rendered pixels do not substitute for that count.
+- **Source limitation:** The EEA catalogue record restricts this dataset to
+  research/non-profit use and excludes nationally restricted contours; this
+  technical validation grants no commercial-use clearance.
+- **Evidence:** [2026-10-18 EEA report](../../QA/validation-20261018-eea-end2022/report.md)
+  and [browser evidence](../../QA/validation-20261018-eea-end2022/browser-evidence.md).
 - **Depends on:** `T3-07` (proxy/render pattern), `T3-08`.
 - **Depended on by:** `T3-17` (raster composition partner).
 - **Source files:** `app/server/services/geospatial/providers/eea.py`,
-  `data/catalog/overlays/eea_noise_2019.json`,
+  `data/catalog/overlays/eea_noise_end2022.json`,
   `app/server/services/geospatial/raster_tiles.py`.
-- **Historical documentation/QA evidence:** route-matrix report
-  (`eea_noise_milan` row), `RASTER-LIVE` gate row, ecosystem audit
-  `eea-noise-upstream-service`/`upstream_unavailable`.
 - **Reconstruction confidence:** MEDIUM.
 
 ### T3-16 — Remaining basemap families (Esri imagery, OpenFreeMap Liberty/Positron)
@@ -420,4 +406,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-17` is now `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` remains deferred on the retired EEA WMS. `T3-18` remains `UNRUN` pending review of its reconstructed scope and remaining prerequisites; T3-17 no longer blocks it. Preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-17` is `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` is `PARTIAL`: the new END-2022 source renders, while zero direct EEA browser requests remains unmeasured. `T3-18` is `PASS` per the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md). Continue with the separate F-13/F-19 route gaps and remaining Tier 4/Tier 5 slices; preserve the exact provider/model lane and browser acknowledgement boundary.

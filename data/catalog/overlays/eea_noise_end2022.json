@@ -1,34 +1,35 @@
 {
-  "id": "eea_noise_2019",
-  "name": "EEA Noise Exposure 2019",
+  "id": "eea_noise_end2022",
+  "name": "EEA END-2022 Noise Exposure",
   "provider": "eea",
   "type": "wms",
-  "description": "European Environment Agency 2019 environmental noise overlay for EU/EEA areas.",
+  "description": "European Environment Agency END-2022 environmental noise contours for EU/EEA areas, served by the ArcGIS map service updated in 2025.",
   "capabilities": [
     "noise",
     "wms"
   ],
   "coverage": "eu-eea",
   "metadata": {
-    "label": "EEA Noise Exposure 2019",
+    "label": "EEA END-2022 Noise Exposure",
     "default_opacity": 0.55,
     "requires_key": false,
-    "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer",
-    "layers": "0",
+    "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/Noise_exposure_2025/MapServer/WMSServer",
+    "layers": "0,17,34,51",
     "wms_version": "1.1.1",
-    "wms_exceptions": "application/vnd.ogc.se_inimage",
+    "wms_exceptions": "application/vnd.ogc.se_xml",
     "bounds": [
       -35,
       24,
       45,
       72
     ],
-    "attribution": "© European Environment Agency (CC BY 4.0 where applicable)",
+    "attribution": "© European Environment Agency — END-2022; research/non-profit use only; nationally restricted contours excluded",
     "keywords": [
       "noise",
       "wms",
       "eea",
-      "eea noise exposure 2019"
+      "eea END-2022 noise exposure",
+      "Noise_exposure_2025"
     ],
     "action_tags": [
       "noise",
@@ -43,7 +44,7 @@
     ],
     "coverage_scope": "eu-eea",
     "temporal_behavior": "static",
-    "constraints": "verify provider availability and attribution requirements",
+    "constraints": "Research/non-profit use only; nationally restricted contours are excluded. Preserve EEA attribution.",
     "content_hash": "7118230a6eb24577193ea1130f6a6cb1a0efd8c8ba257a65afa9d42f8cabc271",
     "human_summary": "Thematic environmental noise map focused on European coverage.",
     "primary_use_cases": [
@@ -62,7 +63,7 @@
     "integration_requirements": [
       "No API key required"
     ],
-    "official_docs_url": "https://www.eea.europa.eu/en/datahub",
+    "official_docs_url": "https://sdi.eea.europa.eu/catalogue/eea-statistical-data/api/records/853e72e4-4642-47d1-8556-2cc231bd43e0?language=eng",
     "source_protocol": "WMS",
     "data_format": "image/png via WMS",
     "geometry_type": "raster-grid",
@@ -72,20 +73,21 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27"
+    "last_validated": "2026-10-18"
   },
   "version": 1,
-  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "last_modified": "2026-10-18T19:17:02+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "wms",
   "sourceOfficialDocs": [
-    "https://www.eea.europa.eu/en/datahub"
+    "https://sdi.eea.europa.eu/catalogue/eea-statistical-data/api/records/853e72e4-4642-47d1-8556-2cc231bd43e0?language=eng",
+    "https://noise.discomap.eea.europa.eu/arcgis/rest/services/noiseStoryMap/Noise_exposure_2025/MapServer"
   ],
   "license": {
-    "name": "© European Environment Agency (CC BY 4.0 where applicable)",
-    "url": "https://www.eea.europa.eu/en/datahub",
+    "name": "EEA END-2022 noise data (research/non-profit use only)",
+    "url": "https://sdi.eea.europa.eu/catalogue/eea-statistical-data/api/records/853e72e4-4642-47d1-8556-2cc231bd43e0?language=eng",
     "attributionRequired": true,
-    "commercialUse": "unknown",
+    "commercialUse": "restricted",
     "embeddingAllowed": "unknown"
   },
   "auth": {
@@ -102,7 +104,7 @@
       "noise",
       "wms",
       "eea",
-      "eea noise exposure 2019"
+      "eea END-2022 noise exposure"
     ],
     "requiredUserAction": [],
     "avoidWhen": [
