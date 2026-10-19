@@ -58,8 +58,9 @@ All Tier 3 slices share the standing campaign rules:
 - Disposable exact-lane backend (see `scripts/validation/run_t3_07_live_runtime.py`
   pattern; default port `5079`) with an isolated data root under
   `runtimes/cache/test-runtime/`; provider/model lane persisted through the
-  Settings API and verified by the native structured probe
-  (`provider=opencode-go`, `model=deepseek-v4.1-flash`, `parse_status=complete`).
+  Settings API (`provider=opencode-go`, `model=deepseek-v4.1-flash`). Earlier
+  readiness runs recorded a successful native structured probe; current
+  Settings uses catalog capability metadata and does not run a test inference.
 - Browser-rendered state is authoritative: expected location/viewport, visible
   tiles, source/layer state, visible pixels where meaningful, attribution, and
   an accepted `map.render_ack` must be recorded when the workflow requires them.
@@ -83,7 +84,7 @@ All Tier 3 slices share the standing campaign rules:
 - **Capability/subsystem:** `usgs_earthquakes` (vector-overlay, GeoJSON Point,
   `renderingMode=clustered-points`, global coverage, keyless,
   `endpoint_health=functional`).
-- **Preconditions:** `T3-01`–`T3-09` PASS; exact lane structured-probe ready;
+- **Preconditions:** `T3-01`–`T3-09` PASS; exact provider/model is configured;
   `usgs_earthquakes` enabled in Geospatial Access; USGS GeoJSON feed reachable.
 - **Validation scenarios:**
   1. `Show recent earthquakes around Tokyo, Japan.` → resolve → route →

@@ -80,9 +80,10 @@ active-run relationship directly; there are no `chat_sessions` or
 
 Core relational storage covers conversations and messages, agent runs and
 events, steering messages, model settings, encrypted model credentials,
-model probe results (the last native tool-contract verdict per model, keyed by
-the selected endpoint and a digest of the stored key, so it survives restarts
-and unrelated settings changes), application runtime settings, and seeded geospatial reference data.
+application runtime settings, and seeded geospatial reference data. Existing
+SQLite files may retain rows from the historical model-probe table; current
+application code does not read or write those rows, and this change does not
+delete them.
 Conversation-scoped native-agent evidence is
 stored in compressed `agent_evidence` rows with bounded summaries, provenance,
 checksums, and parent references; conversation deletion cascades metadata and

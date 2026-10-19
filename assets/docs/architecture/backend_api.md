@@ -93,17 +93,9 @@ Defined in `app/server/api/chat.py`:
   provider API key. The response includes per-source `ok`, reachability, error,
   and model-count status; a provider catalog failure is not converted into a
   usable empty catalog. `reachable` means catalogue transport success only;
-  it is not inference or structured-output proof. Source statuses also expose
-  the separate process-local structured-probe status and expiry timestamps.
-- `GET /api/chat/models/structured-probe`
-  Returns the latest selected-provider/model native structured-response probe, or `not_tested` when
-  no unexpired result exists. Results are keyed by provider, model, protocol,
-  base URL, and credential fingerprint and expire after 15 minutes.
-- `POST /api/chat/models/structured-probe`
-  Runs the selected model through the native route/tool contract using the
-  fixed `Show a map of Italy` request. It stops before location resolution,
-  provider execution, map assembly, and conversation persistence. A probe never
-  changes model selection and never substitutes another provider or model.
+  it is not inference or structured-output proof. Tool-calling readiness uses
+  the model capability field. Settings sends no test inference; missing
+  capability metadata remains unverified.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PATCH /api/chat/settings`

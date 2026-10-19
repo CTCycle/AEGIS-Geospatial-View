@@ -48,7 +48,6 @@ export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers
 export const API_GEOSPATIAL_RENDER_CAPTURES_PATH = '/geospatial/render-captures';
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_MODELS_PATH = '/chat/models';
-export const API_CHAT_STRUCTURED_PROBE_PATH = '/chat/models/structured-probe';
 export const API_CHAT_SETTINGS_PATH = '/chat/settings';
 export const API_RUNTIME_SETTINGS_PATH = '/settings/runtime';
 export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';

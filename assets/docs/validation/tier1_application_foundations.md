@@ -21,7 +21,7 @@ claims are expanded.
 | `T1-08` | Runtime Settings API/persistence | Typed defaults, partial merge, atomic update, invalid values, restart metadata, and reread. | Runtime Settings API/repository tests plus isolated restart. |
 | `T1-09` | Seven-section Settings navigation/drafts | URL-authoritative section selection, invalid tab fallback, dirty draft behavior, save, and return. | Settings component suite plus all seven rendered sections. |
 | `T1-10` | Credential lifecycle | Masked state, safe save/clear, blank-draft safety, invalid input, undecryptable state, and API failure. | Credential/crypto suites plus safe fixture browser flow; never use real secrets. |
-| `T1-11` | Model library/selection/probe | Static and dynamic catalogs, unsupported protocol, selection retention, provider failure, and probe expiry. | Model-library/probe suites and exact selected-model browser proof. |
+| `T1-11` | Model library/selection/capability metadata | Static and dynamic catalogs, unsupported protocol, selection retention, provider failure, and supported/unsupported/unknown capability metadata. | Model-library/readiness suites and exact selected-model browser proof; readiness does not send inference requests. |
 | `T1-12` | Context-window authority/presentation | Known limits, unknown limits, new-chat retention, and measured-request display without fabrication. | Context resolver/UI suites and the dated context-profile browser artifact. |
 
 ## Current result

@@ -192,8 +192,9 @@ message, operation, route, goal, completion contract, tool summaries, trace,
 context usage, conversation state, and optional map candidate. Parser/planner
 projection fields are not part of the contract.
 
-The structured model probe is a readiness check for the native route/tool
-contract. It does not create a conversation or execute a provider capability.
+Settings readiness reads the selected model's tool-support capability from the
+provider catalog. It does not send a test inference; missing metadata remains
+unverified. Actual route behavior is observed during the user's normal run.
 
 ## Map completion flow
 

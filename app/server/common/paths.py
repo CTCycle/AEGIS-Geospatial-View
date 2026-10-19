@@ -16,6 +16,7 @@ CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
 
+
 ###############################################################################
 def resolve_runtime_data_root() -> Path:
     override = os.getenv("AEGIS_DATA_DIR", "").strip()
@@ -25,12 +26,11 @@ def resolve_runtime_data_root() -> Path:
         # repository root before starting the backend. Keep direct backend
         # launches on the same path semantics.
         return (
-            override_path
-            if override_path.is_absolute()
-            else ROOT_DIR / override_path
+            override_path if override_path.is_absolute() else ROOT_DIR / override_path
         )
 
     return DATA_PATH / "runtime"
+
 
 ###############################################################################
 def resolve_database_file_path() -> Path:
@@ -53,7 +53,6 @@ CHAT_TURN_ROUTE = "/turn"
 CHAT_STREAM_ROUTE = "/stream"
 CHAT_JOBS_ROUTE = "/jobs"
 CHAT_MODELS_ROUTE = "/models"
-CHAT_STRUCTURED_PROBE_ROUTE = "/models/structured-probe"
 CHAT_SETTINGS_ROUTE = "/settings"
 CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
 CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"

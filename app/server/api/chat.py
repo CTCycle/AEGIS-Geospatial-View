@@ -12,7 +12,6 @@ from pydantic import ValidationError
 from server.common.paths import (
     CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
-    CHAT_STRUCTURED_PROBE_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -33,7 +32,6 @@ from server.contracts.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
-    StructuredProbeResponse,
 )
 from server.contracts.runs import AgentRunCreateRequest
 from server.contracts.runs import AgentRunState
@@ -59,25 +57,31 @@ from server.services.llm.errors import (
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
+
 
 ###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
+
 ###############################################################################
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
+
 
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
     return getattr(request.app.state, "run_lifecycle_service", None)
 
+
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(public_protocol_projection(event.model_dump(mode="json"))) + "\n"
+
 
 ###############################################################################
 async def _serialize_chat_event_stream(
@@ -90,6 +94,7 @@ async def _serialize_chat_event_stream(
         owner_user_id=owner_user_id,
     ):
         yield _stream_event(event)
+
 
 ###############################################################################
 def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
@@ -109,6 +114,7 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
             ),
         ) from exc
 
+
 ###############################################################################
 @router.post(
     CHAT_JOBS_ROUTE,
@@ -121,6 +127,7 @@ async def create_chat_job(
 ) -> BackgroundJobCreateResponse:
     _build_run_request(payload)
     return job_service.create_chat_job(payload)
+
 
 ###############################################################################
 @router.post(
@@ -145,7 +152,10 @@ async def chat_turn(
 ) -> ChatTurnResponse | AgentRunAcceptedResponse | JSONResponse:
     run_request = _build_run_request(payload)
     try:
-        if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
+        if (
+            runtime.conversation_repository.get_conversation(payload.conversation_id)
+            is None
+        ):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conversation not found.",
@@ -166,7 +176,13 @@ async def chat_turn(
             ),
         )
         if response is not None:
-            return response.model_copy(update={"execution_trace": public_protocol_projection(response.execution_trace)})
+            return response.model_copy(
+                update={
+                    "execution_trace": public_protocol_projection(
+                        response.execution_trace
+                    )
+                }
+            )
         snapshot = lifecycle_service.run_repository.get_run(result.run_id)
         if snapshot is not None and snapshot.error_message:
             raise HTTPException(
@@ -217,6 +233,7 @@ async def chat_turn(
             detail=str(exc),
         ) from exc
 
+
 ###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
@@ -237,6 +254,7 @@ async def chat_stream(
         ),
         media_type="application/x-ndjson",
     )
+
 
 ###############################################################################
 @router.get(
@@ -284,6 +302,7 @@ def get_models(
             ),
         ) from exc
 
+
 ###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
@@ -301,39 +320,6 @@ def get_settings(
             detail=str(exc),
         ) from exc
 
-###############################################################################
-@router.get(
-    CHAT_STRUCTURED_PROBE_ROUTE,
-    response_model=StructuredProbeResponse,
-    status_code=status.HTTP_200_OK,
-)
-def get_structured_probe(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> StructuredProbeResponse:
-    probe_service = runtime.structured_probe_service
-    if probe_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Structured probe is unavailable.",
-        )
-    return probe_service.latest()
-
-###############################################################################
-@router.post(
-    CHAT_STRUCTURED_PROBE_ROUTE,
-    response_model=StructuredProbeResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def run_structured_probe(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> StructuredProbeResponse:
-    probe_service = runtime.structured_probe_service
-    if probe_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Structured probe is unavailable.",
-        )
-    return await probe_service.run()
 
 ###############################################################################
 @router.patch(
@@ -355,6 +341,7 @@ def update_settings(
             detail=str(exc),
         ) from exc
 
+
 ###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -371,6 +358,7 @@ def refresh_ollama_models(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
 
 ###############################################################################
 @router.post(
@@ -402,6 +390,7 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Ollama pull failed.",
         ) from exc
+
 
 ###############################################################################
 @router.get(

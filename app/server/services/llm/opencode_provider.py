@@ -291,7 +291,7 @@ class OpenCodeProvider(DeepSeekProvider):
         declared = self._declared_model_capabilities.get(
             model.strip().lower(), {}
         ).get("supports_tools")
-        return declared if isinstance(declared, bool) else True
+        return declared if isinstance(declared, bool) else None
 
     # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool | None:
@@ -377,11 +377,12 @@ class OpenCodeProvider(DeepSeekProvider):
             "owned_by": str(item.get("owned_by") or "opencode"),
             "protocol": protocol,
             "protocol_source": protocol_source,
-            "tool_support_source": "provider_protocol_registry",
+            "tool_support_source": "unknown",
         }
         if not supported:
             metadata["supports_tools"] = False
             metadata["supports_structured_output"] = False
+            metadata["tool_support_source"] = "provider_protocol_registry"
             metadata["agent_selection_disabled_reason"] = (
                 "This OpenCode model uses an unsupported transport. "
                 "AEGIS supports Chat Completions, Responses and Messages only."
@@ -452,6 +453,10 @@ class OpenCodeProvider(DeepSeekProvider):
         ):
             metadata["context_profile_source"] = "provider_models_api"
             metadata["context_metadata_authority"] = "provider"
+        declared_tool_support = item.get("supports_tools")
+        if supported and isinstance(declared_tool_support, bool):
+            metadata["supports_tools"] = declared_tool_support
+            metadata["tool_support_source"] = "opencode_models_api"
         raw_capabilities = item.get("capabilities")
         if is_json_array(raw_capabilities):
             normalized = {
@@ -461,18 +466,15 @@ class OpenCodeProvider(DeepSeekProvider):
             }
             if supported:
                 metadata["supports_tools"] = "tools" in normalized
+                metadata["tool_support_source"] = "opencode_models_api"
                 metadata["supports_structured_output"] = bool(
                     {"structured", "structured_output"} & normalized
                 )
             capabilities = sorted(normalized)
         elif supported:
-            capabilities = [
-                "chat",
-                "stream",
-                "structured",
-                "structured_output",
-                "tools",
-            ]
+            capabilities = ["chat", "stream", "structured", "structured_output"]
+            if metadata.get("supports_tools") is True:
+                capabilities.append("tools")
         else:
             capabilities = ["chat", "stream"]
         metadata["supports_vision"] = self.supports_vision(model_id)

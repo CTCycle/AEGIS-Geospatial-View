@@ -9,7 +9,6 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 from html.parser import HTMLParser
 from typing import Any, TextIO
-from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 from server.services.llm.base import (
@@ -23,7 +22,6 @@ from server.services.llm.context_budget import (
     prepare_request,
 )
 from server.services.llm.multimodal import normalize_image_content_for_ollama
-from server.prompts.providers import OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT
 from server.services.llm.errors import (
     LLMProviderRequestError,
     LLMResponseParsingError,
@@ -44,9 +42,9 @@ from server.services.llm.types import (
 
 _LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -89,6 +87,7 @@ class _OllamaLibraryParser(HTMLParser):
         )
         self._active_model = None
         self._chunks = []
+
 
 ###############################################################################
 class OllamaProvider(LLMProvider):
@@ -152,8 +151,10 @@ class OllamaProvider(LLMProvider):
             else "chat"
         )
         default_timeout = self.transport_policy.timeout_for(timeout_stage)
-        effective_timeout = default_timeout if timeout is None else min(
-            default_timeout, max(0.1, timeout)
+        effective_timeout = (
+            default_timeout
+            if timeout is None
+            else min(default_timeout, max(0.1, timeout))
         )
         with self._open_url(request, timeout=effective_timeout) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -173,8 +174,10 @@ class OllamaProvider(LLMProvider):
             method="POST",
         )
         default_timeout = self.transport_policy.timeout_for("stream")
-        effective_timeout = default_timeout if timeout is None else min(
-            default_timeout, max(0.1, timeout)
+        effective_timeout = (
+            default_timeout
+            if timeout is None
+            else min(default_timeout, max(0.1, timeout))
         )
         with self._open_url(request, timeout=effective_timeout) as response:
             reader: TextIO = response  # type: ignore[assignment]
@@ -369,7 +372,7 @@ class OllamaProvider(LLMProvider):
                 source="ollama_show",
             )
             return capabilities
-        if self._probe_tool_support(model):
+        if self.tool_capability_cache.get(self.base_url, model) is True:
             capabilities.add("tools")
         return capabilities
 
@@ -385,7 +388,7 @@ class OllamaProvider(LLMProvider):
                 source="ollama_show",
             )
             return supported
-        return self._probe_tool_support(model)
+        return self.tool_capability_cache.get(self.base_url, model)
 
     # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool | None:
@@ -489,11 +492,15 @@ class OllamaProvider(LLMProvider):
         family = str(details.get("family") or "").strip().lower()
         if not family:
             model_info = json_object(payload.get("model_info"))
-            family = str(
-                model_info.get("general.architecture")
-                or model_info.get("general.family")
-                or ""
-            ).strip().lower()
+            family = (
+                str(
+                    model_info.get("general.architecture")
+                    or model_info.get("general.family")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
         if family in {"gpt-oss", "gptoss"}:
             return "low"
         capabilities = self._show_capabilities(model)
@@ -502,76 +509,8 @@ class OllamaProvider(LLMProvider):
         return None
 
     # -------------------------------------------------------------------------
-    def _probe_tool_support(self, model: str) -> bool | None:
-        cached = self.tool_capability_cache.get(self.base_url, model)
-        if cached is not None:
-            return cached
-        tool = LLMToolDefinition(
-            name="aegis_tool_probe",
-            description="Harmless capability probe.",
-            parameters_json_schema={"type": "object", "properties": {}},
-        )
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": OLLAMA_TOOL_CAPABILITY_PROBE_PROMPT,
-                }
-            ],
-            "stream": False,
-            "tools": [self.tool_to_ollama_schema(tool)],
-            "options": {"temperature": 0},
-        }
-        supported: bool | None = None
-        try:
-            response = self._post_json("/api/chat", payload)
-            message = response.get("message") if is_json_object(response) else None
-            supported = True
-            source = "ollama_tool_request_accepted"
-            if is_json_object(message) and self._parse_tool_calls(message):
-                source = "ollama_probe"
-        except HTTPError as exc:
-            if self._is_explicit_tool_unsupported_error(exc):
-                supported = False
-                source = "ollama_tool_request_rejected"
-            else:
-                source = "ollama_probe"
-        except Exception:
-            source = "ollama_probe"
-        if supported is not None:
-            self.tool_capability_cache.set(
-                self.base_url,
-                model,
-                supported,
-                source=source,
-            )
-        return supported
-
-    # -------------------------------------------------------------------------
     def _tool_support_source(self, model: str) -> str:
         return self.tool_capability_cache.source(self.base_url, model) or "unknown"
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_explicit_tool_unsupported_error(exc: HTTPError) -> bool:
-        try:
-            body = exc.read().decode("utf-8", errors="ignore")
-        except Exception:
-            body = ""
-        text = f"{exc.reason} {body}".lower()
-        if "tool" not in text and "function" not in text:
-            return False
-        return any(
-            marker in text
-            for marker in (
-                "not support",
-                "unsupported",
-                "does not support",
-                "doesn't support",
-                "no support",
-            )
-        )
 
     # -------------------------------------------------------------------------
     def list_library_models(self) -> list[ModelDescriptor]:
@@ -668,9 +607,7 @@ class OllamaProvider(LLMProvider):
         effective_request = prepare_request(
             effective_request, provider=self.provider_name
         )
-        usage = compute_context_usage(
-            effective_request, provider=self.provider_name
-        )
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
         try:
             self._validate_request_capabilities(effective_request)
         except LLMStructuredOutputError as exc:
@@ -760,7 +697,9 @@ class OllamaProvider(LLMProvider):
         def iterate() -> Iterable[str]:
             nonlocal usage
             try:
-                for event in self._stream_post_for_request("/api/chat", payload, request):
+                for event in self._stream_post_for_request(
+                    "/api/chat", payload, request
+                ):
                     message = (
                         event.get("message")
                         if is_json_object(event.get("message"))

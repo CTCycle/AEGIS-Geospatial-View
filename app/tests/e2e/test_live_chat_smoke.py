@@ -17,53 +17,34 @@ from tests.e2e.helpers.artifacts import (
     write_snapshot,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
-
-###############################################################################
-def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str, dict[str, Any]]:
-    # Keep the preflight independent from the synchronous /api/chat/turn
-    # response contract. That endpoint can return 503 after the run has
-    # durably completed; the live UI path still needs its own verification.
-    response = page.request.post(
-        f"{api_base_url.rstrip('/')}/api/chat/models/structured-probe",
-    )
-    try:
-        body = response.json()
-    except (TypeError, ValueError):
-        body = {}
-    body = body if isinstance(body, dict) else {}
-    evidence = {
-        "endpoint": "/api/chat/models/structured-probe",
-        "http_status": response.status,
-        "provider": body.get("provider"),
-        "model": body.get("model"),
-        "protocol": body.get("protocol"),
-        "status": body.get("status"),
-        "parse_status": body.get("parse_status"),
-        "duration_ms": body.get("duration_ms"),
-        "tested_commit": os.environ.get("APP_TEST_COMMIT") or "unknown",
-    }
-    if (
-        response.status == 200
-        and evidence["status"] == "passed"
-        and evidence["parse_status"] == "complete"
-    ):
-        return True, "", evidence
-    return False, (
-        "Configured provider structured probe did not pass: "
-        f"{evidence['provider']}/{evidence['model']} "
-        f"status={evidence['status']} parse_status={evidence['parse_status']} "
-        f"http_status={response.status}"
-    ), evidence
+from tests.e2e.helpers.model_capability_metadata import (
+    selected_model_tool_support_metadata,
+)
 
 
 ###############################################################################
-def _record_provider_preflight(dirs: dict[str, Path], evidence: dict[str, Any]) -> None:
+def _check_selected_model_capability(
+    page: Page, api_base_url: str
+) -> tuple[bool, str, dict[str, Any]]:
+    ready, reason, evidence = selected_model_tool_support_metadata(page, api_base_url)
+    evidence["tested_commit"] = os.environ.get("APP_TEST_COMMIT") or "unknown"
+    return ready, reason, evidence
+
+
+###############################################################################
+def _record_capability_metadata(
+    dirs: dict[str, Path], evidence: dict[str, Any]
+) -> None:
     write_http_capture(
         dirs["http"],
-        "provider-structured-probe",
-        {"method": "POST", "path": "/api/chat/models/structured-probe"},
+        "provider-capability-metadata",
+        {
+            "method": "GET",
+            "paths": ["/api/chat/settings", "/api/chat/models"],
+        },
         evidence,
     )
+
 
 ###############################################################################
 def _assert_clean_backend_tail(tail: str) -> None:
@@ -71,9 +52,12 @@ def _assert_clean_backend_tail(tail: str) -> None:
     assert "traceback" not in normalized
     assert "unhandled exception" not in normalized
 
+
 ###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
-    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')")
+    raw = page.evaluate(
+        "() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')"
+    )
     if not raw:
         return None
     data = json.loads(raw)
@@ -86,6 +70,7 @@ def _read_conversation_id(page: Page) -> str | None:
         else None
     )
 
+
 ###############################################################################
 def test_live_chat_happy_path(
     page: Page,
@@ -96,8 +81,8 @@ def test_live_chat_happy_path(
 ) -> None:
     test_id = "CHAT-LIVE-01"
     dirs = ensure_test_artifact_dirs(artifact_root, test_id)
-    ready, reason, preflight = _check_live_provider(page, api_base_url)
-    _record_provider_preflight(dirs, preflight)
+    ready, reason, preflight = _check_selected_model_capability(page, api_base_url)
+    _record_capability_metadata(dirs, preflight)
     if not ready:
         pytest.skip(reason)
 
@@ -129,12 +114,14 @@ def test_live_chat_happy_path(
             "assistant response rendered",
             "conversation id persisted",
             "backend log tail clean",
-            "structured probe lane "
+            "selected-model capability metadata "
             f"{preflight['provider']}/{preflight['model']} "
-            f"status={preflight['status']} parse_status={preflight['parse_status']}",
+            f"supports_tools={preflight['supports_tools']} "
+            f"source={preflight['tool_support_source']}",
         ],
         backend_log_status="clean" if tail.strip() else "empty",
     )
+
 
 ###############################################################################
 def test_live_follow_up_same_conversation(
@@ -146,8 +133,8 @@ def test_live_follow_up_same_conversation(
 ) -> None:
     test_id = "CHAT-LIVE-02"
     dirs = ensure_test_artifact_dirs(artifact_root, test_id)
-    ready, reason, preflight = _check_live_provider(page, api_base_url)
-    _record_provider_preflight(dirs, preflight)
+    ready, reason, preflight = _check_selected_model_capability(page, api_base_url)
+    _record_capability_metadata(dirs, preflight)
     if not ready:
         pytest.skip(reason)
 
@@ -179,12 +166,14 @@ def test_live_follow_up_same_conversation(
             "conversation continuity preserved",
             "no full reset occurred",
             "backend log tail clean",
-            "structured probe lane "
+            "selected-model capability metadata "
             f"{preflight['provider']}/{preflight['model']} "
-            f"status={preflight['status']} parse_status={preflight['parse_status']}",
+            f"supports_tools={preflight['supports_tools']} "
+            f"source={preflight['tool_support_source']}",
         ],
         backend_log_status="clean" if tail.strip() else "empty",
     )
+
 
 ###############################################################################
 def test_live_new_chat_reset(
@@ -195,8 +184,8 @@ def test_live_new_chat_reset(
 ) -> None:
     test_id = "CHAT-LIVE-03"
     dirs = ensure_test_artifact_dirs(artifact_root, test_id)
-    ready, reason, preflight = _check_live_provider(page, api_base_url)
-    _record_provider_preflight(dirs, preflight)
+    ready, reason, preflight = _check_selected_model_capability(page, api_base_url)
+    _record_capability_metadata(dirs, preflight)
     if not ready:
         pytest.skip(reason)
     page.goto(base_url)
@@ -212,12 +201,14 @@ def test_live_new_chat_reset(
         prompts=["Show me Rome"],
         assertions=[
             "new chat reset completed",
-            "structured probe lane "
+            "selected-model capability metadata "
             f"{preflight['provider']}/{preflight['model']} "
-            f"status={preflight['status']} parse_status={preflight['parse_status']}",
+            f"supports_tools={preflight['supports_tools']} "
+            f"source={preflight['tool_support_source']}",
         ],
         backend_log_status="not collected for reset-only flow",
     )
+
 
 ###############################################################################
 def test_live_degraded_path_shows_user_failure_without_crash(

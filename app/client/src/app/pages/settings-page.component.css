@@ -159,6 +159,40 @@
     background: var(--settings-surface);
 }
 
+.runtime-settings__disclosure {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--settings-border);
+    border-radius: var(--settings-radius);
+    background: var(--settings-surface);
+}
+
+.runtime-settings__disclosure summary {
+    cursor: pointer;
+    color: #e6f1f5;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.runtime-settings__disclosure summary:focus-visible {
+    outline: 2px solid #3bb5f2;
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+.runtime-settings__disclosure-content {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.runtime-settings__disclosure-content > p {
+    margin: 0;
+    color: #a9bac2;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
 .runtime-settings__group h3 {
     margin: 0;
     color: #e6f1f5;
@@ -698,41 +732,6 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
-.settings-page__probe {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-4);
-  border: 1px solid var(--settings-border);
-  border-radius: var(--settings-radius);
-  background: var(--settings-surface);
-  color: #d9e6eb;
-}
-
-.settings-page__probe > div {
-  min-width: 0;
-  flex: 1 1 10rem;
-}
-
-.settings-page__probe > button {
-  flex: 0 1 auto;
-}
-
-.settings-page__probe-label {
-  margin: 0 0 0.25rem;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.settings-page__probe p:last-child {
-  margin: 0.35rem 0 0;
-  font-size: 0.85rem;
-  color: #a9bac2;
-}
-
 .settings-page__inline-link {
   justify-self: start;
   cursor: pointer;

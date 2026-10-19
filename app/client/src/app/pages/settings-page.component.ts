@@ -46,7 +46,6 @@ import {
   OllamaHealthResponse,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
-  StructuredProbeResponse,
   VISION_POLICY_VALUES,
   type VisionPolicy,
 } from '../core/types';
@@ -220,7 +219,6 @@ export const VISION_POLICY_OPTIONS: Readonly<
 interface GeoProviderAccess {
   id: string;
   name: string;
-  purpose: string;
   placeholder: string;
   docsUrl: string;
   requiresCredentials: boolean;
@@ -250,15 +248,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly cloudProviders: readonly {
     id: CloudCredentialProvider;
     name: string;
-    purpose: string;
     placeholder: string;
     hint?: string;
   }[] = [
-    { id: 'openai', name: 'OpenAI', purpose: 'Cloud models for general agent routing and chat.', placeholder: 'sk-...', hint: 'Stored credentials are masked and are never returned to the browser.' },
-    { id: 'google', name: 'Google', purpose: 'Google model access for agent routing and chat.', placeholder: 'AIza...', hint: 'Stored credentials are masked and are never returned to the browser.' },
-    { id: 'deepseek', name: 'DeepSeek', purpose: 'Discover and run models through the DeepSeek API.', placeholder: 'sk-...', hint: 'A saved key enables live DeepSeek model discovery.' },
-    { id: 'opencode', name: 'OpenCode Zen', purpose: 'Discover and run OpenCode Zen OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'OpenCode Zen model availability comes from its live account catalog.' },
-    { id: 'opencode-go', name: 'OpenCode Go', purpose: 'Discover and run OpenCode Go OpenAI-compatible models.', placeholder: 'OpenCode API key', hint: 'DeepSeek V4.1 Flash is identified as deepseek-v4.1-flash when published by the live catalog.' },
+    { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
+    { id: 'google', name: 'Google', placeholder: 'AIza...' },
+    { id: 'deepseek', name: 'DeepSeek', placeholder: 'sk-...', hint: 'A saved key enables live DeepSeek model discovery.' },
+    { id: 'opencode', name: 'OpenCode Zen', placeholder: 'OpenCode API key', hint: 'Model availability comes from the live account catalog.' },
+    { id: 'opencode-go', name: 'OpenCode Go', placeholder: 'OpenCode API key', hint: 'DeepSeek V4.1 Flash appears as deepseek-v4.1-flash when published by the live catalog.' },
   ];
   activeSection: SettingsSectionId = 'models';
   readonly state: PersistedSettingsPageState;
@@ -303,18 +300,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   deepseekStatus: ModelLibrarySourceStatus | null = null;
   opencodeStatus: ModelLibrarySourceStatus | null = null;
   opencodeGoStatus: ModelLibrarySourceStatus | null = null;
-  structuredProbe: StructuredProbeResponse = {
-    provider: '',
-    model: '',
-    protocol: 'unknown',
-    status: 'not_tested',
-    parse_status: 'not_tested',
-    duration_ms: null,
-    checked_at: null,
-    expires_at: null,
-    message: 'This model has not been verified against the native route/tool contract.',
-  };
-  isTestingStructuredProbe = false;
 
   runtimeSettings: RuntimeSettingsResponse = createDefaultRuntimeSettings();
   readonly visionPolicyOptions = VISION_POLICY_OPTIONS;
@@ -479,38 +464,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     )?.hint ?? '';
   }
 
-  get structuredProbeLabel(): string {
-    if (this.structuredProbe.status === 'passed') return 'Verified';
-    if (this.structuredProbe.status === 'not_tested') return 'Not verified';
-    return 'Needs attention';
-  }
-
-  async testSelectedModel(): Promise<void> {
-    if (
-      !this.settings.agent_model_provider
-      || !this.settings.agent_model_name
-      || this.isTestingStructuredProbe
-    ) {
-      return;
-    }
-    this.isTestingStructuredProbe = true;
-    this.statusText = `Testing ${this.settings.agent_model_name} against the native route/tool contract...`;
-    this.changeDetectorRef.detectChanges();
-    try {
-      this.structuredProbe = await this.apiClient.runStructuredProbe();
-      this.statusText = this.structuredProbe.message ?? 'Native structured-response probe completed.';
-    } catch (error: unknown) {
-      this.statusText = this.userFacingErrorService.toUserFacingError(
-        error,
-        'Could not run the native structured-response probe.',
-      );
-    } finally {
-      this.isTestingStructuredProbe = false;
-      this.syncState();
-      this.changeDetectorRef.detectChanges();
-    }
-  }
-
   get unavailableAssignedOllamaModels(): string[] {
     const assignedModels = [
       this.settings.agent_model_provider === 'ollama' ? this.settings.agent_model_name : '',
@@ -635,7 +588,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = updated;
-      await this.refreshStructuredProbe(updated);
       this.statusText = `Selected ${model.name} as agent model`;
       this.syncState();
       this.changeDetectorRef.detectChanges();
@@ -702,7 +654,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         ollama_url: this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434',
       });
       this.settings = updated;
-      await this.refreshStructuredProbe(updated);
       this.ollamaUrlDraft = updated.ollama_url;
       await this.reloadOllamaCatalog();
       this.statusText = 'Ollama settings saved';
@@ -932,7 +883,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) return;
       this.settings = updated;
       this.setCloudCredentialValue(provider, '');
-      await this.refreshStructuredProbe(updated);
       if (isDynamicCloudProvider(provider)) {
         await this.ensureProviderModelsLoaded(provider, true);
       }
@@ -959,7 +909,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) return;
       this.settings = updated;
       this.setCloudCredentialValue(provider, '');
-      await this.refreshStructuredProbe(updated);
       if (isDynamicCloudProvider(provider)) {
         this.cloudModels = this.cloudModels.filter((model) => model.provider !== provider);
         this.setDynamicProviderStatus(provider, { ok: false, message: `Add a ${providerDisplayLabel(provider)} API key to load ${providerDisplayLabel(provider)} models.` });
@@ -1016,30 +965,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return undefined;
   }
 
-  // The server owns verification: a verdict stays valid until the selected
-  // model, endpoint or key changes, so re-read it instead of assuming a reset.
-  private async refreshStructuredProbe(settings: ModelSettingsResponse): Promise<void> {
-    try {
-      this.structuredProbe = await this.apiClient.fetchStructuredProbe();
-    } catch {
-      this.structuredProbe = this.unverifiedProbe(settings);
-    }
-  }
-
-  private unverifiedProbe(settings: ModelSettingsResponse): StructuredProbeResponse {
-    return {
-      ...this.structuredProbe,
-      provider: settings.agent_model_provider,
-      model: settings.agent_model_name,
-      status: 'not_tested',
-      parse_status: 'not_tested',
-      duration_ms: null,
-      checked_at: null,
-      expires_at: null,
-      message: 'This model has not been verified against the native route/tool contract.',
-    };
-  }
-
   private dynamicProviderForSettings(settings: ModelSettingsResponse): DynamicCloudProvider | null {
     if (isDynamicCloudProvider(this.providerFilter)) {
       return this.providerFilter;
@@ -1080,7 +1005,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       this.settings = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey);
       this.geoCredentialDrafts[provider] = '';
-      await this.refreshStructuredProbe(this.settings);
       this.statusText = apiKey
         ? `${setup?.name ?? provider} key saved. Provider access has not been validated.`
         : `${setup?.name ?? provider} key cleared. Optional capabilities are disabled.`;
@@ -1102,7 +1026,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return {
       id: setup.credentialStorageKey,
       name: setup.name,
-      purpose: `${this.supportLabel(setup)} for credential-gated geospatial capabilities.`,
       placeholder: setup.keyFormatHint ?? `${setup.name} API key`,
       docsUrl: setup.automation.docsUrl || setup.docsUrl || setup.automation.developerPortalUrl || '',
       requiresCredentials: setup.requiresCredentials,
@@ -1119,14 +1042,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.apiClient.fetchChatSettings(),
         this.apiClient.fetchChatModels(),
       ]);
-      let nextProbe: StructuredProbeResponse;
-      try {
-        nextProbe = await this.apiClient.fetchStructuredProbe();
-      } catch {
-        // Probe health must not make an otherwise selectable model library
-        // unavailable. Treat an unavailable health endpoint as unprobed.
-        nextProbe = this.unverifiedProbe(nextSettings);
-      }
       const dynamicProvider = this.dynamicProviderForSettings(nextSettings);
       let modelLibrary = baseLibrary;
       if (dynamicProvider) {
@@ -1137,7 +1052,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = nextSettings;
-      this.structuredProbe = nextProbe;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.applyModelLibrary(modelLibrary);
       const dynamicProviderFailed = dynamicProvider && modelLibrary.sources[dynamicProvider]?.ok === false;

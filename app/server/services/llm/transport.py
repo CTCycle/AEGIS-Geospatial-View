@@ -49,7 +49,9 @@ class LLMTransportPolicy:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def from_execution_settings(cls, settings: Any | None = None) -> "LLMTransportPolicy":
+    def from_execution_settings(
+        cls, settings: Any | None = None
+    ) -> "LLMTransportPolicy":
         """Build one policy from the existing native execution settings."""
 
         model_timeout = _positive_float(
@@ -97,7 +99,7 @@ class LLMTransportPolicy:
             return self.catalog_timeout_seconds
         if stage == "stream":
             return self.stream_timeout_seconds
-        if stage in {"structured_output", "structured_probe"}:
+        if stage == "structured_output":
             return self.structured_timeout_seconds
         return self.request_timeout_seconds
 
@@ -129,7 +131,7 @@ def _positive_float(value: object, *, default: float) -> float:
         return default
     try:
         parsed = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return parsed if math.isfinite(parsed) and parsed > 0 else default
 
@@ -140,7 +142,7 @@ def _non_negative_float(value: object, *, default: float) -> float:
         return default
     try:
         parsed = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return parsed if math.isfinite(parsed) and parsed >= 0 else default
 
@@ -151,6 +153,6 @@ def _positive_int(value: object, *, default: int) -> int:
         return default
     try:
         parsed = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return parsed if parsed > 0 else default

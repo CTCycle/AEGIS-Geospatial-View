@@ -5,7 +5,6 @@ import {
   createConversation,
   fetchCatalog,
   fetchChatModels,
-  fetchStructuredProbe,
   fetchConversationSnapshot,
   fetchConversationRunStatus,
   fetchConversations,
@@ -22,7 +21,6 @@ import {
   sendChatTurn,
   updateChatSettings,
   updateRuntimeSettings,
-  runStructuredProbe,
 } from './api';
 import {
   CatalogResponse,
@@ -43,7 +41,6 @@ import {
   ModelSettingsUpdateRequest,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
-  StructuredProbeResponse,
   OllamaHealthResponse,
 } from './types';
 
@@ -126,14 +123,6 @@ export class ApiClientService {
 
   updateRuntimeSettings(payload: RuntimeSettingsUpdateRequest): Promise<RuntimeSettingsResponse> {
     return updateRuntimeSettings(payload);
-  }
-
-  fetchStructuredProbe(): Promise<StructuredProbeResponse> {
-    return fetchStructuredProbe();
-  }
-
-  runStructuredProbe(): Promise<StructuredProbeResponse> {
-    return runStructuredProbe();
   }
 
   refreshOllamaModels(): Promise<GenericObjectResponse> {

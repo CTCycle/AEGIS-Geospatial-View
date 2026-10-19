@@ -47,8 +47,6 @@ import {
   RunTraceResponse,
   RuntimeSettingsResponse,
   SelectedModelContext,
-  StructuredProbeResponse,
-  StructuredProbeStatus,
   OllamaHealthResponse,
   MapInspection,
   OverlayCollectionState,
@@ -1404,19 +1402,12 @@ export const parseModelLibrarySources = (
   const sources: ModelLibraryResponse['sources'] = {};
   for (const [key, value] of Object.entries(record)) {
     const source = requireApiRecord(value, endpoint, `sources.${key}`);
-    const probeStatus = optionalApiString(source, 'structured_probe_status', endpoint) ?? 'not_tested';
-    if (!['not_tested', 'passed', 'failed', 'timeout', 'unsupported'].includes(probeStatus)) {
-      apiContract(endpoint, `sources.${key}.structured_probe_status is unsupported`, probeStatus);
-    }
     sources[key] = {
       ok: requireApiBoolean(source, 'ok', endpoint),
       reachable: optionalApiNullableBoolean(source, 'reachable', endpoint) ?? null,
       stale: 'stale' in source ? requireApiBoolean(source, 'stale', endpoint) : false,
       message: optionalApiString(source, 'message', endpoint) ?? null,
       model_count: optionalApiNumber(source, 'model_count', endpoint) ?? null,
-      structured_probe_status: probeStatus as StructuredProbeStatus,
-      structured_probe_checked_at: optionalApiString(source, 'structured_probe_checked_at', endpoint) ?? null,
-      structured_probe_expires_at: optionalApiString(source, 'structured_probe_expires_at', endpoint) ?? null,
     };
   }
   return sources;
@@ -2209,26 +2200,6 @@ export const parseRunTraceResponse = (value: unknown): RunTraceResponse => {
     run_id: runId,
     entries,
     next_cursor: cursor as string | null | undefined,
-  };
-};
-
-export const parseStructuredProbeResponse = (value: unknown): StructuredProbeResponse => {
-  const endpoint = 'native structured-response probe';
-  const record = requireApiRecord(value, endpoint);
-  const status = requireApiString(record, 'status', endpoint);
-  if (!['not_tested', 'passed', 'failed', 'timeout', 'unsupported'].includes(status)) {
-    return apiContract(endpoint, 'status is unsupported', status);
-  }
-  return {
-    provider: requireApiString(record, 'provider', endpoint),
-    model: requireApiString(record, 'model', endpoint),
-    protocol: requireApiString(record, 'protocol', endpoint),
-    status: status as StructuredProbeStatus,
-    parse_status: requireApiString(record, 'parse_status', endpoint),
-    duration_ms: optionalApiNumber(record, 'duration_ms', endpoint) ?? null,
-    checked_at: requireApiStringOrNull(record, 'checked_at', endpoint),
-    expires_at: requireApiStringOrNull(record, 'expires_at', endpoint),
-    message: requireApiStringOrNull(record, 'message', endpoint),
   };
 };
 

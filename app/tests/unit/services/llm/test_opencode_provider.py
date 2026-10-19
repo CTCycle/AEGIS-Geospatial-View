@@ -121,26 +121,30 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert [model.name for model in models] == ["deepseek-v4-flash", "claude-opus-5"]
     assert models[0].provider == OPENCODE_PROVIDER
     assert models[0].metadata["protocol"] == "openai-chat-completions"
-    assert "tools" in models[1].capabilities
+    assert models[1].metadata["tool_support_source"] == "unknown"
+    assert models[1].metadata.get("supports_tools") is None
+    assert "tools" not in models[1].capabilities
     assert models[1].metadata["protocol"] == "anthropic-messages"
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
     assert captured["kwargs"]["headers"]["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
 
 ###############################################################################
-def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
+def test_go_uses_go_endpoint_without_inferred_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
     assert provider.base_url == "https://opencode.ai/zen/go/v1"
     assert provider.protocol_for_model("deepseek-v4.1-flash") == "openai-chat-completions"
-    assert provider.supports_tools("deepseek-v4.1-flash") is True
+    assert provider.supports_tools("deepseek-v4.1-flash") is None
     assert provider.supports_structured_output("deepseek-v4.1-flash") is True
-    assert provider.supports_tools("deepseek-v4-flash") is True
+    assert provider.supports_tools("deepseek-v4-flash") is None
     assert provider.supports_structured_output("deepseek-v4-flash") is True
-    assert provider.supports_tools("minimax-m3") is True
+    assert provider.supports_tools("minimax-m3") is None
 
 ###############################################################################
-def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> None:
+def test_go_catalog_leaves_tool_support_unknown_when_model_omits_capabilities(
+    monkeypatch,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_get(url: str, **kwargs):  # noqa: ANN003, ANN202
@@ -150,7 +154,7 @@ def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> 
             {
                 "object": "list",
                 "data": [
-                    {"id": "deepseek-v4.1-flash", "owned_by": "opencode"},
+                    {"id": "beam-free", "owned_by": "opencode"},
                     {"id": "model-published-without-a-transport"},
                 ],
             }
@@ -162,19 +166,76 @@ def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> 
     models = provider.list_models()
 
     assert [model.name for model in models] == [
-        "deepseek-v4.1-flash",
+        "beam-free",
         "model-published-without-a-transport",
     ]
     selected = models[0]
     assert selected.provider == OPENCODE_GO_PROVIDER
     assert selected.metadata["protocol"] == "openai-chat-completions"
-    assert selected.metadata["protocol_source"] == "opencode_published_endpoint_table"
-    assert "tools" in selected.capabilities
+    assert selected.metadata["tool_support_source"] == "unknown"
+    assert selected.metadata.get("supports_tools") is None
+    assert provider.supports_tools("beam-free") is None
+    assert "tools" not in selected.capabilities
     assert "structured_output" in selected.capabilities
     assert models[1].metadata["protocol"] == "openai-chat-completions"
     assert models[1].metadata["protocol_source"] == "assumed_default"
-    assert "tools" in models[1].capabilities
+    assert models[1].metadata["tool_support_source"] == "unknown"
+    assert "tools" not in models[1].capabilities
     assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
+
+
+###############################################################################
+def test_go_catalog_uses_explicit_model_tool_capabilities(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda url, **kwargs: _Response(
+            {"data": [{"id": "beam-free", "capabilities": ["tools"]}]}
+        ),
+    )
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    model = provider.list_models()[0]
+
+    assert provider.supports_tools("beam-free") is True
+    assert model.metadata["supports_tools"] is True
+    assert model.metadata["tool_support_source"] == "opencode_models_api"
+    assert "tools" in model.capabilities
+
+
+###############################################################################
+def test_go_catalog_uses_explicit_support_flag_when_present(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda url, **kwargs: _Response(
+            {"data": [{"id": "beam-free", "supports_tools": True}]}
+        ),
+    )
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    model = provider.list_models()[0]
+
+    assert provider.supports_tools("beam-free") is True
+    assert model.metadata["supports_tools"] is True
+    assert model.metadata["tool_support_source"] == "opencode_models_api"
+    assert "tools" in model.capabilities
+
+
+###############################################################################
+def test_go_catalog_preserves_explicitly_unsupported_tool_support(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda url, **kwargs: _Response(
+            {"data": [{"id": "beam-free", "supports_tools": False}]}
+        ),
+    )
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    model = provider.list_models()[0]
+
+    assert provider.supports_tools("beam-free") is False
+    assert model.metadata["supports_tools"] is False
+    assert model.metadata["tool_support_source"] == "opencode_models_api"
+    assert "tools" not in model.capabilities
 
 
 ###############################################################################

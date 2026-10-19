@@ -7,7 +7,6 @@ from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.model_probe_results import ModelProbeResultRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.services.agent.agent_loop import AgentLoop
@@ -25,7 +24,6 @@ from server.services.chat.maintenance_service import (
 )
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
-from server.services.chat.structured_probe import StructuredProbeService
 from server.services.chat.history_service import ChatHistoryService
 from server.services.geospatial.composition import GeospatialRuntime
 from server.services.geospatial.render_capture import RenderCaptureStore
@@ -33,6 +31,7 @@ from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.llm.transport import LLMTransportPolicy
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -43,9 +42,9 @@ class ChatRuntime:
     agent_orchestrator: NativeAgentOrchestrator
     conversation_repository: ConversationRepository
     history_service: ChatHistoryService
-    structured_probe_service: StructuredProbeService | None = None
     agent_loop: AgentLoop | None = None
     agent_turn_runner: AgentTurnRunner | None = None
+
 
 ###############################################################################
 def build_chat_runtime(
@@ -93,12 +92,6 @@ def build_chat_runtime(
     capability_registry = geospatial_runtime.capability_registry
     runtime_registry = geospatial_runtime.runtime_registry
     geospatial_api_service = geospatial_runtime.api_service
-    structured_probe_service = StructuredProbeService(
-        provider_factory=llm_factory,
-        settings_service=settings_service,
-        repository=ModelProbeResultRepository(database),
-    )
-    model_library_service.set_structured_probe_service(structured_probe_service)
     location_resolver = LocationResolver(
         nominatim_service=geospatial_runtime.nominatim_service
     )
@@ -152,7 +145,9 @@ def build_chat_runtime(
         execution_settings=execution_settings,
         application_timezone=application_timezone,
         execution_settings_provider=lambda: AgentExecutionSettings(
-            **RuntimeSettingsRepository(database).get_required().agent_execution.model_dump()
+            **RuntimeSettingsRepository(database)
+            .get_required()
+            .agent_execution.model_dump()
         ),
         agent_loop=agent_loop,
     )
@@ -175,5 +170,4 @@ def build_chat_runtime(
         agent_turn_runner=agent_turn_runner,
         agent_orchestrator=agent_orchestrator,
         conversation_repository=conversation_repository,
-        structured_probe_service=structured_probe_service,
     )

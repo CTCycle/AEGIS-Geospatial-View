@@ -25,7 +25,7 @@
     @if (model.supports_embeddings) {
       <span>Embeddings</span>
     }
-    <span>Tool support: {{ model.supports_tools === true ? (model.tool_support_source === 'ollama_probe' ? 'probed' : 'detected') : (model.supports_tools === false ? 'unavailable' : 'not verified') }}</span>
+    <span>Tool support: {{ model.supports_tools === true ? 'detected' : (model.supports_tools === false ? 'unavailable' : 'not verified') }}</span>
     @if (model.context_window_tokens) {
       <span>Max context: {{ formatContextWindow(model.context_window_tokens) }} tokens</span>
     } @else {
