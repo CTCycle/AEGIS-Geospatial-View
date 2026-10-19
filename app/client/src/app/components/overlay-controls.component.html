@@ -24,7 +24,7 @@
               [attr.aria-label]="'Show ' + overlay.label + ' layer'"
               (change)="onOverlayVisibilityChange(overlay.id, $event)"
             />
-            <span>{{ overlay.label }}</span>
+            <span class="overlay-control-row__name" [title]="overlay.label">{{ overlay.label }}</span>
           </label>
           <label class="overlay-control-row__opacity">
             <span class="sr-only">{{ getOpacityLabel(overlay) }}</span>

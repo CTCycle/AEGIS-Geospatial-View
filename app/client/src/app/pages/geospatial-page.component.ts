@@ -142,8 +142,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly canvasMinWidth = 240;
   private readonly maxSeenEventIds = 512;
   private readonly chatPageState: PersistedChatPageState;
-  private mouseMoveHandler?: (event: MouseEvent) => void;
-  private mouseUpHandler?: () => void;
+  private activePointerId?: number;
+  private activeResizeHandle?: HTMLElement;
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
+  private resizeHasMoved = false;
   private seenEventIds = new Set<string>();
   private steeringMutationCounter = 0;
   private isDestroyed = false;
@@ -237,6 +240,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get toolbarWidth(): number {
     return this.toolbarWidthState;
+  }
+
+  get maxToolbarWidth(): number {
+    return Math.max(this.minWidth, window.innerWidth - this.canvasMinWidth);
   }
 
   get renderedMessages(): ChatMessage[] {
@@ -649,27 +656,64 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.router.navigateByUrl('/settings');
   }
 
-  startResize(event?: MouseEvent): void {
-    event?.preventDefault();
-    if (this.isToolbarCollapsed) {
-      this.isToolbarCollapsed = false;
+  startResize(event: PointerEvent): void {
+    if (event.button !== 0 || !event.isPrimary || this.activePointerId !== undefined) {
+      return;
     }
+
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    this.activePointerId = event.pointerId;
+    this.activeResizeHandle = handle;
+    this.resizeStartX = event.clientX;
+    this.resizeStartWidth = this.isToolbarCollapsed ? 0 : this.toolbarWidthState;
+    this.resizeHasMoved = false;
     this.isResizing = true;
+  }
 
-    this.mouseMoveHandler = (event: MouseEvent) => {
-      const viewportWidth = window.innerWidth;
-      const maxAllowedByViewport = viewportWidth - this.canvasMinWidth;
-      const clamped = this.clampToolbarWidth(Math.min(event.clientX, maxAllowedByViewport));
-      this.toolbarWidthState = clamped;
-      this.syncState();
-    };
+  onResizePointerMove(event: PointerEvent): void {
+    if (event.pointerId !== this.activePointerId) {
+      return;
+    }
+    const delta = event.clientX - this.resizeStartX;
+    if (!this.resizeHasMoved && Math.abs(delta) < 1) {
+      return;
+    }
+    this.resizeHasMoved = true;
+    this.isToolbarCollapsed = false;
+    this.toolbarWidthState = Math.min(
+      this.maxToolbarWidth,
+      this.clampToolbarWidth(this.resizeStartWidth + delta),
+    );
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
 
-    this.mouseUpHandler = () => {
-      this.stopResize();
-    };
+  onResizeHandleKeydown(event: KeyboardEvent): void {
+    let nextWidth: number;
+    const currentWidth = this.isToolbarCollapsed ? this.minWidth : this.toolbarWidthState;
+    switch (event.key) {
+      case 'ArrowLeft':
+        nextWidth = currentWidth - 16;
+        break;
+      case 'ArrowRight':
+        nextWidth = currentWidth + 16;
+        break;
+      case 'Home':
+        nextWidth = this.minWidth;
+        break;
+      case 'End':
+        nextWidth = this.maxToolbarWidth;
+        break;
+      default:
+        return;
+    }
 
-    window.addEventListener('mousemove', this.mouseMoveHandler);
-    window.addEventListener('mouseup', this.mouseUpHandler);
+    event.preventDefault();
+    this.isToolbarCollapsed = false;
+    this.toolbarWidthState = Math.min(this.maxToolbarWidth, this.clampToolbarWidth(nextWidth));
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
   }
 
   onTranscriptScroll(event: Event): void {
@@ -2153,15 +2197,20 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
-  private stopResize(): void {
-    this.isResizing = false;
-    if (this.mouseMoveHandler) {
-      window.removeEventListener('mousemove', this.mouseMoveHandler);
-      this.mouseMoveHandler = undefined;
+  stopResize(event?: PointerEvent): void {
+    if (event && event.pointerId !== this.activePointerId) {
+      return;
     }
-    if (this.mouseUpHandler) {
-      window.removeEventListener('mouseup', this.mouseUpHandler);
-      this.mouseUpHandler = undefined;
+
+    const activePointerId = this.activePointerId;
+    const activeResizeHandle = this.activeResizeHandle;
+    this.isResizing = false;
+    this.activePointerId = undefined;
+    this.activeResizeHandle = undefined;
+    this.resizeHasMoved = false;
+    if (activeResizeHandle && activePointerId !== undefined
+      && activeResizeHandle.hasPointerCapture(activePointerId)) {
+      activeResizeHandle.releasePointerCapture(activePointerId);
     }
   }
 

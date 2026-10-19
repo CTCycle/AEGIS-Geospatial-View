@@ -129,8 +129,19 @@
       class="toolbar-resize-handle"
       [class.is-active]="isResizing"
       [class.is-collapsed]="isToolbarCollapsed"
-      aria-hidden="true"
-      (mousedown)="startResize($event)"
+      role="separator"
+      tabindex="0"
+      aria-label="Resize chat and map panels"
+      aria-orientation="vertical"
+      aria-valuemin="0"
+      [attr.aria-valuemax]="maxToolbarWidth"
+      [attr.aria-valuenow]="isToolbarCollapsed ? 0 : toolbarWidth"
+      (pointerdown)="startResize($event)"
+      (pointermove)="onResizePointerMove($event)"
+      (pointerup)="stopResize($event)"
+      (pointercancel)="stopResize($event)"
+      (lostpointercapture)="stopResize($event)"
+      (keydown)="onResizeHandleKeydown($event)"
     ></div>
 
     <section class="canvas-panel" aria-label="Map canvas">
