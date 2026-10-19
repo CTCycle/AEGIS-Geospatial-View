@@ -1,4 +1,5 @@
 <div class="geospatial-page">
+  <h1 class="page-title">Search workspace</h1>
   <div
     class="geospatial-workspace"
     [class.geospatial-workspace--toolbar-collapsed]="isToolbarCollapsed"
@@ -51,6 +52,9 @@
           <div
             #transcript
             class="chat-transcript"
+            role="log"
+            tabindex="0"
+            aria-label="Conversation transcript"
             aria-live="polite"
             (scroll)="onTranscriptScroll($event)"
           >
@@ -95,6 +99,7 @@
             class="context-window-row"
             [class.context-window-row--warning]="contextUsageTone === 'warning'"
             [class.context-window-row--critical]="contextUsageTone === 'critical'"
+            role="group"
             aria-label="Context window usage"
             [attr.title]="contextUsageDetail"
           >
@@ -129,7 +134,7 @@
     ></div>
 
     <section class="canvas-panel" aria-label="Map canvas">
-      <header class="canvas-header" aria-label="Workspace header">
+      <header class="canvas-header">
         <div class="canvas-header__status" role="status" aria-live="polite">
           @if (isLoading) {
             <span class="chat-progress-spinner" aria-hidden="true"></span>
@@ -214,7 +219,7 @@
       </div>
     </section>
 
-    <footer class="workspace-status-bar" aria-label="Workspace status">
+    <footer class="workspace-status-bar" role="group" aria-label="Workspace status">
       <div class="workspace-status-bar__capabilities">
         <app-capability-status-list
           [items]="capabilityStatusItems"

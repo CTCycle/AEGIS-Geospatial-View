@@ -60,11 +60,13 @@ describe('CapabilityStatusListComponent', () => {
 
     expect(action?.getAttribute('href')).toBe('/settings');
     expect(items[1].querySelector('.status-item__action')).toBeNull();
+    expect(action?.hasAttribute('aria-describedby')).toBeFalse();
 
     items[0].dispatchEvent(new MouseEvent('mouseenter'));
     fixture.detectChanges();
 
     const tooltip = host.querySelector<HTMLElement>('[role="tooltip"]');
+    expect(action?.getAttribute('aria-describedby')).toBe(tooltip?.id ?? null);
     expect(tooltip?.querySelector('span')?.textContent).toBe(
       'The configured agent model is ready for use.',
     );

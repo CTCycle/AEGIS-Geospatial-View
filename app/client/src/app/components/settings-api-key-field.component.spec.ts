@@ -39,4 +39,17 @@ describe('SettingsApiKeyFieldComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Enter a key before saving.');
     expect(input.value).toBe('');
   });
+
+  it('references only the health message elements that are rendered', () => {
+    fixture.componentInstance.credentialHealth = 'missing';
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    expect(input.hasAttribute('aria-describedby')).toBeFalse();
+
+    fixture.componentInstance.credentialHealth = 'healthy';
+    fixture.detectChanges();
+    const describedBy = input.getAttribute('aria-describedby') ?? '';
+    expect(fixture.nativeElement.querySelector(`#${describedBy}`)).not.toBeNull();
+  });
 });

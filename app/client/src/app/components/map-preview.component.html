@@ -18,7 +18,7 @@
       </div>
     } @else {
       <div class="maplibre-wrap">
-        <div #mapContainer class="maplibre-container" tabindex="0" aria-label="Interactive map"></div>
+        <div #mapContainer class="maplibre-container" role="region" tabindex="0" aria-label="Interactive map"></div>
 
         @if (availableBasemaps.length) {
           <label class="basemap-selector">
@@ -54,7 +54,7 @@
           </div>
         }
 
-        <div class="map-zoom-controls" aria-label="Map zoom controls">
+        <div class="map-zoom-controls" role="group" aria-label="Map zoom controls">
           <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
           <button type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">&minus;</button>
         </div>
