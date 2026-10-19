@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-09-30
+Last updated: 2026-10-19
 
 ## Geospatial Access
 
@@ -33,21 +33,29 @@ Re-enter a provider key only when Settings reports missing or undecryptable
 credentials; a valid key is not proof that the upstream catalog or inference
 endpoint is currently healthy.
 
-OpenCode Go identifies DeepSeek V4.1 Flash with the canonical mapping
-`DeepSeek V4.1 Flash` → `deepseek-v4.1-flash`. The ID is accepted only when
-it is returned by the live OpenCode Go `/models` catalog; the registry supplies
-its documented OpenAI-compatible Chat Completions transport metadata and does
-not seed or force an application default. OpenCode requests identify AEGIS with a versioned `User-Agent` and carry a
+OpenCode catalogs list every model returned by the live `/models` endpoint.
+Each model's endpoint family (Chat Completions, Responses, or Anthropic
+Messages) comes from the models.dev catalog that OpenCode itself publishes,
+with the built-in table as the offline fallback; models neither source knows
+use Chat Completions, and the native tool probe confirms them. Context limits
+and image input also come from that catalog when `/models` omits them. Only
+Google-protocol models stay disabled, with the reason shown on the card.
+OpenCode requests identify AEGIS with a versioned `User-Agent` and carry a
 stable `x-opencode-session` value for the conversation. The session is reused
 for retries and later turns, while catalog discovery sends only the
-`User-Agent`. AEGIS never silently substitutes a model or provider when a
-saved selection is retired, absent from the live catalog, or uses an
+`User-Agent`. When a model rejects the disabled-thinking control or a
+non-default temperature, AEGIS records that from the provider's own response
+and retries without it. AEGIS never silently substitutes a model or provider
+when a saved selection is retired, absent from the live catalog, or uses an
 unsupported transport; select a replacement deliberately.
 
 Catalogue reachability and inference readiness are separate signals. A model
 catalogue can be reachable while its native structured-response probe has not been run
 or has failed. Settings reports the probe independently of catalogue loading
-and credential presence.
+and credential presence. The last probe verdict is stored in SQLite per model,
+endpoint and saved key, so it survives leaving the page, restarts, and saving
+unrelated settings; changing the selected model's key or endpoint makes it
+"Not verified" again.
 
 ## User-Facing Controls
 
@@ -55,8 +63,11 @@ and credential presence.
 
 The Settings sidebar also exposes Application, Map & Search, Data Sources, and
 Agent Runtime. These sections edit typed, SQLite-backed runtime blocks through
-the runtime settings API. Each save submits only changed blocks and fields; the
-server validates and commits the update atomically. Credentials remain in the
+the runtime settings API. Settings save on the fly: runtime fields autosave
+shortly after a value is committed and when leaving the page, API keys and the
+Ollama URL save when the field is committed (blur or Enter), and clearing a
+saved key remains an explicit action. Each save submits only changed blocks and
+fields; the server validates and commits the update atomically. Credentials remain in the
 separate encrypted credential workflow.
 
 Agent Runtime contains 31 controls covering execution budgets, failure
