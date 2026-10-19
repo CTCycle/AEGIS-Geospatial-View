@@ -7,6 +7,7 @@ from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.model_probe_results import ModelProbeResultRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.services.agent.agent_loop import AgentLoop
@@ -95,8 +96,8 @@ def build_chat_runtime(
     structured_probe_service = StructuredProbeService(
         provider_factory=llm_factory,
         settings_service=settings_service,
+        repository=ModelProbeResultRepository(database),
     )
-    settings_service.structured_probe_service = structured_probe_service
     model_library_service.set_structured_probe_service(structured_probe_service)
     location_resolver = LocationResolver(
         nominatim_service=geospatial_runtime.nominatim_service

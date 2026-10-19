@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from server.domain.llm.types import LLMResult, LLMToolCall
 from server.services.llm.errors import LLMProviderRequestError
+from server.repositories.model_probe_results import ModelProbeResultRepository
 from server.services.chat.structured_probe import StructuredProbeService
 
 ###############################################################################
@@ -29,10 +29,15 @@ class _SettingsService:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.settings = _settings()
+        self.credential = "key-1"
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> SimpleNamespace:
         return self.settings
+
+    # -------------------------------------------------------------------------
+    def credential_identity(self, _provider: str) -> str:
+        return self.credential
 
 ###############################################################################
 class _Provider:
@@ -102,17 +107,24 @@ def _parser_result() -> LLMResult:
 
 
 ###############################################################################
-def _service(provider: _Provider) -> StructuredProbeService:
+def _service(
+    provider: _Provider,
+    database,  # noqa: ANN001
+    settings_service: _SettingsService | None = None,
+) -> StructuredProbeService:
     return StructuredProbeService(
         provider_factory=_ProviderFactory(provider),
-        settings_service=_SettingsService(),
+        settings_service=settings_service or _SettingsService(),
+        repository=ModelProbeResultRepository(database),
     )
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_probe_is_not_tested_then_passed_and_cached() -> None:
+async def test_probe_verdict_is_persisted_across_service_instances(
+    sqlite_backend,  # noqa: ANN001
+) -> None:
     parser = _Provider(result=_parser_result())
-    service = _service(parser)
+    service = _service(parser, sqlite_backend)
 
     assert service.latest().status == "not_tested"
     result = await service.run()
@@ -120,51 +132,34 @@ async def test_probe_is_not_tested_then_passed_and_cached() -> None:
     assert result.status == "passed"
     assert result.parse_status == "complete"
     assert result.checked_at is not None
-    assert result.expires_at is not None
-    assert result.expires_at > datetime.now(timezone.utc)
-    assert service.latest() == result
+    assert result.expires_at is None
     assert parser.calls == 1
     assert parser.requests[0].metadata["thinking_mode"] == "disabled"
+    restarted = _service(_Provider(), sqlite_backend)
+    assert restarted.latest() == result
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_probe_sanitizes_provider_failures_and_expires() -> None:
-    parser = _Provider(
-        error=LLMProviderRequestError(
-            provider="opencode-go",
-            model="deepseek-v4-flash",
-            stage="probe",
-            code="provider_http_error",
-        )
-    )
+async def test_probe_verdict_is_invalidated_only_by_the_selected_credential(
+    sqlite_backend,  # noqa: ANN001
+) -> None:
     settings_service = _SettingsService()
-    service = StructuredProbeService(
-        provider_factory=_ProviderFactory(parser),
-        settings_service=settings_service,
+    service = _service(
+        _Provider(result=_parser_result()), sqlite_backend, settings_service
     )
+    await service.run()
 
-    result = await service.run()
+    settings_service.settings.credentials = {"geospatial": {"api_key": True}}
+    assert service.latest().status == "passed"
 
-    assert result.status == "failed"
-    assert result.message == "Native tool probe failed."
-    assert "secret" not in result.message.lower()
-
-    protocol = service._protocol(
-        settings_service.settings.agent_model_provider,
-        settings_service.settings.agent_model_name,
-        _ProviderFactory(parser),
-    )
-    key = service._cache_key(settings_service.settings, protocol)
-    service._cache[key] = result.model_copy(
-        update={
-            "expires_at": datetime.now(timezone.utc) - timedelta(seconds=1),
-        }
-    )
+    settings_service.credential = "key-2"
     assert service.latest().status == "not_tested"
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_transient_probe_failure_can_recover_and_success_remains_cached() -> None:
+async def test_probe_persists_failures_sanitized_and_recovers(
+    sqlite_backend,  # noqa: ANN001
+) -> None:
     parser = _Provider(
         responses=[
             LLMProviderRequestError(
@@ -176,38 +171,38 @@ async def test_transient_probe_failure_can_recover_and_success_remains_cached() 
             _parser_result(),
         ]
     )
-    service = _service(parser)
+    service = _service(parser, sqlite_backend)
 
     first = await service.run()
     assert first.status == "failed"
-    assert first.expires_at is None
-    assert service.latest().status == "not_tested"
+    assert first.message == "Native tool probe failed."
+    assert service.latest() == first
 
     second = await service.run()
     assert second.status == "passed"
-    assert parser.calls == 2
     assert service.latest() == second
-    assert parser.calls == 2
-
-    service.clear()
-    assert service.latest().status == "not_tested"
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_probe_timeout_does_not_retry_or_expose_provider_detail() -> None:
-    parser = _Provider(error=asyncio.TimeoutError())
-    service = _service(parser)
+async def test_probe_timeout_discards_the_previous_verdict(
+    sqlite_backend,  # noqa: ANN001
+) -> None:
+    passing = _service(_Provider(result=_parser_result()), sqlite_backend)
+    await passing.run()
+    timing_out = _service(_Provider(error=asyncio.TimeoutError()), sqlite_backend)
 
-    result = await service.run()
+    result = await timing_out.run()
 
     assert result.status == "timeout"
     assert result.parse_status == "timeout"
     assert result.message == "Native tool probe timed out."
-    assert parser.calls == 1
+    assert timing_out.latest().status == "not_tested"
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_probe_marks_model_capability_failure_unsupported() -> None:
+async def test_probe_marks_model_capability_failure_unsupported(
+    sqlite_backend,  # noqa: ANN001
+) -> None:
     parser = _Provider(
         error=LLMProviderRequestError(
             provider="opencode-go",
@@ -217,9 +212,8 @@ async def test_probe_marks_model_capability_failure_unsupported() -> None:
             category="model_capability",
         )
     )
-    service = _service(parser)
 
-    result = await service.run()
+    result = await _service(parser, sqlite_backend).run()
 
     assert result.status == "unsupported"
     assert result.parse_status == "unsupported"
