@@ -108,7 +108,7 @@
 
 .capability-table th:nth-child(2),
 .capability-table td:nth-child(2) {
-    width: 27%;
+    width: 24%;
 }
 
 .capability-table th:nth-child(3),
@@ -123,12 +123,12 @@
 
 .capability-table th:nth-child(5),
 .capability-table td:nth-child(5) {
-    width: 12%;
+    width: 17%;
 }
 
 .capability-table th:nth-child(6),
 .capability-table td:nth-child(6) {
-    width: 24%;
+    width: 22%;
 }
 
 .capability-table th,
@@ -189,8 +189,8 @@
     border-left: 2px solid #3a8f76;
     padding-left: 0.55rem;
     color: #b6d5cc;
-    font-weight: 700;
-    line-height: 1.35;
+    font-weight: 500;
+    line-height: 1.4;
 }
 
 .access-status--locked {

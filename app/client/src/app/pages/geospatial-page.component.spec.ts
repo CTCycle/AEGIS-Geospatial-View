@@ -1249,6 +1249,21 @@ describe('pages/geospatial-page.component', () => {
     expect(footer.querySelector('app-execution-status')).not.toBeNull();
   });
 
+  it('closes the alerts and history panels with Escape', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.isAlertsOpen = true;
+    component.isConversationHistoryOpen = true;
+    fixture.detectChanges();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.workspace-alerts')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.conversation-history-drawer')).toBeNull();
+  });
+
   it('keeps canvas icon actions fixed on the right when progress text becomes long', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
