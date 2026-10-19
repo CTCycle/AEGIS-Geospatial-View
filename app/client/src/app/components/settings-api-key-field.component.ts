@@ -35,7 +35,7 @@ export class SettingsApiKeyFieldComponent {
     if (this.hint) {
       ids.push(`${this.inputId}-hint`);
     }
-    if (this.credentialHealth) {
+    if (this.credentialHealth === 'unreadable' || this.credentialHealth === 'healthy') {
       ids.push(`${this.inputId}-health`);
     }
     if (this.validationError) {

@@ -17,7 +17,7 @@
           [routerLink]="route"
           [queryParams]="interactionFor(item)?.queryParams"
           [attr.aria-label]="item.label + ': ' + item.statusLabel + '. ' + (interactionFor(item)?.actionLabel || 'Open details')"
-          [attr.aria-describedby]="tooltipId($index)"
+          [attr.aria-describedby]="activeTooltipIndex === $index ? tooltipId($index) : null"
         >
           <span
             class="state-dot"
@@ -32,9 +32,10 @@
       } @else {
         <span
           class="status-item__content"
+          role="group"
           tabindex="0"
           [attr.aria-label]="item.label + ': ' + item.statusLabel"
-          [attr.aria-describedby]="tooltipId($index)"
+          [attr.aria-describedby]="activeTooltipIndex === $index ? tooltipId($index) : null"
         >
           <span
             class="state-dot"

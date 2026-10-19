@@ -1,4 +1,5 @@
 <div class="settings-page">
+  <h1 class="page-title">Settings</h1>
   <div class="settings-page__content">
     <nav class="settings-sidebar" aria-label="Settings sections">
       @for (section of settingsSections; track section.id) {
@@ -12,7 +13,7 @@
       }
     </nav>
 
-    <main class="settings-page__main">
+    <div class="settings-page__main">
 
     @if (unavailableAssignedOllamaModels.length > 0) {
       <section
@@ -44,6 +45,7 @@
       >
         <div class="settings-page__layout">
           <section class="settings-page__left-column">
+            <h2 class="page-title">Models</h2>
             <section class="settings-page__controls settings-page__controls--navbar" aria-label="Model catalog controls">
               <div class="settings-page__controls-left">
                 <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
@@ -248,7 +250,7 @@
           } @else if (!geoProviders.length) {
             <p class="settings-inline-status" role="status">No optional geospatial provider setup is currently published.</p>
           } @else {
-            <div class="settings-provider-list" aria-label="Geospatial provider access">
+            <div class="settings-provider-list" role="group" aria-label="Geospatial provider access">
               @for (provider of geoProviders; track provider.id) {
                 <article class="settings-provider-card settings-provider-card--geospatial">
                   <header class="settings-provider-card__header">
@@ -641,14 +643,14 @@
       </section>
     }
 
-    <footer class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</footer>
+    <div class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</div>
     @if (runtimeSettingsError) {
       <p class="settings-inline-status settings-inline-status--error" role="alert">{{ runtimeSettingsError }}</p>
     }
     @if (runtimeRestartRequired) {
       <p class="settings-inline-status" role="status" aria-live="polite">Runtime settings saved. Restart AEGIS to apply the changes to active services.</p>
     }
-    </main>
+    </div>
   </div>
 
   @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {
