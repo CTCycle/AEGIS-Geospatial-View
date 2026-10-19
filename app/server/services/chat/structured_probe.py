@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from time import monotonic, perf_counter
 from typing import Any, Literal
 
@@ -11,6 +11,7 @@ from server.contracts.chat import StructuredProbeResponse
 from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.llm.types import LLMRequest, LLMToolDefinition
 from server.prompts.capability_route import build_capability_route_prompt
+from server.repositories.model_probe_results import ModelProbeResultRepository
 from server.services.llm.errors import (
     LLMConfigurationError,
     LLMProviderRequestError,
@@ -19,7 +20,6 @@ from server.services.llm.errors import (
 from server.services.llm.provider_contract import require_canonical_provider
 
 ProbeStatus = Literal["not_tested", "passed", "failed", "timeout", "unsupported"]
-PROBE_TTL_SECONDS = 15 * 60
 PROBE_TIMEOUT_SECONDS = 30.0
 PROBE_REQUEST = "Show a map of Italy"
 
@@ -28,14 +28,16 @@ class StructuredProbeService:
     """Probe the native route/tool contract without creating conversation state."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, provider_factory: Any, settings_service: Any) -> None:
+    def __init__(
+        self,
+        *,
+        provider_factory: Any,
+        settings_service: Any,
+        repository: ModelProbeResultRepository,
+    ) -> None:
         self.provider_factory = provider_factory
         self.settings_service = settings_service
-        self._cache: dict[str, StructuredProbeResponse] = {}
-
-    # -------------------------------------------------------------------------
-    def clear(self) -> None:
-        self._cache.clear()
+        self.repository = repository
 
     # -------------------------------------------------------------------------
     def _settings(self) -> Any:
@@ -65,26 +67,32 @@ class StructuredProbeService:
         return "unknown"
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _credential_fingerprint(settings: Any) -> str:
+    def _credential_fingerprint(self, settings: Any) -> str:
+        """Identify what a verdict depends on: the selected model's endpoint and key.
+
+        Unrelated settings (other providers, geospatial keys) must not
+        invalidate a verdict, but replacing the selected provider's key or
+        endpoint must.
+        """
+
+        provider = str(getattr(settings, "agent_model_provider", ""))
+        endpoint_attribute = {
+            "ollama": "ollama_url",
+            "openai": "openai_base_url",
+            "google": "google_base_url",
+            "deepseek": "deepseek_base_url",
+        }.get(provider)
+        identity = getattr(self.settings_service, "credential_identity", None)
         payload = {
-            "provider": getattr(settings, "agent_model_provider", ""),
+            "provider": provider,
             "model": getattr(settings, "agent_model_name", ""),
-            "ollama_url": getattr(settings, "ollama_url", ""),
-            "openai_base_url": getattr(settings, "openai_base_url", None),
-            "google_base_url": getattr(settings, "google_base_url", None),
-            "deepseek_base_url": getattr(settings, "deepseek_base_url", None),
-            "credentials": getattr(settings, "credentials", {}),
-            "credential_health": getattr(settings, "credential_health", {}),
+            "endpoint": getattr(settings, endpoint_attribute, None)
+            if endpoint_attribute
+            else None,
+            "credential": identity(provider) if callable(identity) else "",
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:24]
-
-    # -------------------------------------------------------------------------
-    def _cache_key(self, settings: Any, protocol: str) -> str:
-        provider = str(getattr(settings, "agent_model_provider", ""))
-        model = str(getattr(settings, "agent_model_name", "")).strip()
-        return "|".join((provider, model, protocol, self._credential_fingerprint(settings)))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -107,13 +115,13 @@ class StructuredProbeService:
         provider = str(getattr(settings, "agent_model_provider", ""))
         model = str(getattr(settings, "agent_model_name", "")).strip()
         protocol = self._protocol(provider, model, self.provider_factory)
-        cached = self._cache.get(self._cache_key(settings, protocol))
-        if cached is None:
-            return self._not_tested(provider, model, protocol)
-        if cached.expires_at is not None and cached.expires_at <= datetime.now(timezone.utc):
-            self._cache.pop(self._cache_key(settings, protocol), None)
-            return self._not_tested(provider, model, protocol)
-        return cached
+        stored = self.repository.get(
+            provider=provider,
+            model=model,
+            protocol=protocol,
+            fingerprint=self._credential_fingerprint(settings),
+        )
+        return stored or self._not_tested(provider, model, protocol)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -144,7 +152,6 @@ class StructuredProbeService:
             require_canonical_provider(provider_id)
         except ValueError:
             protocol = "unknown"
-            key = self._cache_key(settings, protocol)
             checked_at = datetime.now(timezone.utc)
             result = StructuredProbeResponse(
                 provider=provider_id,
@@ -157,10 +164,8 @@ class StructuredProbeService:
                 expires_at=None,
                 message="The selected provider ID is not canonical and cannot be probed.",
             )
-            self._cache.pop(key, None)
             return result
         protocol = self._protocol(provider_id, model, self.provider_factory)
-        key = self._cache_key(settings, protocol)
         checked_at = datetime.now(timezone.utc)
         started = perf_counter()
         status: ProbeStatus = "failed"
@@ -246,11 +251,6 @@ class StructuredProbeService:
             status = "failed"
             parse_status = "failed"
         duration_ms = max(0, int((perf_counter() - started) * 1000))
-        expires_at = (
-            checked_at + timedelta(seconds=PROBE_TTL_SECONDS)
-            if status == "passed"
-            else None
-        )
         result = StructuredProbeResponse(
             provider=provider_id,
             model=model,
@@ -259,14 +259,15 @@ class StructuredProbeService:
             parse_status=parse_status,
             duration_ms=duration_ms,
             checked_at=checked_at,
-            expires_at=expires_at,
+            expires_at=None,
             message=self._safe_message(status),
         )
-        if status == "passed":
-            self._cache[key] = result
+        if status == "timeout":
+            # A timeout says nothing about the model; drop the previous verdict
+            # so the UI reflects the test just run rather than a stale result.
+            self.repository.discard(provider=provider_id, model=model)
         else:
-            # Provider failures and timeouts are transient health signals, not
-            # durable capability results.  Do not let one failed probe poison
-            # later startup or settings checks.
-            self._cache.pop(key, None)
+            self.repository.save(
+                result, fingerprint=self._credential_fingerprint(settings)
+            )
         return result

@@ -155,6 +155,30 @@ class ModelProviderSettingsRecord(Base):
     )
 
 ###############################################################################
+class ModelProbeResultRecord(Base):
+    __tablename__ = "model_probe_results"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "model",
+            "protocol",
+            "fingerprint",
+            name="uq_model_probe_results_identity",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    protocol: Mapped[str] = mapped_column(String(64), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    parse_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    message: Mapped[str | None] = mapped_column(String(200))
+    checked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+###############################################################################
 class CredentialEncryptionMaterial(Base):
     __tablename__ = "credential_encryption_materials"
 

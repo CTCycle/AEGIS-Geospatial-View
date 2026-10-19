@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import cast
 
 from server.common.typing import is_json_object, json_array
@@ -54,7 +55,6 @@ class ChatSettingsService:
         self.crypto_service = crypto_service
         self.model_library_service = model_library_service
         self.context_profile_resolver = context_profile_resolver
-        self.structured_probe_service: object | None = None
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
@@ -181,6 +181,16 @@ class ChatSettingsService:
         )
 
     # -------------------------------------------------------------------------
+    def credential_identity(self, provider: str) -> str:
+        """Stable digest of the stored (encrypted) key, never the secret itself."""
+
+        digest = hashlib.sha256()
+        for item in self.credentials_repo.list_active():
+            if item.provider == provider:
+                digest.update(f"{item.label}:{item.encrypted_value}".encode("utf-8"))
+        return digest.hexdigest()[:24]
+
+    # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
         record = self.settings_repo.get_required()
         return self.model_library_service.normalize_ollama_url(record.ollama_url)
@@ -291,9 +301,6 @@ class ChatSettingsService:
         invalidate_profile = getattr(self.context_profile_resolver, "invalidate", None)
         if callable(invalidate_profile):
             invalidate_profile()
-        clear_probe = getattr(self.structured_probe_service, "clear", None)
-        if callable(clear_probe):
-            clear_probe()
         return self.get_settings()
 
     # -------------------------------------------------------------------------
