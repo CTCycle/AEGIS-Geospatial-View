@@ -1092,7 +1092,9 @@ def _concrete_scope_kind(
     scope = route.spatial_scope
     if scope is None:
         return None
-    if scope.kind in {"administrative_geometry", "feature_geometry"}:
+    if scope.kind in {"administrative_geometry", "feature_geometry", "point"}:
+        # A point-framed request about an area (for example radar) must keep
+        # bbox/viewport providers, matching the catalog tool handler lowering.
         location = _single_known_location(active_state)
         return "bbox" if location is not None and location.bbox else None
     if scope.kind == "radius":

@@ -1,6 +1,6 @@
 # Tier 3 rendering and geospatial feature families
 
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and `T4-04` configured live GTFS. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT had not yet run. Later EEA and vision follow-ups supersede those statuses; Census, elevation, imagery, and narration limitations remain.
 
@@ -394,13 +394,19 @@ All Tier 3 slices share the standing campaign rules:
   themes ("Acknowledgement identity, failed-render recovery, races, outages,
   restart recovery, repetition, malformed input, cancellation, performance,
   accessibility, provider reconciliation, hosted CI") for 13 gates. The 13th
-  ID is unmapped and remains `UNRESOLVED`. The `CONTROLLED-FAULT` matrix
-  (happy, failed-layer, viewport mismatch, stale/duplicate ack, mismatched ack,
-  cancellation, supersession, retry exhaustion) supplies the recovery-case
-  granularity that likely maps to the early `T5` IDs, but the 1:1 assignment
-  cannot be recovered. Do not execute Tier 5 without first resolving this
-  mismatch.
+  ID is unmapped and remains `UNRESOLVED`.
+  **2026-10-19:** following the `T3-10`–`T3-18` precedent, Tier 5 was opened
+  under a reconstructed one-theme-per-ID mapping in strategy order (`T5-01`
+  acknowledgement identity, `T5-02` failed-render recovery, `T5-03` races,
+  `T5-04` outages, `T5-05` restart recovery, `T5-06` repetition, `T5-07`
+  malformed input, `T5-08` cancellation, `T5-09` performance, `T5-10`
+  accessibility, `T5-11` provider reconciliation, `T5-12` hosted CI). The
+  mapping has LOW confidence and needs upstream confirmation; `T5-13` is not
+  executed. Results are in the
+  [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger): five gates pass
+  and eight remain `UNRUN`. The earlier "do not execute Tier 5" guard is
+  therefore relaxed to "execute only under the labelled reconstruction".
 
 ## Next actionable slice
 
-`T3-17` is `PASS`; its [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) records the exact-lane browser acknowledgement and full layer lifecycle. `T3-15` is `PASS`: the [raster follow-up](../../QA/validation-20261018-raster-followup/report.md) closes zero-direct-request capture and repeats the complete EEA lifecycle. `T3-07` remains `PARTIAL` after FEMA browser relay HTTP 500 failures despite successful single-tile probes; ESA passes. `T3-18` is `PASS` per the [2026-10-18 tool-interaction campaign](../../QA/tool-e2e-validation-20261018/report.md). Continue with the separate F-13/F-19 route gaps and remaining Tier 4/Tier 5 slices; preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-07`, `T3-15` and `T3-17`/`T3-18` are `PASS` (see the [2026-10-19 slice](../../QA/validation-20261019-leftovers-tier5/report.md) for the latest route/Census/imagery evidence). Continue with F-19 (explicit USGS time ranges), Overpass reliability, the remaining Tier 5 gates (fixtures and authored performance/accessibility contracts first), and Tier 4B once approved credentials or a local Ollama exist; preserve the exact provider/model lane and browser acknowledgement boundary.

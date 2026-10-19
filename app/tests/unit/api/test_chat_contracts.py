@@ -129,6 +129,25 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert orchestrator_called is False
 
 ###############################################################################
+def test_chat_turn_rejects_invalid_message_with_422_not_404() -> None:
+    runtime = SimpleNamespace(
+        conversation_repository=SimpleNamespace(
+            get_conversation=lambda _conversation_id: object()
+        )
+    )
+    application = _app()
+    application.dependency_overrides[get_chat_runtime] = lambda: runtime
+
+    response = TestClient(application).post(
+        f"/api/chat{CHAT_TURN_ROUTE}",
+        json={"message": "x" * 12001, "conversation_id": "conv-1"},
+    )
+
+    assert response.status_code == 422
+    assert "message is too long" in response.text
+    assert "xxxx" not in response.text
+
+###############################################################################
 class _ChatTurnLifecycleStub(RunLifecycleService):
 
     # -------------------------------------------------------------------------

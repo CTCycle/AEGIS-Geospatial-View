@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import ValidationError
 
 from server.common.paths import (
     CHAT_JOBS_ROUTE,
@@ -124,6 +125,19 @@ async def chat_turn(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse | AgentRunAcceptedResponse | JSONResponse:
     try:
+        run_request = AgentRunCreateRequest(
+            message=payload.message,
+            client_request_id=payload.request_id,
+            timezone=payload.timezone,
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(
+                include_url=False, include_context=False, include_input=False
+            ),
+        ) from exc
+    try:
         if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -137,11 +151,7 @@ async def chat_turn(
             )
         response, result, _created = await lifecycle_service.run_turn(
             payload.conversation_id,
-            AgentRunCreateRequest(
-                message=payload.message,
-                client_request_id=payload.request_id,
-                timezone=payload.timezone,
-            ),
+            run_request,
             owner_user_id=(
                 str(getattr(request.state, "user_id")).strip()
                 if getattr(request.state, "user_id", None) is not None

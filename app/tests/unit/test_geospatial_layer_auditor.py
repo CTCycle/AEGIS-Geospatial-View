@@ -1,6 +1,24 @@
 from __future__ import annotations
 
-from server.services.geospatial.layer_auditor import audit_all_manifests
+from server.services.geospatial.layer_auditor import (
+    audit_all_manifests,
+    profile_claims_unrenderable_map_support,
+)
+
+###############################################################################
+def test_profile_map_support_must_match_contract_render_support() -> None:
+    profile = {"capability_id": "elevation", "supports_map": True}
+
+    assert profile_claims_unrenderable_map_support(
+        profile, {"render_support": "metadata_only"}
+    )
+    assert not profile_claims_unrenderable_map_support(
+        profile, {"render_support": "vector"}
+    )
+    assert not profile_claims_unrenderable_map_support(
+        {"supports_map": False}, {"render_support": "metadata_only"}
+    )
+    assert not profile_claims_unrenderable_map_support(None, {})
 
 ###############################################################################
 def test_layer_auditor_blocks_broken_manual_toggles() -> None:

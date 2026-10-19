@@ -1,6 +1,6 @@
 # Dataset Ingestion
 
-Last updated: 2026-10-17
+Last updated: 2026-10-19
 
 ## Scope
 
@@ -36,10 +36,12 @@ They should also define checksum and bbox constraints when the source publishes 
 4. Normalize CSV point datasets and GeoJSON feature collections into deterministic GeoJSON.
 5. Preserve unsupported heavy formats as raw artifacts and mark the run partial.
 6. Drop invalid rows or invalid geometries and record warnings.
-7. Validate minimum feature count and optional bbox constraints.
+7. Validate minimum feature count and optional bbox constraints on the normalized output (skipped for unsupported heavy formats, which have none).
 8. Build lightweight spatial and text indexes where applicable.
 9. Write a tile manifest for downstream vector-tile generation.
 10. Write source health with feature count, status, warnings, and ingest timestamp.
+
+Failure contract: any failure (checksum mismatch, `minFeatureCount`, bbox, download or write error) rolls the run back. Files and directories the failed run created are removed and files it overwrote are restored, so a failed re-ingestion never replaces a previous good materialization. Verified by `tests/unit/test_geospatial_ingestion.py`.
 
 ## Current Dataset Manifests
 

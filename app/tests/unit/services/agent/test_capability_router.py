@@ -140,6 +140,29 @@ def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resoluti
     assert decision.capability_ids == ["traffic"]
 
 
+def test_router_keeps_bbox_provider_for_point_framed_area_request() -> None:
+    state = _state()
+    state.location_refs["austin"] = ResolvedLocation(
+        label="Austin, Texas",
+        latitude=30.2672,
+        longitude=-97.7431,
+        bbox=[-98.1, 29.9, -97.4, 30.6],
+        country="United States",
+    )
+
+    decision = _router().validate_route(
+        _route(
+            operation="retrieve_features",
+            spatial_scope={"kind": "point", "target_refs": ["Austin"]},
+        ),
+        user_message="Show traffic at Austin.",
+        active_state=state,
+    )
+
+    assert decision.status == "accepted"
+    assert decision.capability_ids == ["traffic"]
+
+
 def test_router_keeps_solar_estimate_on_metadata_only_text_route() -> None:
     state = _state()
     state.user_message = "Estimate PVGIS solar potential near Rome, Italy."

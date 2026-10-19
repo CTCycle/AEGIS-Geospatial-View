@@ -20,6 +20,9 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+TIGERWEB_MAX_RECORDS = 2000
+TIGERWEB_GENERALIZATION_DIVISOR = 1000
+
 ###############################################################################
 class CensusProvider(GeospatialProvider):
     provider_id = "census"
@@ -311,10 +314,15 @@ def _arcgis_query_url(service_url: str, request: ProviderRequest) -> str:
         "inSR": "4326",
         "outSR": "4326",
         "spatialRel": "esriSpatialRelIntersects",
+        "resultRecordCount": str(TIGERWEB_MAX_RECORDS),
     }
     if request.bbox is not None:
         min_lon, min_lat, max_lon, max_lat = request.bbox
         params["geometry"] = f"{min_lon},{min_lat},{max_lon},{max_lat}"
+        # Full-resolution tract geometry for a city-sized bbox exceeds the
+        # provider timeout; generalize to roughly one thousandth of the span.
+        span = max(max_lon - min_lon, max_lat - min_lat)
+        params["maxAllowableOffset"] = f"{span / TIGERWEB_GENERALIZATION_DIVISOR:.6f}"
     return f"{service_url}?{urlencode(params)}"
 
 ###############################################################################

@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import shutil
+import tempfile
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -83,10 +84,61 @@ def execute_ingestion_plan(
     *,
     workspace_root: str | Path = ".",
 ) -> DatasetIngestionResult:
+    """Materialize a dataset, leaving prior output untouched when it fails."""
+
     root = Path(workspace_root)
-    raw_dir = _safe_output_dir(root, plan.raw_path)
-    normalized_dir = _safe_output_dir(root, plan.normalized_path)
-    tile_dir = _safe_output_dir(root, plan.tile_path)
+    output_dirs = [
+        _safe_output_dir(root, plan.raw_path),
+        _safe_output_dir(root, plan.normalized_path),
+        _safe_output_dir(root, plan.tile_path),
+    ]
+    missing_dirs = _missing_directories(output_dirs)
+    existing_files = {
+        file for directory in output_dirs for file in _files_below(directory)
+    }
+    with tempfile.TemporaryDirectory() as backup_root:
+        backup_dir = Path(backup_root)
+        for index, file in enumerate(sorted(existing_files)):
+            shutil.copy2(file, backup_dir / str(index))
+        try:
+            return _execute_ingestion_plan(plan, *output_dirs)
+        except BaseException:
+            for file in {f for d in output_dirs for f in _files_below(d)}:
+                if file not in existing_files:
+                    file.unlink(missing_ok=True)
+            for index, file in enumerate(sorted(existing_files)):
+                shutil.copy2(backup_dir / str(index), file)
+            for directory in missing_dirs:
+                # Reverse creation order so only empty directories are removed.
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+            raise
+
+###############################################################################
+def _files_below(directory: Path) -> list[Path]:
+    return [path for path in directory.rglob("*") if path.is_file()] if directory.exists() else []
+
+###############################################################################
+def _missing_directories(directories: list[Path]) -> list[Path]:
+    """List directories this run will create, deepest first."""
+
+    missing: set[Path] = set()
+    for directory in directories:
+        current = directory
+        while not current.exists():
+            missing.add(current)
+            current = current.parent
+    return sorted(missing, key=lambda path: len(path.parts), reverse=True)
+
+###############################################################################
+def _execute_ingestion_plan(
+    plan: DatasetIngestionPlan,
+    raw_dir: Path,
+    normalized_dir: Path,
+    tile_dir: Path,
+) -> DatasetIngestionResult:
     raw_dir.mkdir(parents=True, exist_ok=True)
     normalized_dir.mkdir(parents=True, exist_ok=True)
     tile_dir.mkdir(parents=True, exist_ok=True)
@@ -137,8 +189,11 @@ def execute_ingestion_plan(
             f"{plan.expected_format} normalization requires optional geospatial ingestion dependencies."
         )
 
-    _validate_feature_count(plan, feature_count)
-    _validate_bbox_intersection(plan, normalized_file)
+    if normalized_file is not None:
+        # Unsupported heavy formats keep their raw artifact and report partial
+        # health; there are no normalized features to validate.
+        _validate_feature_count(plan, feature_count)
+        _validate_bbox_intersection(plan, normalized_file)
     spatial_index_file = (
         _write_spatial_index(normalized_file, normalized_dir)
         if plan.spatial_index and normalized_file
