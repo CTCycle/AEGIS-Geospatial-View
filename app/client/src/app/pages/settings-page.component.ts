@@ -625,7 +625,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.settings = updated;
-      this.structuredProbe = this.unverifiedProbe(updated);
+      await this.refreshStructuredProbe(updated);
       this.statusText = `Selected ${model.name} as agent model`;
       this.syncState();
       this.changeDetectorRef.detectChanges();
@@ -685,7 +685,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         ollama_url: this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434',
       });
       this.settings = updated;
-      this.structuredProbe = this.unverifiedProbe(updated);
+      await this.refreshStructuredProbe(updated);
       this.ollamaUrlDraft = updated.ollama_url;
       await this.reloadOllamaCatalog();
       this.statusText = 'Ollama settings saved';
@@ -902,7 +902,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) return;
       this.settings = updated;
       this.setCloudCredentialValue(provider, '');
-      this.structuredProbe = this.unverifiedProbe(updated);
+      await this.refreshStructuredProbe(updated);
       if (isDynamicCloudProvider(provider)) {
         await this.ensureProviderModelsLoaded(provider, true);
       }
@@ -929,7 +929,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) return;
       this.settings = updated;
       this.setCloudCredentialValue(provider, '');
-      this.structuredProbe = this.unverifiedProbe(updated);
+      await this.refreshStructuredProbe(updated);
       if (isDynamicCloudProvider(provider)) {
         this.cloudModels = this.cloudModels.filter((model) => model.provider !== provider);
         this.setDynamicProviderStatus(provider, { ok: false, message: `Add a ${providerDisplayLabel(provider)} API key to load ${providerDisplayLabel(provider)} models.` });
@@ -986,6 +986,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return undefined;
   }
 
+  // The server owns verification: a verdict stays valid until the selected
+  // model, endpoint or key changes, so re-read it instead of assuming a reset.
+  private async refreshStructuredProbe(settings: ModelSettingsResponse): Promise<void> {
+    try {
+      this.structuredProbe = await this.apiClient.fetchStructuredProbe();
+    } catch {
+      this.structuredProbe = this.unverifiedProbe(settings);
+    }
+  }
+
   private unverifiedProbe(settings: ModelSettingsResponse): StructuredProbeResponse {
     return {
       ...this.structuredProbe,
@@ -1040,7 +1050,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       this.settings = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey);
       this.geoCredentialDrafts[provider] = '';
-      this.structuredProbe = this.unverifiedProbe(this.settings);
+      await this.refreshStructuredProbe(this.settings);
       this.statusText = apiKey
         ? `${setup?.name ?? provider} key saved. Provider access has not been validated.`
         : `${setup?.name ?? provider} key cleared. Optional capabilities are disabled.`;
