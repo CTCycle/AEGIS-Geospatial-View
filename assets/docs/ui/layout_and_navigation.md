@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-09-21
+Last updated: 2026-10-19
 
 ## Desktop Viewport Contract
 
@@ -28,12 +28,17 @@ above; its label and title expose token details.
 
 Toolbar width constraints:
 
-- minimum: `280px`
-- maximum: `760px`
-- map minimum width guard: `320px`
+- minimum: `240px`
+- maximum: viewport width minus the map minimum
+- map minimum width guard: `240px`
 
 The chat rail and map remain side by side at all supported widths. The divider
 is mouse-resizable and the chat rail can be collapsed when map focus is useful.
+
+Map tools (basemap selector, layer controls, legend, and metadata-only/no-result
+notes) are hidden by default and open from the Map tools button at the map's
+top-left. Zoom controls, failures, attribution, and compliance notices stay
+visible.
 
 The map header keeps its status/progress region in a flexible left column and
 its icon actions in a fixed right column. Long status text truncates rather

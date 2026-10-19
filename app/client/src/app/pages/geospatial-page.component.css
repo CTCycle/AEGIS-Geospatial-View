@@ -9,7 +9,7 @@
 .geospatial-workspace {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(20rem, var(--toolbar-width, 30vw)) 0.42rem minmax(0, 1fr);
+    grid-template-columns: var(--toolbar-width, 30vw) 0.6rem minmax(0, 1fr);
     width: 100%;
     height: 100%;
     grid-template-rows: minmax(0, 1fr) 2.1rem;
@@ -17,7 +17,7 @@
 }
 
 .geospatial-workspace--toolbar-collapsed {
-    grid-template-columns: 0 0.42rem minmax(0, 1fr);
+    grid-template-columns: 0 0.6rem minmax(0, 1fr);
 }
 
 .toolbar-panel,
@@ -48,7 +48,7 @@
 }
 
 .toolbar-resize-handle {
-    width: 0.42rem;
+    width: 0.6rem;
     cursor: col-resize;
     background: #22333d;
     transition: background 120ms ease;

@@ -138,9 +138,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   isResizing = false;
   isAlertsOpen = false;
 
-  private readonly minWidth = 280;
-  private readonly maxWidth = 760;
-  private readonly canvasMinWidth = 320;
+  private readonly minWidth = 240;
+  private readonly canvasMinWidth = 240;
   private readonly maxSeenEventIds = 512;
   private readonly chatPageState: PersistedChatPageState;
   private mouseMoveHandler?: (event: MouseEvent) => void;
@@ -650,7 +649,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.router.navigateByUrl('/settings');
   }
 
-  startResize(): void {
+  startResize(event?: MouseEvent): void {
+    event?.preventDefault();
     if (this.isToolbarCollapsed) {
       this.isToolbarCollapsed = false;
     }
@@ -2095,7 +2095,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private clampToolbarWidth(value: number): number {
-    return Math.max(this.minWidth, Math.min(this.maxWidth, value));
+    return Math.max(this.minWidth, value);
   }
 
   private async deliverReadyAcknowledgement(
