@@ -12,7 +12,16 @@ from server.services.llm.opencode_provider import (
     OpenCodeProvider,
 )
 from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
+from server.services.llm.opencode_models_dev import ModelsDevEntry
 from server.services.llm.types import LLMRequest
+
+###############################################################################
+@pytest.fixture(autouse=True)
+def _offline_models_dev(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.fetch_models_dev_entries",
+        lambda provider, policy: {},
+    )
 
 ###############################################################################
 class _StructuredPayload(BaseModel):
@@ -137,7 +146,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_structured_output("deepseek-v4.1-flash") is True
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
-    assert provider.supports_tools("claude-opus-5") is False
+    assert provider.supports_tools("minimax-m3") is False
 
 ###############################################################################
 def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> None:
@@ -171,9 +180,44 @@ def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> 
     assert selected.metadata["protocol_source"] == "opencode_published_endpoint_table"
     assert "tools" in selected.capabilities
     assert "structured_output" in selected.capabilities
-    assert models[1].metadata["supports_tools"] is False
+    assert models[1].metadata["protocol"] == "openai-chat-completions"
+    assert models[1].metadata["protocol_source"] == "assumed_default"
+    assert "tools" in models[1].capabilities
     assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
 
+
+###############################################################################
+def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.fetch_models_dev_entries",
+        lambda provider, policy: {
+            "gpt-6-luna": ModelsDevEntry(
+                "openai-responses", 1_050_000, 128_000, True
+            ),
+            "qwen3.8-max": ModelsDevEntry(
+                "anthropic-messages", 1_000_000, 131_072, True
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda url, **kwargs: _Response(
+            {"data": [{"id": "gpt-6-luna"}, {"id": "qwen3.8-max"}]}
+        ),
+    )
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    luna, qwen = provider.list_models()
+
+    assert luna.metadata["protocol"] == "openai-responses"
+    assert luna.metadata["protocol_source"] == "models_dev"
+    assert luna.metadata["context_window_tokens"] == 1_050_000
+    assert luna.metadata["maximum_output_tokens"] == 128_000
+    assert luna.metadata["supports_vision"] is True
+    assert qwen.metadata["protocol"] == "anthropic-messages"
+    assert provider.protocol_for_model("gpt-6-luna") == "openai-responses"
 
 ###############################################################################
 def test_opencode_normalizes_nested_documented_limits(monkeypatch) -> None:
