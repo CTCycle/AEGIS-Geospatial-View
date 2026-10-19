@@ -1,0 +1,21 @@
+INFO:     Started server process [17112]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t5-recovery-20261019\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51495 - "WebSocket /api/conversations/conv_b9ff0fabdd504f15a4ff42388c669feb/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:60666 - "WebSocket /api/conversations/conv_b9ff0fabdd504f15a4ff42388c669feb/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:53961 - "WebSocket /api/conversations/conv_b9ff0fabdd504f15a4ff42388c669feb/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56659 - "WebSocket /api/conversations/conv_b9ff0fabdd504f15a4ff42388c669feb/realtime" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:63919 - "WebSocket /api/conversations/conv_b9ff0fabdd504f15a4ff42388c669feb/realtime" 403
+INFO:     connection rejected (403 Forbidden)

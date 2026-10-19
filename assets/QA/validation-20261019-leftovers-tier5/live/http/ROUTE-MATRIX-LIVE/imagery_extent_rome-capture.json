@@ -1,0 +1,32 @@
+{
+  "observation": {
+    "started_at": "2026-10-19T06:47:58.545330+00:00",
+    "ended_at": "2026-10-19T06:48:22.046904+00:00",
+    "requests_by_host": {
+      "api.census.gov": 0,
+      "api.open-meteo.com": 0,
+      "gibs.earthdata.nasa.gov": 0,
+      "hazards-fema.maps.arcgis.com": 0,
+      "hazards.fema.gov": 0,
+      "mapproxy.terrascope.be": 0,
+      "noise.discomap.eea.europa.eu": 0,
+      "nominatim.openstreetmap.org": 0,
+      "overpass-api.de": 0,
+      "server.arcgisonline.com": 0,
+      "services.terrascope.be": 0,
+      "tigerweb.geo.census.gov": 0,
+      "titiler.terrascope.be": 0
+    },
+    "requests_by_transport": {},
+    "proxy_requests_by_capability": {},
+    "stored_events": 0,
+    "dropped_events": 0,
+    "counters_independent_of_event_limit": true
+  },
+  "service_workers": "blocked",
+  "http_cache": "disabled_by_context_routing",
+  "failure_type": null,
+  "events": [],
+  "console": [],
+  "page_errors": []
+}

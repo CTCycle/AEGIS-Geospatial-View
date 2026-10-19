@@ -1,0 +1,30 @@
+{
+  "campaign": "validation-20261019-tier5-recovery",
+  "date": "2026-10-19",
+  "branch": "develop",
+  "starting_sha": "817f3242",
+  "lane": "opencode-go / deepseek-v4.1-flash (isolated disposable runtime)",
+  "changed_sources": [
+    "app/server/api/chat.py"
+  ],
+  "changed_tests": [
+    "app/tests/unit/api/test_chat_contracts.py"
+  ],
+  "slices": {
+    "T5-04": "PASS (reconstructed, LOW confidence; credential and provider-URL fixtures)",
+    "T5-05": "PASS (reconstructed, LOW confidence; no product defect)",
+    "T5-06": "PASS (reconstructed, LOW confidence; location-only boundary)",
+    "T5-07": "PASS (extended to stream and job entry points after a fix)"
+  },
+  "leftovers": {
+    "F-13": "radar renders live with accurate narration",
+    "census_cartographic_boundaries_descriptor": "documented; depends on T4-03 shapefile normalizers",
+    "F-19": "open",
+    "overpass_reliability": "open",
+    "T5-09": "UNRUN: no authored contract",
+    "T5-10": "UNRUN: no authored contract",
+    "T5-11": "UNRUN: no approved provider lanes",
+    "T5-13": "UNRUN: theme unresolved"
+  },
+  "quality": {"backend_unit_tests": 1130, "ruff": "pass", "pyright_strict": "0/0/0"}
+}

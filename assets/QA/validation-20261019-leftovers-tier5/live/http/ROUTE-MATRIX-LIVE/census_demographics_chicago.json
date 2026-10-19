@@ -1,0 +1,1486 @@
+{
+  "scenario_id": "census_demographics_chicago",
+  "prompt": "Show census tracts around Chicago, Illinois.",
+  "expected_kind": "map",
+  "classification": "map_render_pass",
+  "assistant_response_visible": true,
+  "ui_text": "AEGIS Search Geodata Settings Start new chat History Show conversation history Show census tracts around Chicago, Illinois. The map is ready and verified. Here's what I prepared: Census tracts around Chicago, Illinois Location: Chicago, South Chicago Township, Cook County, Illinois, United States (resolved with moderate confidence, ~0.83) Data: 1,046 census tract boundary features retrieved from the U.S. Census Bureau (TIGERweb), covering the Chicago area Map: A choropleth-style vector overlay of the tract boundaries on an OpenStreetMap basemap, with the viewport fitted to the tract extent Render status: Verified — the layer loaded successfully with 1,083 tract features rendered in view One note on the source: The initial census cartographic-boundaries capability could not be rendered (its vector-tile render descriptor was unavailable), so I served the same tract geometry through the Census TIGERweb boundary overlay instead. The tract boundaries shown are geometry only — no demographic values (e.g., population) are attached, since that would require a separate ACS demographic join. Let me know if you'd like population or other ACS attributes added. Send message Context Unavailable Chicago, South Chicago Township, Cook County, Illinois, United States Hide chat Alerts © OpenStreetMap contributors | MapLibre Basemap Satellite Imagery Basemap OpenFreeMap Liberty OpenFreeMap Positron Dark Basemap OpenStreetMap OpenTopoMap Terrain + − LAYERS 1 of 1 visible Expand Census TIGERweb Demographic Boundaries Opacity for Census TIGERweb Demographic Boundaries: 100 percent ↑ ↓ Census TIGERweb Demographic Boundaries choropleth U.S. Census Bureau TIGERweb Agent model Verified Satellite Available Optional Keys Optional Tool activity Needs attention",
+  "map_evidence": {
+    "maplibre_map_count": 1,
+    "maplibre_canvas_count": 1,
+    "attribution_present": true,
+    "attribution_text": "U.S. Census Bureau TIGERweb",
+    "target_overlay_status": "loaded",
+    "target_overlay_visible": true,
+    "overlay_rows": [
+      {
+        "index": 0,
+        "text": "Census TIGERweb Demographic Boundaries Opacity for Census TIGERweb Demographic Boundaries: 100 percent ↑ ↓"
+      }
+    ]
+  },
+  "network": {
+    "proxy_request_count": 56,
+    "proxy_response_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "proxy_capabilities_seen": [
+      "osm_default"
+    ],
+    "direct_upstream_browser_request_count": 0,
+    "events": [
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3043.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3043.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3043.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3046.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3046.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3046.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3045.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3044.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3044.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3044.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3045.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3045.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3043.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3044.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2103/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2104/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2102/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3045.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3044.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3045.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3043.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2105/3046.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/13/2101/3046.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/759.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/759.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/759.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/761.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/760.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/760.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/761.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/760.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/761.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/760.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/759.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/763.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/761.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/763.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/763.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/758.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/758.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/763.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/762.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/759.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/760.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/761.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/760.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/525/758.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/526/758.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/763.png"
+      },
+      {
+        "kind": "request",
+        "transport": "aegis_proxy",
+        "method": "GET",
+        "resource_type": "fetch",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/762.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/524/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/759.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/527/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/763.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/523/758.png"
+      },
+      {
+        "kind": "response",
+        "transport": "aegis_proxy",
+        "resource_type": "fetch",
+        "status": 200,
+        "content_type": "image/png",
+        "capability_id": "osm_default",
+        "url": "http://127.0.0.1:5079/api/geospatial/tiles/osm_default/11/528/758.png"
+      }
+    ]
+  },
+  "observation": {
+    "started_at": "2026-10-19T06:47:06.608414+00:00",
+    "ended_at": null,
+    "requests_by_host": {
+      "127.0.0.1": 56,
+      "api.census.gov": 0,
+      "api.open-meteo.com": 0,
+      "gibs.earthdata.nasa.gov": 0,
+      "hazards-fema.maps.arcgis.com": 0,
+      "hazards.fema.gov": 0,
+      "mapproxy.terrascope.be": 0,
+      "noise.discomap.eea.europa.eu": 0,
+      "nominatim.openstreetmap.org": 0,
+      "overpass-api.de": 0,
+      "server.arcgisonline.com": 0,
+      "services.terrascope.be": 0,
+      "tigerweb.geo.census.gov": 0,
+      "titiler.terrascope.be": 0
+    },
+    "requests_by_transport": {
+      "aegis_proxy": 56
+    },
+    "proxy_requests_by_capability": {
+      "osm_default": 56
+    },
+    "stored_events": 112,
+    "dropped_events": 0,
+    "counters_independent_of_event_limit": true
+  },
+  "console": [
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xd1c001b0800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xd1c001b0800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xd1c001b0800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xd1c001b0800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    }
+  ],
+  "page_errors": [],
+  "run_trace": {
+    "status": "ok",
+    "conversation_id": "conv_62c1431ab0a34b59a109e3bafcd63448",
+    "run_id": "run_e49bb73834034674beb7787ab1b0378a",
+    "run_version": 1,
+    "resolved_route": {
+      "primary_domain": "data_retrieval",
+      "secondary_domains": [
+        "place_search",
+        "map_rendering"
+      ],
+      "task_mode": "execute",
+      "operation": "retrieve_census_tracts",
+      "target_refs": [
+        "Chicago, Illinois"
+      ],
+      "temporal_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      }
+    },
+    "selected_capability_ids": [
+      "census_cartographic_boundaries",
+      "osm_default",
+      "census_tigerweb_demographics",
+      "census_acs_demographic_joins"
+    ],
+    "iteration_count": 7,
+    "model_call_count": 9,
+    "tool_call_count": 8,
+    "state_transition_count": 46,
+    "terminal_or_stopped_reason": "completed",
+    "exposed_tools_by_iteration": {
+      "1": [
+        "resolve_geospatial_location"
+      ],
+      "2": [
+        "describe_geospatial_capability",
+        "execute_geospatial_capability",
+        "apply_map_plan"
+      ],
+      "3": [
+        "execute_geospatial_capability",
+        "describe_geospatial_capability",
+        "apply_map_plan"
+      ],
+      "4": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "5": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "6": [
+        "describe_geospatial_capability",
+        "apply_map_plan"
+      ],
+      "7": [
+        "apply_map_plan",
+        "describe_geospatial_capability"
+      ],
+      "0": []
+    },
+    "selected_tool_names": [
+      "resolve_geospatial_location",
+      "describe_geospatial_capability",
+      "execute_geospatial_capability",
+      "apply_map_plan"
+    ],
+    "tool_result_statuses": [
+      {
+        "tool": "resolve_geospatial_location",
+        "status": "success",
+        "iteration": 1,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 2,
+        "error_type": null
+      },
+      {
+        "tool": "execute_geospatial_capability",
+        "status": "success",
+        "iteration": 3,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "failed",
+        "iteration": 4,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "failed",
+        "iteration": 5,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 6,
+        "error_type": null
+      },
+      {
+        "tool": "describe_geospatial_capability",
+        "status": "success",
+        "iteration": 6,
+        "error_type": null
+      },
+      {
+        "tool": "apply_map_plan",
+        "status": "success",
+        "iteration": 7,
+        "error_type": null
+      }
+    ],
+    "evidence_references": [
+      "evidence_dc9f7fb5fab34cb99249296015509da3"
+    ],
+    "apply_map_plan_attempts": 3,
+    "render_preparation": [
+      {
+        "kind": "stage",
+        "event_sequence": 58,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": 6,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "event_sequence": 68,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 72,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "event_sequence": 77,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "event_sequence": 78,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 80,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 83,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "render_observed",
+        "event_sequence": 87,
+        "map_session_id": "candidate-ba6e5a64bfa242cfa2fdbd1cfe4fa15b",
+        "collection_revision": 1,
+        "viewport_bounds": [
+          -88.03300957446696,
+          41.568041452134025,
+          -87.08269042553067,
+          42.18575913500348
+        ],
+        "overlay_results": [
+          {
+            "zoom_range_valid": true,
+            "result_visible": true,
+            "loaded": true,
+            "metadata_only": false,
+            "visibility_matches": true,
+            "source_present": true,
+            "style_valid": true,
+            "rendered_feature_count": 1083,
+            "capability_id": "census_tigerweb_demographics",
+            "failure_code": null,
+            "layer_present": true,
+            "overlay_id": "evidence:evidence_dc9f7fb5fab34cb99249296015509da3:census_tigerweb_demographics"
+          }
+        ],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "ready",
+        "render_checks": {
+          "required_sources_loaded": true,
+          "required_layers_present": true,
+          "viewport_valid": true
+        },
+        "prepared_map": false
+      },
+      {
+        "kind": "render_observed",
+        "event_sequence": 88,
+        "map_session_id": "candidate-ba6e5a64bfa242cfa2fdbd1cfe4fa15b",
+        "collection_revision": 1,
+        "viewport_bounds": [
+          -88.03300957446696,
+          41.568041452134025,
+          -87.08269042553067,
+          42.18575913500348
+        ],
+        "overlay_results": [
+          {
+            "zoom_range_valid": true,
+            "result_visible": true,
+            "loaded": true,
+            "metadata_only": false,
+            "visibility_matches": true,
+            "source_present": true,
+            "style_valid": true,
+            "rendered_feature_count": 1083,
+            "capability_id": "census_tigerweb_demographics",
+            "failure_code": null,
+            "layer_present": true,
+            "overlay_id": "evidence:evidence_dc9f7fb5fab34cb99249296015509da3:census_tigerweb_demographics"
+          }
+        ],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "ready",
+        "render_checks": {
+          "required_sources_loaded": true,
+          "required_layers_present": true,
+          "viewport_valid": true
+        },
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "event_sequence": 90,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "event_sequence": 93,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 95,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "completion_decision",
+        "event_sequence": 97,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": 7,
+        "render_verified": null,
+        "render_status": "terminal",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 99,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "started",
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "checkpoint",
+        "event_sequence": 100,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": null,
+        "render_checks": null,
+        "prepared_map": false
+      },
+      {
+        "kind": "stage",
+        "event_sequence": 103,
+        "map_session_id": null,
+        "collection_revision": null,
+        "viewport_bounds": null,
+        "overlay_results": [],
+        "iteration": null,
+        "render_verified": null,
+        "render_status": "completed",
+        "render_checks": null,
+        "prepared_map": false
+      }
+    ],
+    "temporal_evidence": {
+      "requested_scope": {
+        "mode": "none",
+        "granularity": "none",
+        "aggregation": "none"
+      },
+      "reference_time_iso": "[depth-limited]",
+      "start_time_iso": "[depth-limited]",
+      "end_time_iso": "[depth-limited]",
+      "observation_time": "[depth-limited]"
+    }
+  },
+  "screenshot": "G:\\Projects\\Repositories\\Active projects\\AEGIS Geospatial View\\assets\\QA\\validation-20261019-leftovers-tier5\\live\\screenshots\\ROUTE-MATRIX-LIVE\\census_demographics_chicago.png",
+  "backend_routed_diagnostics": []
+}

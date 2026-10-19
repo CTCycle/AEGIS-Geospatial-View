@@ -1,0 +1,44 @@
+{
+  "campaign": "validation-20261019-leftovers-tier5",
+  "date": "2026-10-19",
+  "branch": "develop",
+  "starting_sha": "e81c2490",
+  "lane": "opencode-go / deepseek-v4.1-flash (live checks only)",
+  "changed_sources": [
+    "app/server/services/agent/capability_router.py",
+    "app/server/services/agent/completion.py",
+    "app/server/services/agent_runs/render_completion.py",
+    "app/server/services/geospatial/ingestion.py",
+    "app/server/services/geospatial/layer_auditor.py",
+    "app/server/services/geospatial/providers/census.py",
+    "app/server/api/chat.py",
+    "data/catalog/runtime_profiles.d/openmeteo_elevation.json"
+  ],
+  "changed_tests": [
+    "app/tests/unit/services/agent/test_capability_router.py",
+    "app/tests/unit/services/test_render_completion.py",
+    "app/tests/unit/test_geospatial_ingestion.py",
+    "app/tests/unit/test_geospatial_layer_auditor.py",
+    "app/tests/unit/test_geospatial_provider_adapters_core.py",
+    "app/tests/unit/api/test_chat_contracts.py"
+  ],
+  "slices": {
+    "T5-01": "PASS (reconstructed, LOW confidence)",
+    "T5-02": "PASS (reconstructed, LOW confidence)",
+    "T5-03": "PASS (reconstructed, LOW confidence)",
+    "T5-07": "PASS (reconstructed, LOW confidence)",
+    "T5-08": "PASS (reconstructed, LOW confidence)",
+    "T5-12": "PASS (hosted CI run 39212579230 on c0da6dc7)"
+  },
+  "leftovers": {
+    "F-13": "routing fixed; narration and browser ack not exercised",
+    "F-19": "open",
+    "F-25": "fixed",
+    "census_timeout": "fixed, live pass",
+    "imagery_temporal": "fixed, live pass",
+    "elevation_numeric": "open by licence opt-in",
+    "overpass_reliability": "open",
+    "failed_materialization_rollback": "fixed"
+  },
+  "quality": {"backend_unit_tests": 1128, "ruff": "pass", "pyright_strict": "0/0/0", "manifest_audit": "86 manifests, 0 errors, 0 warnings"}
+}

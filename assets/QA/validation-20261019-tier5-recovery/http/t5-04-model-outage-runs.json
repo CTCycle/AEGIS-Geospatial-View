@@ -1,0 +1,26 @@
+[
+ {
+  "id": "run_0b5fcf899d60448291b1d67a2e6c6218",
+  "state": "failed",
+  "error_code": "agent_operation_failed",
+  "error_message": "The selected model could not complete this request.",
+  "presentation_status": "not_required",
+  "active_slot": null
+ },
+ {
+  "id": "run_2e5333e6002a452ea3ebd2ad7234bf8a",
+  "state": "completed",
+  "error_code": null,
+  "error_message": null,
+  "presentation_status": "ready",
+  "active_slot": null
+ },
+ {
+  "id": "run_d6433e11f0084db6ae5933ec86cde3db",
+  "state": "completed",
+  "error_code": null,
+  "error_message": null,
+  "presentation_status": "ready",
+  "active_slot": null
+ }
+]

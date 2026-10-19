@@ -1,0 +1,18 @@
+
+> aegis-client@1.0.0 start
+> ng serve --proxy-config proxy.conf.cjs --host 127.0.0.1 --port 5080
+
+> Building...
+√ Building...
+Initial chunk files | Names         |  Raw size
+main.js             | main          | 942.55 kB | 
+styles.css          | styles        |  71.84 kB | 
+
+                    | Initial total |   1.01 MB
+
+Application bundle generation complete. [6.217 seconds] - 2026-10-19T11:08:00.895Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  ➜  Local:   http://127.0.0.1:5080/
+  ➜  press h + enter to show help
