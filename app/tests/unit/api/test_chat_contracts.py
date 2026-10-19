@@ -16,7 +16,6 @@ from server.api.chat import (
 from server.common.paths import (
     CHAT_JOBS_ROUTE,
     CHAT_STREAM_ROUTE,
-    CHAT_STRUCTURED_PROBE_ROUTE,
     CHAT_TURN_ROUTE,
 )
 from server.contracts.chat import (
@@ -24,11 +23,11 @@ from server.contracts.chat import (
     ContextUsageResponse,
     ChatTurnRequest,
     ChatTurnResponse,
-    StructuredProbeResponse,
 )
 from server.contracts.runs import AgentRunCreateResult, AgentRunSnapshot, AgentRunState
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
+
 
 ###############################################################################
 def _app() -> FastAPI:
@@ -36,6 +35,7 @@ def _app() -> FastAPI:
     application.include_router(router, prefix="/api")
     application.dependency_overrides[get_chat_runtime] = lambda: object()
     return application
+
 
 ###############################################################################
 def test_chat_turn_requires_conversation_id_over_http() -> None:
@@ -49,6 +49,7 @@ def test_chat_turn_requires_conversation_id_over_http() -> None:
         error["loc"][-1] == "conversation_id" for error in response.json()["detail"]
     )
 
+
 ###############################################################################
 def test_chat_response_openapi_marks_conversation_id_required() -> None:
     schema = _app().openapi()
@@ -59,12 +60,14 @@ def test_chat_response_openapi_marks_conversation_id_required() -> None:
     assert "/api/chat/jobs" in schema["paths"]
     assert "/api/chat/stream" in schema["paths"]
 
+
 ###############################################################################
 def test_chat_settings_update_uses_patch_semantics() -> None:
     settings_path = _app().openapi()["paths"]["/api/chat/settings"]
 
     assert "patch" in settings_path
     assert "put" not in settings_path
+
 
 ###############################################################################
 def test_chat_turn_request_rejects_missing_conversation_id() -> None:
@@ -74,6 +77,7 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         assert "conversation_id" in str(exc)
     else:
         raise AssertionError("conversation_id must be required")
+
 
 ###############################################################################
 def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
@@ -90,6 +94,7 @@ def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     assert any(
         error["loc"][-1] == "defer_map_commit" for error in response.json()["detail"]
     )
+
 
 ###############################################################################
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
@@ -108,13 +113,13 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
     assert response.goal is None
     assert "turn_contract" not in response.model_dump(mode="json")
 
+
 ###############################################################################
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     orchestrator_called = False
 
     ###############################################################################
     class _ConversationRepository:
-
         # -------------------------------------------------------------------------
         def get_conversation(self, conversation_id: str) -> None:  # noqa: ARG002
             return None
@@ -139,10 +144,9 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert response.json()["detail"] == "Conversation not found."
     assert orchestrator_called is False
 
+
 ###############################################################################
-@pytest.mark.parametrize(
-    "route", [CHAT_TURN_ROUTE, CHAT_STREAM_ROUTE, CHAT_JOBS_ROUTE]
-)
+@pytest.mark.parametrize("route", [CHAT_TURN_ROUTE, CHAT_STREAM_ROUTE, CHAT_JOBS_ROUTE])
 def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -> None:
     runtime = SimpleNamespace(
         conversation_repository=SimpleNamespace(
@@ -164,9 +168,9 @@ def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -
     assert "message is too long" in response.text
     assert "xxxx" not in response.text
 
+
 ###############################################################################
 class _ChatTurnLifecycleStub(RunLifecycleService):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -180,9 +184,7 @@ class _ChatTurnLifecycleStub(RunLifecycleService):
         self._result = result
         self._snapshot = snapshot
         self._conflict = conflict
-        self.run_repository = SimpleNamespace(
-            get_run=lambda _run_id: self._snapshot
-        )
+        self.run_repository = SimpleNamespace(get_run=lambda _run_id: self._snapshot)
 
     # -------------------------------------------------------------------------
     async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
@@ -273,7 +275,6 @@ def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
 
     ###############################################################################
     class _PersistedTerminalLifecycleStub(_ChatTurnLifecycleStub):
-
         # -------------------------------------------------------------------------
         async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
             response = self.read_completed_response("conv-1", "run-1")
@@ -353,40 +354,3 @@ def test_chat_turn_returns_503_for_unusable_provider() -> None:
 
     assert response.status_code == 503
     assert response.json()["detail"] == "The selected provider is unavailable."
-
-###############################################################################
-def test_structured_probe_routes_return_latest_and_run_results() -> None:
-    probe_result = StructuredProbeResponse(
-        provider="opencode-go",
-        model="deepseek-v4-flash",
-        protocol="openai-compatible",
-        status="passed",
-        parse_status="complete",
-        duration_ms=42,
-        message="Native structured-response probe passed.",
-    )
-
-    ###############################################################################
-    class _Probe:
-
-        # -------------------------------------------------------------------------
-        def latest(self) -> StructuredProbeResponse:
-            return probe_result
-
-        # -------------------------------------------------------------------------
-        async def run(self) -> StructuredProbeResponse:
-            return probe_result
-
-    application = _app()
-    application.dependency_overrides[get_chat_runtime] = lambda: SimpleNamespace(
-        structured_probe_service=_Probe()
-    )
-    client = TestClient(application)
-
-    latest = client.get(f"/api/chat{CHAT_STRUCTURED_PROBE_ROUTE}")
-    executed = client.post(f"/api/chat{CHAT_STRUCTURED_PROBE_ROUTE}")
-
-    assert latest.status_code == 200
-    assert latest.json()["status"] == "passed"
-    assert executed.status_code == 200
-    assert executed.json()["parse_status"] == "complete"

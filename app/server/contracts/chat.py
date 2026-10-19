@@ -23,6 +23,7 @@ from server.contracts.runs import AgentRunState
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
+
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,6 +31,7 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -41,6 +43,7 @@ class ChatTurnRequest(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
     request_id: str | None = None
     conversation_id: str
+
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -75,6 +78,7 @@ class ContextUsageResponse(BaseModel):
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
+
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
@@ -115,6 +119,7 @@ class ChatOperationResult(BaseModel):
         | None
     ) = None
 
+
 ###############################################################################
 class AgentToolResultSummary(BaseModel):
     """Bounded model-independent summary of one native tool result."""
@@ -128,6 +133,7 @@ class AgentToolResultSummary(BaseModel):
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     map_candidate_id: str | None = None
     error: ToolExecutionError | None = None
+
 
 ###############################################################################
 class AgentTurnResponse(BaseModel):
@@ -157,6 +163,7 @@ class AgentTurnResponse(BaseModel):
         default_factory=lambda: dict[str, ResolvedLocation]()
     )
 
+
 ###############################################################################
 class ChatTurnResponse(BaseModel):
     """Canonical public response for one native agent turn."""
@@ -185,6 +192,7 @@ class ChatTurnResponse(BaseModel):
     )
     conversation_state: ConversationState | None = None
 
+
 ###############################################################################
 class AgentRunAcceptedResponse(BaseModel):
     """Stable response for work accepted outside the synchronous window."""
@@ -201,6 +209,7 @@ class AgentRunAcceptedResponse(BaseModel):
     status_url: str
     realtime_url: str | None = None
     terminal: bool = False
+
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -223,6 +232,7 @@ class ChatStreamEvent(BaseModel):
     @field_serializer("data")
     def serialize_public_data(self, value: dict[str, Any]) -> dict[str, Any]:
         return public_protocol_projection(value)
+
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -248,6 +258,7 @@ class ModelCardDescriptor(BaseModel):
     ] = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
+
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -257,25 +268,7 @@ class ModelLibrarySourceStatus(BaseModel):
     stale: bool = False
     message: str | None = None
     model_count: int | None = None
-    structured_probe_status: Literal[
-        "not_tested", "passed", "failed", "timeout", "unsupported"
-    ] = "not_tested"
-    structured_probe_checked_at: datetime | None = None
-    structured_probe_expires_at: datetime | None = None
 
-###############################################################################
-class StructuredProbeResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider: str
-    model: str
-    protocol: str
-    status: Literal["not_tested", "passed", "failed", "timeout", "unsupported"]
-    parse_status: str
-    duration_ms: int | None = None
-    checked_at: datetime | None = None
-    expires_at: datetime | None = None
-    message: str | None = None
 
 ###############################################################################
 class SelectedModelContextResponse(BaseModel):
@@ -289,6 +282,7 @@ class SelectedModelContextResponse(BaseModel):
     context_metadata_authority: Literal[
         "provider", "configured", "inferred", "unknown"
     ] = "unknown"
+
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -307,6 +301,7 @@ class ModelSettingsResponse(BaseModel):
     )
     selected_model_context: SelectedModelContextResponse
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelSettingsSnapshot:
@@ -320,6 +315,7 @@ class ModelSettingsSnapshot:
     openai_base_url: str | None
     google_base_url: str | None
     deepseek_base_url: str | None
+
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -371,6 +367,7 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
+
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -385,6 +382,7 @@ class ModelLibraryResponse(BaseModel):
         default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
     )
 
+
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -398,15 +396,18 @@ class OllamaRefreshResponse(BaseModel):
         default_factory=lambda: list[ModelCardDescriptor]()
     )
 
+
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
 
+
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

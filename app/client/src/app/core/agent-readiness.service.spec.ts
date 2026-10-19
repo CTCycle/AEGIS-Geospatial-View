@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { AgentReadinessService } from './agent-readiness.service';
 import { ApiClientService } from './api-client.service';
-import { ModelSettingsResponse } from './types';
+import { ModelCardDescriptor, ModelLibraryResponse, ModelSettingsResponse } from './types';
 import { UserFacingErrorService } from './user-facing-error.service';
 
 const settings = (overrides: Partial<ModelSettingsResponse> = {}): ModelSettingsResponse => ({
@@ -25,6 +25,29 @@ const settings = (overrides: Partial<ModelSettingsResponse> = {}): ModelSettings
   ...overrides,
 });
 
+const model = (
+  provider: string,
+  name: string,
+  supportsTools: boolean | null,
+): ModelCardDescriptor => ({
+  id: name,
+  name,
+  description: '',
+  provider,
+  capabilities: ['chat'],
+  supports_tools: supportsTools,
+  supports_structured_output: null,
+  supports_vision: null,
+  supports_embeddings: null,
+  tool_support_source: 'catalog',
+  metadata: {},
+});
+
+const library = (
+  cloud: ModelCardDescriptor[] = [],
+  local: ModelCardDescriptor[] = [],
+): ModelLibraryResponse => ({ cloud, local, sources: {} });
+
 describe('AgentReadinessService', () => {
   let service: AgentReadinessService;
   let apiClient: jasmine.SpyObj<ApiClientService>;
@@ -35,7 +58,6 @@ describe('AgentReadinessService', () => {
       'fetchChatSettings',
       'fetchChatModels',
       'checkOllamaHealth',
-      'fetchStructuredProbe',
     ]);
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['normalizeDisplayText']);
     errors.normalizeDisplayText.and.callFake((text: string, fallback: string) => text || fallback);
@@ -50,30 +72,58 @@ describe('AgentReadinessService', () => {
     service = TestBed.inject(AgentReadinessService);
   });
 
-  it('reports unprobed configured models without claiming live inference', async () => {
+  it('uses catalog metadata without making a model inference call', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings());
-    apiClient.fetchStructuredProbe.and.resolveTo({
-      provider: 'openai',
-      model: 'gpt-4.1-mini',
-      protocol: 'openai-responses',
-      status: 'not_tested',
-      parse_status: 'not_tested',
-      duration_ms: null,
-      checked_at: null,
-      expires_at: null,
-      message: 'This model has not been verified against the native route/tool contract.',
-    });
+    apiClient.fetchChatModels.and.resolveTo(library([model('openai', 'gpt-4.1-mini', true)]));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('active');
+    expect(readiness.label).toBe('Configured');
+    expect(readiness.message).toContain('Model metadata reports tool calling support');
+    expect(readiness.message).toContain('normal workspace requests exercise live behavior');
+    expect(apiClient.fetchChatModels).toHaveBeenCalledOnceWith(undefined);
+  });
+
+  it('flags models whose metadata says tool calling is unavailable', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings());
+    apiClient.fetchChatModels.and.resolveTo(library([model('openai', 'gpt-4.1-mini', false)]));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('needs_attention');
+    expect(readiness.message).toContain('tool calling is unavailable');
+  });
+
+  it('leaves unknown tool-support metadata unverified without a model-call fallback', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings());
+    apiClient.fetchChatModels.and.resolveTo(library([model('openai', 'gpt-4.1-mini', null)]));
 
     const readiness = await service.loadReadiness();
 
     expect(readiness).toEqual({
       status: 'unknown',
       label: 'Not verified',
-      message: 'This model has not been verified against the native route/tool contract.',
+      message: 'The model catalog does not report whether this model supports tool calling.',
     });
   });
 
-  it('reports cloud credential problems with a typed readiness status', async () => {
+  it('requests the selected dynamic provider catalog by metadata only', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings({
+      agent_model_provider: 'opencode-go',
+      agent_model_name: 'beam-free',
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    }));
+    apiClient.fetchChatModels.and.resolveTo(library([model('opencode-go', 'beam-free', true)]));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('active');
+    expect(apiClient.fetchChatModels).toHaveBeenCalledOnceWith('opencode-go');
+  });
+
+  it('reports cloud credential problems before requesting model metadata', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings({
       credential_health: { openai: { api_key: 'unreadable' } },
     }));
@@ -81,8 +131,8 @@ describe('AgentReadinessService', () => {
     const readiness = await service.loadReadiness();
 
     expect(readiness.status).toBe('needs_attention');
-    expect(readiness.label).toBe('Needs attention');
     expect(readiness.message).toBe('Selected OpenAI credential needs attention (unreadable).');
+    expect(apiClient.fetchChatModels).not.toHaveBeenCalled();
   });
 
   it('reports unavailable local Ollama models', async () => {
@@ -94,12 +144,23 @@ describe('AgentReadinessService', () => {
       credential_health: {},
     }));
     apiClient.checkOllamaHealth.and.resolveTo({ ok: true, detail: 'ok' });
-    apiClient.fetchChatModels.and.resolveTo({ cloud: [], local: [], sources: {} });
+    apiClient.fetchChatModels.and.resolveTo(library([], []));
 
     const readiness = await service.loadReadiness();
 
     expect(readiness.status).toBe('needs_attention');
     expect(readiness.message).toBe('Selected local model unavailable. llama3.2 is selected but not installed in Ollama.');
+  });
+
+  it('reports unknown readiness when model metadata cannot be loaded', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings());
+    apiClient.fetchChatModels.and.rejectWith(new Error('catalog unavailable'));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('unknown');
+    expect(readiness.label).toBe('Not verified');
+    expect(readiness.message).toBe('Could not load selected model capability metadata. Tool calling is not verified.');
   });
 
   it('reports unknown readiness when settings cannot be loaded', async () => {
@@ -109,21 +170,14 @@ describe('AgentReadinessService', () => {
 
     expect(readiness).toEqual({
       status: 'unknown',
-      label: 'Unknown',
-      message: 'Could not verify selected agent readiness.',
+      label: 'Not verified',
+      message: 'Could not verify selected agent readiness from model metadata.',
     });
   });
 
   it('rejects a noncanonical provider instead of normalizing it', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings({
       agent_model_provider: 'OpenAI',
-      selected_model_context: {
-        provider: 'OpenAI',
-        model: 'gpt-4.1-mini',
-        context_window_tokens: 1047576,
-        maximum_output_tokens: 32768,
-        context_profile_source: 'openai_model_catalog',
-      },
     }));
 
     const readiness = await service.loadReadiness();
@@ -132,6 +186,6 @@ describe('AgentReadinessService', () => {
     expect(readiness.message).toBe(
       'Selected provider ID is not supported: OpenAI. Choose a canonical provider in Settings.',
     );
-    expect(apiClient.fetchStructuredProbe).not.toHaveBeenCalled();
+    expect(apiClient.fetchChatModels).not.toHaveBeenCalled();
   });
 });

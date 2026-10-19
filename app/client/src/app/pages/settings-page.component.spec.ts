@@ -836,6 +836,39 @@ describe('pages/settings-page.component', () => {
     expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 
+  it('keeps seven Settings destinations and collapses advanced Agent Runtime controls', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.activeSection = 'agent-runtime';
+    fixture.detectChanges();
+
+    const destinations = Array.from(
+      fixture.nativeElement.querySelectorAll('.settings-sidebar__item') as NodeListOf<HTMLButtonElement>,
+    ).map((button) => button.textContent?.trim());
+    expect(destinations).toEqual([
+      'Models',
+      'Model Providers',
+      'Geospatial Access',
+      'Application',
+      'Map & Search',
+      'Data Sources',
+      'Agent Runtime',
+    ]);
+
+    const disclosures = Array.from(
+      fixture.nativeElement.querySelectorAll('details.runtime-settings__disclosure') as NodeListOf<HTMLDetailsElement>,
+    );
+    expect(disclosures.map((item) => item.querySelector('summary')?.textContent?.trim())).toEqual([
+      'Timeouts and retries',
+      'Advanced limits',
+      'Vision inspection',
+    ]);
+    expect(disclosures.every((item) => !item.open)).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Execution budgets');
+    expect(fixture.nativeElement.textContent).toContain('Failure recovery');
+  });
+
   it('navigateBack preserves state before routing', async () => {
     const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     const fixture = TestBed.createComponent(SettingsPageComponent);

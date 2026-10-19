@@ -21,11 +21,13 @@ from server.services.llm.provider_contract import require_canonical_provider
 from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import ModelDescriptor
 
+
 ###############################################################################
 @dataclass
 class _CachedOllamaFailure:
     expires_at: float
     message: str
+
 
 ###############################################################################
 @dataclass
@@ -34,6 +36,7 @@ class _CachedModelDescriptors:
     models: list[ModelDescriptor]
     source: dict[str, object]
 
+
 ###############################################################################
 class ModelLibrarySourceError(RuntimeError):
     pass
@@ -41,9 +44,9 @@ class ModelLibrarySourceError(RuntimeError):
 
 DYNAMIC_CLOUD_PROVIDERS = ("deepseek", OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER)
 
+
 ###############################################################################
 class ChatModelLibraryService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -69,11 +72,6 @@ class ChatModelLibraryService:
         self._dynamic_catalog_cache: dict[str, _CachedModelDescriptors] = {}
         self._ollama_model_cache: dict[str, _CachedModelDescriptors] = {}
         self._catalog_lock = Lock()
-        self.structured_probe_service: object | None = None
-
-    # -------------------------------------------------------------------------
-    def set_structured_probe_service(self, service: object) -> None:
-        self.structured_probe_service = service
 
     # -------------------------------------------------------------------------
     def invalidate_dynamic_catalogs(self) -> None:
@@ -83,38 +81,6 @@ class ChatModelLibraryService:
             self._dynamic_catalog_cache.clear()
             self._ollama_model_cache.clear()
             self._ollama_unavailable_cache.clear()
-
-    # -------------------------------------------------------------------------
-    def _structured_probe_status(self, provider: str) -> dict[str, object]:
-        service = self.structured_probe_service
-        latest = getattr(service, "latest", None) if service is not None else None
-        if not callable(latest):
-            return {
-                "structured_probe_status": "not_tested",
-                "structured_probe_checked_at": None,
-                "structured_probe_expires_at": None,
-            }
-        try:
-            result = latest()
-        except Exception:
-            return {
-                "structured_probe_status": "not_tested",
-                "structured_probe_checked_at": None,
-                "structured_probe_expires_at": None,
-            }
-        if getattr(result, "provider", None) != provider:
-            return {
-                "structured_probe_status": "not_tested",
-                "structured_probe_checked_at": None,
-                "structured_probe_expires_at": None,
-            }
-        return {
-            "structured_probe_status": str(
-                getattr(result, "status", "not_tested")
-            ),
-            "structured_probe_checked_at": getattr(result, "checked_at", None),
-            "structured_probe_expires_at": getattr(result, "expires_at", None),
-        }
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -223,7 +189,7 @@ class ChatModelLibraryService:
             return None
         try:
             parsed = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return parsed if parsed > 0 else None
 
@@ -233,7 +199,6 @@ class ChatModelLibraryService:
         *,
         ollama_url: str,
         cloud_provider: str | None = None,
-        include_probe_status: bool = True,
     ) -> dict[str, object]:
         normalized_ollama_url = self.normalize_ollama_url(ollama_url)
         if cloud_provider is not None:
@@ -249,22 +214,12 @@ class ChatModelLibraryService:
         if cloud_provider in DYNAMIC_CLOUD_PROVIDERS:
             dynamic_descriptors, source = self._refresh_dynamic_catalog(cloud_provider)
             cloud.extend(self.model_payload(item) for item in dynamic_descriptors)
-            sources[cloud_provider] = {
-                **source,
-                **(
-                    self._structured_probe_status(cloud_provider)
-                    if include_probe_status
-                    else {}
-                ),
-            }
+            sources[cloud_provider] = source
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
         for entry in cloud:
             key = (str(entry.get("provider", "")), str(entry.get("id", "")))
             deduped_cloud[key] = entry
-        local, ollama_status = self._list_ollama_models(
-            normalized_ollama_url,
-            include_probe_status=include_probe_status,
-        )
+        local, ollama_status = self._list_ollama_models(normalized_ollama_url)
         sources["ollama"] = ollama_status
         return {
             "cloud": list(deduped_cloud.values()),
@@ -344,7 +299,8 @@ class ChatModelLibraryService:
                 (
                     item
                     for item in get_cloud_model_catalog()
-                    if item.provider == normalized_provider and item.name == normalized_model
+                    if item.provider == normalized_provider
+                    and item.name == normalized_model
                 ),
                 None,
             )
@@ -362,7 +318,6 @@ class ChatModelLibraryService:
                 provider=normalized_provider,
                 model_name=normalized_model,
                 ollama_url=normalized_ollama_url,
-                include_probe_status=False,
             )
         return self.find_cached_model(
             provider=normalized_provider,
@@ -426,7 +381,6 @@ class ChatModelLibraryService:
         model_name: str,
         ollama_url: str,
         require_provider_availability: bool = False,
-        include_probe_status: bool = True,
     ) -> dict[str, object] | None:
         require_canonical_provider(provider)
         dynamic_cloud_provider = (
@@ -435,7 +389,6 @@ class ChatModelLibraryService:
         library = self.list_models(
             ollama_url=self.normalize_ollama_url(ollama_url),
             cloud_provider=dynamic_cloud_provider,
-            include_probe_status=include_probe_status,
         )
         if require_provider_availability and provider in DYNAMIC_CLOUD_PROVIDERS:
             sources_value = library.get("sources", {})
@@ -532,7 +485,10 @@ class ChatModelLibraryService:
                 if cached is None:
                     continue
                 for descriptor in cached.models:
-                    if descriptor.provider == provider and descriptor.name == model_name:
+                    if (
+                        descriptor.provider == provider
+                        and descriptor.name == model_name
+                    ):
                         descriptor.metadata.update(metadata)
 
     # -------------------------------------------------------------------------
@@ -549,22 +505,13 @@ class ChatModelLibraryService:
     def _list_ollama_models(
         self,
         ollama_url: str,
-        *,
-        include_probe_status: bool = True,
     ) -> tuple[list[dict[str, object]], dict[str, object]]:
         cached_models = self._ollama_model_cache.get(ollama_url)
         now = monotonic()
         if cached_models is not None and cached_models.expires_at > now:
             return (
                 [self.model_payload(model) for model in cached_models.models],
-                {
-                    **cached_models.source,
-                    **(
-                        self._structured_probe_status("ollama")
-                        if include_probe_status
-                        else {}
-                    ),
-                },
+                cached_models.source,
             )
         cached = self._ollama_unavailable_cache.get(ollama_url)
         if cached is not None and cached.expires_at > now:
@@ -573,11 +520,6 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": cached.message,
                 "model_count": 0,
-                **(
-                    self._structured_probe_status("ollama")
-                    if include_probe_status
-                    else {}
-                ),
             }
         self._ollama_unavailable_cache.pop(ollama_url, None)
         ollama = OllamaProvider(
@@ -597,11 +539,6 @@ class ChatModelLibraryService:
                 "reachable": False,
                 "message": message,
                 "model_count": 0,
-                **(
-                    self._structured_probe_status("ollama")
-                    if include_probe_status
-                    else {}
-                ),
             }
         self._ollama_model_cache[ollama_url] = _CachedModelDescriptors(
             expires_at=now + self.dynamic_catalog_ttl_s,
@@ -621,10 +558,6 @@ class ChatModelLibraryService:
                 "reachable": True,
                 "message": None,
                 "model_count": len(local_models),
-                **(
-                    self._structured_probe_status("ollama")
-                    if include_probe_status
-                    else {}
-                ),
+                "stale": False,
             },
         )

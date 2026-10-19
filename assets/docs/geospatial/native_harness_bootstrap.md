@@ -250,8 +250,9 @@ The configured OpenCode Go credential was live for the run above; other lanes
 and hosted infrastructure were not silently substituted. The gates are:
 
 1. Provider-specific serialization and continuation proof for OpenAI Responses
-   and Ollama. OpenCode Go has a live structured probe and the browser run
-   above, but this does not establish parity for the other providers.
+   and Ollama. An earlier OpenCode Go readiness run recorded a successful
+   structured probe, but current Settings uses capability metadata and this
+   does not establish parity for the other providers.
 2. Hosted CI was not rerun after the local commits. The last exact-HEAD CI run
    (`34967001626`) failed its stale Pyright job before this remediation.
 3. The full browser/API E2E matrix was not executed locally because its backend

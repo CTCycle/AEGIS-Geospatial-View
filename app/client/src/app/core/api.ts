@@ -1,7 +1,6 @@
 import {
   API_BASE_URL,
   API_CHAT_MODELS_PATH,
-  API_CHAT_STRUCTURED_PROBE_PATH,
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
   API_CONVERSATION_PATH,
@@ -34,7 +33,6 @@ import {
   parseRuntimeSettingsResponse,
   parseOllamaHealthResponse,
   parseOllamaRefreshResponse,
-  parseStructuredProbeResponse,
   parseRunTraceResponse,
   parseAgentRunSnapshot,
 } from './api-parsers';
@@ -55,7 +53,6 @@ import {
   ModelSettingsUpdateRequest,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
-  StructuredProbeResponse,
   RunTraceResponse,
   AgentRunSnapshot,
   OllamaHealthResponse,
@@ -74,7 +71,6 @@ const requestTimeoutMs = (url: string, init: RequestInit): number => {
   const normalizedUrl = url.toLowerCase();
   if (
     normalizedUrl.includes('/chat/turn')
-    || normalizedUrl.includes('/chat/models/structured-probe')
     || normalizedUrl.includes('/ollama/pull')
     || normalizedUrl.includes('/geospatial/layers/') && normalizedUrl.includes('/features')
   ) {
@@ -357,20 +353,4 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
   return parseOllamaHealthResponse(data);
-};
-
-export const fetchStructuredProbe = async (): Promise<StructuredProbeResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
-    method: 'GET',
-    cache: 'no-store',
-  });
-  return parseStructuredProbeResponse(data);
-};
-
-export const runStructuredProbe = async (): Promise<StructuredProbeResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_STRUCTURED_PROBE_PATH}`, {
-    method: 'POST',
-    cache: 'no-store',
-  });
-  return parseStructuredProbeResponse(data);
 };

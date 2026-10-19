@@ -21,11 +21,13 @@ from server.services.llm.deepseek_provider import DEFAULT_DEEPSEEK_BASE_URL
 from server.services.llm.google_provider import DEFAULT_GOOGLE_BASE_URL
 from server.services.llm.types import ModelContextProfile
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class _CachedProfile:
     expires_at: float
     profile: ModelContextProfile | None
+
 
 ###############################################################################
 class ModelContextProfileResolver:
@@ -152,7 +154,6 @@ class ModelContextProfileResolver:
                     provider=normalized_provider,
                     model_name=normalized_model,
                     ollama_url=self._ollama_url(),
-                    include_probe_status=False,
                 )
                 descriptor = found if is_json_object(found) else None
         except TypeError:
@@ -247,9 +248,7 @@ class ModelContextProfileResolver:
         }.get(provider, "")
 
     # -------------------------------------------------------------------------
-    def _cached_descriptor(
-        self, provider: str, model: str
-    ) -> dict[str, Any] | None:
+    def _cached_descriptor(self, provider: str, model: str) -> dict[str, Any] | None:
         try:
             return self.model_library_service.find_cached_model(
                 provider=provider,

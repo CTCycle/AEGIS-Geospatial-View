@@ -130,7 +130,7 @@ describe('model-selection', () => {
     const summary = buildSelectedAgentModelSummary(
       settings,
       new Set<string>(['llama3.2']),
-      [model({ provider: 'ollama', name: 'llama3.2', capabilities: ['tools', 'json'], tool_support_source: 'ollama_probe' })],
+      [model({ provider: 'ollama', name: 'llama3.2', capabilities: ['tools', 'json'], tool_support_source: 'ollama_show' })],
     );
 
     expect(summary).toEqual(jasmine.objectContaining({
@@ -140,7 +140,7 @@ describe('model-selection', () => {
       installedLocally: true,
       supportsTools: true,
       supportsStructuredOutput: true,
-      toolSupportSource: 'ollama_probe',
+      toolSupportSource: 'ollama_show',
     }));
     expect(summary?.capabilities).toEqual(['tools', 'json']);
   });

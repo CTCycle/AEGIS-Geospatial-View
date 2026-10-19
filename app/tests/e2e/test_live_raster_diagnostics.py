@@ -23,6 +23,9 @@ from tests.e2e.helpers.artifacts import (
     write_log_tail,
     write_snapshot,
 )
+from tests.e2e.helpers.model_capability_metadata import (
+    selected_model_tool_support_metadata,
+)
 
 
 TEST_ID = "RASTER-LIVE-DIAGNOSTICS"
@@ -205,27 +208,6 @@ class _RasterCapture(NetworkCapture):
         page.context.on("requestfailed", on_request_failed)
         page.on("console", on_console)
         page.on("pageerror", on_page_error)
-
-
-def _provider_probe(page: Page, api_base_url: str) -> dict[str, Any]:
-    response = page.request.post(
-        f"{api_base_url.rstrip('/')}/api/chat/models/structured-probe",
-        timeout=60_000,
-    )
-    try:
-        body = response.json()
-    except (TypeError, ValueError):
-        body = {}
-    body = body if isinstance(body, dict) else {}
-    return {
-        "http_status": response.status,
-        "provider": body.get("provider"),
-        "model": body.get("model"),
-        "protocol": body.get("protocol"),
-        "status": body.get("status"),
-        "parse_status": body.get("parse_status"),
-        "duration_ms": body.get("duration_ms"),
-    }
 
 
 def _read_conversation_id(page: Page) -> str | None:
@@ -815,20 +797,22 @@ def test_live_public_raster_request_diagnostics(
     """Persist exact public-raster network evidence without changing map gates."""
 
     dirs = ensure_test_artifact_dirs(artifact_root, TEST_ID)
-    with browser.new_context() as probe_context:
-        preflight = _provider_probe(probe_context.new_page(), api_base_url)
-    ready = (
-        preflight["http_status"] == 200
-        and preflight["status"] == "passed"
-        and preflight["parse_status"] == "complete"
-        and preflight["provider"] == "opencode-go"
-        and preflight["model"] == "deepseek-v4.1-flash"
-    )
+    with browser.new_context() as metadata_context:
+        ready, reason, preflight = selected_model_tool_support_metadata(
+            metadata_context.new_page(), api_base_url
+        )
+    if ready and (
+        preflight["provider"] != "opencode-go"
+        or preflight["model"] != "deepseek-v4.1-flash"
+    ):
+        ready = False
+        reason = "Raster diagnostics require opencode-go / deepseek-v4.1-flash."
     if not ready:
         (dirs["reports"] / f"{TEST_ID}.json").write_text(
-            json.dumps({"provider_probe": preflight}, indent=2), encoding="utf-8"
+            json.dumps({"capability_metadata": preflight}, indent=2),
+            encoding="utf-8",
         )
-        pytest.skip(f"Exact live provider lane was not ready: {preflight}")
+        pytest.skip(f"Selected model capability is not ready: {reason}; {preflight}")
 
     results: list[dict[str, Any]] = []
     scenarios = SCENARIOS
@@ -887,7 +871,7 @@ def test_live_public_raster_request_diagnostics(
 
     report = {
         "test_id": TEST_ID,
-        "provider_probe": preflight,
+        "capability_metadata": preflight,
         "scenarios": results,
         "artifacts": {
             "screenshots": str(dirs["screenshots"]),

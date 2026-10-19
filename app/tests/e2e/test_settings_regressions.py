@@ -22,7 +22,15 @@ from tests.e2e.helpers.realtime_stub import register_realtime_stub
 PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
-SETTINGS_UI_QA_DIR = Path(__file__).resolve().parents[3] / "assets" / "QA" / "settings-ui"
+SETTINGS_UI_QA_DIR = (
+    Path(__file__).resolve().parents[3] / "assets" / "QA" / "settings-ui"
+)
+SETTINGS_METADATA_REVIEW_QA_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "assets"
+    / "QA"
+    / "settings-metadata-only-20261019"
+)
 T1_10_SETTINGS_QA_DIR = (
     Path(__file__).resolve().parents[3]
     / "assets"
@@ -30,6 +38,7 @@ T1_10_SETTINGS_QA_DIR = (
     / "tier1-validation-develop-20260923"
     / "T1-10"
 )
+
 
 ###############################################################################
 def settings_provider_account_setup_payload() -> dict[str, Any]:
@@ -79,9 +88,11 @@ def settings_provider_account_setup_payload() -> dict[str, Any]:
         ]
     }
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _request_json(route: Route) -> dict[str, Any]:
@@ -100,6 +111,7 @@ def _request_json(route: Route) -> dict[str, Any]:
     except Exception:  # noqa: BLE001
         return {}
     return payload if isinstance(payload, dict) else {}
+
 
 ###############################################################################
 def _setup_stub_harness(
@@ -124,7 +136,9 @@ def _setup_stub_harness(
     active_settings = dict(settings_payload or selected_agent_settings_payload())
     active_models = models_payload or model_catalog_payload()
     captured_patch_payloads = patch_payloads if patch_payloads is not None else []
-    captured_settings_responses = settings_responses if settings_responses is not None else []
+    captured_settings_responses = (
+        settings_responses if settings_responses is not None else []
+    )
 
     def handle_settings(route: Route) -> None:
         method = route.request.method.upper()
@@ -157,7 +171,13 @@ def _setup_stub_harness(
                             provider_health[label] = (
                                 "healthy"
                                 if provider
-                                in {"openai", "google", "deepseek", "opencode", "opencode-go"}
+                                in {
+                                    "openai",
+                                    "google",
+                                    "deepseek",
+                                    "opencode",
+                                    "opencode-go",
+                                }
                                 else "stored"
                             )
                         else:
@@ -224,6 +244,7 @@ def _setup_stub_harness(
     )
     return captured_patch_payloads
 
+
 ###############################################################################
 def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     page: Page, base_url: str
@@ -237,10 +258,6 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     expect(
         page.get_by_role("complementary", name="Selected agent model")
     ).to_be_visible(timeout=15000)
-    expect(page.get_by_role("button", name="Test selected model")).to_be_visible(
-        timeout=5000
-    )
-
     layout_metrics = page.evaluate(
         """
         () => {
@@ -270,6 +287,56 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
         or left["bottom"] <= right["top"] + 1
         or right["bottom"] <= left["top"] + 1
     )
+
+
+###############################################################################
+def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_accessible(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+    page.set_viewport_size({"width": 1366, "height": 900})
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=models")
+
+    expect(page.locator(".model-card").first).to_be_visible(timeout=15000)
+    expect(page.get_by_role("button", name="Test selected model")).to_have_count(0)
+    model_card = (
+        page.locator("article.model-card")
+        .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
+        .first
+    )
+    model_card.get_by_role("button", name="Select as agent model: gpt-5-mini").click()
+    expect(page.locator(".settings-page__status")).to_have_text(
+        "Selected gpt-5-mini as agent model"
+    )
+
+    sections = [
+        ("Models", "models", "settings-panel-models"),
+        ("Model Providers", "model-providers", "settings-panel-model-providers"),
+        ("Geospatial Access", "geospatial-access", "settings-panel-geospatial-access"),
+        ("Application", "application", "settings-panel-application"),
+        ("Map & Search", "map-search", "settings-panel-map-search"),
+        ("Data Sources", "data-sources", "settings-panel-data-sources"),
+        ("Agent Runtime", "agent-runtime", "settings-panel-agent-runtime"),
+    ]
+    SETTINGS_METADATA_REVIEW_QA_DIR.mkdir(parents=True, exist_ok=True)
+    for section, slug, panel_id in sections:
+        page.get_by_role("button", name=section, exact=True).click()
+        expect(page.locator(f"#{panel_id}")).to_be_visible(timeout=10000)
+        page.screenshot(path=str(SETTINGS_METADATA_REVIEW_QA_DIR / f"{slug}.png"))
+
+    disclosures = page.locator("details.runtime-settings__disclosure")
+    expect(disclosures).to_have_count(3)
+    expect(page.locator("details.runtime-settings__disclosure[open]")).to_have_count(0)
+    expect(page.get_by_role("heading", name="Execution budgets")).to_be_visible()
+    expect(page.get_by_role("heading", name="Failure recovery")).to_be_visible()
+    for index in range(3):
+        disclosure = disclosures.nth(index)
+        disclosure.locator("summary").focus()
+        page.keyboard.press("Enter")
+        assert disclosure.evaluate("element => element.open") is True
+        page.keyboard.press("Enter")
+        assert disclosure.evaluate("element => element.open") is False
+
 
 ###############################################################################
 def test_settings_provider_surfaces_and_setup_modal_are_responsive(
@@ -329,7 +396,9 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
         )
 
         page.get_by_role("button", name="Geospatial Access").click()
-        geospatial_card = page.locator(".settings-provider-list .settings-provider-card").first
+        geospatial_card = page.locator(
+            ".settings-provider-list .settings-provider-card"
+        ).first
         expect(geospatial_card).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Get API key").click()
         dialog = page.get_by_role("dialog", name="API key setup for TomTom")
@@ -372,6 +441,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
         page.get_by_role("button", name="Cancel guided setup").click()
         expect(dialog).to_be_hidden(timeout=5000)
 
+
 ###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
     patch_payloads: list[dict[str, Any]] = []
@@ -397,10 +467,10 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
         "button", name="Select as agent model: gpt-5-mini"
     )
     selection_button.focus()
+
     def settings_patch(response: Any) -> bool:
-        return (
-            response.request.method == "PATCH"
-            and response.url.endswith("/api/chat/settings")
+        return response.request.method == "PATCH" and response.url.endswith(
+            "/api/chat/settings"
         )
 
     with page.expect_response(settings_patch) as first_selection_response:
@@ -427,13 +497,10 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     )
     summary = page.get_by_role("complementary", name="Selected agent model")
     expect(summary.get_by_role("heading", name="gpt-5-mini")).to_be_visible()
-    probe_button = page.get_by_role("button", name="Test selected model")
-    expect(probe_button).to_be_visible()
     selected_panel_metrics = page.evaluate(
         """
         () => {
           const column = document.querySelector('.settings-page__right-column');
-          const probe = document.querySelector('.settings-page__probe');
           const summary = document.querySelector('.selected-model-summary');
           const rect = (element) => {
             const value = element.getBoundingClientRect();
@@ -441,7 +508,6 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
           };
           return {
             column: column ? rect(column) : null,
-            probe: probe ? rect(probe) : null,
             summary: summary ? rect(summary) : null,
             summaryScrollHeight: summary?.scrollHeight ?? null,
             summaryClientHeight: summary?.clientHeight ?? null,
@@ -450,9 +516,10 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
         """
     )
     assert selected_panel_metrics["column"] is not None
-    assert selected_panel_metrics["probe"] is not None
-    assert selected_panel_metrics["probe"]["bottom"] <= selected_panel_metrics["column"]["bottom"] + 1, selected_panel_metrics
-    assert selected_panel_metrics["summaryScrollHeight"] >= selected_panel_metrics["summaryClientHeight"]
+    assert (
+        selected_panel_metrics["summaryScrollHeight"]
+        >= selected_panel_metrics["summaryClientHeight"]
+    )
     T1_10_SETTINGS_QA_DIR.joinpath("screenshots").mkdir(parents=True, exist_ok=True)
     page.screenshot(
         path=str(T1_10_SETTINGS_QA_DIR / "screenshots" / "models-selected-model.png"),
@@ -464,7 +531,9 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
         matching_payloads = [
             item for item in patch_payloads if "agent_model_provider" in item
         ]
-        assert matching_payloads, f"No model settings payload captured: {patch_payloads}"
+        assert matching_payloads, (
+            f"No model settings payload captured: {patch_payloads}"
+        )
         payload = matching_payloads[-1]
 
     assert payload["agent_model_provider"] == "openai"
@@ -528,7 +597,9 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     assert patch_payloads == []
 
     card.get_by_role("button", name="Clear saved key").click()
-    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text("Synthetic credential update failure.", exact=True)
+    ).to_be_visible()
     expect(page.get_by_text("OpenAI key cleared.", exact=True)).to_have_count(0)
     expect(card.get_by_text("Saved key cannot be read")).to_be_visible()
     assert len(patch_payloads) == 1
@@ -536,7 +607,9 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     fixture_key = "sk-fixturekey12345"
     key_input.fill(fixture_key)
     key_input.press("Enter")
-    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text("Synthetic credential update failure.", exact=True)
+    ).to_be_visible()
     expect(
         page.get_by_text(
             "OpenAI key saved. Provider access has not been validated.", exact=True
@@ -550,7 +623,9 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
 
     screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
     screenshots.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=str(screenshots / "model-provider-update-failure.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "model-provider-update-failure.png"), full_page=True
+    )
 
 
 ###############################################################################
@@ -593,7 +668,9 @@ def test_model_provider_credential_safe_save_clear_and_reload(
 
     screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
     screenshots.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=str(screenshots / "model-provider-credential-saved.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "model-provider-credential-saved.png"), full_page=True
+    )
 
     clear_button.click()
     expect(page.get_by_text("OpenAI key cleared.", exact=True)).to_be_visible()
@@ -607,11 +684,15 @@ def test_model_provider_credential_safe_save_clear_and_reload(
     expect(key_input).to_have_value("")
     expect(clear_button).to_be_disabled()
     expect(page.locator("body")).not_to_contain_text(fixture_key)
-    page.screenshot(path=str(screenshots / "model-provider-credential-cleared.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "model-provider-credential-cleared.png"), full_page=True
+    )
 
 
 ###############################################################################
-def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: str) -> None:
+def test_geospatial_credential_safe_save_clear_and_reload(
+    page: Page, base_url: str
+) -> None:
     patch_payloads: list[dict[str, Any]] = []
     _setup_stub_harness(page, patch_payloads=patch_payloads)
     page.set_viewport_size({"width": 1366, "height": 768})
@@ -644,7 +725,9 @@ def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: 
 
     screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
     screenshots.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=str(screenshots / "geospatial-credential-saved.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "geospatial-credential-saved.png"), full_page=True
+    )
 
     key_input.press("Enter")
     assert len(patch_payloads) == 1
@@ -660,7 +743,9 @@ def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: 
 
     page.reload()
     expect(card.get_by_text("Not configured")).to_be_visible()
-    page.screenshot(path=str(screenshots / "geospatial-credential-cleared.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "geospatial-credential-cleared.png"), full_page=True
+    )
 
 
 ###############################################################################
@@ -690,7 +775,9 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
     fixture_key = "synthetic-tomtom-replacement"
     key_input.fill(fixture_key)
     key_input.press("Enter")
-    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text("Synthetic credential update failure.", exact=True)
+    ).to_be_visible()
     expect(
         page.get_by_text(
             "TomTom key saved. Provider access has not been validated.", exact=True
@@ -702,7 +789,9 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
     expect(card.get_by_text("Saved key is readable (not validated)")).to_be_visible()
 
     card.get_by_role("button", name="Clear saved key").click()
-    expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
+    expect(
+        page.get_by_text("Synthetic credential update failure.", exact=True)
+    ).to_be_visible()
     expect(
         page.get_by_text(
             "TomTom key cleared. Optional capabilities are disabled.", exact=True
@@ -713,7 +802,11 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
 
     screenshots = T1_10_SETTINGS_QA_DIR / "screenshots"
     screenshots.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=str(screenshots / "geospatial-credential-update-failure.png"), full_page=True)
+    page.screenshot(
+        path=str(screenshots / "geospatial-credential-update-failure.png"),
+        full_page=True,
+    )
+
 
 ###############################################################################
 def test_capabilities_tables_do_not_clip_desktop_columns(
@@ -747,6 +840,7 @@ def test_capabilities_tables_do_not_clip_desktop_columns(
     assert all(
         item["right"] <= item["pageRight"] + 1 for item in metrics["wrappedTables"]
     )
+
 
 ###############################################################################
 def test_chat_composer_does_not_cover_latest_assistant_message(
@@ -783,6 +877,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 
     assert metrics["assistantBottom"] <= metrics["composerTop"] + 1
 
+
 ###############################################################################
 def test_settings_query_params_do_not_leak_back_to_chat(
     page: Page, base_url: str
@@ -799,6 +894,7 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     query = page.evaluate("() => window.location.search")
     assert path == "/"
     assert query == ""
+
 
 ###############################################################################
 def test_settings_sections_preserve_drafts_save_and_return(
@@ -895,13 +991,17 @@ def test_settings_sections_preserve_drafts_save_and_return(
     expect(page.get_by_role("heading", name="Data Sources", exact=True)).to_be_visible()
     page.go_forward()
     expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=agent-runtime")
-    expect(page.get_by_role("heading", name="Agent Runtime", exact=True)).to_be_visible()
+    expect(
+        page.get_by_role("heading", name="Agent Runtime", exact=True)
+    ).to_be_visible()
 
     page.get_by_role("button", name="Application", exact=True).click()
     history_limit = page.get_by_label("Maximum history messages")
     with page.expect_response(
-        lambda response: response.request.method == "PATCH"
-        and response.url.endswith("/settings/runtime")
+        lambda response: (
+            response.request.method == "PATCH"
+            and response.url.endswith("/settings/runtime")
+        )
     ) as patch_response:
         history_limit.fill("23")
         page.get_by_role("button", name="Data Sources", exact=True).click()
@@ -923,6 +1023,7 @@ def test_settings_sections_preserve_drafts_save_and_return(
     page.screenshot(
         path=str(screenshot_dir / "application-saved-after-return.png"), full_page=True
     )
+
 
 ###############################################################################
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(

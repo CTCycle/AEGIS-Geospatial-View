@@ -134,24 +134,6 @@
 
           <aside class="settings-page__right-column" aria-label="Selected agent model">
             <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
-            @if (selectedAgentModelSummary) {
-              <section class="settings-page__probe" aria-label="Native route and tool verification">
-                <div>
-                  <p class="settings-page__probe-label">Native route and tools</p>
-                  <strong>{{ structuredProbeLabel }}</strong>
-                  @if (structuredProbe.message) {
-                    <p>{{ structuredProbe.message }}</p>
-                  }
-                </div>
-                <button
-                  type="button"
-                  class="primary-button"
-                  [disabled]="isTestingStructuredProbe"
-                  [attr.aria-busy]="isTestingStructuredProbe"
-                  (click)="testSelectedModel()"
-                >{{ isTestingStructuredProbe ? 'Testing…' : 'Test selected model' }}</button>
-              </section>
-            }
           </aside>
         </div>
       </section>
@@ -165,9 +147,8 @@
         <section class="settings-section" aria-labelledby="model-provider-heading">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Cloud access</p>
               <h2 id="model-provider-heading">Model providers</h2>
-              <p>Save provider credentials to discover account-visible models. A readable saved key is not proof that a provider endpoint is reachable.</p>
+              <p>Save a key to discover account-visible models. Saved values stay masked; a readable key does not confirm the endpoint is reachable.</p>
             </div>
           </header>
           <div class="settings-provider-list">
@@ -176,7 +157,6 @@
                 <header class="settings-provider-card__header">
                   <div>
                     <h3>{{ provider.name }}</h3>
-                    <p>{{ provider.purpose }}</p>
                   </div>
                   <span class="settings-status" [class.settings-status--ready]="isCloudCredentialConfigured(provider.id)">
                     <span aria-hidden="true"></span>{{ modelProviderHealth(provider.id) }}
@@ -204,7 +184,6 @@
         <section class="settings-section settings-section--runtime" aria-labelledby="ollama-heading">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Local runtime</p>
               <h2 id="ollama-heading">Ollama</h2>
               <p>Connect to a local Ollama server, refresh its model library, or pull a model before selecting it.</p>
             </div>
@@ -237,9 +216,8 @@
         <section class="settings-section" aria-labelledby="geospatial-access-heading">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Geospatial access</p>
-              <h2 id="geospatial-access-heading">Optional provider credentials</h2>
-              <p>Manage access for credential-gated geospatial capabilities. Public providers remain available subject to attribution and usage limits.</p>
+              <h2 id="geospatial-access-heading">Geospatial access</h2>
+              <p>Keys unlock selected capabilities. Public sources remain subject to attribution and usage limits; provider notes show source-specific setup.</p>
             </div>
             <span class="settings-status">{{ geoProviders.length }} providers</span>
           </header>
@@ -255,18 +233,16 @@
                   <header class="settings-provider-card__header">
                     <div>
                       <h3>{{ provider.name }}</h3>
-                      <p>{{ provider.purpose }}</p>
                     </div>
-                    <span class="settings-status" [class.settings-status--ready]="geoProviderConfigured(provider.id)">
-                      <span aria-hidden="true"></span>{{ geoProviderHealth(provider.id) }}
+                    <span class="settings-status" [class.settings-status--ready]="!provider.requiresCredentials || geoProviderConfigured(provider.id)">
+                      <span aria-hidden="true"></span>{{ provider.requiresCredentials ? geoProviderHealth(provider.id) : 'No key needed' }}
                     </span>
                   </header>
-                  <div class="settings-provider-card__details">
-                    <span>{{ provider.requiresCredentials ? 'API key required for selected capabilities' : 'Documentation and setup guidance' }}</span>
-                    @if (provider.docsUrl) {
+                  @if (provider.docsUrl) {
+                    <div class="settings-provider-card__details">
                       <a [href]="provider.docsUrl" target="_blank" rel="noreferrer">Provider documentation</a>
-                    }
-                  </div>
+                    </div>
+                  }
                   @if (provider.instructions.length) {
                     <details class="settings-provider-card__instructions">
                       <summary>Setup notes</summary>
@@ -311,9 +287,8 @@
         <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Runtime settings</p>
               <h2 id="application-settings-heading">Application</h2>
-              <p>Control conversation history, timezone handling, and background job polling. Changes are validated and saved automatically.</p>
+              <p>Conversation history, time zone, and background job polling.</p>
             </div>
           </header>
           <div class="runtime-settings__fields">
@@ -336,9 +311,8 @@
         <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Runtime settings</p>
               <h2 id="map-search-settings-heading">Map &amp; Search</h2>
-              <p>Configure the default map request, geospatial bounds, and the Nominatim search endpoint used by location resolution.</p>
+              <p>Map defaults, location search, and coordinate bounds.</p>
             </div>
           </header>
           <div class="runtime-settings__group">
@@ -401,9 +375,8 @@
         <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Runtime settings</p>
               <h2 id="data-source-settings-heading">Data Sources</h2>
-              <p>Keep provider endpoints, request pacing, cache lifetimes, and GIBS layer mappings in one auditable settings surface.</p>
+              <p>Provider endpoints, request limits, and cache settings.</p>
             </div>
           </header>
           <div class="runtime-settings__group">
@@ -557,9 +530,8 @@
         <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
-              <p class="page-kicker">Runtime settings</p>
               <h2 id="agent-runtime-settings-heading">Agent Runtime</h2>
-              <p>Adjust execution budgets, correction limits, and retry behavior used by the native agent loop.</p>
+              <p>Execution limits and recovery behavior for agent runs.</p>
             </div>
           </header>
           <h3>Execution budgets</h3>
@@ -587,44 +559,56 @@
             <label>Route corrections <input class="settings-control" type="number" max="10" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>
             <label>Validation corrections <input class="settings-control" type="number" max="20" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_validation_corrections" /></label>
           </div>
-          <h3>Timeouts and retries</h3>
-          <p>Stage deadlines are capped by the remaining run budget. Provider attempts include the first request.</p>
-          <div class="runtime-settings__fields runtime-settings__fields--wide">
-            <label>Context assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.context_assembly_seconds" /></label>
-            <label>Native model call seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.native_model_call_seconds" /></label>
-            <label>Tool execution seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
-            <label>Tool absolute seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
-            <label>Map assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.map_assembly_seconds" /></label>
-            <label>Persistence seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.persistence_seconds" /></label>
-            <label>Render acknowledgement seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
-            <label>Model attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
-            <label>Provider attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
-            <label>Retry backoff base seconds <input class="settings-control" type="number" max="60.0" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
-            <label>Retry backoff max seconds <input class="settings-control" type="number" max="120.0" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
-            <label>Provider request seconds <input class="settings-control" type="number" max="120.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
-          </div>
-<h3>Advanced limits</h3>
-          <p>Limit parallel work and the size of each model-visible tool observation.</p>
-          <div class="runtime-settings__fields runtime-settings__fields--wide">
-            <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
-            <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
-          </div>
-          <h3>Vision inspection</h3>
-          <p>When the selected model supports image input, AEGIS can capture the rendered map and give it to the agent as visual context.</p>
-          <div class="runtime-settings__fields runtime-settings__fields--wide">
-            <label class="settings-select-field">Vision policy
-              <select class="settings-control" [value]="runtimeSettingsDraft.agent_execution.vision_policy"
-                [disabled]="visionPolicyUnavailable"
-                (change)="runtimeSettingsDraft.agent_execution.vision_policy = $any($event.target).value"
-                aria-label="Vision inspection policy">
-                @for (option of visionPolicyOptions; track option.value) {
-                  <option [value]="option.value">{{ option.label }}</option>
-                }
-              </select>
-            </label>
-            <label>Vision calls per run <input class="settings-control" type="number" max="8" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.vision_max_calls" /></label>
-          </div>
-          <p class="settings-hint">{{ visionPolicyHint }}</p>
+          <details class="runtime-settings__disclosure">
+            <summary>Timeouts and retries</summary>
+            <div class="runtime-settings__disclosure-content">
+              <p>Stage deadlines are capped by the remaining run budget. Provider attempts include the first request.</p>
+              <div class="runtime-settings__fields runtime-settings__fields--wide">
+                <label>Context assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.context_assembly_seconds" /></label>
+                <label>Native model call seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.native_model_call_seconds" /></label>
+                <label>Tool execution seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_execution_seconds" /></label>
+                <label>Tool absolute seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.tool_absolute_seconds" /></label>
+                <label>Map assembly seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.map_assembly_seconds" /></label>
+                <label>Persistence seconds <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.persistence_seconds" /></label>
+                <label>Render acknowledgement seconds <input class="settings-control" type="number" max="90.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.render_ack_seconds" /></label>
+                <label>Model attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.model_max_attempts" /></label>
+                <label>Provider attempts <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_max_attempts" /></label>
+                <label>Retry backoff base seconds <input class="settings-control" type="number" max="60.0" min="0" step="0.05" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_base_seconds" /></label>
+                <label>Retry backoff max seconds <input class="settings-control" type="number" max="120.0" min="0" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.retry_backoff_max_seconds" /></label>
+                <label>Provider request seconds <input class="settings-control" type="number" max="120.0" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.agent_execution.provider_request_seconds" /></label>
+              </div>
+            </div>
+          </details>
+          <details class="runtime-settings__disclosure">
+            <summary>Advanced limits</summary>
+            <div class="runtime-settings__disclosure-content">
+              <p>Limit parallel work and the size of each model-visible tool observation.</p>
+              <div class="runtime-settings__fields runtime-settings__fields--wide">
+                <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
+                <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
+              </div>
+            </div>
+          </details>
+          <details class="runtime-settings__disclosure">
+            <summary>Vision inspection</summary>
+            <div class="runtime-settings__disclosure-content">
+              <p>When the selected model supports image input, AEGIS can capture the rendered map as visual context.</p>
+              <div class="runtime-settings__fields runtime-settings__fields--wide">
+                <label class="settings-select-field">Vision policy
+                  <select class="settings-control" [value]="runtimeSettingsDraft.agent_execution.vision_policy"
+                    [disabled]="visionPolicyUnavailable"
+                    (change)="runtimeSettingsDraft.agent_execution.vision_policy = $any($event.target).value"
+                    aria-label="Vision inspection policy">
+                    @for (option of visionPolicyOptions; track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </label>
+                <label>Vision calls per run <input class="settings-control" type="number" max="8" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.vision_max_calls" /></label>
+              </div>
+              <p class="settings-hint">{{ visionPolicyHint }}</p>
+            </div>
+          </details>
           <div class="settings-actions">
             <button type="button" class="secondary-button" [disabled]="isSavingRuntimeSettings" (click)="restoreAgentExecutionDefaults()">Restore agent defaults</button>
           </div>

@@ -255,46 +255,6 @@
         }
       }
     },
-    "/api/chat/models/structured-probe": {
-      "get": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Get Structured Probe",
-        "operationId": "get_structured_probe_api_chat_models_structured_probe_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StructuredProbeResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Run Structured Probe",
-        "operationId": "run_structured_probe_api_chat_models_structured_probe_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StructuredProbeResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/chat/models/ollama/refresh": {
       "post": {
         "tags": [
@@ -6697,42 +6657,6 @@
               }
             ],
             "title": "Model Count"
-          },
-          "structured_probe_status": {
-            "type": "string",
-            "enum": [
-              "not_tested",
-              "passed",
-              "failed",
-              "timeout",
-              "unsupported"
-            ],
-            "title": "Structured Probe Status",
-            "default": "not_tested"
-          },
-          "structured_probe_checked_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Structured Probe Checked At"
-          },
-          "structured_probe_expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Structured Probe Expires At"
           }
         },
         "additionalProperties": false,
@@ -8013,93 +7937,6 @@
           "model"
         ],
         "title": "SelectedModelContextResponse"
-      },
-      "StructuredProbeResponse": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          },
-          "model": {
-            "type": "string",
-            "title": "Model"
-          },
-          "protocol": {
-            "type": "string",
-            "title": "Protocol"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "not_tested",
-              "passed",
-              "failed",
-              "timeout",
-              "unsupported"
-            ],
-            "title": "Status"
-          },
-          "parse_status": {
-            "type": "string",
-            "title": "Parse Status"
-          },
-          "duration_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration Ms"
-          },
-          "checked_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Checked At"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "model",
-          "protocol",
-          "status",
-          "parse_status"
-        ],
-        "title": "StructuredProbeResponse"
       },
       "ToolExecutionError": {
         "properties": {

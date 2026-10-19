@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Python Quality Gates
 
@@ -70,7 +70,7 @@ The canonical status of local, browser, provider, migration, and hosted-CI
 gates is maintained in
 [`assets/docs/validation/gate_status.md`](../validation/gate_status.md).
 Every entry must identify the exact command/evidence, date, and one of
-`PASS`, `PARTIAL`, `FAIL`, `BLOCKED`, or `NOT RUN`; a build or catalog probe
+`PASS`, `PARTIAL`, `FAIL`, `BLOCKED`, or `NOT RUN`; a build or catalog check
 does not promote a completion-path gate.
 
 ## Frontend Quality Gates
@@ -81,9 +81,9 @@ does not promote a completion-path gate.
 - Parser tests must cover complete contracts, valid intentional ambiguity,
   sparse/default-only `contract_incomplete` failures, the 75/30-second budgets,
   bounded schema correction, and field-specific clarification questions.
-- Structured-probe tests must cover `not_tested`, `passed`, `failed`, `timeout`,
-  and `unsupported`, sanitized messages, 15-minute expiry, cache invalidation
-  after settings changes, and the absence of conversation/tool/map side effects.
+- Model-readiness tests must cover supported, unsupported, and missing
+  capability metadata plus catalog failures. Keep Settings metadata-only; do
+  not send inference requests to determine readiness.
 - Browser smoke coverage lives in `app/client/src/app/e2e`; backend/API E2E
   coverage lives in `app/tests/e2e`.
 
