@@ -1,0 +1,29 @@
+INFO:     Started server process [8428]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t5-recovery-20261019\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58014 - "WebSocket /api/conversations/conv_ecb1e738740a4af18a1bc0df174a7a54/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4420/3076.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4419/3076.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4420/3075.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4419/3075.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4420/3077.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4421/3076.png relay=no
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4419/3076.png
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4419/3077.png relay=no
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4419/3075.png
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4421/3076.png
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4420/3076.png
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4420/3075.png
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4420/3077.png
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4421/3075.png relay=no
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4419/3077.png
+[WARNING] geospatial_tile_proxy_failure category=connection_failure provider=osm_tiles capability=osm_default status=None content_type=unknown content_length=None phase=request upstream=https://tile.openstreetmap.org/13/4421/3075.png

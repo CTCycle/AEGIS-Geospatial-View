@@ -1,0 +1,522 @@
+[
+ {
+  "sequence": 1,
+  "timestamp": "2026-10-19T10:54:04.106159",
+  "type": "progress",
+  "kind": "progress",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 2,
+  "timestamp": "2026-10-19T10:54:04.108638",
+  "type": "trace",
+  "kind": "run_started",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 3,
+  "timestamp": "2026-10-19T10:54:04.855028",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 4,
+  "timestamp": "2026-10-19T10:54:22.882287",
+  "type": "progress",
+  "kind": "progress",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 5,
+  "timestamp": "2026-10-19T10:54:22.884673",
+  "type": "trace",
+  "kind": "run_started",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 6,
+  "timestamp": "2026-10-19T10:54:23.375787",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 7,
+  "timestamp": "2026-10-19T10:54:25.856735",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 8,
+  "timestamp": "2026-10-19T10:54:25.860502",
+  "type": "trace",
+  "kind": "iteration_started",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 9,
+  "timestamp": "2026-10-19T10:54:25.862877",
+  "type": "trace",
+  "kind": "tools_available",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 10,
+  "timestamp": "2026-10-19T10:54:25.875171",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 11,
+  "timestamp": "2026-10-19T10:54:38.653707",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 12,
+  "timestamp": "2026-10-19T10:54:38.655079",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 13,
+  "timestamp": "2026-10-19T10:54:38.658382",
+  "type": "trace",
+  "kind": "tool_selected",
+  "tool_name": "resolve_geospatial_location",
+  "status": null
+ },
+ {
+  "sequence": 14,
+  "timestamp": "2026-10-19T10:54:38.659523",
+  "type": "tool_started",
+  "kind": "tool_started",
+  "tool_name": "resolve_geospatial_location",
+  "status": "running"
+ },
+ {
+  "sequence": 15,
+  "timestamp": "2026-10-19T10:54:39.532935",
+  "type": "trace",
+  "kind": "tool_result",
+  "tool_name": "resolve_geospatial_location",
+  "status": "success"
+ },
+ {
+  "sequence": 16,
+  "timestamp": "2026-10-19T10:54:39.534177",
+  "type": "tool_completed",
+  "kind": "tool_completed",
+  "tool_name": "resolve_geospatial_location",
+  "status": "success"
+ },
+ {
+  "sequence": 17,
+  "timestamp": "2026-10-19T10:54:39.542782",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 18,
+  "timestamp": "2026-10-19T10:54:39.545396",
+  "type": "trace",
+  "kind": "iteration_completed",
+  "tool_name": null,
+  "status": "continue"
+ },
+ {
+  "sequence": 19,
+  "timestamp": "2026-10-19T10:54:39.548806",
+  "type": "trace",
+  "kind": "iteration_started",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 20,
+  "timestamp": "2026-10-19T10:54:39.551119",
+  "type": "trace",
+  "kind": "tools_available",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 21,
+  "timestamp": "2026-10-19T10:54:41.166929",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 22,
+  "timestamp": "2026-10-19T10:54:41.168100",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 23,
+  "timestamp": "2026-10-19T10:54:41.171836",
+  "type": "trace",
+  "kind": "tool_selected",
+  "tool_name": "describe_geospatial_capability",
+  "status": null
+ },
+ {
+  "sequence": 24,
+  "timestamp": "2026-10-19T10:54:41.172755",
+  "type": "tool_started",
+  "kind": "tool_started",
+  "tool_name": "describe_geospatial_capability",
+  "status": "running"
+ },
+ {
+  "sequence": 25,
+  "timestamp": "2026-10-19T10:54:41.176165",
+  "type": "trace",
+  "kind": "tool_result",
+  "tool_name": "describe_geospatial_capability",
+  "status": "success"
+ },
+ {
+  "sequence": 26,
+  "timestamp": "2026-10-19T10:54:41.177083",
+  "type": "tool_completed",
+  "kind": "tool_completed",
+  "tool_name": "describe_geospatial_capability",
+  "status": "success"
+ },
+ {
+  "sequence": 27,
+  "timestamp": "2026-10-19T10:54:41.186900",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 28,
+  "timestamp": "2026-10-19T10:54:41.190193",
+  "type": "trace",
+  "kind": "iteration_completed",
+  "tool_name": null,
+  "status": "continue"
+ },
+ {
+  "sequence": 29,
+  "timestamp": "2026-10-19T10:54:41.194721",
+  "type": "trace",
+  "kind": "iteration_started",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 30,
+  "timestamp": "2026-10-19T10:54:41.197460",
+  "type": "trace",
+  "kind": "tools_available",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 31,
+  "timestamp": "2026-10-19T10:54:43.643165",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 32,
+  "timestamp": "2026-10-19T10:54:43.644708",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 33,
+  "timestamp": "2026-10-19T10:54:43.659245",
+  "type": "trace",
+  "kind": "tool_selected",
+  "tool_name": "execute_geospatial_capability",
+  "status": null
+ },
+ {
+  "sequence": 34,
+  "timestamp": "2026-10-19T10:54:43.661263",
+  "type": "tool_started",
+  "kind": "tool_started",
+  "tool_name": "execute_geospatial_capability",
+  "status": "running"
+ },
+ {
+  "sequence": 35,
+  "timestamp": "2026-10-19T10:54:43.667159",
+  "type": "trace",
+  "kind": "tool_result",
+  "tool_name": "execute_geospatial_capability",
+  "status": "failed"
+ },
+ {
+  "sequence": 36,
+  "timestamp": "2026-10-19T10:54:43.670073",
+  "type": "tool_completed",
+  "kind": "tool_completed",
+  "tool_name": "execute_geospatial_capability",
+  "status": "failed"
+ },
+ {
+  "sequence": 37,
+  "timestamp": "2026-10-19T10:54:43.688391",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 38,
+  "timestamp": "2026-10-19T10:54:43.694418",
+  "type": "trace",
+  "kind": "iteration_completed",
+  "tool_name": null,
+  "status": "continue"
+ },
+ {
+  "sequence": 39,
+  "timestamp": "2026-10-19T10:54:43.702142",
+  "type": "trace",
+  "kind": "iteration_started",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 40,
+  "timestamp": "2026-10-19T10:54:43.707384",
+  "type": "trace",
+  "kind": "tools_available",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 41,
+  "timestamp": "2026-10-19T10:54:46.201165",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 42,
+  "timestamp": "2026-10-19T10:54:46.202362",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 43,
+  "timestamp": "2026-10-19T10:54:46.207852",
+  "type": "trace",
+  "kind": "tool_selected",
+  "tool_name": "discover_geospatial_capabilities",
+  "status": null
+ },
+ {
+  "sequence": 44,
+  "timestamp": "2026-10-19T10:54:46.208949",
+  "type": "tool_started",
+  "kind": "tool_started",
+  "tool_name": "discover_geospatial_capabilities",
+  "status": "running"
+ },
+ {
+  "sequence": 45,
+  "timestamp": "2026-10-19T10:54:46.223239",
+  "type": "trace",
+  "kind": "tool_result",
+  "tool_name": "discover_geospatial_capabilities",
+  "status": "success"
+ },
+ {
+  "sequence": 46,
+  "timestamp": "2026-10-19T10:54:46.224160",
+  "type": "tool_completed",
+  "kind": "tool_completed",
+  "tool_name": "discover_geospatial_capabilities",
+  "status": "success"
+ },
+ {
+  "sequence": 47,
+  "timestamp": "2026-10-19T10:54:46.239007",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 48,
+  "timestamp": "2026-10-19T10:54:46.243366",
+  "type": "trace",
+  "kind": "iteration_completed",
+  "tool_name": null,
+  "status": "continue"
+ },
+ {
+  "sequence": 49,
+  "timestamp": "2026-10-19T10:54:46.250093",
+  "type": "trace",
+  "kind": "iteration_started",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 50,
+  "timestamp": "2026-10-19T10:54:46.254149",
+  "type": "trace",
+  "kind": "tools_available",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 51,
+  "timestamp": "2026-10-19T10:54:51.046307",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 52,
+  "timestamp": "2026-10-19T10:54:51.047486",
+  "type": "context_usage",
+  "kind": "context_usage",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 53,
+  "timestamp": "2026-10-19T10:54:51.053830",
+  "type": "trace",
+  "kind": "tool_selected",
+  "tool_name": "execute_geospatial_capability",
+  "status": null
+ },
+ {
+  "sequence": 54,
+  "timestamp": "2026-10-19T10:54:51.054877",
+  "type": "tool_started",
+  "kind": "tool_started",
+  "tool_name": "execute_geospatial_capability",
+  "status": "running"
+ },
+ {
+  "sequence": 55,
+  "timestamp": "2026-10-19T10:54:51.058838",
+  "type": "trace",
+  "kind": "tool_result",
+  "tool_name": "execute_geospatial_capability",
+  "status": "failed"
+ },
+ {
+  "sequence": 56,
+  "timestamp": "2026-10-19T10:54:51.059772",
+  "type": "tool_completed",
+  "kind": "tool_completed",
+  "tool_name": "execute_geospatial_capability",
+  "status": "failed"
+ },
+ {
+  "sequence": 57,
+  "timestamp": "2026-10-19T10:54:51.077397",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 58,
+  "timestamp": "2026-10-19T10:54:51.082342",
+  "type": "trace",
+  "kind": "completion_decision",
+  "tool_name": null,
+  "status": "terminal"
+ },
+ {
+  "sequence": 59,
+  "timestamp": "2026-10-19T10:54:51.096637",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": "started"
+ },
+ {
+  "sequence": 60,
+  "timestamp": "2026-10-19T10:54:51.101849",
+  "type": "checkpoint",
+  "kind": "checkpoint",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 61,
+  "timestamp": "2026-10-19T10:54:51.103437",
+  "type": "progress",
+  "kind": "progress",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 62,
+  "timestamp": "2026-10-19T10:54:51.104335",
+  "type": "assistant_text_completed",
+  "kind": "assistant_text_completed",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 63,
+  "timestamp": "2026-10-19T10:54:51.105361",
+  "type": "trace",
+  "kind": "stage",
+  "tool_name": null,
+  "status": "completed"
+ },
+ {
+  "sequence": 64,
+  "timestamp": "2026-10-19T10:54:51.107763",
+  "type": "progress",
+  "kind": "progress",
+  "tool_name": null,
+  "status": null
+ },
+ {
+  "sequence": 65,
+  "timestamp": "2026-10-19T10:54:51.109874",
+  "type": "error",
+  "kind": "error",
+  "tool_name": null,
+  "status": null
+ }
+]

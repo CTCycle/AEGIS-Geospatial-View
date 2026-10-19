@@ -1,0 +1,48 @@
+[
+ {
+  "cycle": 1,
+  "prompt": "Show me a map of Lisbon, Portugal.",
+  "kill_after_s": 5,
+  "pre_kill_state": null,
+  "run_id": null,
+  "early_followup_status": 200,
+  "resumed_run": {
+   "state": null,
+   "error_code": null,
+   "error_message": null,
+   "presentation_status": null
+  },
+  "late_followup_status": 200,
+  "active_run_after": "awaiting_render",
+  "roles": [
+   "user",
+   "assistant",
+   "user",
+   "assistant",
+   "user",
+   "assistant"
+  ]
+ },
+ {
+  "cycle": 2,
+  "prompt": "Show me the current weather conditions in Madrid on a map.",
+  "kill_after_s": 9,
+  "pre_kill_state": "running",
+  "run_id": "run_7f7dfb54dd7f409f8d4c36adcb17b29e",
+  "early_followup_status": 409,
+  "resumed_run": {
+   "state": "completed",
+   "error_code": null,
+   "error_message": null,
+   "presentation_status": "not_required"
+  },
+  "late_followup_status": 200,
+  "active_run_after": "awaiting_render",
+  "roles": [
+   "user",
+   "assistant",
+   "user",
+   "assistant"
+  ]
+ }
+]

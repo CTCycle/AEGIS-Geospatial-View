@@ -1,0 +1,112 @@
+[
+ {
+  "mode": "fresh",
+  "i": 0,
+  "status": 200,
+  "seconds": 5.8,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 223832
+ },
+ {
+  "mode": "fresh",
+  "i": 1,
+  "status": 200,
+  "seconds": 4.1,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 224972
+ },
+ {
+  "mode": "fresh",
+  "i": 2,
+  "status": 200,
+  "seconds": 4.7,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225284
+ },
+ {
+  "mode": "fresh",
+  "i": 3,
+  "status": 200,
+  "seconds": 5.0,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225372
+ },
+ {
+  "mode": "fresh",
+  "i": 4,
+  "status": 200,
+  "seconds": 4.0,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225400
+ },
+ {
+  "mode": "fresh",
+  "i": 5,
+  "status": 200,
+  "seconds": 5.6,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225620
+ },
+ {
+  "mode": "fresh",
+  "i": 6,
+  "status": 200,
+  "seconds": 4.2,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225772
+ },
+ {
+  "mode": "fresh",
+  "i": 7,
+  "status": 200,
+  "seconds": 5.1,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 225808
+ },
+ {
+  "mode": "same-conversation",
+  "i": 0,
+  "status": 200,
+  "seconds": 5.6,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 226088
+ },
+ {
+  "mode": "same-conversation",
+  "i": 1,
+  "status": 200,
+  "seconds": 4.8,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 226092
+ },
+ {
+  "mode": "same-conversation",
+  "i": 2,
+  "status": 200,
+  "seconds": 5.8,
+  "presentation_status": "prepared",
+  "detail": null,
+  "assistant": "Data prepared; the map is loading.",
+  "rss_kb": 226100
+ }
+]

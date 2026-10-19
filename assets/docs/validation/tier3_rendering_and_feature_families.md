@@ -403,8 +403,8 @@ All Tier 3 slices share the standing campaign rules:
   accessibility, `T5-11` provider reconciliation, `T5-12` hosted CI). The
   mapping has LOW confidence and needs upstream confirmation; `T5-13` is not
   executed. Results are in the
-  [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger): six gates pass
-  (including hosted-CI `T5-12`) and seven remain `UNRUN`. The earlier "do not execute Tier 5" guard is
+  [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger): nine gates pass
+  (including hosted-CI `T5-12`) and four remain `UNRUN`. The earlier "do not execute Tier 5" guard is
   therefore relaxed to "execute only under the labelled reconstruction".
 
 ## Next actionable slice

@@ -1,0 +1,27 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Scripts\python.exe
+rootdir: G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, base-url-2.1.0, playwright-0.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 10 items
+
+server::test_controlled_map_completion_requires_and_records_visible_rendering[chromium] PASSED [ 10%]
+server::test_controlled_render_fault_scenarios[chromium-failed_layer] PASSED [ 20%]
+server::test_controlled_render_fault_scenarios[chromium-viewport_mismatch] PASSED [ 30%]
+server::test_controlled_render_fault_scenarios[chromium-stale_ack] PASSED [ 40%]
+server::test_controlled_render_fault_scenarios[chromium-mismatched_ack] PASSED [ 50%]
+server::test_controlled_render_fault_scenarios[chromium-duplicate_ack] PASSED [ 60%]
+server::test_controlled_render_fault_scenarios[chromium-cancelled] PASSED [ 70%]
+server::test_controlled_render_fault_scenarios[chromium-superseded] PASSED [ 80%]
+server::test_controlled_render_fault_scenarios[chromium-retry_exhausted] PASSED [ 90%]
+server::test_controlled_evidence_resolves_an_exact_commit PASSED         [100%]
+
+============================== warnings summary ===============================
+server\.venv\Lib\site-packages\_pytest\config\__init__.py:1464
+  G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Lib\site-packages\_pytest\config\__init__.py:1464: PytestConfigWarning: Unknown config option: cache_dir
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 10 passed, 1 warning in 25.27s ========================

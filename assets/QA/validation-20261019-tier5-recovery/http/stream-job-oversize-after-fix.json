@@ -1,0 +1,26 @@
+{
+ "turn:oversize": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ },
+ "turn:empty": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message must not be empty\"}]}"
+ },
+ "stream:oversize": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ },
+ "stream:empty": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message must not be empty\"}]}"
+ },
+ "job:oversize": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ },
+ "job:empty": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message must not be empty\"}]}"
+ }
+}

@@ -1,0 +1,111 @@
+{
+ "cases": [
+  {
+   "case": "turn invalid json",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"json_invalid\",\"loc\":[\"body\",1],\"msg\":\"JSON decode error\",\"input\":{},\"ctx\":{\"error\":\"Expecting property name enclosed in "
+  },
+  {
+   "case": "turn empty body",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+   "case": "turn empty object",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"message\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"conversation_id\"],"
+  },
+  {
+   "case": "turn wrong types",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"string_type\",\"loc\":[\"body\",\"message\"],\"msg\":\"Input should be a valid string\",\"input\":123},{\"type\":\"string_type\",\"loc\":[\""
+  },
+  {
+   "case": "turn null message",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"string_type\",\"loc\":[\"body\",\"message\"],\"msg\":\"Input should be a valid string\",\"input\":null},{\"type\":\"missing\",\"loc\":[\"bod"
+  },
+  {
+   "case": "turn wrong content type",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"model_attributes_type\",\"loc\":[\"body\"],\"msg\":\"Input should be a valid dictionary or object to extract fields from\",\"input"
+  },
+  {
+   "case": "turn unknown conversation",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 404,
+   "body_head": "{\"detail\":\"Conversation not found.\"}"
+  },
+  {
+   "case": "settings patch invalid json",
+   "method": "PATCH",
+   "path": "/api/chat/settings",
+   "status": 422,
+   "body_head": "{\"detail\":[{\"type\":\"json_invalid\",\"loc\":[\"body\",2],\"msg\":\"JSON decode error\",\"input\":{},\"ctx\":{\"error\":\"Expecting value\"}}]}"
+  },
+  {
+   "case": "unknown conversation get",
+   "method": "GET",
+   "path": "/api/conversations/does-not-exist",
+   "status": 404,
+   "body_head": "{\"detail\":\"Conversation not found.\"}"
+  },
+  {
+   "case": "unknown run trace",
+   "method": "GET",
+   "path": "/api/conversations/does-not-exist/runs/none/trace",
+   "status": 404,
+   "body_head": "{\"detail\":\"Conversation not found.\"}"
+  },
+  {
+   "case": "unknown job",
+   "method": "GET",
+   "path": "/api/jobs/does-not-exist",
+   "status": 404,
+   "body_head": "{\"detail\":\"Job not found: does-not-exist\"}"
+  },
+  {
+   "case": "unknown job cancel",
+   "method": "POST",
+   "path": "/api/jobs/does-not-exist/cancel",
+   "status": 404,
+   "body_head": "{\"detail\":\"Job not found: does-not-exist\"}"
+  },
+  {
+   "case": "unknown layer geojson",
+   "method": "GET",
+   "path": "/api/geospatial/layers/does-not-exist/geojson",
+   "status": 404,
+   "body_head": "{\"detail\":\"Geospatial capability 'does-not-exist' was not found.\"}"
+  },
+  {
+   "case": "layer features bad bbox",
+   "method": "GET",
+   "path": "/api/geospatial/layers/usgs_earthquakes/features?bbox=abc",
+   "status": 400,
+   "body_head": "{\"detail\":\"bbox must be four comma-separated numbers.\"}"
+  },
+  {
+   "case": "turn oversize message (existing conversation)",
+   "method": "POST",
+   "path": "/api/chat/turn",
+   "status": 404,
+   "body_head": "{\"detail\":\"1 validation error for AgentRunCreateRequest\\nmessage\\n  Value error, message is too long [type=value_error, input_value='xxxxxxx"
+  }
+ ],
+ "health_after": 200,
+ "server_5xx": []
+}

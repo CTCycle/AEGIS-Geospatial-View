@@ -92,6 +92,24 @@ async def _serialize_chat_event_stream(
         yield _stream_event(event)
 
 ###############################################################################
+def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
+    # Reject unusable input before any run, job, or stream is created; the
+    # error detail omits the submitted value so an oversize message is not echoed.
+    try:
+        return AgentRunCreateRequest(
+            message=payload.message,
+            client_request_id=payload.request_id,
+            timezone=payload.timezone,
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(
+                include_url=False, include_context=False, include_input=False
+            ),
+        ) from exc
+
+###############################################################################
 @router.post(
     CHAT_JOBS_ROUTE,
     response_model=BackgroundJobCreateResponse,
@@ -101,6 +119,7 @@ async def create_chat_job(
     payload: ChatTurnRequest,
     job_service: BackgroundJobService = Depends(get_job_service),
 ) -> BackgroundJobCreateResponse:
+    _build_run_request(payload)
     return job_service.create_chat_job(payload)
 
 ###############################################################################
@@ -124,19 +143,7 @@ async def chat_turn(
     request: Request,
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse | AgentRunAcceptedResponse | JSONResponse:
-    try:
-        run_request = AgentRunCreateRequest(
-            message=payload.message,
-            client_request_id=payload.request_id,
-            timezone=payload.timezone,
-        )
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=exc.errors(
-                include_url=False, include_context=False, include_input=False
-            ),
-        ) from exc
+    run_request = _build_run_request(payload)
     try:
         if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
             raise HTTPException(
@@ -220,6 +227,7 @@ async def chat_stream(
     request: Request,
     streaming_service: ChatStreamingService = Depends(get_chat_streaming_service),
 ) -> StreamingResponse:
+    _build_run_request(payload)
     owner_user_id = getattr(request.state, "user_id", None)
     return StreamingResponse(
         _serialize_chat_event_stream(

@@ -1,0 +1,17 @@
+[
+ {
+  "message_chars": 1000,
+  "status": 503,
+  "body_head": "{\"detail\":\"The agent could not complete this request.\"}"
+ },
+ {
+  "message_chars": 12001,
+  "status": 422,
+  "body_head": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ },
+ {
+  "message_chars": 2000000,
+  "status": 422,
+  "body_head": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ }
+]

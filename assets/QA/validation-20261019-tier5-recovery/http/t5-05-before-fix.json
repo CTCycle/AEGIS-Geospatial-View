@@ -1,0 +1,272 @@
+{
+ "phase": "before_fix",
+ "hydrate_status": 200,
+ "active_run": {
+  "run_id": "run_354bb77edf334381ac659d2e6df95842",
+  "run_version": 1,
+  "state": "running",
+  "presentation_status": "not_required",
+  "presentation": null,
+  "current_iteration": 4,
+  "task_state": {
+   "root_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+   "active_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:required_data_retrieved",
+   "status": "in_progress",
+   "current_iteration": 4,
+   "max_iterations": 12,
+   "tasks": [
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "description": "Show me a map of Lisbon, Portugal with its main parks.",
+     "status": "in_progress",
+     "parent_task_id": null,
+     "dependencies": [],
+     "requirement_name": null,
+     "target_id": null,
+     "result": null,
+     "failure_code": null
+    },
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:location_resolved",
+     "description": "Satisfy location resolved.",
+     "status": "completed",
+     "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "dependencies": [],
+     "requirement_name": "location_resolved",
+     "target_id": null,
+     "result": null,
+     "failure_code": null
+    },
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:required_data_retrieved",
+     "description": "Satisfy required data retrieved.",
+     "status": "in_progress",
+     "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "dependencies": [],
+     "requirement_name": "required_data_retrieved",
+     "target_id": null,
+     "result": null,
+     "failure_code": null
+    },
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:spatial_scope_applied",
+     "description": "Satisfy spatial scope applied.",
+     "status": "pending",
+     "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "dependencies": [],
+     "requirement_name": "spatial_scope_applied",
+     "target_id": null,
+     "result": null,
+     "failure_code": null
+    },
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:map_candidate_prepared",
+     "description": "Satisfy map candidate prepared.",
+     "status": "pending",
+     "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "dependencies": [],
+     "requirement_name": "map_candidate_prepared",
+     "target_id": null,
+     "result": null,
+     "failure_code": null
+    },
+    {
+     "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:target:lisbon--portugal",
+     "description": "Complete the request for Lisbon, Portugal.",
+     "status": "in_progress",
+     "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+     "dependencies": [],
+     "requirement_name": null,
+     "target_id": "Lisbon, Portugal",
+     "result": null,
+     "failure_code": null
+    }
+   ],
+   "completion_requirements": [
+    {
+     "name": "location_resolved",
+     "kind": "location",
+     "required": true,
+     "status": "satisfied",
+     "target_id": null,
+     "evidence_ref": null,
+     "failure_code": null
+    },
+    {
+     "name": "required_data_retrieved",
+     "kind": "provider_data",
+     "required": true,
+     "status": "pending",
+     "target_id": null,
+     "evidence_ref": null,
+     "failure_code": null
+    },
+    {
+     "name": "spatial_scope_applied",
+     "kind": "spatial_scope",
+     "required": true,
+     "status": "pending",
+     "target_id": null,
+     "evidence_ref": null,
+     "failure_code": null
+    },
+    {
+     "name": "map_candidate_prepared",
+     "kind": "map_candidate",
+     "required": true,
+     "status": "pending",
+     "target_id": null,
+     "evidence_ref": null,
+     "failure_code": null
+    }
+   ]
+  }
+ },
+ "recent_runs": [
+  {
+   "conversation_id": "conv_33ae06b527ff4b04b9df42db3a02fcdf",
+   "run_id": "run_354bb77edf334381ac659d2e6df95842",
+   "run_version": 1,
+   "active_run_version": 1,
+   "original_request": "Show me a map of Lisbon, Portugal with its main parks.",
+   "aggregated_request": "Show me a map of Lisbon, Portugal with its main parks.",
+   "state": "running",
+   "request_timezone": null,
+   "created_at": "2026-10-19T10:54:04",
+   "started_at": "2026-10-19T10:54:22.880483",
+   "completed_at": null,
+   "cancel_requested_at": null,
+   "error_code": null,
+   "error_message": null,
+   "presentation_status": "not_required",
+   "duration_ms": null,
+   "current_iteration": 4,
+   "task_state": {
+    "root_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+    "active_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:required_data_retrieved",
+    "status": "in_progress",
+    "current_iteration": 4,
+    "max_iterations": 12,
+    "tasks": [
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "description": "Show me a map of Lisbon, Portugal with its main parks.",
+      "status": "in_progress",
+      "parent_task_id": null,
+      "dependencies": [],
+      "requirement_name": null,
+      "target_id": null,
+      "result": null,
+      "failure_code": null
+     },
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:location_resolved",
+      "description": "Satisfy location resolved.",
+      "status": "completed",
+      "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "dependencies": [],
+      "requirement_name": "location_resolved",
+      "target_id": null,
+      "result": null,
+      "failure_code": null
+     },
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:required_data_retrieved",
+      "description": "Satisfy required data retrieved.",
+      "status": "in_progress",
+      "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "dependencies": [],
+      "requirement_name": "required_data_retrieved",
+      "target_id": null,
+      "result": null,
+      "failure_code": null
+     },
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:spatial_scope_applied",
+      "description": "Satisfy spatial scope applied.",
+      "status": "pending",
+      "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "dependencies": [],
+      "requirement_name": "spatial_scope_applied",
+      "target_id": null,
+      "result": null,
+      "failure_code": null
+     },
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:requirement:map_candidate_prepared",
+      "description": "Satisfy map candidate prepared.",
+      "status": "pending",
+      "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "dependencies": [],
+      "requirement_name": "map_candidate_prepared",
+      "target_id": null,
+      "result": null,
+      "failure_code": null
+     },
+     {
+      "task_id": "task-root-run_354bb77edf334381ac659d2e6df95842:target:lisbon--portugal",
+      "description": "Complete the request for Lisbon, Portugal.",
+      "status": "in_progress",
+      "parent_task_id": "task-root-run_354bb77edf334381ac659d2e6df95842",
+      "dependencies": [],
+      "requirement_name": null,
+      "target_id": "Lisbon, Portugal",
+      "result": null,
+      "failure_code": null
+     }
+    ],
+    "completion_requirements": [
+     {
+      "name": "location_resolved",
+      "kind": "location",
+      "required": true,
+      "status": "satisfied",
+      "target_id": null,
+      "evidence_ref": null,
+      "failure_code": null
+     },
+     {
+      "name": "required_data_retrieved",
+      "kind": "provider_data",
+      "required": true,
+      "status": "pending",
+      "target_id": null,
+      "evidence_ref": null,
+      "failure_code": null
+     },
+     {
+      "name": "spatial_scope_applied",
+      "kind": "spatial_scope",
+      "required": true,
+      "status": "pending",
+      "target_id": null,
+      "evidence_ref": null,
+      "failure_code": null
+     },
+     {
+      "name": "map_candidate_prepared",
+      "kind": "map_candidate",
+      "required": true,
+      "status": "pending",
+      "target_id": null,
+      "evidence_ref": null,
+      "failure_code": null
+     }
+    ]
+   }
+  }
+ ],
+ "run_status": 200,
+ "run": {
+  "state": "running",
+  "error_code": null,
+  "error_message": null,
+  "presentation_status": "not_required"
+ },
+ "followup_status": 409,
+ "followup": {
+  "detail": "Conversation already has an active run.",
+  "state": null,
+  "run_id": null
+ }
+}

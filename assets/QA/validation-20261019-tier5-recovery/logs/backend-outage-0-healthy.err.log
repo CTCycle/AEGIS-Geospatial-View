@@ -1,0 +1,102 @@
+INFO:     Started server process [26656]
+INFO:     Waiting for application startup.
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite migration check: current=202609210001, head=202609210001
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] SQLite synchronization complete: path=G:\Projects\Repositories\Active projects\AEGIS Geospatial View\runtimes\cache\test-runtime\t5-recovery-20261019\database.db, revisions=202609210001
+[INFO] SQLite database is ready: fresh=False, migrations_applied=False
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5079 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63830 - "WebSocket /api/conversations/conv_8bde6324133e456c9cd97ae9918357b9/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4011/3088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4011/3089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4012/3088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4012/3089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4010/3089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4010/3088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4011/3087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4012/3087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4011/3090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4012/3090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4013/3088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4010/3087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4013/3089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4010/3090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4009/3088.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4013/3087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4009/3089.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4013/3090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4009/3087.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4009/3090.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256750/197689.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256750/197690.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256749/197689.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256751/197689.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256749/197690.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256750/197688.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256751/197690.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/19/256749/197688.png relay=no
+INFO:     127.0.0.1:53042 - "WebSocket /api/conversations/conv_ecb1e738740a4af18a1bc0df174a7a54/realtime" [accepted]
+INFO:     connection open
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4379/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4380/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4381/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4378/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4377/3044.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4377/3043.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4377/3045.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4382/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/13/4377/3042.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1095/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1095/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1094/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1094/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1096/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1096/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1095/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1095/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1094/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1094/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1096/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1096/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1093/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1093/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1097/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1097/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1093/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1093/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1095/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1097/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1094/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1097/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1096/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1092/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1092/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1093/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1098/761.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1098/760.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1092/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1092/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1098/759.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1097/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1098/762.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1092/763.png relay=no
+[INFO] geospatial_tile_proxy provider=osm_tiles capability=osm_default upstream=https://tile.openstreetmap.org/11/1098/763.png relay=no

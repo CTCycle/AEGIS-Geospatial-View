@@ -1,0 +1,26 @@
+{
+ "turn:oversize": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message is too long\"}]}"
+ },
+ "turn:empty": {
+  "status": 422,
+  "body": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"message\"],\"msg\":\"Value error, message must not be empty\"}]}"
+ },
+ "stream:oversize": {
+  "status": 200,
+  "body": "{\"event\": \"status\", \"data\": {\"message\": \"received\", \"request_id\": \"\"}}\n{\"event\": \"error\", \"data\": {\"message\": \"1 validation error for AgentRunCreateRequest\\nmessage\\n  Value error, message is too long [type=value_error, input_value='xxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxx', input_type=str"
+ },
+ "stream:empty": {
+  "status": 200,
+  "body": "{\"event\": \"status\", \"data\": {\"message\": \"received\", \"request_id\": \"\"}}\n{\"event\": \"error\", \"data\": {\"message\": \"1 validation error for AgentRunCreateRequest\\nmessage\\n  Value error, message must not be empty [type=value_error, input_value='   ', input_type=str]\\n    For further information visit http"
+ },
+ "job:oversize": {
+  "status": 202,
+  "body": "{\"job_id\":\"job_cf6c3a237daf4464\",\"job_type\":\"chat_turn\",\"status\":\"queued\",\"request_id\":\"chat-377b273b488e\",\"message\":\"Chat job queued\",\"poll_interval\":1.0}"
+ },
+ "job:empty": {
+  "status": 202,
+  "body": "{\"job_id\":\"job_51faa345a6d345e9\",\"job_type\":\"chat_turn\",\"status\":\"queued\",\"request_id\":\"chat-67f9d2c6ca76\",\"message\":\"Chat job queued\",\"poll_interval\":1.0}"
+ }
+}

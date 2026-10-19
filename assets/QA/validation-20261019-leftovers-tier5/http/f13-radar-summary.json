@@ -1,0 +1,11 @@
+{
+  "prompt": "Show the current precipitation radar at Naples, Italy.",
+  "lane": "opencode-go / deepseek-v4.1-flash (isolated runtime, API turn; no browser acknowledgement)",
+  "route_spatial_scope": {"kind": "point", "relationship": "at", "target_refs": ["Naples, Italy"]},
+  "shortlisted_capability_ids": ["noaa_radar", "rainviewer_precipitation_radar", "openmeteo_pressure_humidity_wind", "openmeteo_weather_forecast", "IMERG_Precipitation_Rate"],
+  "prepared_overlay_capability": "rainviewer_precipitation_radar",
+  "prepared_overlay_rendering_mode": "xyz / raster-tile",
+  "presentation_status": "prepared",
+  "assistant_message": "Data prepared; the map is loading.",
+  "note": "Full response (about 200 KB of tile descriptors) intentionally not retained. Browser render acknowledgement was not exercised for this request."
+}
