@@ -12,6 +12,10 @@ from server.common.constants import AEGIS_VERSION
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.opencode_models_dev import (
+    ModelsDevEntry,
+    fetch_models_dev_entries,
+)
 from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import LLMRequest, ModelDescriptor
 
@@ -26,7 +30,6 @@ OPENAI_CHAT_PROTOCOL = "openai-chat-completions"
 OPENAI_RESPONSES_PROTOCOL = "openai-responses"
 ANTHROPIC_MESSAGES_PROTOCOL = "anthropic-messages"
 GOOGLE_MODEL_PROTOCOL = "google-model"
-UNKNOWN_PROTOCOL = "unknown"
 
 SUPPORTED_OPENCODE_PROTOCOLS = frozenset(
     {OPENAI_CHAT_PROTOCOL, OPENAI_RESPONSES_PROTOCOL}
@@ -155,9 +158,7 @@ class _OpenCodeResponsesTransport(OpenAIProvider):
 
     # -------------------------------------------------------------------------
     def supports_vision(self, model: str) -> bool | None:
-        # Vision entrypoints are explicitly suffixed; fail closed otherwise so
-        # images are never sent to an unverified OpenCode model.
-        return "vision" in model.strip().lower()
+        return bool(self._parent.supports_vision(model))
 
 ###############################################################################
 class OpenCodeProvider(DeepSeekProvider):
@@ -182,6 +183,7 @@ class OpenCodeProvider(DeepSeekProvider):
         )
         self.provider_name = provider_name
         self._declared_model_protocols: dict[str, str] = {}
+        self._models_dev: dict[str, ModelsDevEntry] = {}
         self._responses_transport: _OpenCodeResponsesTransport | None = None
 
     # -------------------------------------------------------------------------
@@ -213,9 +215,20 @@ class OpenCodeProvider(DeepSeekProvider):
         declared = self._declared_model_protocols.get(normalized)
         if declared is not None:
             return declared
-        return OPENCODE_PROTOCOL_REGISTRY[self.provider_name].get(
-            normalized, UNKNOWN_PROTOCOL
-        )
+        return self._resolve_protocol(normalized)[0]
+
+    # -------------------------------------------------------------------------
+    def _resolve_protocol(self, normalized: str) -> tuple[str, str]:
+        # models.dev publishes the endpoint family per model and is fresher than
+        # the static table; unknown IDs follow OpenCode's own Chat Completions
+        # default and are verified by the model probe rather than hidden.
+        entry = self._models_dev.get(normalized)
+        if entry is not None:
+            return entry.protocol, "models_dev"
+        static = OPENCODE_PROTOCOL_REGISTRY[self.provider_name].get(normalized)
+        if static is not None:
+            return static, "opencode_published_endpoint_table"
+        return OPENAI_CHAT_PROTOCOL, "assumed_default"
 
     # -------------------------------------------------------------------------
     def _require_supported_protocol(self, request: LLMRequest) -> str:
@@ -264,13 +277,18 @@ class OpenCodeProvider(DeepSeekProvider):
         if self.protocol_for_model(model) not in SUPPORTED_OPENCODE_PROTOCOLS:
             return False
         normalized = model.strip().lower()
+        published = self._models_dev.get(normalized)
         return (
             "vision" in normalized
             or normalized in OPENCODE_VERIFIED_VISION_MODELS[self.provider_name]
+            or (published is not None and published.accepts_images)
         )
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
+        self._models_dev = fetch_models_dev_entries(
+            self.provider_name, self.transport_policy
+        )
         started = time.perf_counter()
         try:
             response = httpx.get(
@@ -321,15 +339,14 @@ class OpenCodeProvider(DeepSeekProvider):
     # -------------------------------------------------------------------------
     def _model_descriptor(self, item: dict[str, Any]) -> ModelDescriptor:
         model_id = str(item.get("id") or "").strip()
-        protocol = OPENCODE_PROTOCOL_REGISTRY[self.provider_name].get(
-            model_id.lower(), UNKNOWN_PROTOCOL
-        )
+        protocol, protocol_source = self._resolve_protocol(model_id.lower())
+        published = self._models_dev.get(model_id.lower())
         supported = protocol in SUPPORTED_OPENCODE_PROTOCOLS
         metadata: dict[str, Any] = {
             "family": model_id.split("-")[0] if "-" in model_id else model_id,
             "owned_by": str(item.get("owned_by") or "opencode"),
             "protocol": protocol,
-            "protocol_source": "opencode_published_endpoint_table",
+            "protocol_source": protocol_source,
             "tool_support_source": "provider_protocol_registry",
         }
         if not supported:
@@ -338,8 +355,6 @@ class OpenCodeProvider(DeepSeekProvider):
             metadata["agent_selection_disabled_reason"] = (
                 "This OpenCode model uses an unsupported transport. "
                 "AEGIS supports Chat Completions and Responses only."
-                if protocol != UNKNOWN_PROTOCOL
-                else "OpenCode did not publish a supported transport for this model."
             )
         for key in (
             "context_window_tokens",
@@ -373,6 +388,26 @@ class OpenCodeProvider(DeepSeekProvider):
                 )
             ) and limit.get("output") is not None:
                 metadata["maximum_output_tokens"] = limit["output"]
+        if published is not None:
+            if published.context_tokens and not any(
+                key in metadata
+                for key in (
+                    "context_window_tokens",
+                    "context_length",
+                    "context_window",
+                    "max_context_tokens",
+                )
+            ):
+                metadata["context_window_tokens"] = published.context_tokens
+            if published.output_tokens and not any(
+                key in metadata
+                for key in (
+                    "maximum_output_tokens",
+                    "max_output_tokens",
+                    "max_completion_tokens",
+                )
+            ):
+                metadata["maximum_output_tokens"] = published.output_tokens
         if any(
             key in metadata
             for key in (
