@@ -1,0 +1,113 @@
+[
+ {
+  "run": "run_773805cdd69c4a88a8cd7f8f18f9064f",
+  "state": "failed",
+  "created_utc": "2026-10-19 17:33:05",
+  "error": "agent_operation_failed",
+  "presentation": "failed",
+  "model_calls": 6,
+  "tools": {
+   "resolve_geospatial_location:success": 1,
+   "describe_geospatial_capability:success": 1,
+   "execute_geospatial_capability:failed": 1,
+   "discover_geospatial_capabilities:valid_empty": 2
+  }
+ },
+ {
+  "run": "run_d6bc909553204db1bfb12ac477dd0d9f",
+  "state": "failed",
+  "created_utc": "2026-10-19 17:35:56",
+  "error": "agent_operation_failed",
+  "presentation": "failed",
+  "model_calls": 7,
+  "tools": {
+   "describe_geospatial_capability:success": 1,
+   "execute_geospatial_capability:failed": 1,
+   "discover_geospatial_capabilities:valid_empty": 1
+  }
+ },
+ {
+  "run": "run_8e4faebd97ed46dfac6e6bc2cb8aa9bf",
+  "state": "failed",
+  "created_utc": "2026-10-19 17:38:32",
+  "error": "agent_operation_failed",
+  "presentation": "failed",
+  "model_calls": 6,
+  "tools": {
+   "execute_geospatial_capability:success": 1,
+   "apply_map_plan:success": 1
+  }
+ },
+ {
+  "run": "run_5650098da3124bb2b20a38ff3edfc209",
+  "state": "failed",
+  "created_utc": "2026-10-19 17:41:37",
+  "error": "agent_operation_failed",
+  "presentation": "failed",
+  "model_calls": 6,
+  "tools": {
+   "resolve_geospatial_location:success": 1,
+   "describe_geospatial_capability:success": 1,
+   "execute_geospatial_capability:failed": 1,
+   "discover_geospatial_capabilities:valid_empty": 3
+  }
+ },
+ {
+  "run": "run_b4dcf35a0d8547c0887a3ca502ba88b2",
+  "state": "completed",
+  "created_utc": "2026-10-19 17:43:07",
+  "error": null,
+  "presentation": "ready",
+  "model_calls": 5,
+  "tools": {
+   "describe_geospatial_capability:success": 1,
+   "execute_geospatial_capability:success": 1,
+   "apply_map_plan:success": 1
+  }
+ },
+ {
+  "run": "run_0cc91f30b27b4988a60b6ceed9e53738",
+  "state": "failed",
+  "created_utc": "2026-10-19 17:44:17",
+  "error": "agent_operation_failed",
+  "presentation": "not_required",
+  "model_calls": 1,
+  "tools": {}
+ },
+ {
+  "run": "run_df0c325d996c4b1ab24c37a5200ec2fe",
+  "state": "completed",
+  "created_utc": "2026-10-19 17:45:35",
+  "error": null,
+  "presentation": "not_required",
+  "model_calls": 2,
+  "tools": {
+   "resolve_geospatial_location:failed": 1
+  }
+ },
+ {
+  "run": "run_64bc1a889a7c4237a4ddb6313ae76e01",
+  "state": "completed",
+  "created_utc": "2026-10-19 17:46:46",
+  "error": null,
+  "presentation": "not_required",
+  "model_calls": 2,
+  "tools": {
+   "resolve_geospatial_location:failed": 1
+  }
+ },
+ {
+  "run": "run_094102a4f93944adaeddb4b7630d8d60",
+  "state": "completed",
+  "created_utc": "2026-10-19 17:47:53",
+  "error": null,
+  "presentation": "ready",
+  "model_calls": 6,
+  "tools": {
+   "resolve_geospatial_location:success": 1,
+   "describe_geospatial_capability:success": 1,
+   "execute_geospatial_capability:valid_empty": 1,
+   "apply_map_plan:success": 1
+  }
+ }
+]
