@@ -608,6 +608,33 @@ describe('pages/settings-page.component', () => {
     expect(payload.credential_health).toBeUndefined();
   });
 
+  it('autosaves only changed runtime settings after the debounce', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    jasmine.clock().install();
+    try {
+      component.onRuntimeSettingChanged();
+      jasmine.clock().tick(500);
+      expect(updateRuntimeSettingsMock).not.toHaveBeenCalled();
+
+      component.runtimeSettingsDraft.chat.max_history_messages = 23;
+      component.onRuntimeSettingChanged();
+      component.onRuntimeSettingChanged();
+      jasmine.clock().tick(500);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+    await fixture.whenStable();
+
+    expect(updateRuntimeSettingsMock).toHaveBeenCalledTimes(1);
+    expect(updateRuntimeSettingsMock.calls.mostRecent().args[0]).toEqual({
+      chat: { max_history_messages: 23 },
+    });
+  });
+
   it('reports unreadable credential health in model provider state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
@@ -805,7 +832,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('TomTom');
-    expect(fixture.nativeElement.textContent).toContain('Save key');
+    expect(fixture.nativeElement.textContent).not.toContain('Save key');
     expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 

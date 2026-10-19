@@ -515,12 +515,10 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
         card.get_by_text("Saved key cannot be decrypted. Re-enter the key.")
     ).to_be_visible()
 
-    card.get_by_role("button", name="Save key").click()
-    expect(
-        page.get_by_text("Enter a OpenAI API key before saving.", exact=True)
-    ).to_be_visible()
+    key_input.press("Enter")
+    assert patch_payloads == []
     key_input.fill("not-a-valid-key")
-    card.get_by_role("button", name="Save key").click()
+    key_input.press("Enter")
     expect(
         card.get_by_text(
             'OpenAI key must start with "sk-" and include a valid key body.',
@@ -537,7 +535,7 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
 
     fixture_key = "sk-fixturekey12345"
     key_input.fill(fixture_key)
-    card.get_by_role("button", name="Save key").click()
+    key_input.press("Enter")
     expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
     expect(
         page.get_by_text(
@@ -581,7 +579,7 @@ def test_model_provider_credential_safe_save_clear_and_reload(
 
     fixture_key = "sk-fixturekey12345"
     key_input.fill(fixture_key)
-    card.get_by_role("button", name="Save key").click()
+    key_input.press("Enter")
     expect(
         page.get_by_text(
             "OpenAI key saved. Provider access has not been validated.", exact=True
@@ -628,17 +626,12 @@ def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: 
     expect(key_input).to_have_attribute("type", "password")
     expect(key_input).to_have_value("")
 
-    card.get_by_role("button", name="Save key").click()
-    expect(
-        page.get_by_text(
-            "Enter a TomTom API key before saving, or clear the saved key.", exact=True
-        )
-    ).to_be_visible()
+    key_input.press("Enter")
     assert patch_payloads == []
 
     fixture_key = "synthetic-tomtom-fixture"
     key_input.fill(fixture_key)
-    card.get_by_role("button", name="Save key").click()
+    key_input.press("Enter")
     expect(
         page.get_by_text(
             "TomTom key saved. Provider access has not been validated.", exact=True
@@ -653,12 +646,7 @@ def test_geospatial_credential_safe_save_clear_and_reload(page: Page, base_url: 
     screenshots.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(screenshots / "geospatial-credential-saved.png"), full_page=True)
 
-    card.get_by_role("button", name="Save key").click()
-    expect(
-        page.get_by_text(
-            "Enter a TomTom API key before saving, or clear the saved key.", exact=True
-        )
-    ).to_be_visible()
+    key_input.press("Enter")
     assert len(patch_payloads) == 1
 
     card.get_by_role("button", name="Clear saved key").click()
@@ -701,7 +689,7 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
 
     fixture_key = "synthetic-tomtom-replacement"
     key_input.fill(fixture_key)
-    card.get_by_role("button", name="Save key").click()
+    key_input.press("Enter")
     expect(page.get_by_text("Synthetic credential update failure.", exact=True)).to_be_visible()
     expect(
         page.get_by_text(
@@ -911,22 +899,20 @@ def test_settings_sections_preserve_drafts_save_and_return(
 
     page.get_by_role("button", name="Application", exact=True).click()
     history_limit = page.get_by_label("Maximum history messages")
-    history_limit.fill("23")
-    page.get_by_role("button", name="Data Sources", exact=True).click()
-    page.get_by_role("button", name="Application", exact=True).click()
-    history_limit = page.get_by_label("Maximum history messages")
-    expect(history_limit).to_have_value("23")
-    page.screenshot(
-        path=str(screenshot_dir / "application-draft-retained.png"), full_page=True
-    )
-
     with page.expect_response(
         lambda response: response.request.method == "PATCH"
         and response.url.endswith("/settings/runtime")
     ) as patch_response:
-        page.get_by_role("button", name="Save application settings").click()
+        history_limit.fill("23")
+        page.get_by_role("button", name="Data Sources", exact=True).click()
     assert patch_response.value.ok, patch_response.value.status
     assert captured_runtime_patches[-1]["chat"]["max_history_messages"] == 23
+    page.get_by_role("button", name="Application", exact=True).click()
+    history_limit = page.get_by_label("Maximum history messages")
+    expect(history_limit).to_have_value("23")
+    page.screenshot(
+        path=str(screenshot_dir / "application-autosaved.png"), full_page=True
+    )
 
     page.get_by_role("link", name="Search", exact=True).click()
     expect(page.get_by_label("Chat message")).to_be_visible(timeout=15000)

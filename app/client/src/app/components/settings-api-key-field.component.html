@@ -6,6 +6,7 @@
     autocomplete="off"
     [ngModel]="value"
     (ngModelChange)="onValueChange($event)"
+    (change)="commit.emit()"
     [name]="inputName"
     [placeholder]="placeholder"
     [class.input-invalid]="!!validationError"
