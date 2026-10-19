@@ -30,6 +30,8 @@ from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.rainviewer import RainViewerService
 from server.services.cryptography import CredentialEncryptionService
 
+USGS_CATALOG_DEADLINE_SECONDS = 40.0
+
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialRuntime:
@@ -66,6 +68,8 @@ def build_provider_execution_policy(
         timeout = getattr(source_settings, "timeout", None)
         if isinstance(timeout, (int, float)) and timeout > 0:
             provider_timeouts[provider_id] = float(timeout)
+    # The USGS dated-range catalog query routinely takes 10-40 s upstream.
+    provider_timeouts["usgs"] = USGS_CATALOG_DEADLINE_SECONDS
     gibs_settings = getattr(settings, "gibs", None)
     gibs_timeouts = [
         getattr(gibs_settings, "timeout", None),

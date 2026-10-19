@@ -2106,6 +2106,27 @@ def test_completion_requires_verified_scope_for_every_requested_source(coverage,
     if not expected:
         assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
 
+@pytest.mark.parametrize('observed,expected', [
+    ('2024-03-27T20:30:45+00:00', True),
+    ('2024-03-31T23:00:00+00:00', True),
+    ('2024-04-01T01:00:00+00:00', False),
+    ('2024-02-29T23:00:00+00:00', False),
+])
+def test_completion_checks_date_only_range_against_aware_observation(observed, expected) -> None:
+    from server.services.agent.completion import CompletionEvaluator
+    state = _state()
+    state.goal = AgentGoal(goal='March quakes', task_mode='execute', presentation='map',
+        operation='show', requires_location=False,
+        temporal_scope={'start_time_iso': '2024-03-01', 'end_time_iso': '2024-03-31'})
+    state.completion_contract = CompletionContract(operation='show', evidence_required=True,
+        temporal_scope_required=True)
+    result = ToolResult(call_id='usgs', tool_name='execute_geospatial_capability', status='success',
+        summary='ok', data={'feature_count': 1}, evidence_refs=['usgs'],
+        metadata=ToolExecutionMetadata(duration_ms=0, capability_id='usgs',
+            coverage={'temporal_scope_satisfied': True}, observation_time=observed))
+    assessment = CompletionEvaluator.assess_evidence(state, result)
+    assert assessment.temporal_scope_satisfied is expected
+
 ###############################################################################
 def _vision_state(render_verified: bool = True) -> AgentRunState:
     state = _state()

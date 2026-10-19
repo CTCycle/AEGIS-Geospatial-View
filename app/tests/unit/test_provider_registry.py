@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from tests.conftest import run_async_in_thread
 
+from server.domain.geospatial.providers import provider_execution_scope
 from server.services.geospatial.provider_registry import (
     ProviderExecutionPolicy,
     ProviderNotRegisteredError,
@@ -332,6 +333,11 @@ def test_provider_registry_preserves_provider_specific_timeout_floor() -> None:
 
     assert registry._timeout_seconds("slow") == 0.05  # pyright: ignore[reportPrivateUsage]
     assert registry._timeout_seconds("other") == 0.01  # pyright: ignore[reportPrivateUsage]
+
+    # An agent run scopes a generic policy; the provider floor must survive it.
+    with provider_execution_scope(ProviderExecutionPolicy(timeout_seconds=0.02)):
+        assert registry._timeout_seconds("slow") == 0.05  # pyright: ignore[reportPrivateUsage]
+        assert registry._timeout_seconds("other") == 0.02  # pyright: ignore[reportPrivateUsage]
 
 ###############################################################################
 def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:

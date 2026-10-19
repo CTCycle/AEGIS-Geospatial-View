@@ -76,3 +76,16 @@ def selected_model_tool_support_metadata(
             evidence,
         )
     return True, "", evidence
+
+
+def exact_lane_tool_support_metadata(
+    page: Page, api_base_url: str
+) -> tuple[bool, str, dict[str, Any]]:
+    """Require the exact opencode-go / deepseek-v4.1-flash validation lane."""
+    ready, reason, evidence = selected_model_tool_support_metadata(page, api_base_url)
+    if ready and (
+        evidence["provider"] != "opencode-go"
+        or evidence["model"] != "deepseek-v4.1-flash"
+    ):
+        return False, "Live validation requires opencode-go / deepseek-v4.1-flash.", evidence
+    return ready, reason, evidence

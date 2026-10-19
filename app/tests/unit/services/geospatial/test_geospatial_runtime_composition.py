@@ -35,6 +35,7 @@ def test_provider_policy_uses_source_timeout_floors() -> None:
         "openmeteo": 15.0,
         "overpass": 20.0,
         "rainviewer": 15.0,
+        "usgs": 40.0,
         "gibs": 30.0,
     }
 

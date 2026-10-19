@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from server.common.typing import is_json_array, is_json_object, json_object
 
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderInvalidQueryError,
     ProviderMalformedPayloadError,
     ProviderRequest,
     ProviderResponse,
@@ -17,6 +19,10 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 from server.services.geospatial.spatial_constraints import geodesic_distance_m
+
+EARTHQUAKE_FDSN_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+EARTHQUAKE_RANGE_LIMIT = 2000
+EARTHQUAKE_RANGE_MAX_DAYS = 366
 
 ###############################################################################
 class USGSProvider(GeospatialProvider):
@@ -37,6 +43,8 @@ class USGSProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def _earthquakes(self, request: ProviderRequest) -> ProviderResponse:
+        if request.time is not None:
+            return await self._earthquake_range(request)
         feed = str(request.params.get("feed") or "all_day").strip()
         features_url = (
             f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
@@ -73,6 +81,63 @@ class USGSProvider(GeospatialProvider):
             },
             attribution=["U.S. Geological Survey"],
             result_type="metadata",
+        )
+
+    # -------------------------------------------------------------------------
+    async def _earthquake_range(self, request: ProviderRequest) -> ProviderResponse:
+        start, end = _resolve_time_range(request)
+        features_url = _fdsn_event_url(start, end, request.bbox)
+        label = f"USGS earthquake catalog {start.date()} to {end.date()}"
+        payload: dict[str, object] = {
+            "renderingMode": "clustered-points",
+            "timeMode": "historical",
+            "legend": {"type": "magnitude", "label": "Earthquake magnitude"},
+            "freshnessLabel": label,
+        }
+        if not request.params.get("live"):
+            payload["featuresUrl"] = features_url
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=self.provider_id,
+                payload=payload,
+                attribution=["U.S. Geological Survey"],
+                result_type="metadata",
+                source_url=features_url,
+            )
+        raw = await call_json_fetcher(self.fetcher, features_url)
+        features = _normalize_earthquake_features(raw)
+        truncated = len(features) >= EARTHQUAKE_RANGE_LIMIT
+        features = _filter_features_to_bbox(features, request.bbox)
+        features = _filter_features_to_radius(features, request.params)
+        times = [
+            value
+            for value in (feature.get("time") for feature in features)
+            if isinstance(value, int | float)
+        ]
+        observation_time = (
+            datetime.fromtimestamp(max(times) / 1000, UTC).isoformat()
+            if times
+            else None
+        )
+        payload.update({"features": features, "totalResults": len(features)})
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload=payload,
+            attribution=["U.S. Geological Survey"],
+            warnings=(
+                [
+                    f"Result capped at {EARTHQUAKE_RANGE_LIMIT} events (most recent "
+                    "first); narrow the area or period for the full list."
+                ]
+                if truncated
+                else []
+            ),
+            result_status="valid_empty" if not features else "ok",
+            result_type="features",
+            observation_time=observation_time,
+            coverage={"temporal_scope_satisfied": True},
+            source_url=features_url,
         )
 
     # -------------------------------------------------------------------------
@@ -122,6 +187,53 @@ class USGSProvider(GeospatialProvider):
             attribution=["U.S. Geological Survey"],
             result_type="metadata",
         )
+
+###############################################################################
+def _resolve_time_range(request: ProviderRequest) -> tuple[datetime, datetime]:
+    start = request.time
+    if start is None:
+        raise ProviderInvalidQueryError("A start time is required.")
+    end_value = request.params.get("end_time_iso")
+    try:
+        end = (
+            datetime.fromisoformat(str(end_value).replace("Z", "+00:00"))
+            if end_value
+            else datetime.now(UTC)
+        )
+    except ValueError as exc:
+        raise ProviderInvalidQueryError("The end time must be ISO-8601.") from exc
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=UTC)
+    if end <= start:
+        raise ProviderInvalidQueryError("The end time must follow the start time.")
+    if end - start > timedelta(days=EARTHQUAKE_RANGE_MAX_DAYS):
+        raise ProviderInvalidQueryError(
+            f"Earthquake ranges are limited to {EARTHQUAKE_RANGE_MAX_DAYS} days."
+        )
+    return start, end
+
+###############################################################################
+def _fdsn_event_url(
+    start: datetime,
+    end: datetime,
+    bbox: tuple[float, float, float, float] | None,
+) -> str:
+    query: dict[str, str | int | float] = {
+        "format": "geojson",
+        "starttime": start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
+        "endtime": end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
+        "orderby": "time",
+        "limit": EARTHQUAKE_RANGE_LIMIT,
+    }
+    # FDSN cannot express antimeridian-crossing boxes; those are filtered locally.
+    if bbox is not None and bbox[0] <= bbox[2]:
+        query.update(
+            minlongitude=bbox[0],
+            minlatitude=bbox[1],
+            maxlongitude=bbox[2],
+            maxlatitude=bbox[3],
+        )
+    return f"{EARTHQUAKE_FDSN_URL}?{urlencode(query)}"
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
