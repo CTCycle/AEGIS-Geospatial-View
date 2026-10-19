@@ -429,6 +429,18 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
     _validate_renderability(path, manifest, report)
 
 ###############################################################################
+def profile_claims_unrenderable_map_support(
+    profile: JsonDict | None, execution_contract: JsonDict
+) -> bool:
+    """Return whether a runtime profile promises a map the contract cannot render."""
+
+    return (
+        profile is not None
+        and profile.get("supports_map") is True
+        and execution_contract.get("render_support") in {"none", "metadata_only"}
+    )
+
+###############################################################################
 def audit_all_manifests(
     strict: bool = False,
     root_path: str | os.PathLike[str] | None = None,
@@ -457,6 +469,11 @@ def audit_all_manifests(
         for item in runtime_profiles
         if json_object(item).get("capability_id")
     }
+    profiles_by_id = {
+        str(json_object(item).get("capability_id")): json_object(item)
+        for item in runtime_profiles
+        if json_object(item).get("capability_id")
+    }
     api_source = _read_text_if_exists(API_SOURCE_PATH)
     client_source = _combined_text(_client_files(CLIENT_SOURCE_DIR))
     test_source = _combined_text(_python_files(TEST_SOURCE_DIR))
@@ -478,6 +495,20 @@ def audit_all_manifests(
                 severity="error",
                 manifest_id=manifest.id,
                 message="Capability is not registered in runtime_profiles.json.",
+            )
+        if profile_claims_unrenderable_map_support(
+            profiles_by_id.get(manifest.id),
+            json_object(_read_json(path).get("executionContract")),
+        ):
+            _add_issue(
+                report,
+                path=path,
+                severity="error",
+                manifest_id=manifest.id,
+                message=(
+                    "Runtime profile supports_map contradicts a metadata-only "
+                    "executionContract.render_support."
+                ),
             )
         if (
             manifest.reliability.status.value == "functional"

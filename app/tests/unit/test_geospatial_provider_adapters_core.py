@@ -698,6 +698,21 @@ def test_census_provider_selects_demographic_choropleth() -> None:
     assert "featuresUrl" not in response.payload
 
 ###############################################################################
+def test_census_cartographic_query_caps_records_and_generalizes_to_bbox_span() -> None:
+    response = run_async_in_thread(
+        CensusProvider().fetch(
+            ProviderRequest(
+                capability_id="census_cartographic_boundaries",
+                bbox=(-87.94, 41.64, -87.52, 42.02),
+            )
+        )
+    )
+
+    url = response.payload["featuresUrl"]
+    assert "resultRecordCount=2000" in url
+    assert "maxAllowableOffset=0.000420" in url
+
+###############################################################################
 def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
     calls: list[tuple[str, dict[str, str] | None]] = []
 

@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Mounting
 
@@ -79,7 +79,9 @@ Defined in `app/server/api/chat.py`:
   or `awaiting_render` returns `202 AgentRunAcceptedResponse`; it is not a
   conflict. The response includes `run_id`, `run_version`, `state`,
   `presentation_status`, a status URL, and the realtime URL. A `409` is reserved
-  for a genuine active-run/idempotency/ownership conflict.
+  for a genuine active-run/idempotency/ownership conflict. A message that is
+  empty or longer than 12,000 characters returns `422` with a sanitized
+  validation detail (never `404`).
 - `POST /api/chat/jobs`
   Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
 - `POST /api/chat/stream`

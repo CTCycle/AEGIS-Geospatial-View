@@ -2,7 +2,7 @@
   "capability_id": "openmeteo_elevation",
   "enabled_by_default": false,
   "credential_provider": null,
-  "supports_map": true,
+  "supports_map": false,
   "supports_direct_text": true,
   "coverage_policy": "global",
   "health_policy": "restricted_usage_opt_in",

@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from server.services.geospatial.ingestion import (
     IngestionManifestError,
     build_ingestion_plan,
@@ -210,6 +212,91 @@ def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
         assert "does not intersect" in str(exc)
     else:
         raise AssertionError("Non-intersecting bbox did not fail ingestion.")
+
+###############################################################################
+def _geojson_plan(tmp_path: Path, features: str, validation: dict, **download):
+    source = tmp_path / "source.geojson"
+    source.write_text(
+        '{"type":"FeatureCollection","features":[' + features + "]}",
+        encoding="utf-8",
+    )
+    manifest = _manifest()
+    manifest["download"].update(
+        {"sourceUrl": str(source), "expectedFormat": "geojson", "compression": "none"}
+        | download
+    )
+    manifest["validation"] = validation
+    return build_ingestion_plan(manifest)
+
+_OUTSIDE_POINT = (
+    '{"type":"Feature","id":"p","properties":{},'
+    '"geometry":{"type":"Point","coordinates":[7.0,45.0]}}'
+)
+
+def _snapshot(tmp_path: Path) -> dict[str, bytes]:
+    return {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in (tmp_path / "data").rglob("*")
+        if path.is_file()
+    }
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("features", "validation", "download", "message"),
+    [
+        ("", {"minFeatureCount": 0}, {"checksumSha256": "0" * 64}, "Checksum mismatch"),
+        ("", {"minFeatureCount": 1}, {}, "expected at least"),
+        (
+            _OUTSIDE_POINT,
+            {"minFeatureCount": 1, "bboxMustIntersect": [-125.0, 24.0, -66.0, 49.0]},
+            {},
+            "does not intersect",
+        ),
+    ],
+)
+def test_failed_ingestion_leaves_no_artifacts_behind(
+    tmp_path, features, validation, download, message
+) -> None:
+    plan = _geojson_plan(tmp_path, features, validation, **download)
+
+    with pytest.raises(RuntimeError, match=message):
+        execute_ingestion_plan(plan, workspace_root=tmp_path)
+
+    assert not (tmp_path / "data").exists()
+
+###############################################################################
+def test_unsupported_heavy_format_keeps_raw_artifact_and_reports_partial(tmp_path) -> None:
+    source = tmp_path / "boundaries.shp"
+    source.write_bytes(b"not-a-real-shapefile")
+    manifest = _manifest()
+    manifest["download"]["sourceUrl"] = str(source)
+    manifest["download"]["compression"] = "none"
+    manifest["validation"] = {
+        "minFeatureCount": 1,
+        "bboxMustIntersect": [-180.0, -90.0, 180.0, 90.0],
+    }
+
+    result = execute_ingestion_plan(
+        build_ingestion_plan(manifest), workspace_root=tmp_path
+    )
+
+    assert result.normalized_file is None
+    assert Path(result.raw_file).read_bytes() == b"not-a-real-shapefile"
+    assert "optional geospatial ingestion dependencies" in result.warnings[0]
+    assert json.loads(Path(result.health_file).read_text(encoding="utf-8"))["status"] == "partial"
+
+###############################################################################
+def test_failed_reingestion_restores_previous_materialization(tmp_path) -> None:
+    good = _geojson_plan(tmp_path, _OUTSIDE_POINT, {"minFeatureCount": 1})
+    execute_ingestion_plan(good, workspace_root=tmp_path)
+    before = _snapshot(tmp_path)
+    assert before
+
+    failing = _geojson_plan(tmp_path, "", {"minFeatureCount": 1})
+    with pytest.raises(RuntimeError, match="expected at least"):
+        execute_ingestion_plan(failing, workspace_root=tmp_path)
+
+    assert _snapshot(tmp_path) == before
 
 ###############################################################################
 def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(

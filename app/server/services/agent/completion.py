@@ -159,7 +159,13 @@ class CompletionEvaluator:
                 map_session.overlay_collection.instances
                 or valid_empty
             ),
-            "temporal_scope_applied": _native_temporal_scope_applied(goal, map_session),
+            "temporal_scope_applied": _native_temporal_scope_applied(
+                goal,
+                map_session,
+                evidence_required=(
+                    completion_contract is None or completion_contract.evidence_required
+                ),
+            ),
             "spatial_scope_applied": _native_spatial_scope_applied(goal, map_session),
             "map_candidate_prepared": True,
             "map_state_committed": False,
@@ -252,7 +258,10 @@ def _native_flag(name: str) -> str:
 
 ###############################################################################
 def _native_temporal_scope_applied(
-    goal: AgentGoal | None, map_session: MapSession
+    goal: AgentGoal | None,
+    map_session: MapSession,
+    *,
+    evidence_required: bool = True,
 ) -> bool:
     if goal is None or not goal.temporal_scope:
         return True
@@ -261,7 +270,9 @@ def _native_temporal_scope_applied(
         return True
     instances = map_session.overlay_collection.instances
     if not instances:
-        return (
+        # Without required evidence (for example a basemap-only imagery view)
+        # there is no data layer a temporal scope could be applied to.
+        return not evidence_required or (
             str(
                 map_session.payload.get("result_status")
                 or map_session.payload.get("resultStatus")

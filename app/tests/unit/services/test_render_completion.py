@@ -392,6 +392,27 @@ def test_temporal_scope_ignores_static_overlay_retained_during_current_update() 
     assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
 
 ###############################################################################
+def test_temporal_scope_is_vacuous_for_basemap_only_view_without_evidence() -> None:
+    goal = _goal(temporal_scope={"mode": "current"})
+    no_evidence = _contract("temporal_scope_applied")
+    needs_evidence = CompletionContract(
+        operation="geospatial_data_retrieval",
+        requirements=["temporal_scope_applied"],
+        map_preparation_required=True,
+        evidence_required=True,
+    )
+
+    vacuous = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=no_evidence, goal=goal, map_session=_session()
+    )
+    strict = CompletionEvaluator.native_candidate_requirements(
+        completion_contract=needs_evidence, goal=goal, map_session=_session()
+    )
+
+    assert next(i for i in vacuous if i.name == "temporal_scope_applied").status == "satisfied"
+    assert next(i for i in strict if i.name == "temporal_scope_applied").status == "pending"
+
+###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
     payload = RealtimeRenderAckPayload(
         run_id="run-1",
