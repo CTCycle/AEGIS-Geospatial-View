@@ -134,6 +134,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   overlayOrder: string[] = [];
   overlayRenderStatuses: OverlayRenderStatus[] = [];
   restoreNotice = '';
+  isToolsOpen = false;
   selectedInspection?: MapInspection;
 
   private inspectionTrigger: HTMLElement | null = null;
@@ -458,6 +459,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (basemapId && basemapId !== this.mapSession?.basemap_id) {
       this.basemapChange.emit(basemapId);
     }
+  }
+
+  toggleTools(): void {
+    this.isToolsOpen = !this.isToolsOpen;
   }
 
   zoomIn(): boolean {

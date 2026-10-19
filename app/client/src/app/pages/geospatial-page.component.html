@@ -130,7 +130,7 @@
       [class.is-active]="isResizing"
       [class.is-collapsed]="isToolbarCollapsed"
       aria-hidden="true"
-      (mousedown)="startResize()"
+      (mousedown)="startResize($event)"
     ></div>
 
     <section class="canvas-panel" aria-label="Map canvas">

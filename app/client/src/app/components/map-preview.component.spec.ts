@@ -146,6 +146,22 @@ getLayer: jasmine.Spy;
     expect(component.overlayOpacity['weather']).toBe(0.33);
   });
 
+  it('hides map tools until the toggle is used', () => {
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector('.map-tools-toggle') as HTMLButtonElement;
+    const tools = fixture.nativeElement.querySelector('#map-tools') as HTMLElement;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(tools.hidden).toBeTrue();
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(tools.hidden).toBeFalse();
+  });
+
   it('uses the backend basemap descriptor when rendering the base map', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();

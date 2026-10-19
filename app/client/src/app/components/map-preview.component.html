@@ -20,6 +20,22 @@
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container" role="region" tabindex="0" aria-label="Interactive map"></div>
 
+        <button
+          type="button"
+          class="map-tools-toggle"
+          [class.map-tools-toggle--active]="isToolsOpen"
+          aria-controls="map-tools"
+          aria-label="Map tools"
+          title="Basemap, layers and legend"
+          [attr.aria-expanded]="isToolsOpen"
+          (click)="toggleTools()"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+            <path d="M12 3 3 8l9 5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" />
+          </svg>
+        </button>
+
+        <div id="map-tools" class="map-tools" [hidden]="!isToolsOpen">
         @if (availableBasemaps.length) {
           <label class="basemap-selector">
             <span>Basemap</span>
@@ -70,7 +86,9 @@
             (overlayOrderChange)="onOverlayOrderChange($event)"
           ></app-overlay-controls>
         }
+        </div>
 
+        <div class="map-tools" [hidden]="!isToolsOpen">
         @if (metadataOnlyOverlays.length) {
           <div class="metadata-panel" aria-label="Metadata-only layers">
             @for (overlay of metadataOnlyOverlays; track overlay.id) {
@@ -91,6 +109,7 @@
             }
           </div>
         }
+        </div>
 
         @if (failedOverlayStatuses.length) {
           <div class="metadata-panel metadata-panel--errors" aria-label="Failed layers">
@@ -100,6 +119,7 @@
           </div>
         }
 
+        <div class="map-tools" [hidden]="!isToolsOpen">
         @if (legendEntries.length) {
           <div class="legend-panel" aria-label="Layer legend">
             @for (entry of legendEntries; track entry.id) {
@@ -112,6 +132,7 @@
             }
           </div>
         }
+        </div>
 
         @if (complianceWarnings.length || restoreNotice || attributionEntries.length) {
           <div class="map-bottom-bar">
