@@ -410,4 +410,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-07`, `T3-15` and `T3-17`/`T3-18` are `PASS` (see the [2026-10-19 slice](../../QA/validation-20261019-leftovers-tier5/report.md) for the latest route/Census/imagery evidence). Continue with F-19 (explicit USGS time ranges), Overpass reliability, the remaining Tier 5 gates (fixtures and authored performance/accessibility contracts first), and Tier 4B once approved credentials or a local Ollama exist; preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-07`, `T3-15` and `T3-17`/`T3-18` are `PASS` (see the [2026-10-19 slice](../../QA/validation-20261019-leftovers-tier5/report.md) for the latest route/Census/imagery evidence). F-19 closed on 2026-10-19 ([report](../../QA/validation-20261019-f19-t4-09/report.md)). Continue with F-26 (dates parsed as coordinates), Overpass reliability, the remaining Tier 5 gates (fixtures and authored performance/accessibility contracts first), and Tier 4B once approved credentials or a local Ollama exist; preserve the exact provider/model lane and browser acknowledgement boundary.

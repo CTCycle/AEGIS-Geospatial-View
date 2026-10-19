@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from datetime import datetime
+from datetime import UTC, datetime, time, timedelta
 
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
@@ -14,6 +14,17 @@ from server.domain.agent.capability_route import (
     CompletionRequirement,
 )
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
+
+###############################################################################
+def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
+    """Parse an ISO instant as UTC; a date-only end bound covers its whole day."""
+
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    if inclusive_end and len(value.strip()) == 10:
+        parsed = datetime.combine(parsed.date(), time.min, tzinfo=UTC) + timedelta(days=1)
+    return parsed
 
 ###############################################################################
 class CompletionEvaluator:
@@ -54,10 +65,10 @@ class CompletionEvaluator:
             observed = result.metadata.observation_time
             if expected and observed:
                 try:
-                    start = datetime.fromisoformat(str(expected).replace("Z", "+00:00"))
-                    actual = datetime.fromisoformat(observed.replace("Z", "+00:00"))
+                    start = _parse_scope_time(str(expected))
+                    actual = _parse_scope_time(observed)
                     end_value = scope.get("end_time_iso")
-                    end = datetime.fromisoformat(str(end_value).replace("Z", "+00:00")) if end_value else start
+                    end = _parse_scope_time(str(end_value), inclusive_end=True) if end_value else start
                     temporal = start <= actual <= end
                 except (ValueError, TypeError):
                     temporal = None

@@ -15,10 +15,12 @@ from tests.e2e.helpers.artifacts import (
     write_log_tail,
     write_snapshot,
 )
+from tests.e2e.helpers.model_capability_metadata import (
+    exact_lane_tool_support_metadata,
+)
 from tests.e2e.test_live_raster_diagnostics import (
     _RasterCapture,
     _expand_overlay_controls,
-    _provider_probe,
     _read_conversation_id,
     _read_latest_run_trace,
     _scenario_result,
@@ -104,14 +106,7 @@ def test_live_gibs_raster_layer(
     """Record each GIBS layer's route, proxy, payload, renderer, and ack boundary."""
 
     dirs = ensure_test_artifact_dirs(artifact_root, TEST_ID)
-    preflight = _provider_probe(page, api_base_url)
-    ready = (
-        preflight["http_status"] == 200
-        and preflight["status"] == "passed"
-        and preflight["parse_status"] == "complete"
-        and preflight["provider"] == "opencode-go"
-        and preflight["model"] == "deepseek-v4.1-flash"
-    )
+    ready, reason, preflight = exact_lane_tool_support_metadata(page, api_base_url)
     if not ready:
         (dirs["reports"] / f"{capability_id}.json").write_text(
             json.dumps(
@@ -119,14 +114,14 @@ def test_live_gibs_raster_layer(
                     "test_id": TEST_ID,
                     "capability_id": capability_id,
                     "temporal": temporal,
-                    "provider_probe": preflight,
+                    "capability_metadata": preflight,
                     "classification": "provider_lane_unavailable",
                 },
                 indent=2,
             ),
             encoding="utf-8",
         )
-        pytest.skip(f"Exact live provider lane was not ready: {preflight}")
+        pytest.skip(f"Exact live provider lane was not ready: {reason}; {preflight}")
 
     page.goto(base_url)
     page.get_by_role("button", name="Start new chat").click()
@@ -206,7 +201,7 @@ def test_live_gibs_raster_layer(
             {
                 "test_id": TEST_ID,
                 "tested_commit": os.environ.get("APP_TEST_COMMIT", "unknown"),
-                "provider_probe": preflight,
+                "capability_metadata": preflight,
                 "result": result,
             },
             indent=2,

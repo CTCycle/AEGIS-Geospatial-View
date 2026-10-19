@@ -427,9 +427,13 @@ class ProviderRegistry:
     def _timeout_seconds(self, provider_id: str) -> float:
         """Resolve one transport deadline from the canonical runtime policy."""
 
-        provider_timeout = current_provider_policy(self.execution_policy).provider_timeout_seconds.get(
+        # Run-scoped policies carry only the generic deadline; per-provider
+        # deadlines stay owned by the registry's configured policy.
+        provider_timeout = current_provider_policy(
+            self.execution_policy
+        ).provider_timeout_seconds.get(
             provider_id
-        )
+        ) or self.execution_policy.provider_timeout_seconds.get(provider_id)
         return max(
             0.01,
             float(current_provider_policy(self.execution_policy).timeout_seconds),

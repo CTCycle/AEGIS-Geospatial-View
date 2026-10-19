@@ -2,6 +2,8 @@
 
 Last updated: 2026-10-19
 
+The [2026-10-19 F-19 / T4-09 slice](../../QA/validation-20261019-f19-t4-09/report.md) passes `T4-09` (exact OpenCode Go lane) and closes F-19; `T4-10` to `T4-13`, `T5-11` and `T5-13` stay `UNRUN`.
+
 The [2026-10-19 Tier 5 accessibility and performance slice](../../QA/validation-20261019-tier5-perf-a11y/report.md) authors the missing contracts and passes `T5-10` (axe-core over nine views at desktop width plus keyboard focus; nine accessibility defects fixed) and `T5-09` (API p95 under 30 ms, 368 kB initial transfer, Rome and Naples renders). `T5-11` and `T5-13` stay `UNRUN`; Tier 4B is unchanged.
 
 The [2026-10-19 Tier 5 recovery slice](../../QA/validation-20261019-tier5-recovery/report.md) passes `T5-04` outages, `T5-05` restart recovery and `T5-06` repetition (reconstructed mapping, LOW confidence), extends `T5-07` to the stream and job routes after fixing a validation defect there, and confirms F-13 live. `T5-09`, `T5-10`, `T5-11` and `T5-13` remain `UNRUN`.
@@ -79,10 +81,10 @@ trusting downstream feature evidence.
 | Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
 | Tier 3 | `T3-01` to `T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Current count: 18 `PASS`. `T3-07` is `PASS` again: ESA renders and FEMA renders after a bounded retry of transient official-relay 500s ([retry follow-up](../../QA/validation-20261018-fema-retry/report.md)). `T3-15` is `PASS`: EEA END-2022 renders in Milan through the same-origin proxy with attribution, spatial-scope evidence, accepted `map.render_ack`, a passing EU coverage guardrail, EEA-plus-GBIF add/remove and a complete zero-direct-request lifecycle capture. `T3-18` is `PASS` per the 2026-10-18 campaign. See [current raster/EEA evidence](../../QA/validation-20261018-eea-end2022/report.md), [T3-07 history](../../QA/tier3-validation-develop-20261001-t3-07-final/report.md), [2026-10-18 campaign](../../QA/tool-e2e-validation-20261018/report.md), and [T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md). Keep provider retrieval, routing, renderer loading, browser requests, and acknowledgement as distinct evidence boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05/T4-07 PARTIAL; T4-06 BLOCKED. [2026-10-17 continuation](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes configured live GTFS and corrects the heavy-format implementation boundary. |
-| Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
+| Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | `T4-09` PASS on 2026-10-19 ([report](../../QA/validation-20261019-f19-t4-09/report.md)); `T4-10`-`T4-13` UNRUN. Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Opened 2026-10-19 with a reconstructed mapping (see the [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger)): `T5-01` to `T5-10` and `T5-12` `PASS`; `T5-11` and `T5-13` are `UNRUN` (Tier 4B lanes and the unresolved 13th theme). `T5-09`/`T5-10` use contracts authored on 2026-10-19. |
 
-The current roll-up is 57 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 7 `UNRUN`. This reconciliation counts `T3-07` and `T3-15` as `PASS` after the 2026-10-18 FEMA relay retry and EEA lifecycle follow-ups, the `T3-17`/`T3-18` passes, and the eleven reconstructed Tier 5 passes of 2026-10-19 (the intermediate 44/5/1/18 figure recorded earlier is superseded). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B is UNRUN and Tier 5 has two UNRUN gates.
+The current roll-up is 58 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 6 `UNRUN`. This reconciliation counts `T3-07` and `T3-15` as `PASS` after the 2026-10-18 FEMA relay retry and EEA lifecycle follow-ups, the `T3-17`/`T3-18` passes, and the eleven reconstructed Tier 5 passes of 2026-10-19 (the intermediate 44/5/1/18 figure recorded earlier is superseded). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B has one PASS (`T4-09`) and four UNRUN, and Tier 5 has two UNRUN gates.
 
 ### Campaign inventory reconciliation
 
@@ -90,10 +92,10 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01` to `T0-05`, `T1-01` to `T1-12`, `T2-01` to `T2-07`, `T3-01` to `T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08`, `T5-01` to `T5-10`, `T5-12` | 57 |
+| `PASS` | `T0-01` to `T0-05`, `T1-01` to `T1-12`, `T2-01` to `T2-07`, `T3-01` to `T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08`, `T4-09`, `T5-01` to `T5-10`, `T5-12` | 58 |
 | `PARTIAL` | `T4-03`, `T4-05`, `T4-07` | 3 |
 | `BLOCKED` | `T4-06` | 1 |
-| `UNRUN` | `T4-09` to `T4-13`, `T5-11`, `T5-13` | 7 |
+| `UNRUN` | `T4-10` to `T4-13`, `T5-11`, `T5-13` | 6 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
 descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).

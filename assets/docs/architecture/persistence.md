@@ -71,7 +71,7 @@ runtime code never calls `Base.metadata.create_all()`.
 Operators must back up a database before deployment. A failed startup never
 silently replaces an existing database file.
 
-The canonical schema contains 18 application tables plus `alembic_version`.
+The canonical schema contains 17 application tables plus `alembic_version`.
 Conversations own their context state, message history, message sequence, and
 active-run relationship directly; there are no `chat_sessions` or
 `conversation_contexts` tables.

@@ -27,9 +27,11 @@ from tests.e2e.helpers.artifacts import (
     write_log_tail,
     write_snapshot,
 )
+from tests.e2e.helpers.model_capability_metadata import (
+    exact_lane_tool_support_metadata,
+)
 from tests.e2e.test_live_raster_diagnostics import (
     _bounded_text,
-    _provider_probe,
     _read_conversation_id,
     _read_latest_run_trace,
     _sanitize_url,
@@ -354,19 +356,14 @@ def test_route_matrix_live_diagnostics(
 
     dirs = ensure_test_artifact_dirs(artifact_root, TEST_ID)
     with browser.new_context() as probe_context:
-        preflight = _provider_probe(probe_context.new_page(), api_base_url)
-    ready = (
-        preflight["http_status"] == 200
-        and preflight["status"] == "passed"
-        and preflight["parse_status"] == "complete"
-        and preflight["provider"] == "opencode-go"
-        and preflight["model"] == "deepseek-v4.1-flash"
-    )
+        ready, reason, preflight = exact_lane_tool_support_metadata(
+            probe_context.new_page(), api_base_url
+        )
     if not ready:
         (dirs["reports"] / f"{TEST_ID}.json").write_text(
-            json.dumps({"provider_probe": preflight}, indent=2), encoding="utf-8"
+            json.dumps({"capability_metadata": preflight}, indent=2), encoding="utf-8"
         )
-        pytest.skip(f"Exact live provider lane was not ready: {preflight}")
+        pytest.skip(f"Exact live provider lane was not ready: {reason}; {preflight}")
 
     results: list[dict[str, Any]] = []
     scenarios = SCENARIOS
@@ -425,7 +422,7 @@ def test_route_matrix_live_diagnostics(
 
     report = {
         "test_id": TEST_ID,
-        "provider_probe": preflight,
+        "capability_metadata": preflight,
         "scenarios": results,
         "artifacts": {
             "screenshots": str(dirs["screenshots"]),

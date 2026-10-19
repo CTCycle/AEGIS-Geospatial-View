@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from tests.conftest import run_async_in_thread
 
 import pytest
 
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
+    ProviderInvalidQueryError,
     ProviderRequest,
     ProviderUnavailableError,
 )
@@ -70,6 +73,74 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "earthquake"
     assert response.payload["features"][0]["magnitude"] == 2.5
+
+###############################################################################
+def test_usgs_dated_range_queries_catalog_with_bbox_and_reports_scope() -> None:
+    urls: list[str] = []
+
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        _ = headers
+        urls.append(url)
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "march-1",
+                    "properties": {"place": "Japan", "mag": 5.1, "time": 1710000000000},
+                    "geometry": {"type": "Point", "coordinates": [140.0, 36.0, 10.0]},
+                }
+            ],
+        }
+
+    response = run_async_in_thread(
+        USGSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="usgs_earthquakes",
+                bbox=(129.0, 31.0, 146.0, 46.0),
+                time=datetime(2024, 3, 1, tzinfo=UTC),
+                params={"live": True, "end_time_iso": "2024-03-31T00:00:00Z"},
+            )
+        )
+    )
+
+    assert "fdsnws/event/1/query" in urls[0]
+    assert "starttime=2024-03-01T00%3A00%3A00" in urls[0]
+    assert "endtime=2024-03-31T00%3A00%3A00" in urls[0]
+    assert "minlongitude=129.0" in urls[0]
+    assert response.payload["timeMode"] == "historical"
+    assert response.payload["totalResults"] == 1
+    assert response.coverage == {"temporal_scope_satisfied": True}
+    assert response.observation_time == "2024-03-09T16:00:00+00:00"
+
+###############################################################################
+def test_usgs_dated_range_empty_is_valid_empty_and_bad_ranges_are_rejected() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        _ = url, headers
+        return {"type": "FeatureCollection", "features": []}
+
+    start = datetime(2024, 3, 1, tzinfo=UTC)
+    empty = run_async_in_thread(
+        USGSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="usgs_earthquakes",
+                time=start,
+                params={"live": True, "end_time_iso": "2024-03-05T00:00:00Z"},
+            )
+        )
+    )
+    assert empty.result_status == "valid_empty"
+
+    for end in ("2024-02-01T00:00:00Z", "2026-03-01T00:00:00Z"):
+        with pytest.raises(ProviderInvalidQueryError):
+            run_async_in_thread(
+                USGSProvider(fetcher=fetcher).fetch(
+                    ProviderRequest(
+                        capability_id="usgs_earthquakes",
+                        time=start,
+                        params={"live": True, "end_time_iso": end},
+                    )
+                )
+            )
 
 ###############################################################################
 def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
