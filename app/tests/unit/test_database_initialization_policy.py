@@ -217,7 +217,7 @@ def test_native_state_migration_preserves_legacy_context_and_settings(
     result = _initialize(migrated)
 
     assert result.current_revisions == ("202609090002",)
-    assert result.final_revisions == ("202610190001",)
+    assert result.final_revisions == ("202610200001",)
     with migrated.engine.connect() as connection:
         columns = {
             item["name"]
