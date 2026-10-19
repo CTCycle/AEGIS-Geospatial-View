@@ -18,14 +18,6 @@ from server.services.llm.opencode_models_dev import ModelsDevEntry
 from server.services.llm.types import LLMRequest
 
 ###############################################################################
-@pytest.fixture(autouse=True)
-def _offline_models_dev(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "server.services.llm.opencode_provider.fetch_models_dev_entries",
-        lambda provider, policy: {},
-    )
-
-###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
@@ -217,6 +209,20 @@ def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(
     assert luna.metadata["supports_vision"] is True
     assert qwen.metadata["protocol"] == "anthropic-messages"
     assert provider.protocol_for_model("gpt-6-luna") == "openai-responses"
+
+###############################################################################
+def test_protocol_lookup_consults_models_dev_without_a_catalog_listing(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.fetch_models_dev_entries",
+        lambda provider, policy: {
+            "grok-4.7": ModelsDevEntry("openai-responses", None, None, False)
+        },
+    )
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    assert provider.protocol_for_model("grok-4.7") == "openai-responses"
 
 ###############################################################################
 def test_opencode_normalizes_nested_documented_limits(monkeypatch) -> None:
