@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-19
 
-The [2026-10-19 leftover and Tier 5 slice](../../QA/validation-20261019-leftovers-tier5/report.md) opens Tier 5 under a reconstructed ID-to-theme mapping (LOW confidence; `T5-13` unresolved): `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` pass. It also fixes Census timeouts, the imagery temporal-scope failure, F-13 point-scope routing, F-25, failed-materialization rollback and an over-long-message 404 defect.
+The [2026-10-19 leftover and Tier 5 slice](../../QA/validation-20261019-leftovers-tier5/report.md) opens Tier 5 under a reconstructed ID-to-theme mapping (LOW confidence; `T5-13` unresolved): `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` pass, and `T5-12` passes on hosted CI run 39212579230. It also fixes Census timeouts, the imagery temporal-scope failure, F-13 point-scope routing, F-25, failed-materialization rollback and an over-long-message 404 defect.
 
 The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and advances `T4-04` to `PASS` for configured live GTFS static/realtime validation. Location-only spatial completion and the realtime-validator contract were repaired; 1,088 backend unit tests, changed-file Ruff, and full strict Pyright pass. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT was not yet run. Later reports supersede the EEA and vision statuses; Census, elevation, imagery, and narration limitations remain.
 
@@ -76,9 +76,9 @@ trusting downstream feature evidence.
 | Tier 3 | `T3-01` to `T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Current count: 18 `PASS`. `T3-07` is `PASS` again: ESA renders and FEMA renders after a bounded retry of transient official-relay 500s ([retry follow-up](../../QA/validation-20261018-fema-retry/report.md)). `T3-15` is `PASS`: EEA END-2022 renders in Milan through the same-origin proxy with attribution, spatial-scope evidence, accepted `map.render_ack`, a passing EU coverage guardrail, EEA-plus-GBIF add/remove and a complete zero-direct-request lifecycle capture. `T3-18` is `PASS` per the 2026-10-18 campaign. See [current raster/EEA evidence](../../QA/validation-20261018-eea-end2022/report.md), [T3-07 history](../../QA/tier3-validation-develop-20261001-t3-07-final/report.md), [2026-10-18 campaign](../../QA/tool-e2e-validation-20261018/report.md), and [T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md). Keep provider retrieval, routing, renderer loading, browser requests, and acknowledgement as distinct evidence boundaries. |
 | Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05/T4-07 PARTIAL; T4-06 BLOCKED. [2026-10-17 continuation](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes configured live GTFS and corrects the heavy-format implementation boundary. |
 | Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
-| Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Opened 2026-10-19 with a reconstructed mapping (see the [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger)): `T5-01`/`T5-02`/`T5-03`/`T5-07`/`T5-08` `PASS`; the other eight are `UNRUN` (fixtures, authored performance/accessibility contracts, Tier 4B lanes, hosted CI and the unresolved 13th theme). |
+| Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Opened 2026-10-19 with a reconstructed mapping (see the [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger)): `T5-01`/`T5-02`/`T5-03`/`T5-07`/`T5-08`/`T5-12` `PASS`; the other seven are `UNRUN` (fixtures, authored performance/accessibility contracts, Tier 4B lanes and the unresolved 13th theme). |
 
-The current roll-up is 51 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 13 `UNRUN`. This reconciliation counts `T3-07` and `T3-15` as `PASS` after the 2026-10-18 FEMA relay retry and EEA lifecycle follow-ups, the `T3-17`/`T3-18` passes, and the five reconstructed Tier 5 passes of 2026-10-19 (the intermediate 44/5/1/18 figure recorded earlier is superseded). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B and Tier 5 remain UNRUN.
+The current roll-up is 52 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 12 `UNRUN`. This reconciliation counts `T3-07` and `T3-15` as `PASS` after the 2026-10-18 FEMA relay retry and EEA lifecycle follow-ups, the `T3-17`/`T3-18` passes, and the six reconstructed Tier 5 passes of 2026-10-19 (the intermediate 44/5/1/18 figure recorded earlier is superseded). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B and Tier 5 remain UNRUN.
 
 ### Campaign inventory reconciliation
 
@@ -86,10 +86,10 @@ The 68 campaign slices are counted exactly once as follows:
 
 | Status | Explicit slice IDs | Count |
 | --- | --- | ---: |
-| `PASS` | `T0-01` to `T0-05`, `T1-01` to `T1-12`, `T2-01` to `T2-07`, `T3-01` to `T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08`, `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` | 51 |
+| `PASS` | `T0-01` to `T0-05`, `T1-01` to `T1-12`, `T2-01` to `T2-07`, `T3-01` to `T3-18`, `T4-01`, `T4-02`, `T4-04`, `T4-08`, `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08`, `T5-12` | 52 |
 | `PARTIAL` | `T4-03`, `T4-05`, `T4-07` | 3 |
 | `BLOCKED` | `T4-06` | 1 |
-| `UNRUN` | `T4-09` to `T4-13`, `T5-04`, `T5-05`, `T5-06`, `T5-09`, `T5-10`, `T5-11`, `T5-12`, `T5-13` | 13 |
+| `UNRUN` | `T4-09` to `T4-13`, `T5-04`, `T5-05`, `T5-06`, `T5-09`, `T5-10`, `T5-11`, `T5-13` | 12 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
 descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
@@ -190,7 +190,7 @@ The Tier 1 application-foundations baseline remains recorded at
 `loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
 ledger and detailed evidence are in
 [`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
-The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 51 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 13 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
+The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 52 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 12 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 
