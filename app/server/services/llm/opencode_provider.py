@@ -9,9 +9,13 @@ from typing import Any
 import httpx
 
 from server.common.constants import AEGIS_VERSION
+from server.services.llm.base import LLMProvider
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.opencode_messages_transport import (
+    _OpenCodeMessagesTransport,  # pyright: ignore[reportPrivateUsage]
+)
 from server.services.llm.opencode_models_dev import (
     ModelsDevEntry,
     fetch_models_dev_entries,
@@ -32,7 +36,7 @@ ANTHROPIC_MESSAGES_PROTOCOL = "anthropic-messages"
 GOOGLE_MODEL_PROTOCOL = "google-model"
 
 SUPPORTED_OPENCODE_PROTOCOLS = frozenset(
-    {OPENAI_CHAT_PROTOCOL, OPENAI_RESPONSES_PROTOCOL}
+    {OPENAI_CHAT_PROTOCOL, OPENAI_RESPONSES_PROTOCOL, ANTHROPIC_MESSAGES_PROTOCOL}
 )
 
 # OpenCode's live /models response currently contains IDs and ownership but
@@ -185,6 +189,7 @@ class OpenCodeProvider(DeepSeekProvider):
         self._declared_model_protocols: dict[str, str] = {}
         self._models_dev: dict[str, ModelsDevEntry] = {}
         self._responses_transport: _OpenCodeResponsesTransport | None = None
+        self._messages_transport: _OpenCodeMessagesTransport | None = None
 
     # -------------------------------------------------------------------------
     def _request_headers(self, request: LLMRequest | None = None) -> dict[str, str]:
@@ -208,6 +213,12 @@ class OpenCodeProvider(DeepSeekProvider):
         if self._responses_transport is None:
             self._responses_transport = _OpenCodeResponsesTransport(self)
         return self._responses_transport
+
+    # -------------------------------------------------------------------------
+    def _messages(self) -> _OpenCodeMessagesTransport:
+        if self._messages_transport is None:
+            self._messages_transport = _OpenCodeMessagesTransport(self)
+        return self._messages_transport
 
     # -------------------------------------------------------------------------
     def protocol_for_model(self, model: str) -> str:
@@ -252,6 +263,11 @@ class OpenCodeProvider(DeepSeekProvider):
             # model contract; omit unsupported sampling parameters.
             "supports_temperature": False,
         }
+        return replace(request, provider=self.provider_name, metadata=metadata)
+
+    # -------------------------------------------------------------------------
+    def _messages_request(self, request: LLMRequest) -> LLMRequest:
+        metadata = {**request.metadata, "protocol": ANTHROPIC_MESSAGES_PROTOCOL}
         return replace(request, provider=self.provider_name, metadata=metadata)
 
     # -------------------------------------------------------------------------
@@ -354,7 +370,7 @@ class OpenCodeProvider(DeepSeekProvider):
             metadata["supports_structured_output"] = False
             metadata["agent_selection_disabled_reason"] = (
                 "This OpenCode model uses an unsupported transport. "
-                "AEGIS supports Chat Completions and Responses only."
+                "AEGIS supports Chat Completions, Responses and Messages only."
             )
         for key in (
             "context_window_tokens",
@@ -455,45 +471,50 @@ class OpenCodeProvider(DeepSeekProvider):
         )
 
     # -------------------------------------------------------------------------
-    def chat(self, request: LLMRequest, **kwargs: Any):  # type: ignore[no-untyped-def]
+    def _route(self, request: LLMRequest) -> tuple[LLMProvider, LLMRequest]:
+        """Pick the transport for the model's endpoint family."""
+
         protocol = self._require_supported_protocol(request)
         if protocol == OPENAI_RESPONSES_PROTOCOL:
-            return self._responses().chat(self._responses_request(request), **kwargs)
-        return super().chat(request, **kwargs)
+            return self._responses(), self._responses_request(request)
+        if protocol == ANTHROPIC_MESSAGES_PROTOCOL:
+            return self._messages(), self._messages_request(request)
+        return self, request
+
+    # -------------------------------------------------------------------------
+    def chat(self, request: LLMRequest, **kwargs: Any):  # type: ignore[no-untyped-def]
+        transport, routed = self._route(request)
+        if transport is self:
+            return super().chat(request, **kwargs)
+        return transport.chat(routed, **kwargs)
 
     # -------------------------------------------------------------------------
     async def achat(self, request: LLMRequest, **kwargs: Any):  # type: ignore[no-untyped-def]
-        protocol = self._require_supported_protocol(request)
-        if protocol == OPENAI_RESPONSES_PROTOCOL:
-            return await self._responses().achat(
-                self._responses_request(request), **kwargs
-            )
-        return await super().achat(request, **kwargs)
+        transport, routed = self._route(request)
+        if transport is self:
+            return await super().achat(request, **kwargs)
+        return await transport.achat(routed, **kwargs)
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest):  # type: ignore[no-untyped-def]
-        protocol = self._require_supported_protocol(request)
-        if protocol == OPENAI_RESPONSES_PROTOCOL:
-            return self._responses().stream_chat(self._responses_request(request))
-        return super().stream_chat(request)
+        transport, routed = self._route(request)
+        if transport is self:
+            return super().stream_chat(request)
+        return transport.stream_chat(routed)
 
     # -------------------------------------------------------------------------
     def structured_output(self, request: LLMRequest, schema: type[Any]):
-        protocol = self._require_supported_protocol(request)
-        if protocol == OPENAI_RESPONSES_PROTOCOL:
-            return self._responses().structured_output(
-                self._responses_request(request), schema
-            )
-        return super().structured_output(request, schema)
+        transport, routed = self._route(request)
+        if transport is self:
+            return super().structured_output(request, schema)
+        return transport.structured_output(routed, schema)
 
     # -------------------------------------------------------------------------
     async def astructured_output(self, request: LLMRequest, schema: type[Any]):
-        protocol = self._require_supported_protocol(request)
-        if protocol == OPENAI_RESPONSES_PROTOCOL:
-            return await self._responses().astructured_output(
-                self._responses_request(request), schema
-            )
-        return await super().astructured_output(request, schema)
+        transport, routed = self._route(request)
+        if transport is self:
+            return await super().astructured_output(request, schema)
+        return await transport.astructured_output(routed, schema)
 
     # -------------------------------------------------------------------------
     @staticmethod

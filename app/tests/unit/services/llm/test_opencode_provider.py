@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
@@ -12,6 +13,7 @@ from server.services.llm.opencode_provider import (
     OpenCodeProvider,
 )
 from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
+from server.services.llm.opencode_messages_transport import build_messages_payload
 from server.services.llm.opencode_models_dev import ModelsDevEntry
 from server.services.llm.types import LLMRequest
 
@@ -127,11 +129,8 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert [model.name for model in models] == ["deepseek-v4-flash", "claude-opus-5"]
     assert models[0].provider == OPENCODE_PROVIDER
     assert models[0].metadata["protocol"] == "openai-chat-completions"
-    assert models[1].capabilities == ["chat", "stream"]
+    assert "tools" in models[1].capabilities
     assert models[1].metadata["protocol"] == "anthropic-messages"
-    assert "unsupported transport" in models[1].metadata[
-        "agent_selection_disabled_reason"
-    ]
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
     assert captured["kwargs"]["headers"]["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
@@ -146,7 +145,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_structured_output("deepseek-v4.1-flash") is True
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
-    assert provider.supports_tools("minimax-m3") is False
+    assert provider.supports_tools("minimax-m3") is True
 
 ###############################################################################
 def test_go_catalog_marks_deepseek_v41_flash_as_live_chat_model(monkeypatch) -> None:
@@ -461,10 +460,10 @@ def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) ->
     assert routed.metadata["supports_temperature"] is False
 
 ###############################################################################
-def test_opencode_rejects_messages_transport_without_guessing() -> None:
-    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+def test_opencode_rejects_unimplemented_transport_without_guessing() -> None:
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_PROVIDER)
     request = LLMRequest(
-        model="minimax-m3",
+        model="gemini-3.7-flash",
         messages=[{"role": "user", "content": "Hello"}],
         provider_session_id="conversation-messages",
     )
@@ -505,3 +504,130 @@ def test_opencode_structured_wrapper_rejects_multiple_payloads() -> None:
         )
 
     assert error.value.code == "structured_invalid_payload"
+
+###############################################################################
+def test_messages_payload_maps_tools_images_and_turn_roles() -> None:
+    payload = build_messages_payload(
+        model="qwen3.8-max",
+        temperature=1.7,
+        max_tokens=99,
+        tool_choice="required",
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "lookup",
+                    "description": "Look up.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ],
+        messages=[
+            {"role": "system", "content": "Be brief."},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "See"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "lookup", "arguments": '{"q": 1}'},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call-1", "content": "found"},
+        ],
+    )
+
+    assert payload["system"] == "Be brief."
+    assert payload["max_tokens"] == 99
+    assert payload["temperature"] == 1.0
+    assert payload["tool_choice"] == {"type": "any"}
+    assert payload["tools"][0]["input_schema"] == {"type": "object", "properties": {}}
+    assert [turn["role"] for turn in payload["messages"]] == [
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert payload["messages"][0]["content"][1]["source"]["media_type"] == "image/png"
+    assert payload["messages"][1]["content"] == [
+        {"type": "tool_use", "id": "call-1", "name": "lookup", "input": {"q": 1}}
+    ]
+    assert payload["messages"][2]["content"][0]["type"] == "tool_result"
+
+###############################################################################
+def test_messages_models_run_structured_output_through_the_messages_endpoint(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_post(self, url, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        captured["url"] = url
+        captured["headers"] = kwargs["headers"]
+        captured["json"] = kwargs["json"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "stop_reason": "tool_use",
+                "usage": {"input_tokens": 7, "output_tokens": 3},
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_1",
+                        "name": "submit_structured_response",
+                        "input": {"answer": "structured"},
+                    }
+                ],
+            },
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    result = provider.structured_output(
+        LLMRequest(
+            model="qwen3.8-max",
+            provider_session_id="conversation-1",
+            messages=[{"role": "user", "content": "Hello"}],
+        ),
+        schema=_StructuredPayload,
+    )
+
+    assert result == {"answer": "structured"}
+    assert captured["url"] == "https://opencode.ai/zen/go/v1/messages"
+    assert captured["headers"]["x-api-key"] == "test-key"
+    assert captured["headers"]["x-opencode-session"] == "conversation-1"
+    assert captured["json"]["tools"][0]["name"] == "submit_structured_response"
+    assert result.context_usage["reported_input_tokens"] == 7
+
+###############################################################################
+def test_messages_error_keeps_status_and_provider_detail(monkeypatch) -> None:
+    def fake_post(self, url, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        return httpx.Response(
+            400,
+            text="prompt is too long for this model",
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+
+    with pytest.raises(LLMProviderRequestError) as error:
+        provider.chat(
+            LLMRequest(
+                model="minimax-m3",
+                provider_session_id="conversation-1",
+                messages=[{"role": "user", "content": "Hello"}],
+            )
+        )
+
+    assert error.value.code == "context_limit_exceeded"
