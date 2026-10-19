@@ -74,7 +74,7 @@ const requestTimeoutMs = (url: string, init: RequestInit): number => {
   const normalizedUrl = url.toLowerCase();
   if (
     normalizedUrl.includes('/chat/turn')
-    || normalizedUrl.includes('/chat/structured-probe')
+    || normalizedUrl.includes('/chat/models/structured-probe')
     || normalizedUrl.includes('/ollama/pull')
     || normalizedUrl.includes('/geospatial/layers/') && normalizedUrl.includes('/features')
   ) {
