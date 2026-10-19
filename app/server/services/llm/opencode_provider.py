@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object
 
 from dataclasses import replace
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
@@ -122,6 +123,14 @@ OPENCODE_COMPATIBLE_MODELS: dict[str, frozenset[str]] = {
     )
     for provider, registry in OPENCODE_PROTOCOL_REGISTRY.items()
 }
+
+# Request constraints the provider reported for a model (thinking control or a
+# fixed temperature). They are learned from its own 400 responses and shared
+# across the per-request provider instances, so each model fails at most once.
+_LEARNED_CONSTRAINTS: dict[tuple[str, str], set[str]] = {}
+_NO_THINKING_CONTROL = "no_thinking_control"
+_FIXED_TEMPERATURE = "fixed_temperature"
+_CONSTRAINTS = (_NO_THINKING_CONTROL, _FIXED_TEMPERATURE)
 
 OPENCODE_BASE_URLS = {
     OPENCODE_PROVIDER: DEFAULT_OPENCODE_BASE_URL,
@@ -487,39 +496,107 @@ class OpenCodeProvider(DeepSeekProvider):
         return self, request
 
     # -------------------------------------------------------------------------
+    def _constrained(self, request: LLMRequest) -> LLMRequest:
+        learned = _LEARNED_CONSTRAINTS.get(
+            (self.provider_name, request.model.strip().lower()), set()
+        )
+        if _NO_THINKING_CONTROL in learned:
+            metadata = {
+                key: value
+                for key, value in request.metadata.items()
+                if key != "thinking_mode"
+            }
+            request = replace(request, metadata=metadata)
+        if _FIXED_TEMPERATURE in learned:
+            request = replace(request, temperature=1.0)
+        return request
+
+    # -------------------------------------------------------------------------
+    def _learn_constraint(self, error: LLMProviderRequestError, request: LLMRequest) -> bool:
+        """Record a rejected request control; True when a retry can differ."""
+
+        detail = str(error.__cause__ or "").lower()
+        learned = _LEARNED_CONSTRAINTS.setdefault(
+            (self.provider_name, request.model.strip().lower()), set()
+        )
+        found = None
+        if "thinking" in detail and "thinking_mode" in request.metadata:
+            found = _NO_THINKING_CONTROL
+        elif "invalid temperature" in detail and request.temperature != 1.0:
+            found = _FIXED_TEMPERATURE
+        if found is None or found in learned:
+            return False
+        learned.add(found)
+        return True
+
+    # -------------------------------------------------------------------------
+    def _with_constraints(self, request: LLMRequest, call: Callable[[LLMRequest], Any]) -> Any:
+        for _ in range(len(_CONSTRAINTS)):
+            constrained = self._constrained(request)
+            try:
+                return call(constrained)
+            except LLMProviderRequestError as exc:
+                if not self._learn_constraint(exc, constrained):
+                    raise
+        return call(self._constrained(request))
+
+    # -------------------------------------------------------------------------
+    async def _awith_constraints(
+        self, request: LLMRequest, call: Callable[[LLMRequest], Awaitable[Any]]
+    ) -> Any:
+        for _ in range(len(_CONSTRAINTS)):
+            constrained = self._constrained(request)
+            try:
+                return await call(constrained)
+            except LLMProviderRequestError as exc:
+                if not self._learn_constraint(exc, constrained):
+                    raise
+        return await call(self._constrained(request))
+
+    # -------------------------------------------------------------------------
     def chat(self, request: LLMRequest, **kwargs: Any):  # type: ignore[no-untyped-def]
         transport, routed = self._route(request)
-        if transport is self:
-            return super().chat(request, **kwargs)
-        return transport.chat(routed, **kwargs)
+        if transport is not self:
+            return transport.chat(routed, **kwargs)
+        return self._with_constraints(
+            request, lambda constrained: super(OpenCodeProvider, self).chat(constrained, **kwargs)
+        )
 
     # -------------------------------------------------------------------------
     async def achat(self, request: LLMRequest, **kwargs: Any):  # type: ignore[no-untyped-def]
         transport, routed = self._route(request)
-        if transport is self:
-            return await super().achat(request, **kwargs)
-        return await transport.achat(routed, **kwargs)
+        if transport is not self:
+            return await transport.achat(routed, **kwargs)
+        return await self._awith_constraints(
+            request, lambda constrained: super(OpenCodeProvider, self).achat(constrained, **kwargs)
+        )
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest):  # type: ignore[no-untyped-def]
         transport, routed = self._route(request)
         if transport is self:
-            return super().stream_chat(request)
+            return super().stream_chat(self._constrained(request))
         return transport.stream_chat(routed)
 
     # -------------------------------------------------------------------------
     def structured_output(self, request: LLMRequest, schema: type[Any]):
         transport, routed = self._route(request)
-        if transport is self:
-            return super().structured_output(request, schema)
-        return transport.structured_output(routed, schema)
+        if transport is not self:
+            return transport.structured_output(routed, schema)
+        return self._with_constraints(
+            request,
+            lambda constrained: super(OpenCodeProvider, self).structured_output(constrained, schema),
+        )
 
     # -------------------------------------------------------------------------
     async def astructured_output(self, request: LLMRequest, schema: type[Any]):
         transport, routed = self._route(request)
-        if transport is self:
-            return await super().astructured_output(request, schema)
-        return await transport.astructured_output(routed, schema)
+        if transport is not self:
+            return await transport.astructured_output(routed, schema)
+        return await self._awith_constraints(
+            request,
+            lambda constrained: super(OpenCodeProvider, self).astructured_output(constrained, schema),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

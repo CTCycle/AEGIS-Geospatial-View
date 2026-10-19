@@ -637,3 +637,39 @@ def test_messages_error_keeps_status_and_provider_detail(monkeypatch) -> None:
         )
 
     assert error.value.code == "context_limit_exceeded"
+
+###############################################################################
+def test_rejected_thinking_control_is_dropped_and_remembered_for_the_model(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider._LEARNED_CONSTRAINTS", {}
+    )
+    client = _Client()
+    original_create = client.completions.create
+    attempts: list[dict[str, object]] = []
+
+    def create(**kwargs):  # noqa: ANN003, ANN202
+        attempts.append(kwargs)
+        if len(attempts) == 1:
+            raise RuntimeError("400: this is a thinking-only model; cannot disable thinking")
+        return original_create(**kwargs)
+
+    client.completions.create = create
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda _request=None, **_kwargs: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"thinking_mode": "disabled"},
+    )
+
+    assert provider.structured_output(request, schema=_StructuredPayload) == {
+        "answer": "structured"
+    }
+    provider.structured_output(request, schema=_StructuredPayload)
+
+    assert attempts[0]["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert "extra_body" not in attempts[1]
+    assert "extra_body" not in attempts[2]
