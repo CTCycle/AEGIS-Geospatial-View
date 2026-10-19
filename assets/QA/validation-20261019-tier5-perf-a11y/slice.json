@@ -1,0 +1,25 @@
+{
+  "campaign": "validation-20261019-tier5-perf-a11y",
+  "date": "2026-10-19",
+  "branch": "develop",
+  "starting_sha": "4ead938d",
+  "lane": "opencode-go / deepseek-v4.1-flash (isolated disposable runtime)",
+  "changed_sources": [
+    "app/client/src/styles.css",
+    "app/client/src/app/components/capability-status-list.component.html",
+    "app/client/src/app/components/map-preview.component.html",
+    "app/client/src/app/components/settings-api-key-field.component.ts",
+    "app/client/src/app/pages/capabilities-page.component.html",
+    "app/client/src/app/pages/geospatial-page.component.html",
+    "app/client/src/app/pages/settings-page.component.html"
+  ],
+  "changed_tests": [
+    "app/client/src/app/components/capability-status-list.component.spec.ts",
+    "app/client/src/app/components/settings-api-key-field.component.spec.ts"
+  ],
+  "slices": {
+    "T5-09": "PASS (authored budget, LOW confidence mapping)",
+    "T5-10": "PASS (automated axe + keyboard boundary, LOW confidence mapping)"
+  },
+  "quality": {"karma": "277/277", "production_build": "pass"}
+}
