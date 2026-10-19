@@ -144,23 +144,32 @@ textarea:disabled {
     font-size: var(--font-size-label);
 }
 
+a:focus-visible {
+    outline: 2px solid #2f9bd7;
+    outline-offset: 2px;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #35505d #0f1a21;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
+    background: #0f1a21;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #35505d;
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #4b6b7b;
 }
 
 @keyframes spin {

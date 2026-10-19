@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-09-18
+Last updated: 2026-10-19
 
 ## Reusable Components
 
@@ -47,6 +47,8 @@ All interactive components must provide:
 - Keep agent availability shown as ready between requests; use run progress labels only while work is active.
 - Describe a cloud agent as configured until a live request succeeds. Mark it verified after a successful run and needs attention after a terminal run error; never infer live provider readiness from stored credential health or model-catalog access alone.
 - Settings dialogs move focus inside on open, trap keyboard focus, close with Escape, and restore focus to their opener.
+- The workspace Alerts popover and conversation-history drawer close with Escape. The history drawer scrolls only its conversation list; its Load more and Start a new chat actions stay visible.
+- Scrollbars use the dark app palette globally (`styles.css`).
 - Keep chat input within the realtime contract's 12,000-character message limit before sending.
 - Treat normalized backend render descriptors as the only source for raster and
   provider-native map layers; component code must not reconstruct provider URLs.

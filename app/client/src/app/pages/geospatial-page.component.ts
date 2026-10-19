@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import {
@@ -502,6 +502,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   toggleAlerts(): void {
     this.isAlertsOpen = !this.isAlertsOpen;
+  }
+
+  @HostListener('document:keydown.escape')
+  closeTransientPanels(): void {
+    if (!this.isAlertsOpen && !this.isConversationHistoryOpen) {
+      return;
+    }
+    this.isAlertsOpen = false;
+    this.isConversationHistoryOpen = false;
+    this.changeDetectorRef.detectChanges();
   }
 
   toggleConversationHistory(): void {

@@ -4,7 +4,9 @@
 }
 
 .conversation-history {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   gap: 0.72rem;
   min-height: 0;
   padding: 0.85rem;
@@ -84,11 +86,19 @@
   font-size: 0.76rem;
 }
 
+.conversation-history > * {
+  flex-shrink: 0;
+}
+
+.conversation-history > .conversation-history__list {
+  flex-shrink: 1;
+}
+
 .conversation-history__list {
   display: grid;
+  align-content: start;
   gap: 0.35rem;
   min-height: 0;
-  max-height: min(36rem, 56vh);
   margin: 0;
   padding: 0;
   overflow: auto;

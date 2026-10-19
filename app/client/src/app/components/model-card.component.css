@@ -10,6 +10,11 @@
   transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
 
+:host(:not(.model-card--disabled):not(.model-card--selected):hover) {
+  border-color: #3a89b8;
+  background: #132632;
+}
+
 :host(.model-card--local) {
   border-color: #376b5d;
   background: #10251f;
