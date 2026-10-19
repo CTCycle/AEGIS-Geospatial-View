@@ -3,12 +3,13 @@
   "date": "2026-10-19",
   "starting_sha": "7343ba62",
   "lane": "opencode-go / deepseek-v4.1-flash",
-  "gates": {"T4-09": "PASS (reconstructed, LOW confidence)", "F-19": "closed with upstream-latency limitation", "F-26": "open (new)"},
+  "gates": {"T4-09": "PASS (reconstructed, LOW confidence)", "F-19": "closed with upstream-latency limitation", "F-26": "fixed, unit-verified"},
   "source_changes": [
     "app/server/services/geospatial/providers/usgs.py",
     "app/server/services/geospatial/composition.py",
     "app/server/services/geospatial/provider_registry.py",
     "app/server/services/agent/completion.py",
+    "app/server/services/agent/tool_handlers/location.py",
     "data/catalog/overlays/usgs_earthquakes.json",
     "app/tests/e2e/helpers/model_capability_metadata.py",
     "app/tests/e2e/test_live_gibs_raster_matrix.py",
@@ -21,7 +22,8 @@
     "app/tests/unit/test_hazard_provider_adapters.py",
     "app/tests/unit/test_provider_registry.py",
     "app/tests/unit/services/geospatial/test_geospatial_runtime_composition.py",
-    "app/tests/unit/services/agent/test_agent_loop_v2.py"
+    "app/tests/unit/services/agent/test_agent_loop_v2.py",
+    "app/tests/unit/services/agent/test_location_tool_handler.py"
   ],
-  "quality": {"unit_tests": "1140 passed", "ruff": "clean", "pyright_strict": "0/0/0", "manifest_audit": "0 errors, 0 warnings"}
+  "quality": {"unit_tests": "1144 passed", "ruff": "clean", "pyright_strict": "0/0/0", "manifest_audit": "0 errors, 0 warnings"}
 }
