@@ -233,6 +233,11 @@ class OpenCodeProvider(DeepSeekProvider):
         # models.dev publishes the endpoint family per model and is fresher than
         # the static table; unknown IDs follow OpenCode's own Chat Completions
         # default and are verified by the model probe rather than hidden.
+        if not self._models_dev:
+            # Providers are built per request; the shared cache keeps this cheap.
+            self._models_dev = fetch_models_dev_entries(
+                self.provider_name, self.transport_policy
+            )
         entry = self._models_dev.get(normalized)
         if entry is not None:
             return entry.protocol, "models_dev"

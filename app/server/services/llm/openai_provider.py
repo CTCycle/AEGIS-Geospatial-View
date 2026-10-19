@@ -214,15 +214,31 @@ class OpenAIProvider(LLMProvider):
     # -------------------------------------------------------------------------
     @staticmethod
     def tool_to_openai_schema(tool: LLMToolDefinition) -> dict[str, Any]:
+        parameters = OpenAIProvider._strict_parameters(tool.parameters_json_schema)
+        # Strict mode cannot describe free-form objects (``dict`` fields); send
+        # such schemas as ordinary function parameters rather than have the
+        # provider reject the whole tool.
+        strict = OpenAIProvider._is_strict_compatible(parameters)
         return {
             "type": "function",
             "name": tool.name,
             "description": tool.description,
-            "parameters": OpenAIProvider._strict_parameters(
-                tool.parameters_json_schema
-            ),
-            "strict": True,
+            "parameters": parameters if strict else tool.parameters_json_schema,
+            "strict": strict,
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_strict_compatible(node: object) -> bool:
+        if is_json_array(node):
+            return all(OpenAIProvider._is_strict_compatible(item) for item in node)
+        if not is_json_object(node):
+            return True
+        if node.get("type") == "object" and node.get("additionalProperties") is not False:
+            return False
+        return all(
+            OpenAIProvider._is_strict_compatible(value) for value in node.values()
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -243,6 +259,24 @@ class OpenAIProvider(LLMProvider):
                 normalized["additionalProperties"] = False
         if is_json_object(normalized.get("items")):
             normalized["items"] = OpenAIProvider._strict_parameters(normalized["items"])
+        for key in ("$defs", "definitions"):
+            definitions = normalized.get(key)
+            if is_json_object(definitions):
+                normalized[key] = {
+                    name: OpenAIProvider._strict_parameters(value)
+                    if is_json_object(value)
+                    else value
+                    for name, value in definitions.items()
+                }
+        for key in ("anyOf", "oneOf", "allOf"):
+            variants = normalized.get(key)
+            if is_json_array(variants):
+                normalized[key] = [
+                    OpenAIProvider._strict_parameters(value)
+                    if is_json_object(value)
+                    else value
+                    for value in variants
+                ]
         return normalized
 
     # -------------------------------------------------------------------------
