@@ -21,6 +21,7 @@ export class SettingsApiKeyFieldComponent {
   @Input() validationError: string | undefined;
 
   @Output() valueChange = new EventEmitter<string>();
+  @Output() commit = new EventEmitter<void>();
 
   get labelText(): string {
     return `${this.label} API key`;

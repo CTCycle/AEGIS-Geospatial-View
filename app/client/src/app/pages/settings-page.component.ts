@@ -72,6 +72,8 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string 
   { id: 'agent-runtime', label: 'Agent Runtime' },
 ];
 
+const RUNTIME_AUTOSAVE_DELAY_MS = 400;
+
 const normalizeSettingsSection = (value: string | null | undefined): SettingsSectionId => (
   SETTINGS_SECTIONS.some((section) => section.id === value)
     ? value as SettingsSectionId
@@ -324,6 +326,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
+  private runtimeAutosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private runtimeSaveQueued = false;
   private routerEventsSubscription?: Subscription;
   private readonly onWindowPopState = (): void => {
     if (typeof window !== 'undefined' && window.location.pathname === '/settings') {
@@ -375,6 +379,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.runtimeAutosaveTimer !== null) {
+      // Flush the edit that is waiting for its debounce before the draft is lost.
+      clearTimeout(this.runtimeAutosaveTimer);
+      this.runtimeAutosaveTimer = null;
+      void this.saveRuntimeSettings();
+    }
     this.isDestroyed = true;
     if (typeof window !== 'undefined') {
       window.removeEventListener('popstate', this.onWindowPopState);
@@ -678,6 +688,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  commitOllamaUrl(): void {
+    const draft = this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434';
+    if (draft !== this.settings.ollama_url) {
+      void this.saveOllamaSettings();
+    }
+  }
+
   async saveOllamaSettings(): Promise<void> {
     try {
       const updated = await this.apiClient.updateChatSettings({
@@ -768,6 +785,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     window.open(target, '_blank', 'noreferrer');
+  }
+
+  commitGeoCredential(provider: string): void {
+    if (this.geoCredentialDrafts[provider]?.trim()) {
+      void this.saveGeoProvider(provider);
+    }
   }
 
   async saveGeoProvider(provider: string): Promise<void> {
@@ -878,6 +901,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   credentialHealthForTemplate(provider: CloudCredentialProvider): string | null {
     return this.credentialHealth(provider);
+  }
+
+  commitCloudCredential(provider: CloudCredentialProvider): void {
+    // An untouched or emptied field is not a save request; clearing stays explicit.
+    if (this.cloudCredentialValue(provider).trim()) {
+      void this.saveCloudProvider(provider);
+    }
   }
 
   async saveCloudProvider(provider: CloudCredentialProvider): Promise<void> {
@@ -1163,19 +1193,41 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  onRuntimeSettingChanged(): void {
+    if (this.runtimeAutosaveTimer !== null) {
+      clearTimeout(this.runtimeAutosaveTimer);
+    }
+    this.runtimeAutosaveTimer = setTimeout(() => {
+      this.runtimeAutosaveTimer = null;
+      void this.saveRuntimeSettings();
+    }, RUNTIME_AUTOSAVE_DELAY_MS);
+  }
+
   async saveRuntimeSettings(): Promise<void> {
-    if (this.isSavingRuntimeSettings || this.isLoadingRuntimeSettings) {
+    if (this.isLoadingRuntimeSettings) {
       return;
     }
+    if (this.isSavingRuntimeSettings) {
+      this.runtimeSaveQueued = true;
+      return;
+    }
+    const patch = this.runtimeSettingsPatch();
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    const sentDraft = JSON.stringify(this.runtimeSettingsDraft);
     this.isSavingRuntimeSettings = true;
     this.runtimeSettingsError = '';
+    this.statusText = 'Saving runtime settings...';
     try {
-      const saved = await this.apiClient.updateRuntimeSettings(this.runtimeSettingsPatch());
+      const saved = await this.apiClient.updateRuntimeSettings(patch);
       if (this.isDestroyed) {
         return;
       }
       this.runtimeSettings = saved;
-      this.runtimeSettingsDraft = cloneRuntimeSettings(saved);
+      if (JSON.stringify(this.runtimeSettingsDraft) === sentDraft) {
+        this.runtimeSettingsDraft = cloneRuntimeSettings(saved);
+      }
       this.runtimeRestartRequired = saved.restart_required;
       this.statusText = saved.message ?? 'Runtime settings saved.';
     } catch (error: unknown) {
@@ -1188,11 +1240,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       this.statusText = this.runtimeSettingsError;
     } finally {
-      if (this.isDestroyed) {
-        return;
+      if (!this.isDestroyed) {
+        this.isSavingRuntimeSettings = false;
+        if (this.runtimeSaveQueued) {
+          this.runtimeSaveQueued = false;
+          void this.saveRuntimeSettings();
+        }
+        this.changeDetectorRef.detectChanges();
       }
-      this.isSavingRuntimeSettings = false;
-      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -1214,7 +1269,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   restoreAgentExecutionDefaults(): void {
     this.runtimeSettingsDraft.agent_execution = createDefaultRuntimeSettings().agent_execution;
-    this.statusText = 'Agent defaults restored in the form. Save to apply them to new runs.';
+    void this.saveRuntimeSettings();
   }
 
   private async ensureProviderModelsLoaded(

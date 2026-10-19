@@ -191,10 +191,10 @@
                   [credentialHealth]="credentialHealthForTemplate(provider.id)"
                   [validationError]="cloudCredentialValidationError(provider.id)"
                   (valueChange)="setCloudCredentialValue(provider.id, $event)"
+                  (commit)="commitCloudCredential(provider.id)"
                 ></app-settings-api-key-field>
                 <footer class="settings-actions">
                   <button type="button" class="secondary-button" [disabled]="isSavingCredential || !isCloudCredentialConfigured(provider.id)" (click)="clearCloudProvider(provider.id)">Clear saved key</button>
-                  <button type="button" class="primary-button" [disabled]="isSavingCredential" (click)="saveCloudProvider(provider.id)">Save key</button>
                 </footer>
               </article>
             }
@@ -212,17 +212,16 @@
               <span aria-hidden="true"></span>{{ ollamaStatus?.ok === true ? 'Connection healthy' : 'Not checked' }}
             </span>
           </header>
-          <form class="settings-runtime-form" (ngSubmit)="saveOllamaSettings()">
+          <div class="settings-runtime-form">
             <label>
               Ollama server URL
-              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" autocomplete="off" />
+              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" (change)="commitOllamaUrl()" name="ollama_server_url" autocomplete="off" />
             </label>
             <div class="settings-actions">
               <button type="button" class="secondary-button" (click)="checkOllamaConnection()">Check connection</button>
               <button type="button" class="secondary-button" [disabled]="isRefreshingOllama" (click)="refreshOllamaLibrary()">Refresh models</button>
-              <button type="submit" class="primary-button">Save settings</button>
             </div>
-          </form>
+          </div>
           @if (ollamaStatusText) {
             <p class="settings-inline-status" role="status" aria-live="polite">{{ visibleOllamaStatusText }}</p>
           }
@@ -286,13 +285,13 @@
                       [value]="geoCredentialDrafts[provider.id] ?? ''"
                       [credentialHealth]="geoProviderCredentialHealth(provider.id)"
                       (valueChange)="setGeoCredentialDraft(provider.id, $event)"
+                      (commit)="commitGeoCredential(provider.id)"
                     ></app-settings-api-key-field>
                     <footer class="settings-actions">
                       @if (canShowGeoSignupTrigger(provider.id)) {
                         <button type="button" class="secondary-button" [disabled]="isLoadingAccountSetups" (click)="openGeoProviderSignup(provider.id)">Get API key</button>
                       }
                       <button type="button" class="secondary-button" [disabled]="isSavingGeospatialCredential || !geoProviderConfigured(provider.id)" (click)="clearGeoProvider(provider.id)">Clear saved key</button>
-                      <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeoProvider(provider.id)">Save key</button>
                     </footer>
                   } @else if (canShowGeoSignupTrigger(provider.id)) {
                     <footer class="settings-actions">
@@ -309,12 +308,12 @@
 
     @if (activeSection === 'application') {
       <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="application-settings-heading">
-        <section class="settings-section">
+        <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <p class="page-kicker">Runtime settings</p>
               <h2 id="application-settings-heading">Application</h2>
-              <p>Control conversation history, timezone handling, and background job polling. Changes are validated and stored atomically.</p>
+              <p>Control conversation history, timezone handling, and background job polling. Changes are validated and saved automatically.</p>
             </div>
           </header>
           <div class="runtime-settings__fields">
@@ -328,16 +327,13 @@
               <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.jobs.polling_interval" />
             </label>
           </div>
-          <div class="settings-actions">
-            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save application settings' }}</button>
-          </div>
         </section>
       </section>
     }
 
     @if (activeSection === 'map-search') {
       <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="map-search-settings-heading">
-        <section class="settings-section">
+        <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <p class="page-kicker">Runtime settings</p>
@@ -396,16 +392,13 @@
               </label>
             </div>
           </div>
-          <div class="settings-actions">
-            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save map &amp; search settings' }}</button>
-          </div>
         </section>
       </section>
     }
 
     @if (activeSection === 'data-sources') {
       <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="data-source-settings-heading">
-        <section class="settings-section">
+        <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <p class="page-kicker">Runtime settings</p>
@@ -555,16 +548,13 @@
               </label>
             </div>
           </div>
-          <div class="settings-actions">
-            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save data source settings' }}</button>
-          </div>
         </section>
       </section>
     }
 
     @if (activeSection === 'agent-runtime') {
       <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="agent-runtime-settings-heading">
-        <section class="settings-section">
+        <section class="settings-section" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <p class="page-kicker">Runtime settings</p>
@@ -636,7 +626,6 @@
           </div>
           <p class="settings-hint">{{ visionPolicyHint }}</p>
           <div class="settings-actions">
-            <button type="button" class="primary-button" [disabled]="isSavingRuntimeSettings" (click)="saveRuntimeSettings()">{{ isSavingRuntimeSettings ? 'Saving…' : 'Save agent runtime settings' }}</button>
             <button type="button" class="secondary-button" [disabled]="isSavingRuntimeSettings" (click)="restoreAgentExecutionDefaults()">Restore agent defaults</button>
           </div>
         </section>
