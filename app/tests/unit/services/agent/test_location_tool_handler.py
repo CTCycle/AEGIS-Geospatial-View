@@ -302,3 +302,22 @@ def test_unknown_location_type_is_not_accepted_as_a_legacy_alias() -> None:
             query="Vermont, United States",
             expected_location_type="administrative_region",
         )
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("quakes near Point Nemo from March 1 to March 7, 2024", None),
+        ("storms on Sept. 9, 2023", None),
+        ("show 41.9, 12.5 on 7, 2024 data", (41.9, 12.5)),
+        ("show 41.9, 12.5", (41.9, 12.5)),
+    ],
+)
+def test_text_coordinates_ignore_calendar_dates(text: str, expected) -> None:
+    from server.services.agent.tool_handlers.location import (
+        _parse_coordinate_pair_from_text,
+        _search_text_coordinates,
+    )
+
+    assert _parse_coordinate_pair_from_text(text) == expected
+    assert (_search_text_coordinates(text) is not None) is (expected is not None)

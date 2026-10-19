@@ -46,6 +46,11 @@ _COORDINATE_PAIR_RE = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
     r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
 )
+_MONTH_BEFORE_RE = re.compile(
+    r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|"
+    r"aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s*$",
+    re.IGNORECASE,
+)
 _COORDINATE_PAIR_SEARCH_RE = re.compile(
     r"(?<![\d.])"
     r"(?P<latitude>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
@@ -105,7 +110,7 @@ class LocationToolHandler:
 
         coordinates = _parse_coordinate_pair(query)
         coordinate_source = "model"
-        text_coordinate_match = _COORDINATE_PAIR_SEARCH_RE.search(state.user_message)
+        text_coordinate_match = _search_text_coordinates(state.user_message)
         if coordinates is None and text_coordinate_match is not None:
             coordinates = _parse_coordinate_pair_from_text(state.user_message)
             coordinate_source = "text"
@@ -218,8 +223,18 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
 
 
 ###############################################################################
+def _search_text_coordinates(text: str) -> re.Match[str] | None:
+    """Find a coordinate pair in free text, ignoring calendar dates ("March 7, 2024")."""
+
+    for match in _COORDINATE_PAIR_SEARCH_RE.finditer(text):
+        if _MONTH_BEFORE_RE.search(text[: match.start()]) is None:
+            return match
+    return None
+
+
+###############################################################################
 def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
-    match = _COORDINATE_PAIR_SEARCH_RE.search(text)
+    match = _search_text_coordinates(text)
     if match is None:
         return None
     latitude = float(match.group("latitude"))

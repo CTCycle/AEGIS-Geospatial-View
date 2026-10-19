@@ -19,8 +19,8 @@ Ledger review left two actionable items that need no new credentials or hardware
 3. **Date-only temporal scopes always failed the completion check.** `CompletionEvaluator.assess_evidence` compared a naive date with an aware observation time (`TypeError`, swallowed as "unknown"), so the backend rejected every dated-range map with `temporal_scope_applied`. Dates are now parsed as UTC and a date-only end bound covers its whole day. This affected any historical range request, not only USGS.
 4. **Harness:** three live e2e modules imported `_provider_probe`, removed by `b9e3874f`, so unit collection failed. They now use a shared `exact_lane_tool_support_metadata` helper. `test_canonical_schema...` and `persistence.md` still said 18 tables after `model_probe_results` was dropped; both now say 17.
 
-## Open finding (not fixed)
-**F-26:** for an unresolvable place name, date text such as "March 7, 2024" was parsed as a coordinate pair ("7, 2024 is outside coordinate bounds"). Observed with "Point Nemo ... from March 1 to March 7, 2024".
+## F-26 (found here, fixed afterwards)
+**F-26:** for an unresolvable place name, date text such as "March 7, 2024" was parsed as a coordinate pair ("7, 2024 is outside coordinate bounds"). Observed with "Point Nemo ... from March 1 to March 7, 2024". Fix: `_search_text_coordinates` in `tool_handlers/location.py` skips pairs preceded by a month name; parametrized unit test added (1,144 unit tests, Ruff and strict Pyright pass, [log](logs/full-unit-f26.log)). Not re-run live.
 
 ## Limitations
 - A full-month Japan query timed out at the 40 s deadline in one live run (two earlier runs of the same query completed upstream in 9-15 s). USGS catalog latency is external; the failure was reported honestly with no empty layer drawn. The one-week window is the render proof.
