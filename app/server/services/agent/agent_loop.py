@@ -13,6 +13,8 @@ from difflib import SequenceMatcher
 from typing import Any, Callable, Literal, Protocol
 from urllib.parse import urlparse
 
+from pydantic import ValidationError
+
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_route import (
     AgentGoal,
@@ -1500,6 +1502,7 @@ class AgentLoop:
                 budget_stage="route_request",
             )
             call = result.tool_calls[0] if result.tool_calls else None
+            validation_errors: list[dict[str, str]] = []
             if (
                 call is not None
                 and call.name == route_tool.name
@@ -1508,8 +1511,20 @@ class AgentLoop:
             ):
                 try:
                     proposed = CapabilityRoute.model_validate(call.arguments)
-                except Exception:
-                    proposed = None
+                except ValidationError as exc:
+                    proposed = (
+                        self._salvage_route(call.arguments, exc)
+                        if attempt == request.max_route_corrections
+                        else None
+                    )
+                    validation_errors = [
+                        {
+                            "field": ".".join(str(part) for part in error["loc"])
+                            or "(root)",
+                            "message": error["msg"],
+                        }
+                        for error in exc.errors()[:8]
+                    ]
                 if proposed is not None:
                     decision = self.capability_router.validate_route(
                         proposed,
@@ -1556,7 +1571,21 @@ class AgentLoop:
             correction_messages.append(
                 {
                     "role": "user",
-                    "content": "Return one valid route_request call matching the supplied schema.",
+                    "content": (
+                        json.dumps(
+                            {
+                                "route_invalid": True,
+                                "errors": validation_errors,
+                                "instruction": (
+                                    "Return one corrected route_request call "
+                                    "matching the supplied schema."
+                                ),
+                            },
+                            separators=(",", ":"),
+                        )
+                        if validation_errors
+                        else "Return one valid route_request call matching the supplied schema."
+                    ),
                 }
             )
         fallback = build_location_map_fallback_route(request.state.user_message)
@@ -1570,6 +1599,26 @@ class AgentLoop:
                 request.state.capability_ids = list(decision.capability_ids)
                 return None, "", decision.route
         return None, "", None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _salvage_route(
+        arguments: dict[str, Any], error: ValidationError
+    ) -> CapabilityRoute | None:
+        """Drop invalid optional route fields; required fields are never guessed."""
+
+        fields = CapabilityRoute.model_fields
+        invalid = {str(item["loc"][0]) for item in error.errors() if item["loc"]}
+        if not invalid or any(
+            name in fields and fields[name].is_required() for name in invalid
+        ):
+            return None
+        try:
+            return CapabilityRoute.model_validate(
+                {key: value for key, value in arguments.items() if key not in invalid}
+            )
+        except ValidationError:
+            return None
 
     # -------------------------------------------------------------------------
     async def _model_step(

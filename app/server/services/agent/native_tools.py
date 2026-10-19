@@ -114,6 +114,38 @@ def _map_plan_schema(
     return schema
 
 ###############################################################################
+def _inline_schema_refs(schema: JsonSchema) -> JsonSchema:
+    """Resolve local ``$defs`` references so weaker models see enums inline."""
+
+    raw_definitions = schema.get("$defs")
+    definitions = raw_definitions if isinstance(raw_definitions, dict) else {}
+
+    def resolve(value: JsonValue, active: frozenset[str]) -> JsonValue:
+        if isinstance(value, list):
+            return [resolve(item, active) for item in value]
+        if not isinstance(value, dict):
+            return value
+        ref = value.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/$defs/"):
+            name = ref.removeprefix("#/$defs/")
+            target = definitions.get(name)
+            if name in active or not isinstance(target, dict):
+                raise ValueError(f"Cannot inline schema reference '{ref}'.")
+            siblings = {key: item for key, item in value.items() if key != "$ref"}
+            return resolve({**target, **siblings}, active | {name})
+        return {
+            key: resolve(item, active)
+            for key, item in value.items()
+            if key != "$defs"
+        }
+
+    try:
+        resolved = resolve(schema, frozenset())
+    except ValueError:
+        return schema
+    return resolved if isinstance(resolved, dict) else schema
+
+###############################################################################
 def register_agent_tools(
     registry: ToolRegistry,
     *,
@@ -159,6 +191,9 @@ def register_agent_tools(
             name="route_request",
             description="Select one bounded high-level AEGIS capability route.",
             input_model=RouteRequestInput,
+            parameters_json_schema=_inline_schema_refs(
+                RouteRequestInput.model_json_schema()
+            ),
             handler=_route_handler,
             domains=_MIXED,
             phases=_ROUTE_PHASE,

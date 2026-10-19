@@ -31,7 +31,11 @@ from server.domain.agent.tool_result import (
 )
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
-from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
+from server.services.agent.agent_loop import (
+    AgentLoop,
+    AgentLoopOutcome,
+    AgentLoopRequest,
+)
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
@@ -280,6 +284,74 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
     ]
     assert provider.requests[0]["request"].provider_session_id == state.conversation_id
     assert state.transition_trace
+
+###############################################################################
+def _route_call_with(*, drop: str | None = None, **updates: Any) -> LLMResult:
+    arguments = {**(_route_call().tool_calls[0].arguments or {}), **updates}
+    arguments.pop(drop or "", None)
+    return LLMResult(
+        content="",
+        tool_calls=[
+            LLMToolCall(id="route-1", name="route_request", arguments=arguments)
+        ],
+    )
+
+###############################################################################
+async def _run_route(provider: FakeProvider) -> AgentLoopOutcome:
+    return await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_invalid_route_retry_reports_the_failing_fields() -> None:
+    provider = FakeProvider(
+        [
+            _route_call_with(primary_domain="general"),
+            _route_call(),
+            LLMResult(content="Hospitals found."),
+        ]
+    )
+
+    outcome = await _run_route(provider)
+
+    assert outcome.stopped_reason == "goal_satisfied"
+    correction = json.loads(provider.requests[1]["request"].messages[-1]["content"])
+    assert correction["route_invalid"] is True
+    assert [error["field"] for error in correction["errors"]] == ["primary_domain"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_final_route_attempt_drops_invalid_optional_scope() -> None:
+    malformed = _route_call_with(spatial_scope={"center": "Lyon", "radius": 5})
+    provider = FakeProvider(
+        [malformed, malformed, LLMResult(content="Hospitals found.")]
+    )
+
+    outcome = await _run_route(provider)
+
+    assert outcome.stopped_reason == "goal_satisfied"
+    assert outcome.state.route is not None
+    assert outcome.state.route.spatial_scope is None
+    assert outcome.state.route.capability_queries == ["hospitals"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_route_missing_required_field_is_never_salvaged() -> None:
+    incomplete = _route_call_with(drop="task_mode")
+    provider = FakeProvider([incomplete, incomplete])
+
+    outcome = await _run_route(provider)
+
+    assert outcome.stopped_reason == "failed"
+    assert outcome.final_text == (
+        "The request could not be routed to a supported capability."
+    )
 
 ###############################################################################
 def test_native_route_promotes_the_execution_profile_once() -> None:

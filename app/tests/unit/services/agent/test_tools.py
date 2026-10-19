@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -177,6 +178,19 @@ def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
         "esri_world_imagery",
         "osm_dark",
         "osm_default",
+    ]
+
+
+###############################################################################
+def test_route_request_schema_inlines_enums_and_nested_scopes() -> None:
+    tool = _registry().get("route_request")
+
+    assert tool is not None
+    schema = tool.definition.parameters_json_schema
+    assert "$ref" not in json.dumps(schema)
+    assert "$defs" not in schema
+    assert schema["properties"]["primary_domain"]["enum"] == [
+        domain.value for domain in CapabilityDomain
     ]
 
 
