@@ -49,19 +49,46 @@
 
 .toolbar-resize-handle {
     width: 0.6rem;
+    position: relative;
     cursor: col-resize;
-    background: #22333d;
+    touch-action: none;
+    background: #1b2a31;
     transition: background 120ms ease;
+}
+
+.toolbar-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 2rem;
+    border-radius: 1px;
+    background: #52666e;
+    opacity: 0.8;
+    transform: translate(-50%, -50%);
+    transition: background 120ms ease, height 120ms ease, opacity 120ms ease;
 }
 
 .toolbar-resize-handle:hover,
 .toolbar-resize-handle.is-active {
-    background: #2f9bd7;
+    background: #293b43;
+}
+
+.toolbar-resize-handle:hover::after,
+.toolbar-resize-handle.is-active::after {
+    height: 2.4rem;
+    background: #91a4aa;
+    opacity: 1;
 }
 
 .toolbar-resize-handle.is-collapsed {
     cursor: e-resize;
-    background: #2f9bd7;
+}
+
+.toolbar-resize-handle:focus-visible {
+    outline: 2px solid #81979f;
+    outline-offset: -2px;
 }
 
 .canvas-panel { background: #0d171d; }
