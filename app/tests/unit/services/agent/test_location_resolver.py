@@ -1140,3 +1140,32 @@ def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> N
         ]
 
     run_async_in_thread(_run())
+
+
+def test_location_resolver_matches_local_ordinals_from_signage_to_english_display() -> None:
+
+    ###############################################################################
+    class _EnglishOrdinalGeocoder:
+
+        # -------------------------------------------------------------------------
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            return {
+                "display_name": (
+                    "Avenue Gustave Eiffel, Quartier du Gros-Caillou, 7th Arrondissement, "
+                    "Paris, Ile-de-France, Metropolitan France, 75007, France"
+                ),
+                "lat": 48.8576,
+                "lon": 2.2956,
+                "selected_result_type": "pedestrian",
+                "selected_result_class": "highway",
+                "selected_address_type": "road",
+                "address": {"pedestrian": "Avenue Gustave Eiffel", "suburb": "7th Arrondissement",
+                            "city": "Paris", "country": "France", "country_code": "fr"},
+            }
+
+    resolver = LocationResolver(nominatim_service=_EnglishOrdinalGeocoder())
+    raw = "Avenue Gustave Eiffel, 7e Arrondissement, Paris, France"
+    result = run_async_in_thread(resolver.resolve_location_signals(
+        [LocationSignal(signal_type="street", raw_value=raw, normalized_value=raw)], {}))
+    assert isinstance(result, ResolvedLocation)
+    assert result.latitude == 48.8576
