@@ -42,7 +42,7 @@ from server.services.agent.tool_definitions import (
     SearchConversationHistoryInput,
 )
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
-from server.services.agent.tool_handlers.evidence import EvidenceToolHandler
+from server.services.agent.tool_handlers.evidence import EvidenceToolHandler, PlaceLabeler
 from server.services.agent.tool_handlers.location import LocationToolHandler
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_handlers.history import HistoryToolHandler
@@ -158,6 +158,7 @@ def register_agent_tools(
     location_resolver: LocationResolver,
     geospatial_api_service: Any,
     history_repository: ChatHistoryRepository | None = None,
+    place_labeler: PlaceLabeler | None = None,
 ) -> None:
     """Register the permanent model-facing native tool surface once."""
 
@@ -175,7 +176,7 @@ def register_agent_tools(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
-    evidence = EvidenceToolHandler(repository=evidence_repository)
+    evidence = EvidenceToolHandler(repository=evidence_repository, place_labeler=place_labeler)
     location = LocationToolHandler(resolver=location_resolver)
     provider_layers = ProviderLayerToolHandler(
         geospatial_api_service=geospatial_api_service,

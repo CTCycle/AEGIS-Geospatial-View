@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -21,12 +22,24 @@ from server.services.agent.tool_definitions import (
     TransformEvidenceInput,
 )
 
+# Coordinate-only result points that receive a reverse-geocoded nearest place
+# name, in result order. Nominatim allows one request per second.
+MAX_PLACE_LABELS = 10
+
+PlaceLabeler = Callable[[float, float], Awaitable[str | None]]
+
 ###############################################################################
 class EvidenceToolHandler:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, repository: AgentEvidenceRepository) -> None:
+    def __init__(
+        self,
+        *,
+        repository: AgentEvidenceRepository,
+        place_labeler: PlaceLabeler | None = None,
+    ) -> None:
         self.repository = repository
+        self.place_labeler = place_labeler
 
     # -------------------------------------------------------------------------
     async def inspect(
@@ -153,6 +166,7 @@ class EvidenceToolHandler:
                 started=started,
             )
         status = "success" if transformed else "valid_empty"
+        labelled = await self._label_places(transformed)
         points = [point for item in transformed if (point := _record_point(item)) is not None]
         bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None
         value_fields = sorted({key for item in transformed for key, value in _properties(item).items() if _numeric(value) is not None})
@@ -173,6 +187,7 @@ class EvidenceToolHandler:
                 "parent_count": len(refs),
                 "bbox": bbox,
                 "located_record_count": len(points),
+                "place_labelled_count": labelled,
                 "value_fields": value_fields,
                 "map_eligibility": "renderable" if points else "not_renderable",
             },
@@ -188,13 +203,33 @@ class EvidenceToolHandler:
             summary=f"Created derived evidence with {len(transformed)} records.",
             data={"record_count": len(transformed), "parent_refs": refs,
                   "preview": transformed[:5], "located_record_count": len(points),
-                  "unlocated_record_count": unlocated, "parent_coverage": provenance["coverage"]},
+                  "unlocated_record_count": unlocated, "place_labelled_count": labelled,
+                  "parent_coverage": provenance["coverage"]},
             evidence_refs=[evidence_ref],
             metadata=ToolExecutionMetadata(
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=[evidence_ref],
             ),
         )
+
+    # -------------------------------------------------------------------------
+    async def _label_places(self, records: list[dict[str, Any]]) -> int:
+        """Attach nearest place names to the leading coordinate-only points."""
+        if self.place_labeler is None:
+            return 0
+        labelled = 0
+        candidates = [item for item in records if _properties(item).get("label_kind") == "coordinates"]
+        for item in candidates[:MAX_PLACE_LABELS]:
+            point = _record_point(item)
+            if point is None:
+                continue
+            label = await self.place_labeler(point[1], point[0])
+            if label:
+                properties = _properties(item)
+                properties["place_label"] = label
+                properties["label_kind"] = "nearest_reverse_geocoded"
+                labelled += 1
+        return labelled
 
 ###############################################################################
 def _decode_json(raw: bytes) -> Any:

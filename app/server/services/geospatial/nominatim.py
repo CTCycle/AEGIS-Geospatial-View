@@ -647,6 +647,33 @@ class NominatimService:
         return [west, south, east, north]
 
     # -------------------------------------------------------------------------
+    async def reverse_place(self, latitude: float, longitude: float) -> str | None:
+        """Nearest settlement or region name, e.g. "Seville, Spain"."""
+        params = {
+            "lat": f"{latitude:.5f}",
+            "lon": f"{longitude:.5f}",
+            "format": "jsonv2",
+            "zoom": "10",
+            "addressdetails": "1",
+            "accept-language": "en",
+        }
+        response = await asyncio.to_thread(self.perform_reverse_request, params)
+        address = response.get("address") if response else None
+        if not is_json_object(address):
+            return None
+        place = next(
+            (
+                str(address[key])
+                for key in ("city", "town", "village", "municipality", "county", "state", "region")
+                if address.get(key)
+            ),
+            None,
+        )
+        country = str(address.get("country") or "") or None
+        parts = [part for part in (place, country) if part]
+        return ", ".join(parts) if parts else None
+
+    # -------------------------------------------------------------------------
     def compose_query(
         self, address: str | None, city: str | None, country_name: str | None
     ) -> str:

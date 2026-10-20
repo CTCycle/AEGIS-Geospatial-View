@@ -110,6 +110,7 @@ def build_chat_runtime(
         location_resolver=location_resolver,
         geospatial_api_service=geospatial_api_service,
         history_repository=history_repository,
+        place_labeler=geospatial_runtime.nominatim_service.reverse_place,
     )
     agent_loop = AgentLoop(
         provider_factory=llm_factory,
