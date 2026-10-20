@@ -113,7 +113,7 @@
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "knownLimitations": ["Area queries sample at most 100 grid points of model estimates and may miss local extremes."]
   },
   "cachePolicy": {
     "mode": "memory",
@@ -129,14 +129,14 @@
   },
   "executionContract": {
     "supported_operations": ["show", "inspect", "forecast"],
-    "supported_scope_kinds": ["point", "bbox"],
+    "supported_scope_kinds": ["point", "bbox", "grid_sample"],
     "temporal_modes": ["current", "forecast"],
     "temporal_windows": ["provider_forecast_window"],
     "required_inputs": ["location", "temporal_mode"],
     "output_geometry_type": "Point",
     "render_support": "vector",
     "coverage": "global",
-    "limitations": ["Weather values are sampled at a point; no area raster is provided."],
+    "limitations": ["Area queries sample at most 100 grid points of model estimates; point queries sample the location. No area raster is provided."],
     "fallback_ids": []
   }
 }

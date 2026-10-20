@@ -28,6 +28,7 @@ class ResolveLocationInput(StrictToolInput):
             "landmark",
             "poi",
             "region",
+    "macro_region",
             "river",
             "road",
             "street",
@@ -169,6 +170,14 @@ class AggregateOperation(StrictToolInput):
     op: Literal["aggregate"]
     field: str = Field(min_length=1, max_length=200)
     group_by: str = Field(min_length=1, max_length=200)
+    metric: Literal["sum", "count", "mean", "max", "min"] = "sum"
+
+
+class GridAggregateOperation(StrictToolInput):
+    op: Literal["grid_aggregate"]
+    cell_size_deg: float = Field(ge=0.1, le=10)
+    value_field: str | None = Field(default=None, max_length=200)
+    order_by: Literal["count", "sum", "mean", "max"] = "count"
 
 
 EvidenceOperation = Annotated[
@@ -178,7 +187,8 @@ EvidenceOperation = Annotated[
     | SortOperation
     | LimitOperation
     | FieldProjectionOperation
-    | AggregateOperation,
+    | AggregateOperation
+    | GridAggregateOperation,
     Field(discriminator="op"),
 ]
 

@@ -267,6 +267,11 @@ class CapabilityRouter:
                 ),
             })
 
+        if proposed.analysis is not None:
+            # Analysis is performed by transform_evidence, never by inventing a
+            # provider operation such as rank_precipitation or grid_aggregate.
+            proposed = proposed.model_copy(update={"operation": "show" if proposed.presentation in {"map", "both"} else "inspect"})
+
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
         if proposed.primary_domain is CapabilityDomain.MAP_STATE:
             if active_state.active_map_session is None:

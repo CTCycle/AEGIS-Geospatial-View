@@ -109,7 +109,10 @@ def test_usgs_dated_range_queries_catalog_with_bbox_and_reports_scope() -> None:
     assert "minlongitude=129.0" in urls[0]
     assert response.payload["timeMode"] == "historical"
     assert response.payload["totalResults"] == 1
-    assert response.coverage == {"temporal_scope_satisfied": True}
+    assert response.coverage["temporal_scope_satisfied"] is True
+    assert response.coverage["bbox"] == [129.0, 31.0, 146.0, 46.0]
+    assert response.coverage["truncated"] is False
+    assert "M2.5" in response.coverage["completeness_note"]
     assert response.observation_time == "2024-03-09T16:00:00+00:00"
 
 ###############################################################################
@@ -446,3 +449,20 @@ def test_nasa_firms_normalizes_live_csv() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "active_fire"
     assert response.payload["features"][0]["timestamp"] == "2026-05-11T09:30:00Z"
+
+
+@pytest.mark.asyncio
+async def test_usgs_magnitude_filter_feed_and_dated_query():
+    urls = []
+    async def fetcher(url, headers=None):
+        urls.append(url)
+        return {"type": "FeatureCollection", "features": [
+            {"id": str(mag), "properties": {"mag": mag}, "geometry": {"type": "Point", "coordinates": [8, 45]}}
+            for mag in [1, 3, 5]]}
+    provider = USGSProvider(fetcher=fetcher)
+    feed = await provider.fetch(ProviderRequest(capability_id="usgs_earthquakes", params={"live": True, "filters": {"min_magnitude": 2.5}}))
+    assert [item["magnitude"] for item in feed.payload["features"]] == [3, 5]
+    assert feed.coverage["min_magnitude"] == 2.5
+    await provider.fetch(ProviderRequest(capability_id="usgs_earthquakes", time=datetime(2026, 10, 19, tzinfo=UTC),
+        params={"live": True, "end_time_iso": "2026-10-20T00:00:00Z", "filters": {"min_magnitude": 2.5}}))
+    assert "minmagnitude=2.5" in urls[-1]

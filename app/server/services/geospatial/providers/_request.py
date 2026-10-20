@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 from server.services.geospatial.providers.base import ProviderRequest
 
@@ -34,3 +35,17 @@ def _number_param(params: dict[str, Any], *keys: str) -> float | None:
             except ValueError:
                 continue
     return None
+
+
+def grid_points(bbox: tuple[float, float, float, float], max_points: int = 100) -> tuple[list[tuple[float, float]], float]:
+    """Return (latitude, longitude) cell centres and maximum angular spacing."""
+    west, south, east, north = bbox
+    if not (-180 <= west < east <= 180 and -85 <= south < north <= 85):
+        raise ValueError("Grid bbox must be ordered and within longitude / latitude bounds.")
+    cap = max(1, min(100, max_points))
+    width, height = east - west, north - south
+    columns = max(1, min(cap, round(math.sqrt(cap * width / height))))
+    rows = max(1, cap // columns)
+    dx, dy = width / columns, height / rows
+    return ([(round(south + (row + 0.5) * dy, 5), round(west + (col + 0.5) * dx, 5))
+             for row in range(rows) for col in range(columns)], max(dx, dy))

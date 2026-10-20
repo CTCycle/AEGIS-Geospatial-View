@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from server.common.typing import is_json_array, is_json_object
@@ -106,6 +107,7 @@ class EvidenceToolHandler:
                 started=started,
             )
         records: list[dict[str, Any]] = []
+        parents: list[dict[str, Any]] = []
         for ref in refs:
             item = self.repository.get_payload(
                 ref,
@@ -128,6 +130,9 @@ class EvidenceToolHandler:
                     recovery="replan",
                     started=started,
                 )
+            parents.append({"provider": summary.provenance.get("provider_id") or summary.provenance.get("provider"),
+                            **summary.provenance,
+                            **{key: summary.summary[key] for key in ("coverage", "units", "observation_time", "value_kind") if key in summary.summary}})
             records.extend(_records_from_payload(_decode_json(raw)))
         transformed, error = _apply_operations(
             records,
@@ -142,19 +147,30 @@ class EvidenceToolHandler:
                 started=started,
             )
         status = "success" if transformed else "valid_empty"
+        points = [point for item in transformed if (point := _record_point(item)) is not None]
+        bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None
+        value_fields = sorted({key for item in transformed for key, value in _properties(item).items() if _numeric(value) is not None})
+        unlocated = sum(_record_point(item) is None for item in records)
+        provenance = {"operation_count": len(request.operations), "parents": parents,
+                      "coverage": [parent.get("coverage") for parent in parents]}
+        if len(parents) == 1:
+            provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "coverage", "units", "observation_time", "value_kind") if key in parents[0]})
         evidence = self.repository.create(
             conversation_id=state.conversation_id,
             run_id=state.request_id,
             kind="derived",
             media_type="application/json",
             status="available" if transformed else "valid_empty",
-            payload={"records": transformed},
+            payload={"features": transformed},
             summary={
                 "record_count": len(transformed),
                 "parent_count": len(refs),
-                "map_eligibility": "renderable" if transformed else "not_renderable",
+                "bbox": bbox,
+                "located_record_count": len(points),
+                "value_fields": value_fields,
+                "map_eligibility": "renderable" if points else "not_renderable",
             },
-            provenance={"operation_count": len(request.operations)},
+            provenance=provenance,
             parent_evidence_ids=refs,
         )
         evidence_ref = str(evidence.evidence_id)
@@ -164,7 +180,9 @@ class EvidenceToolHandler:
             tool_name="transform_evidence",
             status=status,
             summary=f"Created derived evidence with {len(transformed)} records.",
-            data={"record_count": len(transformed), "parent_refs": refs},
+            data={"record_count": len(transformed), "parent_refs": refs,
+                  "preview": transformed[:5], "located_record_count": len(points),
+                  "unlocated_record_count": unlocated, "parent_coverage": provenance["coverage"]},
             evidence_refs=[evidence_ref],
             metadata=ToolExecutionMetadata(
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
@@ -216,10 +234,10 @@ def _inspect_payload(
         }
     if view == "statistics":
         statistics: dict[str, Any] = {}
-        for key in sorted({key for item in records for key in item}):
+        for key in sorted({key for item in records for key in _properties(item)}):
             values: list[float] = []
             for item in records:
-                raw_value = item.get(key)
+                raw_value = _properties(item).get(key)
                 if isinstance(raw_value, (int, float)) and not isinstance(
                     raw_value, bool
                 ):
@@ -229,6 +247,9 @@ def _inspect_payload(
                     "min": min(values),
                     "max": max(values),
                     "count": len(values),
+                    "mean": sum(values) / len(values),
+                    "argmax": _compact_record(max((item for item in records if _numeric(_properties(item).get(key)) is not None), key=lambda item: float(_properties(item)[key]))),
+                    "argmin": _compact_record(min((item for item in records if _numeric(_properties(item).get(key)) is not None), key=lambda item: float(_properties(item)[key]))),
                 }
         return {"statistics": statistics, "record_count": len(records)}
     start = int(cursor or 0) if str(cursor or "0").isdigit() else 0
@@ -254,6 +275,7 @@ def _apply_operations(
         "limit",
         "field_projection",
         "aggregate",
+        "grid_aggregate",
     }
     result = list(records)
     for operation in operations:
@@ -269,32 +291,34 @@ def _apply_operations(
             result = [
                 item
                 for item in result
-                if _matches(item.get(field), operator, expected)
+                if _matches(_properties(item).get(field), operator, expected)
             ]
         elif op == "temporal_filter":
             field = str(operation.get("field") or "timestamp")
-            start = str(operation.get("start") or "")
-            end = str(operation.get("end") or "")
-            if not start and not end:
+            try:
+                start = _timestamp(operation.get("start"))
+                end = _timestamp(operation.get("end"))
+            except ValueError:
+                return result, "temporal_filter bounds must be ISO times or epoch values."
+            if start is None and end is None:
                 return result, "temporal_filter requires a start or end bound."
             filtered: list[dict[str, Any]] = []
             for item in result:
-                value = item.get(field)
-                if (
-                    isinstance(value, str)
-                    and (not start or value >= start)
-                    and (not end or value <= end)
-                ):
+                try:
+                    value = _timestamp(_properties(item).get(field))
+                except ValueError:
+                    continue
+                if value is not None and (start is None or value >= start) and (end is None or value <= end):
                     filtered.append(item)
             result = filtered
         elif op == "sort":
             field = str(operation.get("field") or "")
             if not field:
                 return result, "sort requires a field."
-            result.sort(
-                key=lambda item: (item.get(field) is None, str(item.get(field) or "")),
-                reverse=bool(operation.get("descending")),
-            )
+            present = [item for item in result if _properties(item).get(field) is not None]
+            missing = [item for item in result if _properties(item).get(field) is None]
+            present.sort(key=lambda item: _sort_key(_properties(item).get(field)), reverse=bool(operation.get("descending")))
+            result = present + missing
         elif op == "limit":
             count = operation.get("value")
             if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 10000:
@@ -309,20 +333,23 @@ def _apply_operations(
                 for item in result
             ]
         elif op == "aggregate":
+            metric = str(operation.get("metric") or "sum")
             field = str(operation.get("field") or "")
             group_by = str(operation.get("group_by") or "")
             if not field or not group_by:
                 return result, "aggregate requires field and group_by."
             groups: dict[str, list[float]] = {}
             for item in result:
-                value = item.get(field)
-                group = str(item.get(group_by) or "")
-                if isinstance(value, (int, float)) and not isinstance(value, bool):
-                    groups.setdefault(group, []).append(float(value))
+                value = _numeric(_properties(item).get(field))
+                group = str(_properties(item).get(group_by) or "")
+                if value is not None or metric == "count":
+                    groups.setdefault(group, []).append(value or 0.0)
             result = [
-                {group_by: group, field: sum(values), "count": len(values)}
+                {group_by: group, field: _aggregate(values, metric), "count": len(values)}
                 for group, values in groups.items()
             ]
+        elif op == "grid_aggregate":
+            result = _grid_aggregate(result, operation)
         elif op == "spatial_filter":
             result, error = _spatial_filter(result, operation)
             if error is not None:
@@ -369,16 +396,10 @@ def _spatial_filter(
         return records, "spatial_filter center is outside coordinate bounds."
 
     def within(item: dict[str, Any]) -> bool:
-        geometry = item.get(field)
-        coordinates = geometry.get("coordinates") if is_json_object(geometry) else geometry
-        if not is_json_array(coordinates) or len(coordinates) < 2:
+        point = _record_point(item, field=field)
+        if point is None:
             return False
-        try:
-            lon, lat = float(coordinates[0]), float(coordinates[1])
-        except (TypeError, ValueError):
-            return False
-        if not -180 <= lon <= 180 or not -90 <= lat <= 90:
-            return False
+        lon, lat = point
         dlat = math.radians(lat - lat0)
         dlon = math.radians(lon - lon0)
         a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat0)) * math.cos(math.radians(lat)) * math.sin(dlon / 2) ** 2
@@ -414,3 +435,83 @@ def _failure(
 
 
 __all__ = ["EvidenceToolHandler"]
+
+
+def _properties(item: dict[str, Any]) -> dict[str, Any]:
+    properties = item.get("properties")
+    return properties if is_json_object(properties) else item
+
+
+def _numeric(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _sort_key(value: Any) -> tuple[int, Any]:
+    number = _numeric(value)
+    return (0, number) if number is not None else (1, str(value))
+
+
+def _timestamp(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    number = _numeric(value)
+    if number is not None:
+        return number / 1000 if abs(number) >= 100_000_000_000 else number
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).timestamp()
+
+
+def _record_point(item: dict[str, Any], *, field: str = "geometry") -> tuple[float, float] | None:
+    geometry = item.get(field)
+    coordinates = geometry.get("coordinates") if is_json_object(geometry) and geometry.get("type") == "Point" else geometry if is_json_array(geometry) else None
+    props = _properties(item)
+    if not is_json_array(coordinates) or len(coordinates) < 2:
+        coordinates = [props.get("longitude"), props.get("latitude")]
+    lon, lat = _numeric(coordinates[0]), _numeric(coordinates[1])
+    if lon is None or lat is None or not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        return None
+    return lon, lat
+
+
+def _compact_record(item: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in _properties(item).items() if not isinstance(value, (list, dict))}
+
+
+def _aggregate(values: list[float], metric: str) -> float:
+    if metric == "count":
+        return float(len(values))
+    if metric == "mean":
+        return sum(values) / len(values)
+    if metric == "max":
+        return max(values)
+    if metric == "min":
+        return min(values)
+    return sum(values)
+
+
+def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) -> list[dict[str, Any]]:
+    size = float(operation["cell_size_deg"])
+    field = operation.get("value_field")
+    groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for item in records:
+        point = _record_point(item)
+        if point is not None:
+            key = (math.floor((point[0] + 180) / size), math.floor((point[1] + 90) / size))
+            groups.setdefault(key, []).append(item)
+    cells: list[dict[str, Any]] = []
+    for (x, y), items in groups.items():
+        west, south = x * size - 180, y * size - 90
+        east, north = min(180.0, west + size), min(90.0, south + size)
+        values = [value for item in items if (value := _numeric(_properties(item).get(field))) is not None] if field else []
+        representative = max(items, key=lambda item: _numeric(_properties(item).get(field)) or 0) if field else items[0]
+        cells.append({"longitude": (west + east) / 2, "latitude": (south + north) / 2,
+                      "cell_bbox": [west, south, east, north], "count": len(items),
+                      "sum": sum(values), "mean": sum(values) / len(values) if values else None,
+                      "max": max(values) if values else None, "representative": _compact_record(representative)})
+    return sorted(cells, key=lambda item: item.get(str(operation.get("order_by") or "count")) or 0, reverse=True)
