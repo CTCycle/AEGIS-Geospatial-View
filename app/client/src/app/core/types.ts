@@ -305,6 +305,7 @@ export interface GeospatialProviderPayload {
 }
 
 export interface MapOverlayEntry {
+  value_encoding?: { mode: 'graduated' | 'heatmap'; field: string; min: number; max: number };
   id: string;
   instance_id?: string;
   capability_id?: string;

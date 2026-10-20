@@ -40,6 +40,27 @@ describe('map-preview-rendering', () => {
     },
   });
 
+  for (const mode of ['graduated', 'heatmap'] as const) {
+    for (const max of [0, 100]) {
+      it(`renders ${mode} with maximum ${max} without clustering`, () => {
+        const sources: Array<Record<string, unknown>> = [];
+        const layers: Array<Record<string, unknown>> = [];
+        const map = {addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+                     addLayer: (layer: Record<string, unknown>) => layers.push(layer)};
+        const overlay: MapOverlayEntry = {id: 'grid', label: 'Grid', provider: 'test', type: 'geojson',
+          rendering_mode: 'clustered-points', data: {type: 'FeatureCollection', features: []},
+          value_encoding: {mode, field: 'rain', min: 0, max}};
+        expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status).toBe('loaded');
+        expect(sources[0]['cluster']).toBeUndefined();
+        expect(layers[0]['type']).toBe(mode === 'heatmap' ? 'heatmap' : 'circle');
+        expect(getOverlayLayerIds(overlay)).toEqual([String(layers[0]['id'])]);
+        const paint = layers[0]['paint'] as Record<string, unknown>;
+        const encoded = paint[mode === 'heatmap' ? 'heatmap-weight' : 'circle-radius'];
+        expect(Array.isArray(encoded)).toBe(max !== 0);
+      });
+    }
+  }
+
   it('compares boolean records by keys and values', () => {
     expect(recordBooleanEqual({ a: true }, { a: true })).toBeTrue();
     expect(recordBooleanEqual({ a: true }, { a: false })).toBeFalse();

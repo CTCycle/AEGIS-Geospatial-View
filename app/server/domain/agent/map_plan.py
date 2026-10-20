@@ -21,10 +21,16 @@ class SetBasemapAction(MapActionBase):
     capability_id: str
 
 ###############################################################################
+class ValueEncoding(MapActionBase):
+    mode: Literal["graduated", "heatmap"]
+    field: str = Field(min_length=1, max_length=200)
+
+
 class AddEvidenceLayerAction(MapActionBase):
     action: Literal["add_evidence_layer"]
     evidence_ref: str
     capability_id: str
+    value_encoding: ValueEncoding | None = None
     visible: bool = True
     opacity: float = Field(default=1.0, ge=0.0, le=1.0)
 

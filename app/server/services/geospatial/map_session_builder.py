@@ -37,7 +37,7 @@ from server.services.geospatial.raster_tiles import (
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 _GEOJSON_RENDERING_MODES = frozenset(
-    {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points"}
+    {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points", "circles"}
 )
 _GEOJSON_GEOMETRY_TYPES = frozenset(
     {
@@ -234,6 +234,16 @@ class MapSessionBuilder:
                 descriptor["result_type"] = evidence.summary.get(
                     "result_type", "features"
                 )
+            if action.value_encoding is not None:
+                field = action.value_encoding.field
+                features: list[dict[str, Any]] = render_data.get("features", []) if render_data else []
+                values = [feature.get("properties", {}).get(field) for feature in features]
+                numbers = [float(value) for value in values if isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)]
+                if not numbers:
+                    raise MapPlanBuildError("invalid_value_field", f"Field '{field}' has no numeric values; choose a numeric evidence field.")
+                descriptor["value_encoding"] = {"mode": action.value_encoding.mode, "field": field, "min": min(numbers), "max": max(numbers)}
+                descriptor["rendering_mode"] = "circles"
+                descriptor.pop("render", None)
             self._validate_render_descriptor(descriptor)
             additions = OverlayCollectionService.from_rendered_descriptors(
                 [descriptor],

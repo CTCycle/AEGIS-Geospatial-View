@@ -196,6 +196,9 @@ class MapPlanService:
     def _valid_empty_data_only(state: AgentRunState) -> bool:
         """Mark a location-only candidate when data retrieval was valid-empty."""
 
+        if state.route is not None and state.route.analysis is not None:
+            transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
+            return bool(transforms) and transforms[-1].status == "valid_empty"
         data_results = [
             result
             for result in state.tool_results
@@ -374,6 +377,7 @@ class MapPlanService:
                 )
             if summary.kind not in {
                 "vector",
+                "derived",
                 "raster_descriptor",
                 "provider_layer_descriptor",
                 "capability_result",
