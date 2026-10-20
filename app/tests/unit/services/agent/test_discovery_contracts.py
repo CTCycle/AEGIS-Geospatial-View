@@ -159,6 +159,31 @@ async def test_derived_bbox_preview_and_provenance() -> None:
 
 
 @pytest.mark.asyncio
+async def test_transform_labels_leading_coordinate_points_with_nearest_place() -> None:
+    repo = MemoryEvidence()
+    features = [{"latitude": 40 + index, "longitude": 8, "name": f"{40 + index}, 8", "label_kind": "coordinates",
+                 "value": 100 - index} for index in range(12)]
+    parent = repo.create(kind="vector", media_type="application/json", status="available",
+                         payload={"features": features}, summary={}, provenance={"provider_id": "openmeteo"})
+    value = state()
+    value.evidence_refs = [parent.evidence_id]
+    calls: list[tuple[float, float]] = []
+    async def labeler(latitude: float, longitude: float) -> str | None:
+        calls.append((latitude, longitude))
+        return None if latitude == 41 else f"Place {latitude:g}, Country"
+    result = await EvidenceToolHandler(repository=repo, place_labeler=labeler).transform(TransformEvidenceInput(
+        evidence_refs=value.evidence_refs, operations=[{"op": "sort", "field": "value", "descending": True}]), value)
+    _, payload = repo.get_payload(result.evidence_refs[0])
+    records = json.loads(payload)["features"]
+    assert calls == [(40 + index, 8) for index in range(10)]
+    assert records[0]["place_label"] == "Place 40, Country" and records[0]["label_kind"] == "nearest_reverse_geocoded"
+    # A failed lookup and points past the cap stay coordinate-only.
+    assert "place_label" not in records[1] and records[1]["label_kind"] == "coordinates"
+    assert "place_label" not in records[10]
+    assert result.data["place_labelled_count"] == 9
+
+
+@pytest.mark.asyncio
 async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder():
     from server.domain.agent.evidence import AgentEvidenceEnvelope
     from server.domain.agent.map_plan import AddEvidenceLayerAction, SetBasemapAction
@@ -180,5 +205,5 @@ async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder()
 def test_discovery_prompt_requires_disclosure_and_forbids_overclaiming():
     from server.prompts.agent import build_native_agent_system_prompt
     prompt = build_native_agent_system_prompt()
-    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "sample count", "model estimates", "partial or excluded", "verified maximum", "evidence does not contain"]:
+    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "sample count", "model estimates", "partial or excluded", "verified maximum", "evidence does not contain", "near <place_label>", "emsc_earthquakes"]:
         assert term in prompt
