@@ -497,3 +497,17 @@ async def test_emsc_empty_204_body_is_valid_empty(monkeypatch):
     response = await EMSCProvider().fetch(ProviderRequest(
         capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0), params={"live": True}))
     assert response.result_status == "valid_empty"
+
+
+@pytest.mark.asyncio
+async def test_macro_region_keeps_member_and_nearby_offshore_events_only():
+    events = {"anatolia": (39.5, 28.5), "aegean_off_greece": (38.6, 24.3), "athens": (37.98, 23.73)}
+    async def fetcher(url, headers=None):
+        return {"type": "FeatureCollection", "features": [{"properties": {
+            "unid": name, "time": "2026-10-20T11:54:53Z", "lat": lat, "lon": lon, "mag": 3.0}}
+            for name, (lat, lon) in events.items()]}
+    response = await EMSCProvider(fetcher=fetcher).fetch(ProviderRequest(
+        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0),
+        params={"live": True, "macro_region": "Europe"}))
+    assert {event["id"] for event in response.payload["features"]} == {"aegean_off_greece", "athens"}
+    assert response.coverage["excluded_outside_region_events"] == 1
