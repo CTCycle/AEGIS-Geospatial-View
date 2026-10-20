@@ -57,6 +57,7 @@ from server.services.geospatial.providers.mobility_database import (
     MobilityDatabaseProvider,
 )
 from server.services.geospatial.providers.usgs import USGSProvider
+from server.services.geospatial.providers.emsc import EMSCProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
 ProviderFactory = Callable[[str | None], Any]
@@ -87,6 +88,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "tomtom": lambda credential: TomTomProvider(api_key=credential),
     "windy_webcams": lambda credential: WindyWebcamsProvider(api_key=credential),
     "usgs": lambda _credential: USGSProvider(),
+    "emsc": lambda _credential: EMSCProvider(),
     "noaa": lambda _credential: NOAAProvider(),
     "fema": lambda _credential: FEMAProvider(),
     "nasa_firms": lambda credential: NASAFIRMSProvider(api_key=credential),

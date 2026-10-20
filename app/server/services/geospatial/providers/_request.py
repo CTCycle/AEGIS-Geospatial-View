@@ -4,8 +4,8 @@ from typing import Any
 import math
 
 from shapely.geometry import Point
-from shapely.prepared import PreparedGeometry
 
+from server.services.geospatial.land_mask import LandMask
 from server.services.geospatial.providers.base import ProviderRequest
 
 ###############################################################################
@@ -43,7 +43,7 @@ def _number_param(params: dict[str, Any], *keys: str) -> float | None:
 def grid_points(
     bbox: tuple[float, float, float, float],
     max_points: int = 100,
-    mask: PreparedGeometry | None = None,
+    mask: LandMask | None = None,
 ) -> tuple[list[tuple[float, float]], float, int]:
     """Return (latitude, longitude) cell centres, angular spacing, and the
     number of candidate centres excluded by the mask.

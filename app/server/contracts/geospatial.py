@@ -72,6 +72,8 @@ class CapabilityExecutionContract(BaseModel):
     output_geometry_type: str | None = None
     render_support: Literal["vector", "raster", "metadata_only", "none"] = "none"
     coverage: str | None = None
+    # [west, south, east, north] where this source ranks above global equivalents.
+    preferred_bbox: tuple[float, float, float, float] | None = None
     limitations: list[str] = Field(default_factory=lambda: list[str]())
     fallback_ids: list[str] = Field(default_factory=lambda: list[str]())
 

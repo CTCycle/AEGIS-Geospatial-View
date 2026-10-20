@@ -19,6 +19,8 @@ from server.services.geospatial.providers.fema import (
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
+from server.services.geospatial.providers import emsc as emsc_module
+from server.services.geospatial.providers.emsc import EMSC_FDSN_URL, EMSCProvider
 
 ###############################################################################
 def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
@@ -466,3 +468,32 @@ async def test_usgs_magnitude_filter_feed_and_dated_query():
     await provider.fetch(ProviderRequest(capability_id="usgs_earthquakes", time=datetime(2026, 10, 19, tzinfo=UTC),
         params={"live": True, "end_time_iso": "2026-10-20T00:00:00Z", "filters": {"min_magnitude": 2.5}}))
     assert "minmagnitude=2.5" in urls[-1]
+
+
+@pytest.mark.asyncio
+async def test_emsc_queries_seismicportal_and_normalizes_events():
+    urls = []
+    async def fetcher(url, headers=None):
+        urls.append(url)
+        return {"type": "FeatureCollection", "features": [{"id": "20261020_0000162", "properties": {
+            "unid": "20261020_0000162", "time": "2026-10-20T11:54:53.055513Z", "flynn_region": "FRANCE",
+            "lat": 45.5955, "lon": 3.9241, "depth": 0.0, "mag": 2.1, "magtype": "ml", "auth": "ReNaSS"}}]}
+    response = await EMSCProvider(fetcher=fetcher).fetch(ProviderRequest(
+        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0),
+        params={"live": True, "filters": {"min_magnitude": 2}}))
+    assert urls[0].startswith(EMSC_FDSN_URL) and "format=json" in urls[0]
+    assert "minmagnitude=2.0" in urls[0] and "minlatitude=34.0" in urls[0] and "starttime=" in urls[0]
+    [event] = response.payload["features"]
+    assert event["name"] == "France" and event["magnitude"] == 2.1 and event["time"] == 1792497293055
+    assert response.attribution == ["EMSC-CSEM SeismicPortal"]
+    assert "M2.5-3" in response.coverage["completeness_note"]
+
+
+@pytest.mark.asyncio
+async def test_emsc_empty_204_body_is_valid_empty(monkeypatch):
+    async def empty_body(url, headers=None):
+        return b""
+    monkeypatch.setattr(emsc_module, "fetch_bytes_url", empty_body)
+    response = await EMSCProvider().fetch(ProviderRequest(
+        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0), params={"live": True}))
+    assert response.result_status == "valid_empty"

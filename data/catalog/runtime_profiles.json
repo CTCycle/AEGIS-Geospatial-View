@@ -212,6 +212,27 @@
       "auth_required": false
     },
     {
+      "capability_id": "emsc_earthquakes",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": "emsc_earthquakes",
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "clustered-points",
+      "health_status": "functional",
+      "planner_hints": [
+        "earthquake",
+        "seismic",
+        "hazard",
+        "europe"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
       "capability_id": "noaa_weather_alerts",
       "enabled_by_default": true,
       "credential_provider": null,
