@@ -298,17 +298,42 @@ remain retrieval primitives; analysis names are not provider operations.
 `search_area_bound` and `result_locations_derived` are server-owned completion
 obligations. A map is unavailable until a located or valid-empty transform exists.
 
-Open-Meteo area queries use at most 100 grid cell centres in one cached request.
-Hourly accumulation excludes future hours; numeric values retain units and
-per-point local time windows. Coverage identifies model estimates, requested and
-usable samples, spacing, excluded sea points, and missing data. USGS accepts
-`filters.min_magnitude` and reports truncation and catalog completeness.
-Final answers must disclose these boundaries and describe sampled extrema as
-sampled, not verified regional maxima. Unlabeled grid results use coordinates.
+Macro regions list their member countries (ISO alpha-2). Area sampling masks
+the bbox with simplified Natural Earth 1:50m country shapes (0.05° coastal
+buffer): only land of member countries is sampled, so Europe excludes North
+Africa and Anatolia and sea cells are never requested. The grid densifies until
+masked land points approach a 300-point budget, fetched as cached Open-Meteo
+calls of at most 100 locations (World spacing about 8.6°). A refinement pass
+re-samples a 3×3 neighbourhood at one third of the spacing around the five
+strongest coarse cells per metric (`sample_stage: refined`). Hourly
+accumulation excludes future hours; numeric values retain units and per-point
+local time windows. Coverage identifies model estimates, region, mask source,
+requested, refined and usable samples, spacing, excluded out-of-region points,
+and missing data.
 
-Limitations: visual-clue image upload is deferred. Static rectangular bboxes
-over-cover (Europe includes parts of North Africa and Turkey); sampling misses
-local extremes and World sampling is roughly 25 degrees. Open-Meteo values are
-model estimates; elevation zero is only an approximate sea heuristic. Outside
-the US, USGS is generally complete only above about M4.5, so event counts are lower bounds.
-Reverse-geocoded result labels remain a follow-up.
+Earthquakes: `emsc_earthquakes` (EMSC SeismicPortal FDSN) declares an
+`executionContract.preferred_bbox` over Europe, the Mediterranean and the
+Middle East and outranks the global `usgs_earthquakes` there; USGS still wins
+elsewhere and whenever named. Both accept `filters.min_magnitude`, report
+truncation and a catalog completeness note (EMSC: about M2.5–3 in Europe), and
+for a macro region keep only events within 0.5° of member countries.
+
+`transform_evidence` reverse-geocodes up to ten leading coordinate-only result
+points through Nominatim (`place_label`, `label_kind:
+nearest_reverse_geocoded`); answers say "near <place>" and keep coordinates.
+Final answers must disclose these boundaries and describe sampled extrema as
+sampled, not verified regional maxima.
+
+Visual clues: the composer uploads one image (downscaled to 1024 px JPEG) to
+`POST /api/chat/attachments`; `run.start` references its `attachment_id`. The
+image is held in the in-memory capture store (900 s TTL) and attached to every
+model call of that run when the model reports vision; otherwise the model is
+told it cannot view images. Image-inferred places are hypotheses with named
+cues. The resolver collapses local ordinals (7e, 1er) when matching geocoder
+candidates.
+
+Remaining limitations: Open-Meteo values are model estimates and sampling can
+still miss extremes between samples. Earthquake catalogs remain incomplete
+below their completeness magnitude. Masks are simplified 1:50m shapes, so
+islands under about 5 km and fine coastlines are approximate. Attached images
+live in memory only and are lost on restart; only one image per request.

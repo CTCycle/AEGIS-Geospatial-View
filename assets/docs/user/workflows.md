@@ -64,8 +64,9 @@ messages or warnings; they are not treated as successful empty map results.
 
 Ask an objective such as “Where in Europe did it rain most today?”, “Show the
 highest temperatures in Southeast Asia”, or “Show European seismic hotspots
-this week.” AEGIS searches a static regional bounding box, retrieves data,
-derives ranked points or grid bins, and fits a value-driven map to the results.
+this week.” AEGIS samples the land of the region's member countries, refines
+around the strongest samples, derives ranked points or grid bins, names the
+nearest place for leading results, and fits a value-driven map to the results.
 An unspecified search area uses World. A country outside the macro-region
 catalog still uses the normal location resolver. Springfield and Florence can
 still require clarification.
@@ -73,7 +74,14 @@ still require clarification.
 Read the source, sample count/spacing, units, time window and excluded/partial
 coverage in the answer. Weather grid values are Open-Meteo model estimates,
 not station measurements. The highest sample is not a verified regional
-maximum. Rectangular regions may include neighbouring geography; coarse World
-sampling and the approximate sea filter can omit relevant locations. USGS
-counts outside the US are lower bounds, particularly below about M4.5. Visual-clue
-image uploads and reverse-geocoded grid labels are not supported in this slice.
+maximum. European, Mediterranean and Middle East earthquakes come from EMSC,
+which is denser than USGS there; counts below the stated completeness magnitude
+remain lower bounds. Place names are the nearest settlement, not a measured
+site.
+
+## Locate a photo
+
+Attach an image with the button left of the message box (vision-capable models
+only; the button is disabled otherwise) and ask, for example, “Where was this
+photo taken?”. The agent names the visual cues it used, treats the place as a
+hypothesis, and asks for confirmation when cues are not specific.

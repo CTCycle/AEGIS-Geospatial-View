@@ -88,7 +88,13 @@ alias. `search_area` uses explicit area references and defaults to World;
 `analysis` contains kind (`rank`, `hotspot`, `threshold`), metric, order and top_k
 (1–25). Each capability query describes one distinct retrieval objective.
 The macro-region reference catalog is static, cached and alias-only, with
-validated bboxes and unique aliases; it is not database seeded.
+validated bboxes, unique aliases and member-country lists used for land and
+region masks; it is not database seeded.
+
+`executionContract.preferred_bbox` ([west, south, east, north]) ranks a
+regional source above global equivalents only when the resolved location falls
+inside it (and below them outside it); `emsc_earthquakes` uses it for the
+Euro-Mediterranean area.
 
 `grid_sample` declares support for server-owned area sampling. Open-Meteo
 weather supports a capped grid; other manifests retain their existing point or
