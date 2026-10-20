@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import base64
 import time
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass, field, replace
 
 from server.common.typing import is_json_array
 
@@ -23,6 +24,8 @@ SUPPORTED_CAPTURE_MIME_TYPES = frozenset(
 # cap protects the store and the LLM request from runaway payloads.
 MAX_CAPTURE_BASE64_CHARS = 3 * 1024 * 1024
 DEFAULT_CAPTURE_TTL_SECONDS = 900.0
+# User-uploaded images share the capture bounds and TTL under this session key.
+USER_ATTACHMENT_SESSION = "user_attachment"
 
 
 ###############################################################################
@@ -61,6 +64,7 @@ class RenderCaptureStore:
     def __init__(self, *, ttl_seconds: float = DEFAULT_CAPTURE_TTL_SECONDS) -> None:
         self.ttl_seconds = float(ttl_seconds)
         self._captures: dict[tuple[str, str, int], RenderCapture] = {}
+        self._attachment_conversations: dict[str, str] = {}
 
     # -------------------------------------------------------------------------
     def _key(self, run_id: str, map_session_id: str, collection_revision: int) -> tuple[str, str, int]:
@@ -142,6 +146,53 @@ class RenderCaptureStore:
         return self._captures.get(
             self._key(run_id, map_session_id, collection_revision)
         )
+
+    # -------------------------------------------------------------------------
+    def save_attachment(
+        self,
+        *,
+        conversation_id: str,
+        mime_type: str,
+        image_base64: str,
+        width: int,
+        height: int,
+    ) -> str:
+        """Hold a user-uploaded image until a run start references it."""
+        attachment_id = f"att_{uuid.uuid4().hex}"
+        self.save(
+            run_id=attachment_id,
+            map_session_id=USER_ATTACHMENT_SESSION,
+            collection_revision=0,
+            mime_type=mime_type,
+            image_base64=image_base64,
+            width=width,
+            height=height,
+        )
+        self._attachment_conversations[attachment_id] = conversation_id
+        return attachment_id
+
+    # -------------------------------------------------------------------------
+    def has_attachment(self, attachment_id: str, conversation_id: str) -> bool:
+        return (
+            self._attachment_conversations.get(attachment_id) == conversation_id
+            and self.get(attachment_id, USER_ATTACHMENT_SESSION, 0) is not None
+        )
+
+    # -------------------------------------------------------------------------
+    def bind_attachment(self, attachment_id: str, conversation_id: str, run_id: str) -> bool:
+        """Move an uploaded image onto the run that will consume it."""
+        if not self.has_attachment(attachment_id, conversation_id):
+            return False
+        self._attachment_conversations.pop(attachment_id, None)
+        capture = self._captures.pop((attachment_id, USER_ATTACHMENT_SESSION, 0))
+        self._captures[(run_id, USER_ATTACHMENT_SESSION, 0)] = replace(
+            capture, run_id=run_id, captured_at=time.time()
+        )
+        return True
+
+    # -------------------------------------------------------------------------
+    def attachment_for_run(self, run_id: str) -> RenderCapture | None:
+        return self.get(run_id, USER_ATTACHMENT_SESSION, 0)
 
     # -------------------------------------------------------------------------
     def delete_for_run(self, run_id: str) -> int:

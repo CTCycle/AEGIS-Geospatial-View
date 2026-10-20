@@ -108,6 +108,48 @@
         }
       }
     },
+    "/api/chat/attachments": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Create Chat Attachment",
+        "description": "Hold one user image for the next run start that references it.",
+        "operationId": "create_chat_attachment_api_chat_attachments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatAttachmentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat/stream": {
       "post": {
         "tags": [
@@ -3129,6 +3171,71 @@
         ],
         "title": "CapabilityRoute"
       },
+      "ChatAttachmentCreateRequest": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Conversation Id"
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "default": "image/jpeg"
+          },
+          "image_base64": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Image Base64"
+          },
+          "width": {
+            "type": "integer",
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "image_base64",
+          "width",
+          "height"
+        ],
+        "title": "ChatAttachmentCreateRequest"
+      },
+      "ChatAttachmentResponse": {
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "title": "Attachment Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attachment_id",
+          "expires_in_seconds"
+        ],
+        "title": "ChatAttachmentResponse"
+      },
       "ChatOperationResult": {
         "properties": {
           "kind": {
@@ -3281,6 +3388,18 @@
           "conversation_id": {
             "type": "string",
             "title": "Conversation Id"
+          },
+          "attachment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachment Id"
           }
         },
         "additionalProperties": false,

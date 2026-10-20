@@ -23,10 +23,12 @@ from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import (
     RunAccessError,
+    RunAttachmentError,
     RunConflictError,
     RunNotFoundError,
 )
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.services.geospatial.render_capture import RenderCaptureStore
 
 ###############################################################################
 class RunLifecycleService:
@@ -40,7 +42,9 @@ class RunLifecycleService:
         aggregation_service: AggregatedRequestService,
         event_publisher: RunEventPublisher,
         run_orchestrator: AgentRunOrchestrator,
+        attachment_store: RenderCaptureStore | None = None,
     ) -> None:
+        self.attachment_store = attachment_store
         self.conversation_repository = conversation_repository
         self.run_repository = run_repository
         self.aggregation_service = aggregation_service
@@ -88,6 +92,15 @@ class RunLifecycleService:
             raise RunNotFoundError("Conversation not found.") from exc
         except PermissionError as exc:
             raise RunAccessError("Conversation access denied.") from exc
+        if payload.attachment_id is not None and (
+            self.attachment_store is None
+            or not self.attachment_store.has_attachment(
+                payload.attachment_id, conversation_id
+            )
+        ):
+            raise RunAttachmentError(
+                "The attached image is unavailable or expired; attach it again."
+            )
         aggregate = self.aggregation_service.build_aggregated_request(
             payload.message, []
         )
@@ -106,6 +119,10 @@ class RunLifecycleService:
             raise RunNotFoundError(message) from exc
         except PermissionError as exc:
             raise RunAccessError(str(exc)) from exc
+        if created and payload.attachment_id is not None and self.attachment_store is not None:
+            self.attachment_store.bind_attachment(
+                payload.attachment_id, conversation_id, run.run_id
+            )
         if created and schedule:
             self._schedule_run(run.run_id)
         return AgentRunCreateResult(

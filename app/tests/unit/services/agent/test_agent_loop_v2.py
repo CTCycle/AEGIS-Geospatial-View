@@ -2290,6 +2290,34 @@ async def test_non_vision_model_never_attaches() -> None:
 
 
 ###############################################################################
+@pytest.mark.parametrize("vision", [True, False])
+@pytest.mark.asyncio
+async def test_user_attached_image_reaches_every_model_call_or_is_declared_unviewable(vision: bool) -> None:
+    import base64
+
+    provider = VisionFakeProvider([LLMResult(content="ok")], vision=vision)
+    store = RenderCaptureStore()
+    attachment_id = store.save_attachment(conversation_id="conversation-1", mime_type="image/jpeg",
+                                          image_base64=base64.b64encode(b"photo").decode("ascii"), width=8, height=8)
+    assert store.bind_attachment(attachment_id, "conversation-1", "request-1")
+    state = _state()
+    loop = _loop(provider, capture_store=store)
+    request = AgentLoopRequest(provider="fake", model="m", state=state,
+                               budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10))
+    await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
+
+    sent = provider.requests[0]["request"]
+    if vision:
+        parts = _image_parts(sent)
+        assert parts[-1] == {"type": "image", "mime_type": "image/jpeg", "data": base64.b64encode(b"photo").decode("ascii")}
+        assert "Image attached by the user" in parts[0]["text"]
+        assert sent.metadata.get("requires_vision") is True
+    else:
+        assert _image_parts(sent) == []
+        assert any("cannot view images" in str(message.get("content")) for message in sent.messages)
+
+
+###############################################################################
 @pytest.mark.asyncio
 async def test_on_failure_policy_attaches_only_after_a_relevant_failure() -> None:
     provider = VisionFakeProvider([LLMResult(content="ok")])

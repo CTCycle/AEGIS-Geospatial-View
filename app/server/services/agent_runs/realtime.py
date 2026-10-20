@@ -34,6 +34,7 @@ from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import (
     RunAccessError,
+    RunAttachmentError,
     RunConflictError,
     RunNotFoundError,
     RunServiceError,
@@ -373,6 +374,7 @@ class RealtimeConnection:
                 message=payload.message,
                 client_request_id=payload.client_request_id,
                 timezone=payload.timezone,
+                attachment_id=payload.attachment_id,
             ),
         )
         await self._send(
@@ -610,6 +612,8 @@ class RealtimeConnection:
             return "access_denied"
         if isinstance(exc, RunConflictError):
             return "run_conflict"
+        if isinstance(exc, RunAttachmentError):
+            return "attachment_unavailable"
         return "run_service_failure"
 
 ###############################################################################

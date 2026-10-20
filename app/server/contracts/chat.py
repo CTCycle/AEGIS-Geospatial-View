@@ -43,6 +43,26 @@ class ChatTurnRequest(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
     request_id: str | None = None
     conversation_id: str
+    attachment_id: str | None = Field(default=None, max_length=64)
+
+
+###############################################################################
+class ChatAttachmentCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str = Field(min_length=1, max_length=160)
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"] = "image/jpeg"
+    image_base64: str = Field(min_length=1)
+    width: int = Field(ge=1, le=4096)
+    height: int = Field(ge=1, le=4096)
+
+
+###############################################################################
+class ChatAttachmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attachment_id: str
+    expires_in_seconds: int
 
 
 ###############################################################################

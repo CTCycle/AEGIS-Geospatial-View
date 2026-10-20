@@ -81,6 +81,7 @@ describe('pages/geospatial-page.component', () => {
       'fetchChatSettings',
       'fetchConversationRunTrace',
       'fetchConversations',
+      'uploadChatAttachment',
     ]);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
@@ -211,6 +212,38 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Agent ready');
     expect(component.messages.at(-1)?.content).toContain('Search executed successfully.');
     expect(component.contextUsagePercent).toBe(6);
+  });
+
+  it('uploads an attached image over HTTP and references it in the run start', async () => {
+    apiClient.uploadChatAttachment.and.resolveTo('att_1');
+    const runStart = spyOn(realtime, 'sendRunStart').and.callThrough();
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerImage = {
+      name: 'street.jpg', dataUrl: 'data:image/jpeg;base64,cGhvdG8=', base64: 'cGhvdG8=',
+      mimeType: 'image/jpeg', width: 8, height: 6,
+    };
+    component.composerDraft = 'Where was this photo taken?';
+    await component.sendMessage();
+    expect(apiClient.uploadChatAttachment).toHaveBeenCalledOnceWith({
+      conversation_id: 'conv-1', mime_type: 'image/jpeg', image_base64: 'cGhvdG8=', width: 8, height: 6,
+    });
+    expect(runStart.calls.mostRecent().args[3]).toBe('att_1');
+    expect(component.composerImage).toBeUndefined();
+  });
+
+  it('disables image attachment when the selected model cannot view images', async () => {
+    agentReadiness.loadReadiness.and.resolveTo({
+      status: 'active', label: 'Configured', message: 'Configured.', supportsVision: false,
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('.chat-composer__attach') as HTMLButtonElement;
+    expect(button.disabled).toBeTrue();
+    expect(button.title).toContain('cannot view images');
   });
 
   it('clarification responses return the persistent agent status to ready', async () => {

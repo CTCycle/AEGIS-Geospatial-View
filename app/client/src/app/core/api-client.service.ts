@@ -16,11 +16,13 @@ import {
   fetchGeospatialProviderAccountSetups,
   fetchGeospatialLayerFeatures,
   fetchGeospatialLayers,
+  postChatAttachment,
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
   updateChatSettings,
   updateRuntimeSettings,
+  type ChatAttachmentPayload,
 } from './api';
 import {
   CatalogResponse,
@@ -103,6 +105,10 @@ export class ApiClientService {
     params: { limit?: number; cursor?: string } = {},
   ): Promise<RunTraceResponse> {
     return fetchConversationRunTrace(conversationId, runId, params);
+  }
+
+  uploadChatAttachment(payload: ChatAttachmentPayload): Promise<string> {
+    return postChatAttachment(payload);
   }
 
   fetchChatModels(provider?: 'deepseek' | 'opencode' | 'opencode-go'): Promise<ModelLibraryResponse> {

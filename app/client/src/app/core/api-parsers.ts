@@ -485,6 +485,11 @@ export const parseGeospatialCredentialStatus = (
   };
 };
 
+export const parseChatAttachmentResponse = (value: unknown): string => {
+  const endpoint = 'chat attachment';
+  return requireApiString(requireApiRecord(value, endpoint), 'attachment_id', endpoint);
+};
+
 export const parseConversationCreateResponse = (
   value: unknown,
 ): ConversationCreateResponse => {

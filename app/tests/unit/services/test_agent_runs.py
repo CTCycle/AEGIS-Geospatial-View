@@ -27,7 +27,8 @@ from server.repositories.schemas.models import (
 from server.domain.agent.conversation import ConversationState
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
-from server.services.agent_runs.exceptions import RunConflictError
+from server.services.agent_runs.exceptions import RunAttachmentError, RunConflictError
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 
@@ -441,6 +442,25 @@ async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -
     assert fake_orchestrator.started == ["run_restart"]
 
 ###############################################################################
+def test_run_start_binds_a_known_attachment_and_rejects_an_unknown_one(run_repositories) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    store = RenderCaptureStore()
+    lifecycle.attachment_store = store
+    conversation = lifecycle.create_conversation(title="Photo")
+    with pytest.raises(RunAttachmentError):
+        run_async_in_thread(lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Where is this?", attachment_id="att_missing"),
+        ))
+    attachment_id = store.save_attachment(conversation_id=conversation.conversation_id, mime_type="image/jpeg",
+                                          image_base64="cGhvdG8=", width=8, height=8)
+    result, _ = run_async_in_thread(lifecycle.create_run_with_status(
+        conversation.conversation_id,
+        AgentRunCreateRequest(message="Where is this?", attachment_id=attachment_id),
+    ))
+    assert store.attachment_for_run(result.run_id) is not None
+
+
 def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Idempotency")

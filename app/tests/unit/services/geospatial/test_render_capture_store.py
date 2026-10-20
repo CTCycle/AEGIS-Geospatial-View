@@ -152,3 +152,20 @@ def test_clear_empties_the_store() -> None:
     store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=_png_base64(), width=10, height=10)
     store.clear()
     assert len(store) == 0
+
+
+###############################################################################
+def test_user_attachment_binds_once_to_a_run_of_its_conversation() -> None:
+    store = RenderCaptureStore()
+    attachment_id = store.save_attachment(
+        conversation_id="conv-1", mime_type="image/png", image_base64=_png_base64(), width=1, height=1
+    )
+    assert not store.has_attachment(attachment_id, "conv-2")
+    assert not store.bind_attachment(attachment_id, "conv-2", "run-1")
+    assert store.bind_attachment(attachment_id, "conv-1", "run-1")
+    assert not store.bind_attachment(attachment_id, "conv-1", "run-2")
+    attachment = store.attachment_for_run("run-1")
+    assert attachment is not None and attachment.mime_type == "image/png"
+    store.delete_for_run("run-1")
+    assert store.attachment_for_run("run-1") is None
+

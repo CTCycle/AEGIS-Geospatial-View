@@ -15,3 +15,7 @@ class RunConflictError(RunServiceError):
 ###############################################################################
 class RunAccessError(RunServiceError):
     pass
+
+###############################################################################
+class RunAttachmentError(RunServiceError):
+    pass

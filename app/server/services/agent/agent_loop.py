@@ -68,6 +68,15 @@ from server.services.llm.multimodal import attach_image, messages_contain_image
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.transport import LLMTransportPolicy
 
+USER_IMAGE_CAPTION = (
+    "Image attached by the user to this request. Use its visual clues as evidence "
+    "about the place or subject; a location inferred from it is a hypothesis."
+)
+USER_IMAGE_UNSUPPORTED_NOTE = (
+    "The user attached an image, but the selected model cannot view images. Say so "
+    "and do not describe or guess its content."
+)
+
 # Failures caused by the external source rather than by the call itself.
 _PROVIDER_FAILURE_TYPES = frozenset(
     {"timeout", "rate_limit", "provider_unavailable", "provider_malformed_response"}
@@ -1770,6 +1779,53 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    async def _attach_user_image(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+        *,
+        first_call: bool,
+    ) -> list[dict[str, Any]]:
+        """Give every model call of the run the image the user attached.
+
+        Independent of the map-capture vision policy: the image is part of the
+        request itself. A model without vision gets a note instead, so it can
+        tell the user rather than guess.
+        """
+
+        capture_store = getattr(self, "capture_store", None)
+        if capture_store is None:
+            return messages
+        attachment = capture_store.attachment_for_run(
+            request.state.run_id or request.state.request_id
+        )
+        if attachment is None:
+            return messages
+        supported = (
+            provider.supports_vision(request.model)
+            if hasattr(provider, "supports_vision")
+            else None
+        )
+        if supported is not True:
+            if first_call:
+                await self._emit_vision_trace(request, "user_image_unsupported", None)
+            return [*messages, {"role": "system", "content": USER_IMAGE_UNSUPPORTED_NOTE}]
+        if first_call:
+            await self._emit_vision_trace(
+                request,
+                "user_image_attached",
+                None,
+                {"mime_type": attachment.mime_type, "width": attachment.width, "height": attachment.height},
+            )
+        return attach_image(
+            messages,
+            data=attachment.image_base64,
+            mime_type=attachment.mime_type,
+            caption=USER_IMAGE_CAPTION,
+        )
+
+    # -------------------------------------------------------------------------
     async def _emit_vision_trace(
         self,
         request: AgentLoopRequest,
@@ -1879,6 +1935,9 @@ class AgentLoop:
     ) -> LLMResult:
         self._ensure_run_control(request)
         request.budget.ensure_available(budget_stage)
+        messages = await self._attach_user_image(
+            request, provider, messages, first_call=budget_stage == "route_request"
+        )
         metadata: dict[str, Any] = {
             "supports_tools": True,
             REQUEST_DEADLINE_METADATA_KEY: request.budget.deadline_monotonic,

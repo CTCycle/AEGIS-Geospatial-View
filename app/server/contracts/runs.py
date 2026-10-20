@@ -195,6 +195,7 @@ class AgentRunCreateRequest(BaseModel):
     message: str
     client_request_id: str | None = None
     timezone: str | None = Field(default=None, max_length=64)
+    attachment_id: str | None = Field(default=None, max_length=64)
 
     # -------------------------------------------------------------------------
     @field_validator("message")
