@@ -46,6 +46,9 @@ import {
   RunTraceEntry,
   RunTraceResponse,
   RuntimeSettingsResponse,
+  DatabaseSettingsRequest,
+  DatabaseSettingsResponse,
+  DatabaseConnectionTestResponse,
   SelectedModelContext,
   OllamaHealthResponse,
   MapInspection,
@@ -1684,6 +1687,48 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
     ),
     restart_required: requireApiBoolean(record, 'restart_required', endpoint),
     message: optionalApiString(record, 'message', endpoint) ?? null,
+  };
+};
+
+const parseDatabaseSettingsRequest = (value: unknown, endpoint: string): DatabaseSettingsRequest => {
+  const record = requireApiRecord(value, endpoint);
+  const backend = requireApiString(record, 'backend', endpoint);
+  if (backend !== 'sqlite') {
+    return apiContract(endpoint, 'backend is unsupported', backend);
+  }
+  return {
+    backend,
+    database_path: requireApiString(record, 'database_path', endpoint),
+    sqlite_lock_timeout_seconds: requireApiNumber(record, 'sqlite_lock_timeout_seconds', endpoint),
+  };
+};
+
+export const parseDatabaseSettingsResponse = (value: unknown): DatabaseSettingsResponse => {
+  const endpoint = 'database settings';
+  const record = requireApiRecord(value, endpoint);
+  return {
+    ...parseDatabaseSettingsRequest(record, endpoint),
+    active: requireApiBoolean(record, 'active', endpoint),
+  };
+};
+
+export const parseDatabaseConnectionTestResponse = (value: unknown): DatabaseConnectionTestResponse => {
+  const endpoint = 'database connection test';
+  const record = requireApiRecord(value, endpoint);
+  const backend = requireApiString(record, 'backend', endpoint);
+  const schemaStatus = requireApiString(record, 'schema_status', endpoint);
+  if (backend !== 'sqlite') {
+    return apiContract(endpoint, 'backend is unsupported', backend);
+  }
+  if (!['ready', 'upgradable', 'empty'].includes(schemaStatus)) {
+    return apiContract(endpoint, 'schema_status is unsupported', schemaStatus);
+  }
+  return {
+    ok: requireApiBoolean(record, 'ok', endpoint),
+    backend,
+    database_path: requireApiString(record, 'database_path', endpoint),
+    schema_status: schemaStatus as DatabaseConnectionTestResponse['schema_status'],
+    message: requireApiString(record, 'message', endpoint),
   };
 };
 

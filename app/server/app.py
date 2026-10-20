@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
@@ -31,7 +33,10 @@ from server.common.paths import (
     FASTAPI_ROOT_ENDPOINT,
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
-from server.configurations import build_database_settings, ensure_environment_loaded
+from server.configurations import DatabaseSettings, ensure_environment_loaded
+from server.configurations.database_configuration import (
+    load_database_configuration,
+)
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
@@ -55,14 +60,21 @@ from server.repositories.agent_steering import AgentSteeringRepository
 from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
 from server.services.settings.runtime_settings import RuntimeSettingsService
+from server.services.database_runtime import (
+    DatabaseRuntimeGateMiddleware,
+    DatabaseRuntimeManager,
+)
+
 
 ###############################################################################
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
+
 
 ###############################################################################
 def _dispose_sqlite_engine(database: object) -> None:
@@ -70,6 +82,7 @@ def _dispose_sqlite_engine(database: object) -> None:
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -84,29 +97,36 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
-###############################################################################
-def serve_client_root() -> FileResponse:
-    return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-###############################################################################
-def serve_client_path(full_path: str) -> FileResponse:
-    client_file = _resolve_client_file(full_path)
-    if client_file is not None:
-        return FileResponse(client_file)
-    return FileResponse(CLIENT_INDEX_FILE_PATH)
+@dataclass
+class _RuntimeBundle:
+    database: SQLiteRepository
+    runtime_repository: RuntimeSettingsRepository
+    runtime_settings: Any
+    settings: Any
+    geospatial_runtime: Any
+    render_capture_store: RenderCaptureStore
+    chat_runtime: Any
+    event_repository: AgentRunEventRepository
+    run_event_publisher: RunEventPublisher
+    run_repository: AgentRunRepository
+    conversation_repository: Any
+    steering_repository: AgentSteeringRepository
+    conversation_snapshot_service: ConversationSnapshotService
+    aggregation_service: AggregatedRequestService
+    render_completion_service: RenderCompletionService
+    run_orchestrator: AgentRunOrchestrator
+    run_lifecycle_service: RunLifecycleService
+    chat_streaming_service: ChatStreamingService
+    run_steering_service: RunSteeringService
+    realtime_connections: RealtimeConnectionRegistry
+    realtime_metrics: RealtimeMetrics
+    job_service: BackgroundJobService
+    runtime_settings_service: RuntimeSettingsService
 
-###############################################################################
-def redirect_root_to_docs() -> RedirectResponse:
-    return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
-###############################################################################
-@asynccontextmanager
-async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
-    _application_logger.debug("Application logging configured.")
-    ensure_environment_loaded()
-    database_settings = build_database_settings()
+def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle:
     database = SQLiteRepository(database_settings)
-
     try:
         initialize_database(
             database,
@@ -191,35 +211,143 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         chat_streaming_service=chat_streaming_service,
         polling_interval=settings.jobs.polling_interval,
     )
-    application.state.chat_runtime = chat_runtime
-    application.state.geospatial_runtime = geospatial_runtime
-    application.state.chat_streaming_service = chat_streaming_service
-    application.state.run_lifecycle_service = run_lifecycle_service
-    application.state.run_steering_service = run_steering_service
-    application.state.conversation_repository = conversation_repository
-    application.state.conversation_snapshot_service = conversation_snapshot_service
-    application.state.run_repository = run_repository
-    application.state.run_event_publisher = run_event_publisher
-    application.state.render_completion_service = render_completion_service
-    application.state.render_capture_store = render_capture_store
-    application.state.realtime_connections = realtime_connections
-    application.state.realtime_metrics = realtime_metrics
-    application.state.job_service = job_service
-    application.state.runtime_settings_service = runtime_settings_service
+    return _RuntimeBundle(
+        database=database,
+        runtime_repository=runtime_repository,
+        runtime_settings=runtime_app_settings,
+        settings=settings,
+        geospatial_runtime=geospatial_runtime,
+        render_capture_store=render_capture_store,
+        chat_runtime=chat_runtime,
+        event_repository=event_repository,
+        run_event_publisher=run_event_publisher,
+        run_repository=run_repository,
+        conversation_repository=conversation_repository,
+        steering_repository=steering_repository,
+        conversation_snapshot_service=conversation_snapshot_service,
+        aggregation_service=aggregation_service,
+        render_completion_service=render_completion_service,
+        run_orchestrator=run_orchestrator,
+        run_lifecycle_service=run_lifecycle_service,
+        chat_streaming_service=chat_streaming_service,
+        run_steering_service=run_steering_service,
+        realtime_connections=realtime_connections,
+        realtime_metrics=realtime_metrics,
+        job_service=job_service,
+        runtime_settings_service=runtime_settings_service,
+    )
 
+
+def _build_validated_runtime_bundle(
+    database_settings: DatabaseSettings,
+) -> _RuntimeBundle:
+    bundle = _build_runtime_bundle(database_settings)
     try:
-        job_service.start()
-        chat_runtime.settings_service.validate_persisted_settings()
-        run_startup_validations(geospatial_runtime.catalog_snapshot)
-        resume_active_runs = getattr(run_lifecycle_service, "resume_active_runs", None)
-        if callable(resume_active_runs):
-            resume_active_runs()
+        _validate_runtime_bundle(bundle)
+    except BaseException:
+        _dispose_sqlite_engine(bundle.database)
+        raise
+    return bundle
+
+
+def _publish_runtime_bundle(application: FastAPI, bundle: _RuntimeBundle) -> None:
+    application.state.runtime_bundle = bundle
+    application.state.database = bundle.database
+    application.state.chat_runtime = bundle.chat_runtime
+    application.state.geospatial_runtime = bundle.geospatial_runtime
+    application.state.chat_streaming_service = bundle.chat_streaming_service
+    application.state.run_lifecycle_service = bundle.run_lifecycle_service
+    application.state.run_steering_service = bundle.run_steering_service
+    application.state.conversation_repository = bundle.conversation_repository
+    application.state.conversation_snapshot_service = (
+        bundle.conversation_snapshot_service
+    )
+    application.state.run_repository = bundle.run_repository
+    application.state.run_event_publisher = bundle.run_event_publisher
+    application.state.render_completion_service = bundle.render_completion_service
+    application.state.render_capture_store = bundle.render_capture_store
+    application.state.realtime_connections = bundle.realtime_connections
+    application.state.realtime_metrics = bundle.realtime_metrics
+    application.state.job_service = bundle.job_service
+    application.state.runtime_settings_service = bundle.runtime_settings_service
+
+
+async def _activate_runtime_bundle(bundle: _RuntimeBundle) -> None:
+    bundle.job_service.start()
+    bundle.run_lifecycle_service.resume_active_runs()
+
+
+async def _shutdown_runtime_bundle(bundle: _RuntimeBundle) -> None:
+    await bundle.realtime_connections.close_all()
+    await asyncio.to_thread(bundle.job_service.stop)
+    await bundle.run_lifecycle_service.shutdown()
+    _dispose_sqlite_engine(bundle.database)
+
+
+def _validate_runtime_bundle(bundle: _RuntimeBundle) -> None:
+    bundle.chat_runtime.settings_service.validate_persisted_settings()
+    run_startup_validations(bundle.geospatial_runtime.catalog_snapshot)
+
+
+def _database_busy_reasons(bundle: _RuntimeBundle) -> list[str]:
+    reasons: list[str] = []
+    if bundle.job_service.has_nonterminal_jobs:
+        reasons.append("background jobs")
+    if bundle.run_repository.has_active_runs():
+        reasons.append("agent runs")
+    return reasons
+
+
+###############################################################################
+def serve_client_root() -> FileResponse:
+    return FileResponse(CLIENT_INDEX_FILE_PATH)
+
+
+###############################################################################
+def serve_client_path(full_path: str) -> FileResponse:
+    client_file = _resolve_client_file(full_path)
+    if client_file is not None:
+        return FileResponse(client_file)
+    return FileResponse(CLIENT_INDEX_FILE_PATH)
+
+
+###############################################################################
+def redirect_root_to_docs() -> RedirectResponse:
+    return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
+
+
+###############################################################################
+@asynccontextmanager
+async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    _application_logger.debug("Application logging configured.")
+    ensure_environment_loaded()
+    configuration = load_database_configuration()
+    database_settings = DatabaseSettings(
+        database_path=configuration.database_path,
+        sqlite_lock_timeout_seconds=configuration.sqlite_lock_timeout_seconds,
+        backend=configuration.backend,
+    )
+    bundle = _build_runtime_bundle(database_settings)
+    try:
+        _validate_runtime_bundle(bundle)
+        _publish_runtime_bundle(application, bundle)
+        application.state.database_runtime_manager = DatabaseRuntimeManager(
+            configuration=configuration,
+            runtime_bundle=bundle,
+            build_candidate=_build_validated_runtime_bundle,
+            publish_runtime=lambda candidate: _publish_runtime_bundle(
+                application, candidate
+            ),
+            activate_runtime=_activate_runtime_bundle,
+            shutdown_runtime=_shutdown_runtime_bundle,
+            busy_reasons=_database_busy_reasons,
+        )
+        await _activate_runtime_bundle(bundle)
         yield
     finally:
-        await realtime_connections.close_all()
-        await asyncio.to_thread(job_service.stop)
-        await run_lifecycle_service.shutdown()
-        _dispose_sqlite_engine(database)
+        active_bundle = getattr(application.state, "runtime_bundle", bundle)
+        await _shutdown_runtime_bundle(active_bundle)
+
 
 ###############################################################################
 def create_app() -> FastAPI:
@@ -227,6 +355,10 @@ def create_app() -> FastAPI:
         title="AEGIS API",
         version=AEGIS_VERSION,
         lifespan=app_lifespan,
+    )
+    application.add_middleware(
+        DatabaseRuntimeGateMiddleware,
+        state=application.state,
     )
 
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)

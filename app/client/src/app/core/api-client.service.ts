@@ -22,6 +22,9 @@ import {
   sendChatTurn,
   updateChatSettings,
   updateRuntimeSettings,
+  fetchDatabaseSettings,
+  testDatabaseConnection,
+  updateDatabaseSettings,
   type ChatAttachmentPayload,
 } from './api';
 import {
@@ -43,6 +46,9 @@ import {
   ModelSettingsUpdateRequest,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
+  DatabaseSettingsRequest,
+  DatabaseSettingsResponse,
+  DatabaseConnectionTestResponse,
   OllamaHealthResponse,
 } from './types';
 
@@ -129,6 +135,18 @@ export class ApiClientService {
 
   updateRuntimeSettings(payload: RuntimeSettingsUpdateRequest): Promise<RuntimeSettingsResponse> {
     return updateRuntimeSettings(payload);
+  }
+
+  fetchDatabaseSettings(): Promise<DatabaseSettingsResponse> {
+    return fetchDatabaseSettings();
+  }
+
+  testDatabaseConnection(payload: DatabaseSettingsRequest): Promise<DatabaseConnectionTestResponse> {
+    return testDatabaseConnection(payload);
+  }
+
+  updateDatabaseSettings(payload: DatabaseSettingsRequest): Promise<DatabaseSettingsResponse> {
+    return updateDatabaseSettings(payload);
   }
 
   refreshOllamaModels(): Promise<GenericObjectResponse> {

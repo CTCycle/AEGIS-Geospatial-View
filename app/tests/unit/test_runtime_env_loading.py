@@ -10,6 +10,7 @@ from server.configurations.environment import (
     reset_environment_bootstrap_for_tests,
 )
 
+
 ###############################################################################
 def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
@@ -50,6 +51,7 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     assert os.getenv("KERAS_BACKEND") == "tensorflow"
     assert os.getenv("MPLBACKEND") == "Agg"
 
+
 ###############################################################################
 def test_process_environment_values_are_not_overwritten(
     monkeypatch: pytest.MonkeyPatch,
@@ -67,6 +69,7 @@ def test_process_environment_values_are_not_overwritten(
 
     assert os.getenv("AEGIS_DATA_DIR") == "from-process"
 
+
 ###############################################################################
 def test_missing_runtime_env_is_created_from_example(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -74,10 +77,9 @@ def test_missing_runtime_env_is_created_from_example(
     env_file = tmp_path / "settings" / ".env"
     example_file = tmp_path / "settings" / ".env.example"
     example_file.parent.mkdir()
-    example_file.write_bytes(b"FASTAPI_PORT=6101\r\nSQLITE_LOCK_TIMEOUT=9\r\n")
+    example_file.write_bytes(b"FASTAPI_PORT=6101\r\n")
 
     monkeypatch.delenv("FASTAPI_PORT", raising=False)
-    monkeypatch.delenv("SQLITE_LOCK_TIMEOUT", raising=False)
     monkeypatch.setattr(
         "server.configurations.environment.ENV_FILE_PATH", str(env_file)
     )
@@ -91,7 +93,7 @@ def test_missing_runtime_env_is_created_from_example(
     assert loaded_path == env_file
     assert env_file.read_bytes() == example_file.read_bytes()
     assert os.getenv("FASTAPI_PORT") == "6101"
-    assert os.getenv("SQLITE_LOCK_TIMEOUT") == "9"
+
 
 ###############################################################################
 def test_existing_runtime_env_is_not_overwritten(

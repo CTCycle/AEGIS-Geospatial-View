@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-09-28
+Last updated: 2026-10-20
 
 ## Local Development Via Launcher
 
@@ -43,8 +43,11 @@ applying changes. Data management can remove the SQLite database,
 runtime/provider data, ingested files, generated vectors, and logs while
 preserving application source files. The final option exits the launcher.
 
-Database synchronization runs before backend repositories and background jobs
-are constructed. A missing SQLite file is created, migrated, and seeded.
+Startup loads and validates `<AEGIS_DATA_DIR or data/runtime>/database-settings.json`
+before opening a database, so selecting the database never depends on database
+contents. A first-run file defaults to `database.db`; database synchronization
+runs before repositories and background jobs are constructed. A missing SQLite
+file is created, migrated, and seeded.
 Versioned SQLite files receive pending migrations and menu option 4 invokes the
 same idempotent workflow. A populated database without an Alembic revision,
 unknown revisions, and structurally invalid files fail with an actionable
@@ -54,10 +57,18 @@ only when an existing database needs a migration or required seed mutation; a
 current, fully seeded database takes a no-copy path. Mutating operations restore
 the backup if they fail.
 
-During seeding, an older `settings/configurations.json` is imported into the
-typed `application_runtime_settings` row. The source is retired only after the
-SQLite transaction commits; invalid legacy settings stop startup and leave the
-source available for correction.
+New databases seed the typed `application_runtime_settings` row with built-in
+defaults. Existing rows remain authoritative, and startup does not read runtime
+settings from JSON files.
+
+The Settings Database section can test and switch the active SQLite file while
+the server is running. A switch validates and prepares the target first, then
+is rejected if requests or WebSockets, queued or running jobs, or agent runs
+are active. A failed activation rolls back to the prior database and config.
+The browser reloads its client state after success so the selected database's
+settings are visible immediately. A switch never copies records between
+databases. Changing `AEGIS_DATA_DIR` or process-level hosts, ports, and reload
+configuration still requires an application restart.
 
 Launch option 1 checks both configured ports before dependency work and again
 before starting services. If a port is occupied, it shows the grouped PID,

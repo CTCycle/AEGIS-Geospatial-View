@@ -9,7 +9,7 @@ from alembic.config import Config
 from filelock import Timeout
 from sqlalchemy import inspect
 
-from server.configurations import AppSettings, DatabaseSettings
+from server.configurations import DatabaseSettings
 from server.repositories.database import migration_runner
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.migration_runner import (
@@ -17,7 +17,6 @@ from server.repositories.database.migration_runner import (
     DatabaseMigrationError,
 )
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.schemas import (
     Base,
     CredentialEncryptionMaterial,
@@ -39,21 +38,10 @@ def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
     )
 
 ###############################################################################
-def _initialize(
-    repository: SQLiteRepository,
-    *,
-    legacy_settings_path: Path | None = None,
-):
-    if legacy_settings_path is None:
-        database_path = repository.engine.url.database
-        assert database_path is not None
-        legacy_settings_path = Path(database_path).with_name(
-            "missing-configurations.json"
-        )
+def _initialize(repository: SQLiteRepository):
     return initialize_database(
         repository,
         on_ready=lambda: seed_reference_catalog(repository),
-        legacy_settings_path=legacy_settings_path,
     )
 
 ###############################################################################
@@ -79,33 +67,6 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert repository.count_records(ReferenceCountryRecord) > 0
     assert repository.count_records(ApplicationRuntimeSettingsRecord) == 1
 
-
-###############################################################################
-def test_database_initialization_imports_legacy_settings_and_restart_is_idempotent(
-    tmp_path: Path,
-) -> None:
-    database_path = tmp_path / "database.db"
-    legacy_path = tmp_path / "configurations.json"
-    legacy_payload = AppSettings().runtime_payload()
-    legacy_payload.pop("agent_execution")
-    legacy_payload["map"]["tiles"] = "CartoDB Positron"
-    legacy_payload["chat"]["max_history_messages"] = 24
-    expected = AppSettings.model_validate(legacy_payload).runtime_payload()
-    legacy_path.write_text(json.dumps(legacy_payload), encoding="utf-8")
-    repository = SQLiteRepository(_settings(database_path))
-
-    _initialize(repository, legacy_settings_path=legacy_path)
-
-    imported = RuntimeSettingsRepository(repository).get_required()
-    assert imported.runtime_payload() == expected
-    assert imported.agent_execution == AppSettings().agent_execution
-    assert not legacy_path.exists()
-    assert repository.count_records(ApplicationRuntimeSettingsRecord) == 1
-
-    _initialize(repository, legacy_settings_path=legacy_path)
-
-    assert RuntimeSettingsRepository(repository).get_required() == imported
-    assert repository.count_records(ApplicationRuntimeSettingsRecord) == 1
 
 ###############################################################################
 def test_existing_sqlite_database_is_idempotent(

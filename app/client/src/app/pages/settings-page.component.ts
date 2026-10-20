@@ -46,6 +46,9 @@ import {
   OllamaHealthResponse,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
+  DatabaseConnectionTestResponse,
+  DatabaseSettingsRequest,
+  DatabaseSettingsResponse,
   VISION_POLICY_VALUES,
   type VisionPolicy,
 } from '../core/types';
@@ -59,7 +62,8 @@ export type SettingsSectionId =
   | 'application'
   | 'map-search'
   | 'data-sources'
-  | 'agent-runtime';
+  | 'agent-runtime'
+  | 'database';
 
 export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string }[] = [
   { id: 'models', label: 'Models' },
@@ -69,6 +73,7 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string 
   { id: 'map-search', label: 'Map & Search' },
   { id: 'data-sources', label: 'Data Sources' },
   { id: 'agent-runtime', label: 'Agent Runtime' },
+  { id: 'database', label: 'Database' },
 ];
 
 const RUNTIME_AUTOSAVE_DELAY_MS = 400;
@@ -309,6 +314,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   isSavingRuntimeSettings = false;
   runtimeRestartRequired = false;
 
+  databaseSettings: DatabaseSettingsResponse | null = null;
+  databaseSettingsDraft: DatabaseSettingsRequest = {
+    backend: 'sqlite',
+    database_path: '',
+    sqlite_lock_timeout_seconds: 60,
+  };
+  databaseConnectionTest: DatabaseConnectionTestResponse | null = null;
+  databaseSettingsError = '';
+  databaseSettingsMessage = '';
+  isLoadingDatabaseSettings = false;
+  isTestingDatabaseConnection = false;
+  isSavingDatabaseSettings = false;
+
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
   private runtimeAutosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -350,6 +368,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncQueryState();
     void this.loadData();
     void this.loadRuntimeSettings();
+    void this.loadDatabaseSettings();
     void this.loadProviderAccountSetups();
     this.syncState();
   }
@@ -1105,6 +1124,112 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.isLoadingRuntimeSettings = false;
       this.changeDetectorRef.detectChanges();
     }
+  }
+
+  async loadDatabaseSettings(): Promise<void> {
+    this.isLoadingDatabaseSettings = true;
+    this.databaseSettingsError = '';
+    try {
+      const loaded = await this.apiClient.fetchDatabaseSettings();
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseSettings = loaded;
+      this.databaseSettingsDraft = {
+        backend: loaded.backend,
+        database_path: loaded.database_path,
+        sqlite_lock_timeout_seconds: loaded.sqlite_lock_timeout_seconds,
+      };
+      this.databaseConnectionTest = null;
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseSettingsError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load database settings right now.',
+      );
+    } finally {
+      if (!this.isDestroyed) {
+        this.isLoadingDatabaseSettings = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  async testDatabaseConnection(): Promise<void> {
+    this.isTestingDatabaseConnection = true;
+    this.databaseSettingsError = '';
+    this.databaseSettingsMessage = '';
+    this.databaseConnectionTest = null;
+    try {
+      const result = await this.apiClient.testDatabaseConnection(this.databaseSettingsRequest());
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseConnectionTest = result;
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseSettingsError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'The database connection test failed.',
+      );
+    } finally {
+      if (!this.isDestroyed) {
+        this.isTestingDatabaseConnection = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  async saveDatabaseSettings(): Promise<void> {
+    if (this.isSavingDatabaseSettings || this.isLoadingDatabaseSettings) {
+      return;
+    }
+    this.isSavingDatabaseSettings = true;
+    this.databaseSettingsError = '';
+    this.databaseSettingsMessage = '';
+    try {
+      await this.apiClient.updateDatabaseSettings(this.databaseSettingsRequest());
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseSettingsMessage = 'Database switched. Reloading settings from the selected database…';
+      this.changeDetectorRef.detectChanges();
+      // Recreate every client-side store and cache from the newly active database.
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.databaseSettingsError = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not switch the active database.',
+      );
+    } finally {
+      if (!this.isDestroyed) {
+        this.isSavingDatabaseSettings = false;
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private databaseSettingsRequest(): DatabaseSettingsRequest {
+    return {
+      backend: 'sqlite',
+      database_path: this.databaseSettingsDraft.database_path.trim(),
+      sqlite_lock_timeout_seconds: Number(this.databaseSettingsDraft.sqlite_lock_timeout_seconds),
+    };
+  }
+
+  onDatabaseSettingsDraftChanged(): void {
+    this.databaseConnectionTest = null;
+    this.databaseSettingsError = '';
+    this.databaseSettingsMessage = '';
   }
 
   onRuntimeSettingChanged(): void {

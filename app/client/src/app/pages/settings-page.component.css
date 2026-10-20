@@ -150,6 +150,38 @@
     gap: var(--space-4);
 }
 
+.database-settings__active {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.database-settings__badge {
+    justify-self: start;
+    border: 1px solid #2f7c61;
+    border-radius: 999px;
+    background: rgb(48 116 85 / 16%);
+    color: #a9e8c0;
+    padding: 0.2rem 0.58rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.database-settings__path {
+    overflow-wrap: anywhere;
+    color: #c5d5dc;
+    font-size: 0.78rem;
+}
+
+.database-settings__fields {
+    grid-template-columns: minmax(0, 2fr) minmax(14rem, 1fr);
+}
+
+.database-settings__path-field {
+    grid-column: 1 / -1;
+}
+
 .runtime-settings__group {
     display: grid;
     gap: var(--space-3);

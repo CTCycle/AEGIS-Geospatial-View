@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-09-30
+Last updated: 2026-10-20
 
 ## Environment file
 
@@ -12,7 +12,6 @@ Common keys include:
 
 - `AEGIS_DATA_DIR` (optional; defaults to `data/runtime`; relative
   values are resolved from the repository root)
-- `SQLITE_LOCK_TIMEOUT` (positive seconds; defaults to `60`)
 - `FASTAPI_HOST`
 - `FASTAPI_PORT`
 - `UI_HOST`
@@ -25,22 +24,27 @@ Common keys include:
   deployment into public capabilities marked with the
   `restricted_usage_opt_in` runtime policy)
 
-The SQLite database path is always derived as:
+The data root contains the independent database configuration and, by default,
+the SQLite file:
 
 ```text
+<AEGIS_DATA_DIR or data/runtime>/database-settings.json
 <AEGIS_DATA_DIR or data/runtime>/database.db
 ```
 
-`SQLITE_LOCK_TIMEOUT` controls how long startup and the explicit launcher
-initialization action wait for the adjacent SQLite migration lock. It does not
-change SQL transaction timeouts or database durability settings.
+`database-settings.json` is the only source for the selected database backend,
+database path, and SQLite migration-lock timeout. It is written atomically,
+validated on load, and has a `.bak` recovery copy. If neither the file nor its
+recovery copy exists, built-in defaults select SQLite at `database.db` with a
+60-second migration-lock timeout. The file is never populated from environment
+variables.
 
 ## Runtime configuration
 
-`settings/.env` is limited to bootstrap and deployment values: data-root and
-database-lock settings, service hosts and ports, reload behavior, and other
-process-level switches. It is not the source of application-editable runtime
-blocks.
+`settings/.env` is limited to bootstrap and deployment values: the general
+application data root, service hosts and ports, reload behavior, and other
+process-level switches. It is not the source of database connection settings
+or application-editable runtime blocks.
 
 Application runtime settings are validated typed blocks stored in the SQLite
 `application_runtime_settings` row and exposed through
@@ -52,10 +56,8 @@ the changed fields, and the server merges and validates the patch before one
 atomic commit. Responses never contain credentials or secret values and identify
 when a restart is required.
 
-Older installations with `settings/configurations.json` are migrated once at
-startup: the legacy file is validated, the SQLite row is committed, and only
-then is the file retired. Invalid legacy data fails visibly and remains in
-place for correction; SQLite is not silently replaced with defaults.
+When a database has no runtime-settings row, initialization seeds built-in
+defaults. Runtime settings are never imported from or read from a JSON fallback.
 
 The `agent_execution` runtime block owns the complete native-agent deadline
 policy and exposes 31 editable fields. Defaults are grouped as follows:
@@ -81,8 +83,7 @@ policy and exposes 31 editable fields. Defaults are grouped as follows:
 
 Smaller provider/model limits still win. These values are one typed policy block
 rather than independent environment knobs. Provider request settings are
-injected into the same runtime provider policy, and there is no
-legacy/shadow execution-mode setting.
+injected into the same runtime provider policy.
 
 Agent-only PATCH updates are hot-applied for future work: each new agent run
 reads the latest saved policy and receives an immutable execution-policy

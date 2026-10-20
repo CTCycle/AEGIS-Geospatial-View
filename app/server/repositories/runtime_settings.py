@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
 from typing import Any, Mapping, cast
 
 from pydantic import ValidationError
 from server.common.time import utc_now_naive
-from server.configurations.legacy_runtime_settings import (
-    LegacyRuntimeSettingsError,
-    legacy_runtime_settings_path,
-    load_legacy_runtime_settings,
-    retire_legacy_runtime_settings,
-)
 from server.configurations.settings import AppSettings, RUNTIME_SETTING_BLOCKS
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
@@ -41,14 +34,12 @@ class RuntimeSettingsRepository:
             )
         return settings
 
-    def initialize_defaults(self, *, legacy_path: Path | None = None) -> AppSettings:
+    def initialize_defaults(self) -> AppSettings:
         existing = self.get()
         if existing is not None:
             return existing
 
-        source = Path(legacy_path or legacy_runtime_settings_path())
-        imported = load_legacy_runtime_settings(source)
-        settings = imported or AppSettings()
+        settings = AppSettings()
         payload = self._validated_payload(settings.runtime_payload())
 
         with self._session_factory() as session:
@@ -64,18 +55,10 @@ class RuntimeSettingsRepository:
             )
             session.commit()
 
-        if imported is not None:
-            try:
-                retire_legacy_runtime_settings(source)
-            except LegacyRuntimeSettingsError:
-                # The committed SQLite row is authoritative.  Keep startup
-                # successful if a locked or read-only legacy file cannot be
-                # removed; the next maintenance run can retire it safely.
-                pass
         return self.get_required()
 
-    def seed_required(self, *, legacy_path: Path | None = None) -> AppSettings:
-        return self.initialize_defaults(legacy_path=legacy_path)
+    def seed_required(self) -> AppSettings:
+        return self.initialize_defaults()
 
     def replace(self, settings: AppSettings | Mapping[str, Any]) -> AppSettings:
         candidate = self._coerce_settings(settings)

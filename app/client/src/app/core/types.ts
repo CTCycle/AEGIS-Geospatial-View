@@ -1136,6 +1136,24 @@ export interface RuntimeSettingsUpdateRequest {
   agent_execution?: Partial<RuntimeAgentExecutionSettings>;
 }
 
+export interface DatabaseSettingsRequest {
+  backend: 'sqlite';
+  database_path: string;
+  sqlite_lock_timeout_seconds: number;
+}
+
+export interface DatabaseSettingsResponse extends DatabaseSettingsRequest {
+  active: boolean;
+}
+
+export interface DatabaseConnectionTestResponse {
+  ok: boolean;
+  backend: 'sqlite';
+  database_path: string;
+  schema_status: 'ready' | 'upgradable' | 'empty';
+  message: string;
+}
+
 export interface OllamaHealthResponse {
   ok: boolean | null;
   detail: string | null;

@@ -616,6 +616,89 @@
       </section>
     }
 
+    @if (activeSection === 'database') {
+      <section
+        id="settings-panel-database"
+        class="settings-page__section-panel settings-page__section-panel--runtime"
+        aria-labelledby="database-settings-heading"
+      >
+        <h2 class="page-title" id="database-settings-heading">Database</h2>
+        <p class="settings-intro">Choose the database AEGIS uses for application settings and data. Each database remains independent; switching does not copy data.</p>
+
+        <section class="runtime-settings__group" aria-labelledby="active-database-heading">
+          <h3 id="active-database-heading">Active database</h3>
+          @if (databaseSettings) {
+            <div class="database-settings__active">
+              <span class="database-settings__badge">Active · SQLite</span>
+              <code class="database-settings__path">{{ databaseSettings.database_path }}</code>
+            </div>
+          } @else if (isLoadingDatabaseSettings) {
+            <p class="settings-hint" role="status">Loading database status…</p>
+          }
+        </section>
+
+        <section class="runtime-settings__group" aria-labelledby="database-connection-heading">
+          <h3 id="database-connection-heading">SQLite connection</h3>
+          <p class="settings-hint">SQLite is the database backend supported by this installation. A connection test checks file access, integrity, and schema without changing the selected database.</p>
+          <div class="runtime-settings__fields database-settings__fields">
+            <label class="database-settings__path-field">
+              Database file path
+              <input
+                class="settings-control"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                required
+                [disabled]="isLoadingDatabaseSettings || isSavingDatabaseSettings"
+                [(ngModel)]="databaseSettingsDraft.database_path"
+                (ngModelChange)="onDatabaseSettingsDraftChanged()"
+              />
+            </label>
+            <label>
+              SQLite migration lock timeout (seconds)
+              <input
+                class="settings-control"
+                type="number"
+                min="1"
+                step="1"
+                required
+                [disabled]="isLoadingDatabaseSettings || isSavingDatabaseSettings"
+                [(ngModel)]="databaseSettingsDraft.sqlite_lock_timeout_seconds"
+                (ngModelChange)="onDatabaseSettingsDraftChanged()"
+              />
+            </label>
+          </div>
+          <p class="settings-hint">When applying a new path, AEGIS initializes an empty database or upgrades a recognized schema. It never copies settings or records from the current database.</p>
+          <p class="settings-hint">Switching is blocked while requests, open WebSockets, background jobs, or agent runs are active. Retry when the app is idle.</p>
+          <div class="settings-actions">
+            <button
+              type="button"
+              class="secondary-button"
+              [disabled]="isLoadingDatabaseSettings || isTestingDatabaseConnection || isSavingDatabaseSettings || !databaseSettingsDraft.database_path.trim()"
+              (click)="testDatabaseConnection()"
+            >{{ isTestingDatabaseConnection ? 'Testing…' : 'Test connection' }}</button>
+            <button
+              type="button"
+              class="primary-button"
+              [disabled]="isLoadingDatabaseSettings || isTestingDatabaseConnection || isSavingDatabaseSettings || !databaseSettingsDraft.database_path.trim() || databaseSettingsDraft.sqlite_lock_timeout_seconds < 1"
+              (click)="saveDatabaseSettings()"
+            >{{ isSavingDatabaseSettings ? 'Switching…' : 'Apply and switch' }}</button>
+          </div>
+          @if (databaseConnectionTest) {
+            <p class="settings-inline-status" role="status" aria-live="polite">
+              Test passed · {{ databaseConnectionTest.schema_status }} schema. {{ databaseConnectionTest.message }}
+            </p>
+          }
+          @if (databaseSettingsMessage) {
+            <p class="settings-inline-status" role="status" aria-live="polite">{{ databaseSettingsMessage }}</p>
+          }
+          @if (databaseSettingsError) {
+            <p class="settings-inline-status settings-inline-status--error" role="alert">{{ databaseSettingsError }}</p>
+          }
+        </section>
+      </section>
+    }
+
     <div class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</div>
     @if (runtimeSettingsError) {
       <p class="settings-inline-status settings-inline-status--error" role="alert">{{ runtimeSettingsError }}</p>
