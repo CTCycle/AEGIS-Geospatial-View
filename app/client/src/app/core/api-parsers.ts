@@ -766,6 +766,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
   const normalizedData = data ?? undefined;
   return {
     id: String(value.id),
+    value_encoding: parseValueEncoding(value['value_encoding']),
     instance_id: typeof value.instance_id === 'string' ? value.instance_id : undefined,
     capability_id: typeof value.capability_id === 'string' ? value.capability_id : undefined,
     label: String(value.label ?? value.id),
@@ -2333,4 +2334,15 @@ function parseAnalysisIntent(value: unknown, endpoint: string): AgentGoal['analy
     return apiContract(endpoint, 'analysis is invalid', value);
   }
   return {kind: kind as 'rank' | 'hotspot' | 'threshold', metric: requireApiString(item, 'metric', endpoint), order: requireApiString(item, 'order', endpoint), top_k: top};
+}
+
+function parseValueEncoding(value: unknown): MapOverlayEntry['value_encoding'] {
+  if (!isRecord(value)) return undefined;
+  const mode = value['mode'];
+  const field = value['field'];
+  const min = value['min'];
+  const max = value['max'];
+  if ((mode !== 'graduated' && mode !== 'heatmap') || typeof field !== 'string' || !field.trim()
+      || typeof min !== 'number' || !Number.isFinite(min) || typeof max !== 'number' || !Number.isFinite(max) || min > max) return undefined;
+  return {mode, field, min, max};
 }

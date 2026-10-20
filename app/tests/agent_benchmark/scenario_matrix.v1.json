@@ -231,6 +231,38 @@
       "dimensions": {"intent": "location_lookup", "dataset": "location", "geographic_scale": "city", "temporal": "current", "ambiguity": "none", "tool_count": "one", "availability": "supported", "conversation": "fresh"},
       "expected": {"task_classes": ["map_search"], "capability_families": ["location"], "clarification": "not_required", "minimum_tool_count": 1, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
       "assertions": ["provider_reachable", "record_upstream_status"]
+    },
+    {
+      "id": "discovery-europe-rain",
+      "lane": "model_in_loop",
+      "prompt": "Where in Europe did it rain most today? Show a map.",
+      "dimensions": {"intent": "regional_discovery", "dataset": "weather", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 3, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "discovery-global-heat",
+      "lane": "model_in_loop",
+      "prompt": "Show the highest temperatures worldwide today.",
+      "dimensions": {"intent": "regional_discovery", "dataset": "weather", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 3, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "discovery-europe-seismic",
+      "lane": "model_in_loop",
+      "prompt": "Show hotspots of European seismic activity this week.",
+      "dimensions": {"intent": "regional_discovery", "dataset": "earthquakes", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["earthquakes"], "clarification": "not_required", "minimum_tool_count": 3, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
+    },
+    {
+      "id": "discovery-southern-europe-dry-heat",
+      "lane": "model_in_loop",
+      "prompt": "Show Southern Europe above 30 degrees C with no rain today.",
+      "dimensions": {"intent": "regional_discovery", "dataset": "weather", "geographic_scale": "region", "temporal": "current", "ambiguity": "none", "tool_count": "multiple", "availability": "supported", "conversation": "fresh"},
+      "expected": {"task_classes": ["map_search"], "capability_families": ["weather"], "clarification": "not_required", "minimum_tool_count": 3, "rendering_types": ["map", "point"], "provenance_required": true, "fabrication_forbidden": true},
+      "assertions": ["rendered_map", "valid_arguments"]
     }
   ]
 }

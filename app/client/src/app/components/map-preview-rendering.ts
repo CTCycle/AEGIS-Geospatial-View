@@ -1,3 +1,4 @@
+import type { ExpressionSpecification } from 'maplibre-gl';
 import { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 
@@ -305,7 +306,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
       }
 
       if (
-        ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
+        ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points', 'circles'].includes(renderingMode)
         && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
       ) {
         statuses.push(noResultsStatus(overlay));
@@ -397,7 +398,8 @@ export const getOverlayLayerIds = (overlay: OverlayEntry): string[] => {
   const renderingMode = String(
     overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
   ).toLowerCase();
-  if (renderingMode === 'clustered-points') {
+  if (overlay.value_encoding?.mode === 'heatmap') return [`${layerId}-heatmap`];
+  if (renderingMode === 'clustered-points' && !overlay.value_encoding) {
     return [
       `${layerId}-clusters`,
       `${layerId}-cluster-count`,
@@ -439,6 +441,7 @@ export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
     'geojson',
     'arcgis-geojson',
     'clustered-points',
+    'circles',
     'choropleth',
     'camera-points',
   ]);
@@ -480,10 +483,27 @@ const addGeoJsonOverlayLayer = (
   map.addSource(sourceId, {
     type: 'geojson',
     data: (overlay.data || overlay.url!) as unknown as GeoJSON,
-    ...(renderingMode === 'clustered-points'
+    ...(renderingMode === 'clustered-points' && !overlay.value_encoding
       ? { cluster: true, clusterMaxZoom: 14, clusterRadius: 50 }
       : {}),
   });
+  const encoding = overlay.value_encoding;
+  if (encoding) {
+    const value: ExpressionSpecification = ['to-number', ['get', encoding.field], encoding.min];
+    if (encoding.mode === 'heatmap') {
+      map.addLayer({id: `${layerId}-heatmap`, source: sourceId, type: 'heatmap', paint: {
+        'heatmap-weight': encoding.min === encoding.max ? 1 : ['interpolate', ['linear'], value, encoding.min, 0, encoding.max, 1],
+        'heatmap-radius': 30, 'heatmap-opacity': opacity,
+      }});
+    } else {
+      map.addLayer({id: layerId, source: sourceId, type: 'circle', paint: {
+        'circle-color': encoding.min === encoding.max ? '#ef4444' : ['interpolate', ['linear'], value, encoding.min, '#38bdf8', encoding.max, '#ef4444'],
+        'circle-radius': encoding.min === encoding.max ? 9 : ['interpolate', ['linear'], value, encoding.min, 4, encoding.max, 16],
+        'circle-opacity': opacity, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff',
+      }});
+    }
+    return true;
+  }
   const geometryType = overlay.geometry_type?.toLowerCase() || '';
   if (renderingMode === 'camera-points') {
     map.addLayer({
