@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Geospatial Access
 
@@ -63,8 +63,8 @@ as a fallback.
 
 ### Runtime Settings
 
-The seven Settings destinations are Models, Model Providers, Geospatial Access,
-Application, Map & Search, Data Sources, and Agent Runtime. Runtime sections
+The eight Settings destinations are Models, Model Providers, Geospatial Access,
+Application, Map & Search, Data Sources, Agent Runtime, and Database. Runtime sections
 edit typed, SQLite-backed settings blocks through
 the runtime settings API. Settings save on the fly: runtime fields autosave
 shortly after a value is committed and when leaving the page, API keys and the
@@ -72,6 +72,19 @@ Ollama URL save when the field is committed (blur or Enter), and clearing a
 saved key remains an explicit action. Each save submits only changed blocks and
 fields; the server validates and commits the update atomically. Credentials remain in the
 separate encrypted credential workflow.
+
+### Database
+
+Database shows the active SQLite file, provides the SQLite migration-lock
+timeout, and can test another file's access, integrity, and schema before
+switching. Applying a switch initializes an empty database or migrates a
+recognized older schema. The app refuses to switch while API or WebSocket work,
+queued or running jobs, or active agent runs are present. Each file keeps its
+own settings and records; switching never copies data. After activation the
+browser reloads so all client-side settings come from the selected database.
+SQLite is the only database backend currently implemented. Changing the
+application data root or process-level service configuration still requires a
+server restart.
 
 Agent Runtime contains 31 controls covering execution budgets, failure
 recovery, timeouts and retries, and advanced limits. Their defaults and the

@@ -1,59 +1,95 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-import pytest
-
-from server.common.paths import ROOT_DIR, resolve_database_file_path
+from server.common.paths import resolve_database_configuration_path
 from server.configurations import build_database_settings
+from server.configurations import database_configuration as database_config
 
-###############################################################################
-def test_database_settings_use_default_sqlite_path(monkeypatch) -> None:
-    monkeypatch.delenv("AEGIS_DATA_DIR", raising=False)
-    monkeypatch.delenv("SQLITE_LOCK_TIMEOUT", raising=False)
 
-    settings = build_database_settings()
+def _isolate_configuration(monkeypatch, tmp_path: Path) -> None:
+    data_root = tmp_path / "runtime"
+    monkeypatch.setenv("AEGIS_DATA_DIR", str(data_root))
 
-    assert settings.database_path == str(
-        ROOT_DIR / "data" / "runtime" / "database.db"
-    )
-    assert settings.database_path == str(resolve_database_file_path())
-    assert settings.sqlite_lock_timeout_seconds == 60
 
-###############################################################################
-def test_database_settings_use_short_data_directory_override(
+def test_first_run_writes_database_only_configuration_and_uses_its_values(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("AEGIS_DATA_DIR", str(tmp_path))
+    _isolate_configuration(monkeypatch, tmp_path)
+
+    settings = build_database_settings()
+    config_path = resolve_database_configuration_path()
+    stored = json.loads(config_path.read_text(encoding="utf-8"))
+
+    assert settings.database_path == str(tmp_path / "runtime" / "database.db")
+    assert settings.sqlite_lock_timeout_seconds == 60
+    assert stored == {
+        "schema_version": 1,
+        "backend": "sqlite",
+        "database_path": str(tmp_path / "runtime" / "database.db"),
+        "sqlite_lock_timeout_seconds": 60,
+    }
+    assert not set(stored) & {"FASTAPI_PORT", "UI_PORT", "application_settings"}
+
+
+def test_existing_database_configuration_is_the_only_runtime_source(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _isolate_configuration(monkeypatch, tmp_path)
+    database_config.save_database_configuration(
+        database_config.DatabaseConfiguration(
+            database_path=str(tmp_path / "chosen.sqlite"),
+            sqlite_lock_timeout_seconds=15,
+        )
+    )
 
     settings = build_database_settings()
 
-    assert settings.database_path == str(tmp_path / "database.db")
+    assert settings.database_path == str(tmp_path / "chosen.sqlite")
+    assert settings.sqlite_lock_timeout_seconds == 15
 
 
-def test_database_settings_resolve_relative_data_directory_from_repository_root(
+def test_invalid_primary_recovers_from_valid_backup(
     monkeypatch,
+    tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("AEGIS_DATA_DIR", "alternate-data")
+    _isolate_configuration(monkeypatch, tmp_path)
+    config_path = resolve_database_configuration_path()
+    config_path.parent.mkdir(parents=True)
+    backup_path = config_path.with_name(f"{config_path.name}.bak")
+    recovered = database_config.DatabaseConfiguration(
+        database_path=str(tmp_path / "recovered.sqlite"),
+        sqlite_lock_timeout_seconds=23,
+    )
+    backup_path.write_text(recovered.model_dump_json(), encoding="utf-8")
+    config_path.write_text('{"schema_version": "bad"}', encoding="utf-8")
 
-    settings = build_database_settings()
+    loaded = database_config.load_database_configuration()
 
-    assert settings.database_path == str(ROOT_DIR / "alternate-data" / "database.db")
+    assert loaded == recovered
+    assert database_config._read_configuration(config_path) == recovered
 
-###############################################################################
-def test_database_settings_read_sqlite_lock_timeout(monkeypatch) -> None:
-    monkeypatch.setenv("SQLITE_LOCK_TIMEOUT", "12")
 
-    assert build_database_settings().sqlite_lock_timeout_seconds == 12
-
-###############################################################################
-@pytest.mark.parametrize("value", ["0", "-1", "not-an-integer"])
-def test_database_settings_reject_invalid_sqlite_lock_timeout(
+def test_atomic_save_keeps_last_valid_configuration_as_backup(
     monkeypatch,
-    value: str,
+    tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("SQLITE_LOCK_TIMEOUT", value)
+    _isolate_configuration(monkeypatch, tmp_path)
+    first = database_config.DatabaseConfiguration(
+        database_path=str(tmp_path / "one.sqlite")
+    )
+    second = database_config.DatabaseConfiguration(
+        database_path=str(tmp_path / "two.sqlite")
+    )
 
-    with pytest.raises(RuntimeError, match="SQLITE_LOCK_TIMEOUT"):
-        build_database_settings()
+    database_config.save_database_configuration(first)
+    database_config.save_database_configuration(second)
+
+    config_path = resolve_database_configuration_path()
+    backup_path = config_path.with_name(f"{config_path.name}.bak")
+    assert database_config._read_configuration(config_path) == second
+    assert database_config._read_configuration(backup_path) == first
+    assert not list(config_path.parent.glob("*.tmp"))

@@ -12,6 +12,7 @@ LOGS_PATH = DATA_PATH / "logs"
 ENV_FILE_PATH = SETTING_PATH / ".env"
 ENV_EXAMPLE_FILE_PATH = SETTING_PATH / ".env.example"
 DATABASE_FILENAME = "database.db"
+DATABASE_CONFIGURATION_FILENAME = "database-settings.json"
 CLIENT_DIST_PATH = APP_DIR / "client" / "dist" / "browser"
 CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
@@ -35,6 +36,10 @@ def resolve_runtime_data_root() -> Path:
 ###############################################################################
 def resolve_database_file_path() -> Path:
     return resolve_runtime_data_root() / DATABASE_FILENAME
+
+
+def resolve_database_configuration_path() -> Path:
+    return resolve_runtime_data_root() / DATABASE_CONFIGURATION_FILENAME
 
 
 ROOT_ROUTE = "/"

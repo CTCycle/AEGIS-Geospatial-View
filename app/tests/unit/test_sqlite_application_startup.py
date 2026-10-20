@@ -10,6 +10,7 @@ import server.app as app_module
 from server.configurations import environment
 from server.repositories.model_settings import ModelSettingsRepository
 
+
 ###############################################################################
 def test_application_starts_against_isolated_sqlite_database(
     monkeypatch,
@@ -39,6 +40,7 @@ def test_application_starts_against_isolated_sqlite_database(
 
     database_path = data_dir / "database.db"
     assert database_path.is_file()
+    assert (data_dir / "database-settings.json").is_file()
     with sqlite3.connect(database_path) as connection:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
@@ -113,3 +115,89 @@ def test_dynamic_provider_outage_does_not_block_isolated_application_startup(
     assert selected_settings[0].agent_model_provider == "deepseek"
     assert network_attempts == []
     assert (data_dir / "database.db").is_file()
+
+
+def test_database_switch_keeps_each_database_settings_independent_and_survives_restart(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    data_dir = tmp_path / "runtime"
+    env_file = tmp_path / "settings" / ".env"
+    example_file = tmp_path / "settings" / ".env.example"
+    env_file.parent.mkdir()
+    env_file.write_text(f"AEGIS_DATA_DIR={data_dir}\n", encoding="utf-8")
+    example_file.write_text(env_file.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(environment, "ENV_FILE_PATH", env_file)
+    monkeypatch.setattr(environment, "ENV_EXAMPLE_FILE_PATH", example_file)
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
+    monkeypatch.delenv("AEGIS_DATA_DIR", raising=False)
+
+    environment.reset_environment_bootstrap_for_tests()
+    try:
+        with TestClient(app_module.create_app()) as client:
+            original_path = str(data_dir / "database.db")
+            assert (
+                client.get("/api/settings/database").json()["database_path"]
+                == original_path
+            )
+            assert (
+                client.patch(
+                    "/api/settings/runtime",
+                    json={"chat": {"max_history_messages": 18}},
+                ).status_code
+                == 200
+            )
+
+            target = {
+                "backend": "sqlite",
+                "database_path": str(data_dir / "alternate.sqlite"),
+                "sqlite_lock_timeout_seconds": 60,
+            }
+            tested = client.post("/api/settings/database/test", json=target)
+            assert tested.status_code == 200
+            assert tested.json()["schema_status"] == "empty"
+
+            switched = client.put("/api/settings/database", json=target)
+            assert switched.status_code == 200
+            assert (
+                client.get("/api/settings/runtime").json()["chat"][
+                    "max_history_messages"
+                ]
+                == 12
+            )
+            assert (
+                client.patch(
+                    "/api/settings/runtime",
+                    json={"chat": {"max_history_messages": 8}},
+                ).status_code
+                == 200
+            )
+
+            switched_back = client.put(
+                "/api/settings/database",
+                json={
+                    **target,
+                    "database_path": original_path,
+                },
+            )
+            assert switched_back.status_code == 200
+            assert (
+                client.get("/api/settings/runtime").json()["chat"][
+                    "max_history_messages"
+                ]
+                == 18
+            )
+    finally:
+        environment.reset_environment_bootstrap_for_tests()
+
+    with TestClient(app_module.create_app()) as restarted_client:
+        assert restarted_client.get("/api/settings/database").json()[
+            "database_path"
+        ] == str(data_dir / "database.db")
+        assert (
+            restarted_client.get("/api/settings/runtime").json()["chat"][
+                "max_history_messages"
+            ]
+            == 18
+        )
+    assert (data_dir / "database-settings.json").is_file()

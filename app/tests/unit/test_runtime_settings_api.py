@@ -18,7 +18,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, RuntimeSettingsRepository]:
     database = SQLiteRepository(DatabaseSettings(str(tmp_path / "runtime.db")))
     Base.metadata.create_all(database.engine)
     repository = RuntimeSettingsRepository(database)
-    repository.initialize_defaults(legacy_path=tmp_path / "missing.json")
+    repository.initialize_defaults()
     application = FastAPI()
     application.include_router(router, prefix="/api")
     application.state.runtime_settings_service = RuntimeSettingsService(repository)

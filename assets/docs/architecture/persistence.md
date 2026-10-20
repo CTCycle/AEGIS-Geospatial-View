@@ -1,23 +1,33 @@
 # Persistence
 
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## SQLite-only relational storage
 
-AEGIS uses one local SQLite database. The application resolves the database
-file through `server.common.paths.resolve_database_file_path()`:
+AEGIS currently supports one relational backend: SQLite. Its connection
+configuration is stored in the database-independent file
+`database-settings.json` inside the application data root:
 
-- default: `<repo>/data/runtime/database.db`
+- default config: `<repo>/data/runtime/database-settings.json`
+- default database: `<repo>/data/runtime/database.db`
 - optional data-root override: `AEGIS_DATA_DIR`
+
+The file contains only the backend (`sqlite`), database file path, and SQLite
+migration-lock timeout. It is schema-validated, atomically replaced, and keeps
+a `.bak` recovery copy. SQLite has no database username or password. All other
+user-editable application settings remain in the active database.
 
 `app/server/app.py` and `app/scripts/initialize_database.py` construct one
 `SQLiteRepository` directly from `DatabaseSettings`. That concrete object owns
 the SQLAlchemy engine and session factory and is passed to domain repositories.
-There is no backend selector, provider registry, or generic database contract.
+`DatabaseSettings` is loaded from that file before the database is initialized.
+There is no alternate backend implementation or driver exposed in Settings.
 
 ```mermaid
 flowchart TD
-    ENV[settings/.env or process environment]
+    ENV[Bootstrap and deployment environment]
+    ROOT[Application data root]
+    CONFIG[database-settings.json]
     SETTINGS[DatabaseSettings]
     DB[SQLiteRepository]
     ENGINE[SQLite engine and sessionmaker]
@@ -27,7 +37,9 @@ flowchart TD
     REPOS[Domain repositories]
     SERVICES[Services and application runtimes]
 
-    ENV --> SETTINGS
+    ENV --> ROOT
+    ROOT --> CONFIG
+    CONFIG --> SETTINGS
     SETTINGS --> DB
     DB --> ENGINE
     DB --> MIG
@@ -94,9 +106,23 @@ constraints. Payload columns use SQLAlchemy `JSON` directly.
 The repository/service boundary remains intentional: repositories translate
 SQLite/ORM records into domain snapshots, while services own orchestration and
 business behavior. Persistence construction remains explicit at the
-application composition root. `application_runtime_settings` is the sole
-persisted owner for application-editable runtime blocks; `.env` remains the
-bootstrap/deployment boundary.
+application composition root. `application_runtime_settings` is the persisted
+owner for application-editable runtime blocks. Model preferences, credentials,
+and domain data also belong to the selected SQLite database; `.env` contains
+only bootstrap and deployment values such as the data root and service ports.
+
+## Runtime database switching
+
+Settings tests the selected SQLite file for integrity and a recognized Alembic
+revision before activation. Empty files are initialized and recognized older
+schemas are migrated by the existing guarded initializer. A candidate runtime
+is built before the active runtime is replaced; activation failures restore the
+previous connection configuration and runtime. The app rejects a switch while
+API or WebSocket work, queued or running jobs, or active agent runs are in
+flight. Each database retains its own settings and data. Switching does not
+copy records between files, and the browser reloads its client stores after a
+successful switch. Changing the data-root environment or process-level service
+configuration still requires restarting the application.
 
 ### Native conversation and presentation contracts
 

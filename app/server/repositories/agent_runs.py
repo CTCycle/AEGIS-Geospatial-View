@@ -321,6 +321,17 @@ class AgentRunRepository:
         ]
 
     # -------------------------------------------------------------------------
+    def has_active_runs(self) -> bool:
+        """Return whether any persisted conversation run still owns its active slot."""
+
+        with self._session_factory() as session:
+            record_id = session.scalar(
+                select(AgentRunRecord.id)
+                .where(AgentRunRecord.active_slot == 1)
+                .limit(1)
+            )
+        return record_id is not None
+
     def list_runs_for_conversation(
         self,
         conversation_id: str,

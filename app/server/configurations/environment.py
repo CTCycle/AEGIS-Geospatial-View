@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 from server.common.logger import logger
 from server.common.paths import ENV_EXAMPLE_FILE_PATH, ENV_FILE_PATH
+
 
 ###############################################################################
 @dataclass
@@ -16,10 +18,12 @@ class _EnvironmentState:
     lock: Lock = field(default_factory=Lock)
     bootstrapped: bool = False
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def _bootstrap_state() -> _EnvironmentState:
     return _EnvironmentState()
+
 
 ###############################################################################
 def _create_environment_file(path: Path) -> None:
@@ -36,6 +40,7 @@ def _create_environment_file(path: Path) -> None:
 
     logger.info("Created %s from %s.", path, template_path)
 
+
 ###############################################################################
 def ensure_environment_loaded(*, force: bool = False) -> Path | None:
     state = _bootstrap_state()
@@ -47,12 +52,15 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
 
         if not path.exists():
             _create_environment_file(path)
-        # Explicit process values, including AEGIS_DATA_DIR, take precedence
-        # over the checked-in local template.
-        load_dotenv(dotenv_path=path, override=False)
+        # The data-root and process settings remain environment configuration.
+        for name, value in dotenv_values(path).items():
+            if value is None:
+                continue
+            os.environ.setdefault(name, value)
 
         state.bootstrapped = True
         return path
+
 
 ###############################################################################
 def reset_environment_bootstrap_for_tests() -> None:

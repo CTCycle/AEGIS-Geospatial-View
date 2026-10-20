@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 
 from server.common.logger import logger
 from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
@@ -33,14 +32,11 @@ def initialize_database(
     database: SQLiteRepository,
     *,
     on_ready: Callable[[], None] | None = None,
-    legacy_settings_path: Path | None = None,
 ) -> MigrationResult:
     def seed_required_data() -> None:
         seed_credential_encryption_material(database)
         ModelSettingsRepository(database).seed_required()
-        RuntimeSettingsRepository(database).seed_required(
-            legacy_path=legacy_settings_path
-        )
+        RuntimeSettingsRepository(database).seed_required()
         if on_ready is not None:
             on_ready()
 

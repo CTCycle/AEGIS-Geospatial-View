@@ -17,6 +17,8 @@ import {
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
   API_RUNTIME_SETTINGS_PATH,
+  API_DATABASE_SETTINGS_PATH,
+  API_DATABASE_CONNECTION_TEST_PATH,
 } from './constants';
 import {
   parseCatalogResponse,
@@ -33,6 +35,8 @@ import {
   parseModelLibraryResponse,
   parseModelSettingsResponse,
   parseRuntimeSettingsResponse,
+  parseDatabaseSettingsResponse,
+  parseDatabaseConnectionTestResponse,
   parseOllamaHealthResponse,
   parseOllamaRefreshResponse,
   parseRunTraceResponse,
@@ -55,6 +59,9 @@ import {
   ModelSettingsUpdateRequest,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdateRequest,
+  DatabaseSettingsRequest,
+  DatabaseSettingsResponse,
+  DatabaseConnectionTestResponse,
   RunTraceResponse,
   AgentRunSnapshot,
   OllamaHealthResponse,
@@ -313,6 +320,36 @@ export const updateRuntimeSettings = async (
     body: JSON.stringify(payload),
   });
   return parseRuntimeSettingsResponse(data);
+};
+
+export const fetchDatabaseSettings = async (): Promise<DatabaseSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_DATABASE_SETTINGS_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  return parseDatabaseSettingsResponse(data);
+};
+
+export const testDatabaseConnection = async (
+  payload: DatabaseSettingsRequest,
+): Promise<DatabaseConnectionTestResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_DATABASE_CONNECTION_TEST_PATH}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseDatabaseConnectionTestResponse(data);
+};
+
+export const updateDatabaseSettings = async (
+  payload: DatabaseSettingsRequest,
+): Promise<DatabaseSettingsResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_DATABASE_SETTINGS_PATH}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseDatabaseSettingsResponse(data);
 };
 
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
