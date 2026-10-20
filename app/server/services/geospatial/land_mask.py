@@ -29,7 +29,9 @@ def country_shapes() -> dict[str, Geometry]:
 ###############################################################################
 @lru_cache(maxsize=64)
 def land_mask(
-    bbox: tuple[float, float, float, float], countries: tuple[str, ...] = ()
+    bbox: tuple[float, float, float, float],
+    countries: tuple[str, ...] = (),
+    buffer_deg: float = COAST_BUFFER_DEG,
 ) -> LandMask:
     """Land inside the bbox, restricted to member countries when given."""
     shapes = country_shapes()
@@ -37,5 +39,6 @@ def land_mask(
     if unknown:
         raise ValueError(f"Unknown country codes for land mask: {', '.join(unknown)}")
     members = [shapes[code] for code in countries] if countries else list(shapes.values())
-    # A small buffer keeps coastal cells that the simplified coastline cuts off.
-    return prep(unary_union(members).intersection(box(*bbox)).buffer(COAST_BUFFER_DEG))
+    # The default buffer keeps coastal cells the simplified coastline cuts off;
+    # callers widen it to keep offshore observations near the region.
+    return prep(unary_union(members).intersection(box(*bbox)).buffer(buffer_deg))

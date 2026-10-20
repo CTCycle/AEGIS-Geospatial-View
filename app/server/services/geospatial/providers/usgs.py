@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import Any
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+from shapely.geometry import Point
+
 from server.common.typing import is_json_array, is_json_object, json_object
+from server.services.catalog.loader import find_macro_region_entry
+from server.services.geospatial.land_mask import land_mask
 
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -24,6 +29,8 @@ from server.services.geospatial.spatial_constraints import geodesic_distance_m
 EARTHQUAKE_FDSN_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 EARTHQUAKE_RANGE_LIMIT = 2000
 EARTHQUAKE_RANGE_MAX_DAYS = 366
+# Events within about 50 km of a macro region's member countries count as in it.
+REGION_OFFSHORE_BUFFER_DEG = 0.5
 
 ###############################################################################
 class USGSProvider(GeospatialProvider):
@@ -126,6 +133,7 @@ class USGSProvider(GeospatialProvider):
         truncated = len(features) >= EARTHQUAKE_RANGE_LIMIT
         features = _filter_features_to_bbox(features, request.bbox)
         features = _filter_features_to_radius(features, request.params)
+        features, region_coverage = await _filter_features_to_region(features, request)
         times = [
             value
             for value in (feature.get("time") for feature in features)
@@ -153,7 +161,8 @@ class USGSProvider(GeospatialProvider):
             result_status="valid_empty" if not features else "ok",
             result_type="features",
             observation_time=observation_time,
-            coverage={**_earthquake_coverage(request, truncated=truncated, note=self.COMPLETENESS_NOTE), "temporal_scope_satisfied": True},
+            coverage={**_earthquake_coverage(request, truncated=truncated, note=self.COMPLETENESS_NOTE),
+                      **region_coverage, "temporal_scope_satisfied": True},
             source_url=features_url,
         )
 
@@ -435,6 +444,29 @@ def _filter_features_to_radius(
             <= radius_m
         )
     ]
+
+
+async def _filter_features_to_region(
+    features: list[dict[str, object]], request: ProviderRequest
+) -> tuple[list[dict[str, object]], dict[str, Any]]:
+    """Keep events on or near a macro region's member countries.
+
+    A bbox alone over-covers (Europe would include Anatolia); the offshore
+    buffer keeps events just off member coasts.
+    """
+
+    region = find_macro_region_entry(str(request.params.get("macro_region") or ""))
+    if region is None or not region.countries or request.bbox is None:
+        return features, {}
+    mask = await asyncio.to_thread(land_mask, request.bbox, region.countries, REGION_OFFSHORE_BUFFER_DEG)
+    kept = [
+        feature for feature in features
+        if (latitude := _float_or_none(feature.get("latitude"))) is not None
+        and (longitude := _float_or_none(feature.get("longitude"))) is not None
+        and mask.contains(Point(longitude, latitude))
+    ]
+    return kept, {"region": region.name, "region_offshore_buffer_deg": REGION_OFFSHORE_BUFFER_DEG,
+                  "excluded_outside_region_events": len(features) - len(kept)}
 
 
 def _min_magnitude(request: ProviderRequest) -> float | None:
