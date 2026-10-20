@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-10-18
+Last updated: 2026-10-20
 
 ## Summary
 
@@ -279,3 +279,36 @@ proof, credentialed geospatial provider runs, and full browser/API execution
 remain explicit validation gates where the environment is required. Native
 iteration checkpoints are persisted in the internal run event log and active
 runs are requeued on application startup.
+
+## Intent-driven regional investigation
+
+Routes separate geography (`location_mode`: `none`, `target`, `search_area`) from
+analysis (`rank`, `hotspot`, `threshold`, with metric, order and top_k 1–25).
+The place is the subject in target mode; in search-area mode the investigation
+finds result locations inside the requested area. An unspecified area becomes
+World. A static alias-only macro-region catalog binds an ordinary
+`ResolvedLocation` with a bbox at bootstrap. Countries such as Italy retain the
+normal resolver; ambiguous city names still require clarification. Earlier
+location references cannot satisfy a different search area.
+
+Analysis uses existing tools: retrieve evidence, sort and limit for ranks,
+`grid_aggregate` for hotspots, or `attribute_filter` for thresholds, then map the
+derived reference with `value_encoding` and `fit_evidence`. Provider operations
+remain retrieval primitives; analysis names are not provider operations.
+`search_area_bound` and `result_locations_derived` are server-owned completion
+obligations. A map is unavailable until a located or valid-empty transform exists.
+
+Open-Meteo area queries use at most 100 grid cell centres in one cached request.
+Hourly accumulation excludes future hours; numeric values retain units and
+per-point local time windows. Coverage identifies model estimates, requested and
+usable samples, spacing, excluded sea points, and missing data. USGS accepts
+`filters.min_magnitude` and reports truncation and catalog completeness.
+Final answers must disclose these boundaries and describe sampled extrema as
+sampled, not verified regional maxima. Unlabeled grid results use coordinates.
+
+Limitations: visual-clue image upload is deferred. Static rectangular bboxes
+over-cover (Europe includes parts of North Africa and Turkey); sampling misses
+local extremes and World sampling is roughly 25 degrees. Open-Meteo values are
+model estimates; elevation zero is only an approximate sea heuristic. Outside
+the US, USGS is generally complete only above about M4.5, so event counts are lower bounds.
+Reverse-geocoded result labels remain a follow-up.
