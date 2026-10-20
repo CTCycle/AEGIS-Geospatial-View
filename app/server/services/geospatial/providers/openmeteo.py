@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_array, json_object
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import math
 from typing import Any, Literal, cast
 
 from server.configurations.settings import OpenMeteoSettings
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
-from server.services.geospatial.providers._request import request_center
+from server.services.geospatial.providers._request import request_center, grid_points
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
@@ -33,6 +34,8 @@ class OpenMeteoProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        if request.params.get("sampling") == "area" and request.bbox is not None and request.capability_id == "openmeteo_weather_forecast":
+            return await self._weather_grid(request)
         latitude, longitude = request_center(request)
         try:
             if "elevation" in request.capability_id:
@@ -93,6 +96,71 @@ class OpenMeteoProvider(GeospatialProvider):
             ),
             result_type="features",
             partial=partial,
+        )
+
+    async def _weather_grid(self, request: ProviderRequest) -> ProviderResponse:
+        assert request.bbox is not None
+        points, spacing = grid_points(request.bbox)
+        now = datetime.now(UTC)
+        past_days = min(14, max(0, math.ceil(max(0.0, (now - request.time).total_seconds() - 60) / 86400))) if request.time else 0
+        try:
+            locations = await self.service.get_weather_grid(points, past_days)
+        except (OpenMeteoServiceError, ValueError) as exc:
+            raise ProviderUnavailableError(str(exc)) from exc
+        features: list[dict[str, Any]] = []
+        excluded = 0
+        partial = len(locations) != len(points)
+        windows: list[tuple[str, str]] = []
+        for index, payload in enumerate(locations[:len(points)]):
+            if payload.get("elevation") == 0:
+                excluded += 1
+                continue
+            current = json_object(payload.get("current"))
+            hourly = json_object(payload.get("hourly"))
+            current_time = current.get("time")
+            times = hourly.get("time", [])
+            temperatures = hourly.get("temperature_2m", [])
+            precipitation = hourly.get("precipitation", [])
+            if not isinstance(current_time, str):
+                partial = True
+                continue
+            # Open-Meteo times share each point's local timezone. Compare local
+            # instants only within that point and disclose the per-point window.
+            local_end = datetime.fromisoformat(current_time)
+            local_start = local_end - timedelta(days=past_days) if past_days else local_end.replace(hour=0, minute=0, second=0)
+            selected = [i for i, stamp in enumerate(times) if isinstance(stamp, str)
+                        and local_start <= datetime.fromisoformat(stamp) <= local_end]
+            rain = [precipitation[i] if i < len(precipitation) else None for i in selected]
+            heat = [temperatures[i] if i < len(temperatures) else None for i in selected]
+            def numeric(value: Any) -> bool:
+                return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            if not selected or not all(numeric(value) for value in [*rain, *heat, current.get("temperature_2m")]):
+                partial = True
+                continue
+            latitude, longitude = points[index]
+            start, end = times[selected[0]], times[selected[-1]]
+            windows.append((start, end))
+            features.append({
+                "id": f"openmeteo:grid:{index}", "latitude": latitude, "longitude": longitude,
+                "precipitation_sum_mm": sum(float(value) for value in rain if value is not None), "temperature_2m_max_c": max(float(value) for value in heat if value is not None),
+                "temperature_2m_current_c": current["temperature_2m"], "elevation": payload.get("elevation"),
+                "window_start": start, "window_end": end, "timezone": payload.get("timezone"),
+                "value_kind": "model_estimate",
+            })
+        units = {"precipitation_sum_mm": "mm", "temperature_2m_max_c": "\u00b0C", "temperature_2m_current_c": "\u00b0C", "elevation": "m"}
+        coverage: dict[str, Any] = {"type": "grid_sample", "bbox": list(request.bbox), "point_count": len(features),
+                    "requested_point_count": len(points), "spacing_deg": spacing, "excluded_sea_points": excluded,
+                    "temporal_scope_satisfied": not partial and (request.time is None or now - request.time <= timedelta(days=14)),
+                    "window_start": min((w[0] for w in windows), default=None),
+                    "window_end": max((w[1] for w in windows), default=None),
+                    "value_kind": "model_estimate"}
+        return ProviderResponse(
+            capability_id=request.capability_id, provider_id=self.provider_id,
+            payload={"features": features, "renderingMode": "circles", "value_kind": "model_estimate", "units": units, "coverage": coverage},
+            attribution=["Open-Meteo"], coverage=coverage, units=units,
+            result_type="features", result_status="valid_empty" if not features else "partial" if partial else "ok",
+            partial=partial and bool(features), source_url=self.service.weather_base_url,
+            observation_time=coverage["window_end"], spatial_resolution=f"{spacing:.2f} degree grid",
         )
 
     # -------------------------------------------------------------------------

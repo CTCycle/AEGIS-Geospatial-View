@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
@@ -54,6 +55,9 @@ class USGSProvider(GeospatialProvider):
             features = _normalize_earthquake_features(payload)
             features = _filter_features_to_bbox(features, request.bbox)
             features = _filter_features_to_radius(features, request.params)
+            minimum = _min_magnitude(request)
+            if minimum is not None:
+                features = [item for item in features if (_float_or_none(item.get("magnitude")) or float("-inf")) >= minimum]
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -68,6 +72,7 @@ class USGSProvider(GeospatialProvider):
                 attribution=["U.S. Geological Survey"],
                 result_status="valid_empty" if not features else "ok",
                 result_type="features",
+                coverage=_earthquake_coverage(request, truncated=False),
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -86,7 +91,7 @@ class USGSProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     async def _earthquake_range(self, request: ProviderRequest) -> ProviderResponse:
         start, end = _resolve_time_range(request)
-        features_url = _fdsn_event_url(start, end, request.bbox)
+        features_url = _fdsn_event_url(start, end, request.bbox, _min_magnitude(request))
         label = f"USGS earthquake catalog {start.date()} to {end.date()}"
         payload: dict[str, object] = {
             "renderingMode": "clustered-points",
@@ -136,7 +141,7 @@ class USGSProvider(GeospatialProvider):
             result_status="valid_empty" if not features else "ok",
             result_type="features",
             observation_time=observation_time,
-            coverage={"temporal_scope_satisfied": True},
+            coverage={**_earthquake_coverage(request, truncated=truncated), "temporal_scope_satisfied": True},
             source_url=features_url,
         )
 
@@ -217,6 +222,7 @@ def _fdsn_event_url(
     start: datetime,
     end: datetime,
     bbox: tuple[float, float, float, float] | None,
+    min_magnitude: float | None = None,
 ) -> str:
     query: dict[str, str | int | float] = {
         "format": "geojson",
@@ -225,6 +231,8 @@ def _fdsn_event_url(
         "orderby": "time",
         "limit": EARTHQUAKE_RANGE_LIMIT,
     }
+    if min_magnitude is not None:
+        query["minmagnitude"] = min_magnitude
     # FDSN cannot express antimeridian-crossing boxes; those are filtered locally.
     if bbox is not None and bbox[0] <= bbox[2]:
         query.update(
@@ -408,3 +416,24 @@ def _filter_features_to_radius(
             <= radius_m
         )
     ]
+
+
+def _min_magnitude(request: ProviderRequest) -> float | None:
+    filters = request.params.get("filters")
+    value = filters.get("min_magnitude") if is_json_object(filters) else None
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ProviderInvalidQueryError("min_magnitude must be numeric.") from exc
+    if not math.isfinite(number):
+        raise ProviderInvalidQueryError("min_magnitude must be finite.")
+    return number
+
+
+def _earthquake_coverage(request: ProviderRequest, *, truncated: bool) -> dict[str, Any]:
+    return {"bbox": list(request.bbox) if request.bbox else None,
+            "min_magnitude": _min_magnitude(request), "truncated": truncated,
+            "value_kind": "observation",
+            "completeness_note": "Outside the US the catalog is roughly complete from about M2.5; counts are lower bounds."}

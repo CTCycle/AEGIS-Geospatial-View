@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_object, json_array, json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import asyncio
 import json
@@ -93,6 +93,24 @@ class OpenMeteoService:
         self._lock = threading.Lock()
         self._last_call_by_key: dict[str, float] = {}
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    async def get_weather_grid(self, points: list[tuple[float, float]], past_days: int) -> list[dict[str, Any]]:
+        if not points or len(points) > 100:
+            raise ValueError("Weather grids require 1 through 100 points.")
+        params = {
+            "latitude": ",".join(f"{lat:.5f}" for lat, _ in points),
+            "longitude": ",".join(f"{lon:.5f}" for _, lon in points),
+            "current": "temperature_2m,precipitation",
+            "hourly": "temperature_2m,precipitation",
+            "past_days": str(max(0, min(14, past_days))),
+            "forecast_days": "1", "timezone": "auto",
+        }
+        payload = await asyncio.to_thread(self._get_json, endpoint=self.weather_base_url,
+                                          params=params, provider_key="openmeteo_weather_grid")
+        results = payload.get("locations", [payload])
+        if not is_json_array(results) or not all(is_json_object(item) for item in results):
+            raise OpenMeteoRequestError("Open-Meteo grid response is malformed.")
+        return [item for item in results if is_json_object(item)]
 
     # -------------------------------------------------------------------------
     async def get_weather_forecast(
@@ -369,6 +387,8 @@ class OpenMeteoService:
             raise OpenMeteoRequestError(
                 "Open-Meteo response was not valid JSON."
             ) from exc
+        if is_json_array(data):
+            data = {"locations": data}
         if not is_json_object(data):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
         self._cache_set(cache_key, data)

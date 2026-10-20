@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from shapely.geometry import Point, box, shape
 from shapely.errors import GEOSException
 
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import json_object, is_json_array, is_json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
@@ -185,7 +185,7 @@ class CapabilityExecutionService:
                 retryable=True,
             )
 
-        provider_params = _provider_params(request, location=location)
+        provider_params = _provider_params(request, location=location, manifest=manifest)
         manifest_metadata = manifest.get("metadata")
         if is_json_object(manifest_metadata):
             provider_params.setdefault("metadata", dict(manifest_metadata))
@@ -212,6 +212,10 @@ class CapabilityExecutionService:
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
         coverage = dict(response.coverage or {})
+        if request.arguments.get("sampling") == "area" and "sampling" not in provider_params:
+            coverage["area_sampling"] = "single_point_center"
+        if coverage.get("type") == "grid_sample" and request.bbox is not None:
+            coverage["spatial_scope_satisfied"] = True
         if str(coverage.get("type") or "").strip().casefold() == "circle":
             # Provider-bounded radius results (Overpass ``around``) declare a
             # circle coverage (center + radius_m). The provider already bounded
@@ -273,6 +277,7 @@ class CapabilityExecutionService:
             # no-results boundary (mirrors the valid-empty evidence contract).
             coverage["query_complete"] = True
         summary["coverage"] = coverage
+        summary["value_kind"] = response.payload.get("value_kind") or coverage.get("value_kind")
         try:
             evidence_ref = self._persist_evidence(
                 context=context,
@@ -525,8 +530,12 @@ def _provider_params(
     request: ExecuteCapabilityInput,
     *,
     location: ResolvedLocation | None = None,
+    manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params = dict(request.arguments)
+    scopes = json_object((manifest or {}).get("executionContract")).get("supported_scope_kinds", [])
+    if "grid_sample" not in scopes:
+        params.pop("sampling", None)
     if location is not None:
         # Provider adapters are deliberately location-agnostic at the model
         # boundary.  Inject the server-resolved point after tool validation so
