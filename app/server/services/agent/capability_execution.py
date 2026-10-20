@@ -546,6 +546,8 @@ def _provider_params(
         # supplied coordinates.
         params["latitude"] = location.latitude
         params["longitude"] = location.longitude
+        if location.source == "aegis_macro_regions":
+            params["macro_region"] = location.label
     if request.operation is not None:
         params.setdefault("operation", request.operation)
     if request.location_ref is not None:

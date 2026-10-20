@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 import math
 
+from shapely.geometry import Point
+from shapely.prepared import PreparedGeometry
+
 from server.services.geospatial.providers.base import ProviderRequest
 
 ###############################################################################
@@ -37,15 +40,53 @@ def _number_param(params: dict[str, Any], *keys: str) -> float | None:
     return None
 
 
-def grid_points(bbox: tuple[float, float, float, float], max_points: int = 100) -> tuple[list[tuple[float, float]], float]:
-    """Return (latitude, longitude) cell centres and maximum angular spacing."""
+def grid_points(
+    bbox: tuple[float, float, float, float],
+    max_points: int = 100,
+    mask: PreparedGeometry | None = None,
+) -> tuple[list[tuple[float, float]], float, int]:
+    """Return (latitude, longitude) cell centres, angular spacing, and the
+    number of candidate centres excluded by the mask.
+
+    With a mask the regular grid is densified until the masked centres
+    approach the budget, so sea or out-of-region cells do not consume it.
+    """
     west, south, east, north = bbox
     if not (-180 <= west < east <= 180 and -85 <= south < north <= 85):
         raise ValueError("Grid bbox must be ordered and within longitude / latitude bounds.")
-    cap = max(1, min(100, max_points))
+    budget = max(1, min(1000, max_points))
+    points, spacing = _regular_grid(bbox, budget)
+    if mask is None:
+        return points, spacing, 0
+    def sample(cells: int) -> tuple[list[tuple[float, float]], float, int]:
+        candidates, cell_spacing = _regular_grid(bbox, cells)
+        kept = [point for point in candidates if mask.contains(Point(point[1], point[0]))]
+        return kept, cell_spacing, len(candidates) - len(kept)
+
+    low, best = budget, sample(budget)
+    high: int | None = None
+    for _ in range(10):
+        if len(best[0]) >= 0.85 * budget or low >= budget * 64:
+            break
+        if high is None:
+            cells = min(budget * 64, int(low * min(4.0, 0.95 * budget / max(len(best[0]), 1))) + 1)
+        else:
+            cells = (low + high) // 2
+            if cells <= low:
+                break
+        result = sample(cells)
+        if len(result[0]) > budget:
+            high = cells
+        else:
+            low, best = cells, result
+    return best
+
+
+def _regular_grid(bbox: tuple[float, float, float, float], cells: int) -> tuple[list[tuple[float, float]], float]:
+    west, south, east, north = bbox
     width, height = east - west, north - south
-    columns = max(1, min(cap, round(math.sqrt(cap * width / height))))
-    rows = max(1, cap // columns)
+    columns = max(1, min(cells, round(math.sqrt(cells * width / height))))
+    rows = max(1, cells // columns)
     dx, dy = width / columns, height / rows
     return ([(round(south + (row + 0.5) * dy, 5), round(west + (col + 0.5) * dx, 5))
              for row in range(rows) for col in range(columns)], max(dx, dy))

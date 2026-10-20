@@ -47,3 +47,5 @@ class MacroRegionEntry(BaseModel):
     aliases: tuple[str, ...]
     bbox: tuple[float, float, float, float]
     kind: str
+    # ISO alpha-2 members; empty means all land inside the bbox.
+    countries: tuple[str, ...] = ()
