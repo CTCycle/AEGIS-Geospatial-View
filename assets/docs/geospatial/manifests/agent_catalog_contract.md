@@ -1,6 +1,6 @@
 # Agent Catalog Contract
 
-Last updated: 2026-10-18
+Last updated: 2026-10-20
 
 ## Stable native boundary
 
@@ -80,3 +80,25 @@ Tool exposure is catalog-based and responsibility-driven. The registry must not
 depend on embeddings, semantic retrieval, or vector ranking to decide which
 manifest tools are visible. A tool is exposed only when its route phase and
 state-owned prerequisites match the current unmet completion contract.
+
+## Search areas and evidence analytics
+
+`location_mode` replaces the old boolean route prerequisite without a legacy
+alias. `search_area` uses explicit area references and defaults to World;
+`analysis` contains kind (`rank`, `hotspot`, `threshold`), metric, order and top_k
+(1–25). Each capability query describes one distinct retrieval objective.
+The macro-region reference catalog is static, cached and alias-only, with
+validated bboxes and unique aliases; it is not database seeded.
+
+`grid_sample` declares support for server-owned area sampling. Open-Meteo
+weather supports a capped grid; other manifests retain their existing point or
+bbox contracts. Provider coverage must disclose point-centre substitutions.
+
+`transform_evidence` supports numeric sort, ISO/epoch temporal filtering,
+lat/lon spatial filtering, sum/count/mean/max/min aggregation, and grid bins
+with count, sum, mean, max, representative, centre and cell bounds. Derived
+payloads use `features`; summaries carry bbox, located count and value fields.
+Provenance chains retain provider, coverage, units, observation time and value
+kind. `add_evidence_layer.value_encoding` accepts graduated or heatmap plus a
+numeric field. The server computes the range and rejects invalid fields with
+correctable `invalid_value_field`.

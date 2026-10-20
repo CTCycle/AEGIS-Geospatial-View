@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-09-30
+Last updated: 2026-10-20
 
 ## Layering
 
@@ -286,3 +286,23 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
 - Each native run persists bounded iteration checkpoints in the internal run
   event log and reloads the latest checkpoint when an active run is resumed.
   The in-memory background-job state itself remains process-local.
+
+## Regional discovery within the native harness
+
+The route carries required `location_mode` and optional structured analysis.
+Static macro-region aliases bind to the same bbox-bearing `ResolvedLocation`
+used by ordinary targets. `MapSession`, location references, execution extents,
+and coverage policy retain their existing contracts. Search-area availability
+requires the explicit requested area, rather than a prior map or unrelated ref.
+
+The server binds `sampling=area` and recent day/week/month windows. Provider
+parameters include sampling only for manifests declaring `grid_sample`; other
+sources report `coverage.area_sampling=single_point_center`. Analysis retrieval
+completes with one valid numeric (non-raster) execution; the registry keeps
+`execute` exposed for further distinct sources (up to one per capability query,
+at most three) and blocks duplicates. Raster descriptors and transforms do not
+count as retrieval.
+Derived evidence stores `features`, spatial bounds, numeric value fields, and
+parent provenance. Completion requires located derived records or valid-empty
+analysis before map preparation. Graduated/heatmap encodings include validated
+numeric min/max; the browser renders unclustered value-driven layers.
