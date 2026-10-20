@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
+from typing import TypeAlias
 
 from shapely import Geometry
 from shapely.geometry import box, shape
@@ -11,6 +12,7 @@ from shapely.prepared import PreparedGeometry, prep
 from server.services.catalog.loader import get_catalog_root
 
 MASK_SOURCE = "natural_earth_50m_admin0"
+LandMask: TypeAlias = "PreparedGeometry[Geometry]"
 COAST_BUFFER_DEG = 0.05
 
 ###############################################################################
@@ -28,7 +30,7 @@ def country_shapes() -> dict[str, Geometry]:
 @lru_cache(maxsize=64)
 def land_mask(
     bbox: tuple[float, float, float, float], countries: tuple[str, ...] = ()
-) -> PreparedGeometry:
+) -> LandMask:
     """Land inside the bbox, restricted to member countries when given."""
     shapes = country_shapes()
     unknown = [code for code in countries if code not in shapes]

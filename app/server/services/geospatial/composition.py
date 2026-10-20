@@ -70,6 +70,7 @@ def build_provider_execution_policy(
             provider_timeouts[provider_id] = float(timeout)
     # The USGS dated-range catalog query routinely takes 10-40 s upstream.
     provider_timeouts["usgs"] = USGS_CATALOG_DEADLINE_SECONDS
+    provider_timeouts["emsc"] = USGS_CATALOG_DEADLINE_SECONDS
     gibs_settings = getattr(settings, "gibs", None)
     gibs_timeouts = [
         getattr(gibs_settings, "timeout", None),

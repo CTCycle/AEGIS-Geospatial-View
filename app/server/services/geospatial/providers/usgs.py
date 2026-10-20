@@ -28,6 +28,15 @@ EARTHQUAKE_RANGE_MAX_DAYS = 366
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
+    # FDSN event-catalog identity; EMSC reuses the range path with its own.
+    FDSN_URL = EARTHQUAKE_FDSN_URL
+    FDSN_FORMAT = "geojson"
+    CATALOG_NAME = "USGS earthquake catalog"
+    ATTRIBUTION = "U.S. Geological Survey"
+    COMPLETENESS_NOTE = (
+        "Outside the US the catalog is generally complete only from about M4.5; "
+        "smaller events are sparse and counts are lower bounds."
+    )
     WATER_DATA_ITEMS_URL = (
         "https://api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items"
     )
@@ -72,7 +81,7 @@ class USGSProvider(GeospatialProvider):
                 attribution=["U.S. Geological Survey"],
                 result_status="valid_empty" if not features else "ok",
                 result_type="features",
-                coverage=_earthquake_coverage(request, truncated=False),
+                coverage=_earthquake_coverage(request, truncated=False, note=self.COMPLETENESS_NOTE),
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -91,8 +100,11 @@ class USGSProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     async def _earthquake_range(self, request: ProviderRequest) -> ProviderResponse:
         start, end = _resolve_time_range(request)
-        features_url = _fdsn_event_url(start, end, request.bbox, _min_magnitude(request))
-        label = f"USGS earthquake catalog {start.date()} to {end.date()}"
+        features_url = _fdsn_event_url(
+            start, end, request.bbox, _min_magnitude(request),
+            base_url=self.FDSN_URL, response_format=self.FDSN_FORMAT,
+        )
+        label = f"{self.CATALOG_NAME} {start.date()} to {end.date()}"
         payload: dict[str, object] = {
             "renderingMode": "clustered-points",
             "timeMode": "historical",
@@ -105,12 +117,12 @@ class USGSProvider(GeospatialProvider):
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
                 payload=payload,
-                attribution=["U.S. Geological Survey"],
+                attribution=[self.ATTRIBUTION],
                 result_type="metadata",
                 source_url=features_url,
             )
         raw = await call_json_fetcher(self.fetcher, features_url)
-        features = _normalize_earthquake_features(raw)
+        features = self._normalize_events(raw)
         truncated = len(features) >= EARTHQUAKE_RANGE_LIMIT
         features = _filter_features_to_bbox(features, request.bbox)
         features = _filter_features_to_radius(features, request.params)
@@ -129,7 +141,7 @@ class USGSProvider(GeospatialProvider):
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload=payload,
-            attribution=["U.S. Geological Survey"],
+            attribution=[self.ATTRIBUTION],
             warnings=(
                 [
                     f"Result capped at {EARTHQUAKE_RANGE_LIMIT} events (most recent "
@@ -141,9 +153,13 @@ class USGSProvider(GeospatialProvider):
             result_status="valid_empty" if not features else "ok",
             result_type="features",
             observation_time=observation_time,
-            coverage={**_earthquake_coverage(request, truncated=truncated), "temporal_scope_satisfied": True},
+            coverage={**_earthquake_coverage(request, truncated=truncated, note=self.COMPLETENESS_NOTE), "temporal_scope_satisfied": True},
             source_url=features_url,
         )
+
+    # -------------------------------------------------------------------------
+    def _normalize_events(self, payload: object) -> list[dict[str, object]]:
+        return _normalize_earthquake_features(payload)
 
     # -------------------------------------------------------------------------
     async def _water_services(self, request: ProviderRequest) -> ProviderResponse:
@@ -223,9 +239,12 @@ def _fdsn_event_url(
     end: datetime,
     bbox: tuple[float, float, float, float] | None,
     min_magnitude: float | None = None,
+    *,
+    base_url: str = EARTHQUAKE_FDSN_URL,
+    response_format: str = "geojson",
 ) -> str:
     query: dict[str, str | int | float] = {
-        "format": "geojson",
+        "format": response_format,
         "starttime": start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
         "endtime": end.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
         "orderby": "time",
@@ -241,7 +260,7 @@ def _fdsn_event_url(
             maxlongitude=bbox[2],
             maxlatitude=bbox[3],
         )
-    return f"{EARTHQUAKE_FDSN_URL}?{urlencode(query)}"
+    return f"{base_url}?{urlencode(query)}"
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
@@ -432,8 +451,7 @@ def _min_magnitude(request: ProviderRequest) -> float | None:
     return number
 
 
-def _earthquake_coverage(request: ProviderRequest, *, truncated: bool) -> dict[str, Any]:
+def _earthquake_coverage(request: ProviderRequest, *, truncated: bool, note: str) -> dict[str, Any]:
     return {"bbox": list(request.bbox) if request.bbox else None,
             "min_magnitude": _min_magnitude(request), "truncated": truncated,
-            "value_kind": "observation",
-            "completeness_note": "Outside the US the catalog is generally complete only from about M4.5; smaller events are sparse and counts are lower bounds."}
+            "value_kind": "observation", "completeness_note": note}

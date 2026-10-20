@@ -8,12 +8,11 @@ import math
 from typing import Any, Literal, cast
 
 from shapely.geometry import Point
-from shapely.prepared import PreparedGeometry
 
 from server.configurations.settings import OpenMeteoSettings
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
 from server.services.catalog.loader import find_macro_region_entry
-from server.services.geospatial.land_mask import MASK_SOURCE, land_mask
+from server.services.geospatial.land_mask import MASK_SOURCE, LandMask, land_mask
 from server.services.geospatial.providers._request import request_center, grid_points
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -383,7 +382,7 @@ def _grid_feature(
 
 
 def _refinement_points(
-    features: list[dict[str, Any]], spacing: float, mask: PreparedGeometry, existing: set[tuple[float, float]]
+    features: list[dict[str, Any]], spacing: float, mask: LandMask, existing: set[tuple[float, float]]
 ) -> list[tuple[float, float]]:
     seeds: list[dict[str, Any]] = []
     for metric in ("precipitation_sum_mm", "temperature_2m_max_c"):

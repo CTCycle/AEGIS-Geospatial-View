@@ -525,7 +525,9 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     )
     assert worldcover[0]["id"] == "esa_worldcover"
 
-    for query in ("USGS", "hazard"):
+    # Inside the Euro-Mediterranean preferred area EMSC outranks the global
+    # USGS catalog unless USGS is named.
+    for query, expected in (("USGS", "usgs_earthquakes"), ("hazard", "emsc_earthquakes")):
         usgs = registry.shortlist(
             domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
             queries=[query],
@@ -537,7 +539,7 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
             requires_render=True,
             location=location,
         )
-        assert usgs[0]["id"] == "usgs_earthquakes"
+        assert usgs[0]["id"] == expected
 
     earthquake_catalog = registry.shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
@@ -550,7 +552,7 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
         requires_render=True,
         location=location,
     )
-    assert earthquake_catalog[0]["id"] == "usgs_earthquakes"
+    assert earthquake_catalog[0]["id"] == "emsc_earthquakes"
 
     earthquake_route = registry.shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
@@ -563,7 +565,7 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
         requires_render=True,
         location=location,
     )
-    assert earthquake_route[0]["id"] == "usgs_earthquakes"
+    assert earthquake_route[0]["id"] == "emsc_earthquakes"
 
     water_gauges = registry.shortlist(
         domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},

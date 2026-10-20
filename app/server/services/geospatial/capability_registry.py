@@ -4,7 +4,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, Protocol
 
-from server.common.typing import is_json_array, is_json_object, json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.domain.geospatial.registry import (
     CapabilityRegistrySnapshot,
     GeospatialManifestSnapshot,
@@ -25,6 +25,11 @@ class RuntimeEligibility(Protocol):
 
     # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool: ...
+
+
+# Score swing for a manifest whose executionContract.preferred_bbox contains
+# (or misses) the resolved location; smaller than one identity match.
+PREFERRED_AREA_BONUS = 40.0
 
 
 ###############################################################################
@@ -63,6 +68,7 @@ _QUERY_ALIASES: dict[str, set[str]] = {
     "buildings": {"building", "buildings", "residential", "infrastructure"},
     "worldcover": {"worldcover", "landcover", "land", "cover", "vegetation"},
     "usgs": {"usgs", "earthquake", "hazard", "water", "gauge"},
+    "emsc": {"emsc", "earthquake", "seismic", "hazard"},
 }
 
 _GENERIC_QUERY_TOKENS = {
@@ -101,6 +107,7 @@ _ROUTING_QUERY_ALIASES: dict[str, set[str]] = {
     "hazard": {"hazard"},
     "hazards": {"hazard"},
     "usgs": {"usgs"},
+    "emsc": {"emsc"},
     "poi": {"poi"},
     "amenity": {"poi"},
     "amenities": {"poi"},
@@ -264,6 +271,12 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
     contract["coverage"] = (
         str(raw.get("coverage")).strip() if raw.get("coverage") is not None else None
     )
+    preferred = [
+        float(value)
+        for value in json_array(raw.get("preferred_bbox"))
+        if isinstance(value, int | float)
+    ]
+    contract["preferred_bbox"] = preferred if len(preferred) == 4 else None
     return contract
 
 ###############################################################################
@@ -586,6 +599,7 @@ class CapabilityRegistry:
             score += float(len(semantic_matches) * 60)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
+            score += _preferred_area_bonus(contract, location)
             candidate = dict(item)
             candidate["routing_score"] = score
             candidate["routing_query_matches"] = sorted(matched_queries)
@@ -621,6 +635,23 @@ class CapabilityRegistry:
         )
         return candidates[:bounded_limit]
 
+
+###############################################################################
+def _preferred_area_bonus(
+    contract: dict[str, Any], location: ResolvedLocation | None
+) -> float:
+    """Rank a regional source above a global equivalent only inside its area."""
+
+    preferred = contract.get("preferred_bbox")
+    if not preferred:
+        return 0.0
+    west, south, east, north = preferred
+    inside = (
+        location is not None
+        and west <= location.longitude <= east
+        and south <= location.latitude <= north
+    )
+    return PREFERRED_AREA_BONUS if inside else -PREFERRED_AREA_BONUS
 
 ###############################################################################
 def _contract_supports(

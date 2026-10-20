@@ -1,0 +1,151 @@
+{
+  "id": "emsc_earthquakes",
+  "name": "EMSC Earthquakes",
+  "provider": "emsc",
+  "type": "vector-overlay",
+  "description": "Earthquake observations from the EMSC-CSEM SeismicPortal FDSN catalog: recent events (last 24 hours) or an explicit dated range. Denser than global catalogs across Europe, the Mediterranean and the Middle East.",
+  "capabilities": [
+    "earthquake",
+    "hazard",
+    "seismic",
+    "current"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "EMSC Earthquakes",
+    "requires_key": false,
+    "attribution": "EMSC-CSEM SeismicPortal",
+    "keywords": [
+      "earthquake",
+      "seismic",
+      "hazard",
+      "emsc",
+      "europe",
+      "mediterranean"
+    ],
+    "action_tags": [
+      "earthquake",
+      "hazard",
+      "current"
+    ],
+    "task_tags": [
+      "hazard monitoring",
+      "earthquake map"
+    ],
+    "source_protocol": "FDSN event web service",
+    "data_format": "GeoJSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.seismicportal.eu/fdsn-wsevent.html",
+    "last_validated": "2026-10-20",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 1,
+  "last_modified": "2026-10-20T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://www.seismicportal.eu/fdsn-wsevent.html"
+  ],
+  "license": {
+    "name": "EMSC-CSEM data policy (attribution required)",
+    "url": "https://www.emsc-csem.org/about/data-policy",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": [
+      "data_retrieval",
+      "map_rendering"
+    ],
+    "plannerHints": [
+      "earthquake",
+      "seismic",
+      "hazard",
+      "current",
+      "europe",
+      "mediterranean",
+      "middle east"
+    ],
+    "requiredUserAction": [
+      "hazard",
+      "earthquake"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-10-20",
+    "knownLimitations": [
+      "Typically complete from about M2.5-3 in Europe and the Mediterranean and about M4.5 elsewhere; counts are lower bounds.",
+      "Dated ranges are capped at 366 days and 2000 events."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry.coordinates",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.time",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "filter",
+      "near",
+      "around",
+      "within_distance"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "radius"
+    ],
+    "temporal_modes": [
+      "current",
+      "historical"
+    ],
+    "temporal_windows": [
+      "recent_feed",
+      "dated_range"
+    ],
+    "required_inputs": [
+      "location",
+      "analysis_scope"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "vector",
+    "coverage": "global",
+    "limitations": [
+      "Without a dated range the last 24 hours of the catalog are used.",
+      "A dated range (start_time_iso, optional end_time_iso) is limited to 366 days and returns at most 2000 events, most recent first.",
+      "Preferred over global catalogs inside Europe, the Mediterranean and the Middle East."
+    ],
+    "fallback_ids": [],
+    "preferred_bbox": [
+      -30,
+      25,
+      60,
+      75
+    ]
+  }
+}
