@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from server.domain.catalog import (
     GibsLayerDefaultReferenceEntry,
     GibsTileMatrixSetReferenceEntry,
     ReferenceCatalog,
+    MacroRegionEntry,
 )
 
 REFERENCE_CATALOG_DIR_NAME = "reference"
@@ -252,3 +254,37 @@ def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
         entry = _require_string(item, field_name=field_name)
         normalized.append(entry)
     return tuple(normalized)
+
+
+@lru_cache(maxsize=8)
+def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEntry, ...]:
+    payload = _load_json_file((catalog_root or get_catalog_root()) / "reference" / "macro_regions.json")
+    entries = payload.get("macro_regions")
+    if not is_json_array(entries):
+        raise ValueError("macro_regions.json must contain a macro_regions list.")
+    seen: set[str] = set()
+    regions: list[MacroRegionEntry] = []
+    ids: set[str] = set()
+    for item in entries:
+        if not is_json_object(item):
+            raise ValueError("Macro-region entries must be objects.")
+        name = _require_string(item.get("name"), field_name="macro_region.name")
+        region_id = _require_string(item.get("id"), field_name="macro_region.id")
+        if region_id in ids:
+            raise ValueError(f"Duplicate macro-region id: {region_id}")
+        ids.add(region_id)
+        raw_aliases = item.get("aliases", [])
+        if not is_json_array(raw_aliases):
+            raise ValueError("Macro-region aliases must be a list.")
+        aliases = tuple(_require_string(alias, field_name="macro_region.alias") for alias in raw_aliases)
+        for alias in (name, *aliases):
+            key = _normalize_alias_key(alias)
+            if key in seen:
+                raise ValueError(f"Duplicate macro-region alias: {alias}")
+            seen.add(key)
+        region = MacroRegionEntry.model_validate({"id": region_id, "name": name, "aliases": aliases, "bbox": item.get("bbox"), "kind": _require_string(item.get("kind"), field_name="macro_region.kind")})
+        w, south, e, north = region.bbox
+        if not (-180 <= w < e <= 180 and -85 <= south < north <= 85):
+            raise ValueError(f"Invalid macro-region bbox: {name}")
+        regions.append(region)
+    return tuple(regions)

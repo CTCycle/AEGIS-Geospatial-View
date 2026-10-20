@@ -53,7 +53,7 @@ from server.services.agent.capability_router import (
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.completion import CompletionEvaluator
-from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.tool_registry import analysis_complete, route_target_location_available, ToolRegistry
 from server.services.agent.vision_policy import (
     ITERATION_CALL_KIND,
     TERMINAL_CALL_KIND,
@@ -233,6 +233,7 @@ class AgentLoop:
                     category="response_parsing",
                 )
             state.route = route
+            self._bind_search_area(state, route)
             profile = self._budget_profile(route)
             request.budget.promote(profile)
             request.budget.configure_limits(
@@ -256,6 +257,7 @@ class AgentLoop:
                 ),
             )
             self._compile_native_goal(state, route)
+            await self._refresh_capabilities_after_location(request, state, [])
             self._sync_task_state(state)
             await self._checkpoint(request)
 
@@ -1253,6 +1255,8 @@ class AgentLoop:
         return {
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
+            "search_area_bound": route_target_location_available(state),
+            "result_locations_derived": analysis_complete(state),
             "required_data_retrieved": data_completed,
             "evidence_inspected": evidence_inspected,
             "capabilities_discovered": capabilities_discovered,
@@ -1312,6 +1316,8 @@ class AgentLoop:
         requirements: list[CompletionRequirement] = []
         requirement_kinds: dict[str, CompletionRequirementKind] = {
             "location_resolved": "location",
+            "search_area_bound": "location",
+            "result_locations_derived": "evidence_analysis",
             "capabilities_discovered": "capability_discovery",
             "required_data_retrieved": "provider_data",
             "evidence_inspected": "evidence_inspection",
@@ -2324,10 +2330,9 @@ class AgentLoop:
                 and not route.secondary_domains
             )
             or state.capability_ids
-            or not any(
-                result.tool_name == "resolve_geospatial_location"
-                and result.status == "success"
-                for result in results
+            or not (
+                (route.location_mode == "search_area" and route_target_location_available(state))
+                or any(result.tool_name == "resolve_geospatial_location" and result.status == "success" for result in results)
             )
         ):
             return None
@@ -2350,7 +2355,7 @@ class AgentLoop:
             state,
             request.budget,
             trace_callback=request.trace_callback,
-            iteration=state.current_iteration,
+            iteration=max(1, state.current_iteration),
             task_id=self._active_task_id(state),
             exposed_tool_names={"discover_geospatial_capabilities"},
         )
@@ -2820,9 +2825,21 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _bind_search_area(state: AgentRunState, route: CapabilityRoute) -> None:
+        from server.services.agent.location_resolver import find_macro_region
+
+        if route.location_mode != "search_area":
+            return
+        for ref in route.target_refs:
+            location = find_macro_region(ref)
+            if location is not None:
+                state.location_refs[ref] = location
+
+    @staticmethod
     def _budget_profile(route: CapabilityRoute) -> str:
         if (
-            route.presentation in {"map", "both"}
+            route.analysis is not None
+            or route.presentation in {"map", "both"}
             or route.secondary_domains
             or len(route.capability_queries) > 1
             or route.primary_domain is CapabilityDomain.SPATIAL_ANALYSIS
@@ -2865,7 +2882,9 @@ class AgentLoop:
         filters = dict(route.filters)
         requirements: list[str] = []
         if route.location_mode != "none":
-            requirements.append("location_resolved")
+            requirements.append("search_area_bound" if route.location_mode == "search_area" else "location_resolved")
+        if route.analysis is not None:
+            requirements.append("result_locations_derived")
         route_domains = {route.primary_domain, *route.secondary_domains}
         text_location_resolution_only = (
             route.primary_domain is CapabilityDomain.PLACE_SEARCH

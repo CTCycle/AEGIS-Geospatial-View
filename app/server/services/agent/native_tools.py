@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import math
 from functools import partial
 from typing import Any, cast
@@ -342,7 +344,7 @@ def register_agent_tools(
             visibility="model",
             # A location-only map is a valid candidate: it can contain a
             # validated basemap and viewport without fabricating a data layer.
-            prerequisites=frozenset({"route", "location", "map_presentation"}),
+            prerequisites=frozenset({"route", "location", "map_presentation", "analysis_complete_if_required"}),
             idempotent=False,
             semantic_validator=_map_plan_semantic_validator,
         ),
@@ -453,6 +455,8 @@ def _bind_execute_request(
         "filters": {**request.filters, **goal.filters},
         "bbox": None,
     }
+    if goal.location_mode == "search_area":
+        updates["arguments"]["sampling"] = "area"
     temporal = goal.temporal_scope
     if temporal:
         temporal_mode = _optional_string(temporal.get("mode"))
@@ -460,6 +464,9 @@ def _bind_execute_request(
             updates["temporal_mode"] = temporal_mode
         updates["start_time_iso"] = _optional_string(temporal.get("start_time_iso"))
         updates["end_time_iso"] = _optional_string(temporal.get("end_time_iso"))
+        days = {"day": 1, "week": 7, "month": 30}.get(str(temporal.get("granularity")))
+        if days and not any(temporal.get(key) for key in ("start_time_iso", "end_time_iso", "reference_time_iso")):
+            updates["start_time_iso"] = (datetime.now(UTC) - timedelta(days=days)).isoformat()
         reference_time = _optional_string(temporal.get("reference_time_iso"))
         if reference_time:
             updates["arguments"] = {
@@ -491,6 +498,7 @@ def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Keep semantic provider arguments while removing invariant aliases."""
 
     owned = {
+        "sampling",
         "bbox",
         "end",
         "end_time",
@@ -711,10 +719,13 @@ def _map_plan_semantic_validator(
 def _valid_empty_data_only(state: AgentRunState) -> bool:
     """Allow a location-only map when the provider found no matching data."""
 
+    if state.route is not None and state.route.analysis is not None:
+        transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
+        return bool(transforms) and transforms[-1].status == "valid_empty"
     data_results = [
         result
         for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability"
+        if result.tool_name in {"execute_geospatial_capability", "transform_evidence"}
     ]
     return bool(data_results) and all(
         result.status == "valid_empty" for result in data_results
@@ -752,6 +763,13 @@ def _capability_semantic_validator(
     capability_registry: CapabilityRegistry | None = None,
 ) -> list[str]:
     errors: list[str] = []
+    if state.route is not None and state.route.analysis is not None and any(
+        result.tool_name == "execute_geospatial_capability"
+        and result.metadata.capability_id == request.capability_id
+        and result.status in {"success", "partial", "valid_empty"}
+        for result in state.tool_results
+    ):
+        errors.append("This capability already executed successfully; choose a distinct capability or transform its evidence.")
     if state.capability_ids and request.capability_id not in state.capability_ids:
         errors.append("capability_id is outside the validated route shortlist.")
     goal_targets = {
@@ -805,6 +823,7 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Remove route-owned aliases before applying the manifest schema."""
 
     owned = {
+        "sampling",
         "bbox",
         "end",
         "end_time",

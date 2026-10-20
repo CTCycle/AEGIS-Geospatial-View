@@ -126,7 +126,7 @@ class ToolRegistry:
     def _prerequisites_satisfied(
         prerequisites: frozenset[str], state: "AgentRunState"
     ) -> bool:
-        has_location = _route_target_location_available(state)
+        has_location = route_target_location_available(state)
         for prerequisite in prerequisites:
             if prerequisite == "route" and state.route is None:
                 return False
@@ -151,6 +151,8 @@ class ToolRegistry:
                 and state.route.location_mode != "none"
                 and not has_location
             ):
+                return False
+            if prerequisite == "analysis_complete_if_required" and not analysis_complete(state):
                 return False
             if prerequisite == "evidence" and not _evidence_available_for_route(state):
                 return False
@@ -227,7 +229,7 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
 
 
 ###############################################################################
-def _route_target_location_available(state: "AgentRunState") -> bool:
+def route_target_location_available(state: "AgentRunState") -> bool:
     """Check the validated route targets, not merely any prior map state."""
 
     route = state.route
@@ -240,6 +242,8 @@ def _route_target_location_available(state: "AgentRunState") -> bool:
         and route.spatial_scope.target_refs
         else list(route.target_refs) if route is not None else []
     )
+    if not target_refs and route is not None and route.location_mode == "search_area":
+        return False
     if not target_refs:
         return bool(state.location_refs) or state.active_map_session is not None
     return all(
@@ -323,7 +327,7 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
     route = state.route
     route_domains = _route_domains(state)
     if registered.definition.name == "resolve_geospatial_location":
-        return route.location_mode != "none" and not _route_target_location_available(state)
+        return route.location_mode != "none" and not route_target_location_available(state)
     if registered.definition.name == "apply_map_plan":
         return route.presentation in {"map", "both"}
     if route.primary_domain is CapabilityDomain.MAP_STATE:
@@ -351,16 +355,8 @@ def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
         return False
-    domains = _route_domains(state)
-    if CapabilityDomain.SPATIAL_ANALYSIS in domains:
-        return True
-    terms = " ".join(
-        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
-    ).casefold()
-    return any(
-        marker in terms
-        for marker in ("analy", "aggregate", "statistic", "transform", "inspect")
-    )
+    return (route.analysis is not None or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
+            or route.operation == "inspect_evidence")
 
 
 ###############################################################################
@@ -379,6 +375,12 @@ def _history_recall_required(state: "AgentRunState") -> bool:
 
 ###############################################################################
 def _data_obligation_unmet(state: "AgentRunState") -> bool:
+    if state.route is not None and state.route.analysis is not None:
+        ids = {result.metadata.capability_id for result in state.tool_results
+               if result.tool_name == "execute_geospatial_capability"
+               and result.status in {"success", "partial", "valid_empty"}
+               and result.metadata.capability_id}
+        return len(ids) < min(3, max(1, len(state.route.capability_queries)))
     contract = state.completion_contract
     if contract is not None and contract.data_requirement != "provider_data":
         return True
@@ -401,3 +403,15 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
 
 
 __all__ = ["ToolRegistry"]
+
+
+def analysis_complete(state: "AgentRunState") -> bool:
+    if state.route is None or state.route.analysis is None:
+        return True
+    return any(
+        result.tool_name == "transform_evidence"
+        and (result.status == "valid_empty" or (
+            result.status == "success" and isinstance(result.data, dict)
+            and result.data.get("located_record_count", 0) >= 1
+        )) for result in state.tool_results
+    )

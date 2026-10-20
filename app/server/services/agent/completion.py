@@ -87,15 +87,18 @@ class CompletionEvaluator:
         results = [result for result in state.tool_results if result.tool_name in {
             "execute_geospatial_capability", "inspect_evidence", "transform_evidence"
         }]
+        analysis = state.route is not None and state.route.analysis is not None
+        if analysis:
+            results = [result for result in results if result.tool_name == "execute_geospatial_capability"]
         assessments = [(result, CompletionEvaluator.assess_evidence(state, result)) for result in results]
         eligible = [(result, assessment) for result, assessment in assessments
                     if assessment.tool_execution_success and assessment.data_valid is True
-                    and assessment.data_relevant is True and result.status != "partial"]
+                    and assessment.data_relevant is True and (analysis or result.status != "partial")]
         required = set(state.route.explicit_capability_ids if state.route else [])
         def covered(field: str) -> bool:
             matched = {result.metadata.capability_id for result, assessment in eligible
                        if getattr(assessment, field) is True}
-            return bool(matched) and (not required or required <= matched)
+            return bool(matched) and (not required or required <= matched) and (not analysis or len(matched) >= min(3, max(1, len(state.route.capability_queries if state.route else []))))
         return {
             "required_data_retrieved": covered("data_valid"),
             "spatial_scope_applied": covered("spatial_scope_satisfied"),
@@ -165,6 +168,8 @@ class CompletionEvaluator:
         )
         values = {
             "location_resolved": True,
+            "search_area_bound": True,
+            "result_locations_derived": True,
             "required_data_retrieved": not data_failure
             and bool(
                 map_session.overlay_collection.instances
@@ -260,6 +265,8 @@ class CompletionEvaluator:
 def _native_flag(name: str) -> str:
     return {
         "location_resolved": "location",
+        "search_area_bound": "location",
+        "result_locations_derived": "evidence",
         "required_data_retrieved": "evidence",
         "temporal_scope_applied": "temporal_scope",
         "spatial_scope_applied": "spatial_scope",
