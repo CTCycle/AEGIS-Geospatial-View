@@ -963,6 +963,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.composerImage = undefined;
       this.composerError = error instanceof Error ? error.message : 'The image could not be attached.';
     }
+    this.changeDetectorRef.detectChanges();
   }
 
   removeComposerImage(): void {
