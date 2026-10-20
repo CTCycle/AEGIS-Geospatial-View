@@ -112,7 +112,7 @@ def test_usgs_dated_range_queries_catalog_with_bbox_and_reports_scope() -> None:
     assert response.coverage["temporal_scope_satisfied"] is True
     assert response.coverage["bbox"] == [129.0, 31.0, 146.0, 46.0]
     assert response.coverage["truncated"] is False
-    assert "M2.5" in response.coverage["completeness_note"]
+    assert "M4.5" in response.coverage["completeness_note"]
     assert response.observation_time == "2024-03-09T16:00:00+00:00"
 
 ###############################################################################

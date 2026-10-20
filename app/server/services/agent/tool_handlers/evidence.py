@@ -122,6 +122,12 @@ class EvidenceToolHandler:
                     started=started,
                 )
             summary, raw = item
+            if summary.kind == "raster_descriptor":
+                return _failure(
+                    tool_name="transform_evidence", code="unsupported_evidence_records",
+                    message="A raster descriptor has no numeric records to analyze. Retrieve located numeric feature evidence from another capability.",
+                    recovery="choose_alternate_tool", started=started,
+                )
             if summary.status == "failed":
                 return _failure(
                     tool_name="transform_evidence",

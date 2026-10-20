@@ -213,7 +213,10 @@ class CapabilityExecutionService:
         summary = _response_summary(response, request=request, location=location)
         coverage = dict(response.coverage or {})
         if request.arguments.get("sampling") == "area" and "sampling" not in provider_params:
-            coverage["area_sampling"] = "single_point_center"
+            coverage["area_sampling"] = (
+                "bbox_query" if request.bbox is not None and coverage.get("bbox") == list(request.bbox)
+                else "single_point_center"
+            )
         if coverage.get("type") == "grid_sample" and request.bbox is not None:
             coverage["spatial_scope_satisfied"] = True
         if str(coverage.get("type") or "").strip().casefold() == "circle":

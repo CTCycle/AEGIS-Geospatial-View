@@ -13,6 +13,7 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_execution import _provider_params
+from server.services.agent.completion import CompletionEvaluator
 from server.services.agent.location_resolver import LocationResolver, find_macro_region
 from server.services.agent.native_tools import _bind_execute_request, _capability_semantic_validator
 from server.services.agent.tool_definitions import ExecuteCapabilityInput, TransformEvidenceInput
@@ -82,16 +83,45 @@ def test_stale_location_and_analysis_map_gate() -> None:
     assert ToolRegistry._prerequisites_satisfied(frozenset({"analysis_complete_if_required"}), value)
 
 
+def test_text_stop_is_no_progress_while_derived_locations_are_pending() -> None:
+    value = state()
+    value.context_hydrated = True
+    AgentLoop._bind_search_area(value, value.route)
+    AgentLoop._compile_native_goal(value, value.route)
+    assert "result_locations_derived" in AgentLoop._pending_native_requirements(value)
+    assert AgentLoop._evaluate_text_stop(value, value.route, "Done", available_tools=["transform_evidence"])[0] == "no_progress"
+
+
 def test_analysis_requires_distinct_executes() -> None:
     value = state()
     value.route.capability_queries = ["weather", "earthquakes"]
     value.tool_results.append(ToolResult(call_id="one", tool_name="execute_geospatial_capability", status="success", summary="ok",
-                                      metadata=ToolExecutionMetadata(duration_ms=0, capability_id="one")))
+                                      evidence_refs=["evidence_one"], metadata=ToolExecutionMetadata(duration_ms=0, capability_id="one")))
     assert _data_obligation_unmet(value)
+    # A further source stays available, but one source covering both metrics completes retrieval.
+    assert CompletionEvaluator.data_checks(value)["required_data_retrieved"]
     assert _capability_semantic_validator(ExecuteCapabilityInput(capability_id="one"), value)
     assert not _capability_semantic_validator(ExecuteCapabilityInput(capability_id="two"), value)
     value.tool_results.append(value.tool_results[0].model_copy(update={"metadata": ToolExecutionMetadata(duration_ms=0, capability_id="two")}))
     assert not _data_obligation_unmet(value)
+
+
+def test_raster_descriptor_does_not_close_numeric_retrieval() -> None:
+    value = state()
+    value.tool_results.append(ToolResult(call_id="raster", tool_name="execute_geospatial_capability", status="success", summary="descriptor",
+                                      metadata=ToolExecutionMetadata(duration_ms=0, capability_id="imagery", result_type="raster")))
+    assert _data_obligation_unmet(value)
+
+
+def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -> None:
+    from server.repositories.agent_runs import redact_trace_payload
+    intent = {"kind": "rank", "metric": "rain", "order": "descending", "top_k": 5}
+    payload = {"route": {"location_mode": "search_area", "analysis": intent},
+               "analysis": "private reasoning", "provider": {"analysis": "private reasoning"}}
+    safe = redact_trace_payload(payload)
+    assert safe["route"]["analysis"] == intent
+    assert "analysis" not in safe and "analysis" not in safe["provider"]
+    assert "analysis" not in redact_trace_payload({"location_mode": "target", "analysis": {**intent, "thoughts": "private"}})
 
 
 def test_numeric_sort_spatial_epoch_statistics_and_grid() -> None:

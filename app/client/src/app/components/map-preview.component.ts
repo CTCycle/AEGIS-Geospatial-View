@@ -1303,7 +1303,13 @@ private fitMaxZoom(defaultMaxZoom: number): number {
           map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
         }
       });
-      if (overlay.type === 'point-insight') {
+      if (overlay.value_encoding) {
+        map.setPaintProperty(layerIds[0], overlay.value_encoding.mode === 'heatmap'
+          ? 'heatmap-opacity' : 'circle-opacity', opacityValue);
+        if (overlay.value_encoding.mode === 'heatmap' && map.getLayer(layerIds[1])) {
+          map.setPaintProperty(layerIds[1], 'circle-opacity', opacityValue);
+        }
+      } else if (overlay.type === 'point-insight') {
         map.setPaintProperty(layerIds[0], 'circle-opacity', opacityValue);
       } else if (isGeoJsonOverlay(overlay)) {
         const geometryType = overlay.geometry_type?.toLowerCase() || '';

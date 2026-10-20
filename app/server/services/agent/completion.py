@@ -89,7 +89,8 @@ class CompletionEvaluator:
         }]
         analysis = state.route is not None and state.route.analysis is not None
         if analysis:
-            results = [result for result in results if result.tool_name == "execute_geospatial_capability"]
+            results = [result for result in results if result.tool_name == "execute_geospatial_capability"
+                       and result.metadata.result_type != "raster"]
         assessments = [(result, CompletionEvaluator.assess_evidence(state, result)) for result in results]
         eligible = [(result, assessment) for result, assessment in assessments
                     if assessment.tool_execution_success and assessment.data_valid is True
@@ -98,7 +99,9 @@ class CompletionEvaluator:
         def covered(field: str) -> bool:
             matched = {result.metadata.capability_id for result, assessment in eligible
                        if getattr(assessment, field) is True}
-            return bool(matched) and (not required or required <= matched) and (not analysis or len(matched) >= min(3, max(1, len(state.route.capability_queries if state.route else []))))
+            # One numeric source may cover several queried metrics; the
+            # registry still permits further distinct sources for analysis.
+            return bool(matched) and (not required or required <= matched)
         return {
             "required_data_retrieved": covered("data_valid"),
             "spatial_scope_applied": covered("spatial_scope_satisfied"),

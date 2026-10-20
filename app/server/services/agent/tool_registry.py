@@ -379,6 +379,7 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
         ids = {result.metadata.capability_id for result in state.tool_results
                if result.tool_name == "execute_geospatial_capability"
                and result.status in {"success", "partial", "valid_empty"}
+               and result.metadata.result_type != "raster"
                and result.metadata.capability_id}
         return len(ids) < min(3, max(1, len(state.route.capability_queries)))
     contract = state.completion_contract

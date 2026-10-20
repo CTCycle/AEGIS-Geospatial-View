@@ -57,7 +57,7 @@ class USGSProvider(GeospatialProvider):
             features = _filter_features_to_radius(features, request.params)
             minimum = _min_magnitude(request)
             if minimum is not None:
-                features = [item for item in features if (_float_or_none(item.get("magnitude")) or float("-inf")) >= minimum]
+                features = [item for item in features if (magnitude := _float_or_none(item.get("magnitude"))) is not None and magnitude >= minimum]
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -436,4 +436,4 @@ def _earthquake_coverage(request: ProviderRequest, *, truncated: bool) -> dict[s
     return {"bbox": list(request.bbox) if request.bbox else None,
             "min_magnitude": _min_magnitude(request), "truncated": truncated,
             "value_kind": "observation",
-            "completeness_note": "Outside the US the catalog is roughly complete from about M2.5; counts are lower bounds."}
+            "completeness_note": "Outside the US the catalog is generally complete only from about M4.5; smaller events are sparse and counts are lower bounds."}

@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import uuid4
 
+from pydantic import ValidationError
 from server.contracts.events import (
     RunEventCreate,
     RunEventType,
@@ -16,7 +17,7 @@ from server.contracts.events import (
 )
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.contracts.geospatial import MapSession
-from server.domain.agent.capability_route import AgentTaskState
+from server.domain.agent.capability_route import AgentAnalysisIntent, AgentTaskState
 from server.domain.agent.conversation import ConversationState
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.database.sqlite import SQLiteRepository
@@ -1975,7 +1976,15 @@ def _redact_trace_value(
             if _is_trace_secret_key(normalized_key):
                 continue
             if normalized_key in _TRACE_REASONING_KEYS:
-                continue
+                # A route/goal's typed analysis intent is operational state,
+                # distinct from an SDK's unstructured analysis/reasoning text.
+                if normalized_key != "analysis" or mapping.get("location_mode") not in ("none", "target", "search_area"):
+                    continue
+                try:
+                    if raw_value is not None:
+                        AgentAnalysisIntent.model_validate(raw_value)
+                except ValidationError:
+                    continue
             result[key] = _redact_trace_value(
                 raw_value,
                 depth=depth + 1,

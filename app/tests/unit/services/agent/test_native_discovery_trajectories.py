@@ -146,6 +146,29 @@ async def test_failed_discovery_provider_has_no_map() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stale_lyon_does_not_bind_italy_search_area() -> None:
+    class Resolver:
+        async def resolve_location_signals(self, *args: Any, **kwargs: Any) -> ResolvedLocation:
+            return ResolvedLocation(label="Italy", latitude=42, longitude=12, bbox=[6, 36, 19, 47])
+    model = _ScriptedProvider([
+        _call("route", "route_request", {"primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "map",
+              "location_mode": "search_area", "target_refs": ["Italy"], "capability_queries": ["weather"],
+              "analysis": {"kind": "rank", "metric": "temperature"}}),
+        _call("resolve", "resolve_geospatial_location", {"query": "Italy", "target_id": "Italy", "expected_location_type": "country"}),
+        LLMResult(content="I still need to retrieve and analyze weather evidence."),
+    ])
+    providers = DiscoveryProvider()
+    value = AgentRunState(phase=AgentPhase.RECEIVE_REQUEST, request_id="stale", conversation_id="stale",
+                          user_message="Where in Italy is it hottest?", context_hydrated=True,
+                          location_refs={"lyon": ResolvedLocation(label="Lyon", latitude=45.75, longitude=4.85)})
+    result = await make_loop(model, providers, Resolver()).run(AgentLoopRequest(provider="scripted", model="scripted",
+        state=value, budget=AgentExecutionBudget(total_seconds=10), max_no_progress_corrections=0))
+    assert result.tool_results[0].tool_name == "resolve_geospatial_location"
+    assert any(location.label == "Italy" for location in value.location_refs.values())
+    assert not providers.requests
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("area,seismic,partial", [("Europe", False, False), (None, False, False),
                                                  ("Europe", True, False), ("Europe", False, True)])
 async def test_discovery_reaches_derived_map_without_location_turn(area: str | None, seismic: bool, partial: bool) -> None:
