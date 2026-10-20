@@ -43,6 +43,7 @@ class RealtimeStartPayload(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
     client_request_id: str = Field(min_length=1, max_length=160)
     timezone: str | None = Field(default=None, max_length=64)
+    attachment_id: str | None = Field(default=None, max_length=64)
 
     # -------------------------------------------------------------------------
     @field_validator("message")

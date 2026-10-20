@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
 from server.common.paths import (
+    CHAT_ATTACHMENTS_ROUTE,
     CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
@@ -22,6 +23,8 @@ from server.common.paths import (
 )
 from server.contracts.chat import (
     AgentRunAcceptedResponse,
+    ChatAttachmentCreateRequest,
+    ChatAttachmentResponse,
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
@@ -37,6 +40,7 @@ from server.contracts.runs import AgentRunCreateRequest
 from server.contracts.runs import AgentRunState
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
+from server.services.geospatial.render_capture import RenderCaptureStore
 from server.domain.agent.trace import public_protocol_projection
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
@@ -44,6 +48,7 @@ from server.services.chat.streaming import ChatStreamingService
 from server.services.jobs import BackgroundJobService
 from server.services.agent_runs.exceptions import (
     RunAccessError,
+    RunAttachmentError,
     RunConflictError,
     RunNotFoundError,
 )
@@ -105,6 +110,7 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
             message=payload.message,
             client_request_id=payload.request_id,
             timezone=payload.timezone,
+            attachment_id=payload.attachment_id,
         )
     except ValidationError as exc:
         raise HTTPException(
@@ -232,6 +238,48 @@ async def chat_turn(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+    except RunAttachmentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+###############################################################################
+@router.post(
+    CHAT_ATTACHMENTS_ROUTE,
+    response_model=ChatAttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_chat_attachment(
+    payload: ChatAttachmentCreateRequest,
+    request: Request,
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> ChatAttachmentResponse:
+    """Hold one user image for the next run start that references it."""
+    if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        )
+    store: RenderCaptureStore = request.app.state.render_capture_store
+    try:
+        attachment_id = store.save_attachment(
+            conversation_id=payload.conversation_id,
+            mime_type=payload.mime_type,
+            image_base64=payload.image_base64,
+            width=payload.width,
+            height=payload.height,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return ChatAttachmentResponse(
+        attachment_id=attachment_id,
+        expires_in_seconds=int(store.ttl_seconds),
+    )
 
 
 ###############################################################################

@@ -305,7 +305,7 @@
     position: relative;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 2.75rem;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
     align-items: stretch;
     width: 100%;
     gap: 0;
@@ -323,7 +323,8 @@
     resize: none;
     border: 1px solid #324753;
     border-right: none;
-    border-radius: 0.45rem 0 0 0.45rem;
+    border-left: none;
+    border-radius: 0;
     background: #12222c;
     padding: 0.72rem 0.84rem;
     color: #dce8ed;
@@ -463,6 +464,78 @@
 .chat-composer .primary-button:hover:not(:disabled) {
     background: #152935;
     border-color: #2f9bd7;
+    color: #e5f5ff;
+}
+
+.chat-composer__attach {
+    min-height: 3.35rem;
+    border: 1px solid #324753;
+    border-right: none;
+    border-radius: 0.45rem 0 0 0.45rem;
+    background: #12222c;
+    color: #a9bac3;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.chat-composer__attach:hover:not(:disabled),
+.chat-composer__attach:focus-visible {
+    background: #152935;
+    border-color: #2f9bd7;
+    color: #e5f5ff;
+}
+
+.chat-composer__attach:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    color: #7f919a;
+}
+
+.chat-composer__attachment {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid #263a45;
+    border-radius: 0.45rem;
+    background: #12222c;
+    color: #c3d3da;
+    font-size: 0.78rem;
+}
+
+.chat-composer__attachment img {
+    width: 2.6rem;
+    height: 2.6rem;
+    object-fit: cover;
+    border-radius: 0.3rem;
+}
+
+.chat-composer__attachment-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-composer__attachment-remove {
+    width: 1.8rem;
+    height: 1.8rem;
+    border: none;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: #a9bac3;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.chat-composer__attachment-remove:hover,
+.chat-composer__attachment-remove:focus-visible {
+    background: #1a3240;
     color: #e5f5ff;
 }
 

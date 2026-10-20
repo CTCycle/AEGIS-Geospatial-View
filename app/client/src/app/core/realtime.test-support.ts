@@ -47,7 +47,7 @@ export class FakeRealtimeService {
 
   discardPendingMapRenderAcks(): void {}
 
-  sendRunStart(message: string, _clientRequestId: string, _timezone?: string): string {
+  sendRunStart(message: string, _clientRequestId: string, _timezone?: string, _attachmentId?: string): string {
     const conversationId = this.conversationId;
     if (!conversationId) {
       throw new Error('Conversation is not connected.');

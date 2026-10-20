@@ -77,6 +77,10 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "you recognize the coordinates. A timezone is not a place label. "
     "Quote the per-point window_start and window_end with their timezone; do not call "
     "local times UTC.\n\n"
+    "Visual clues: when the user attached an image, name the visible cues (signage, "
+    "script, landmarks, architecture, vegetation, terrain) behind any inferred place, "
+    "resolve it only when the cues are specific, and otherwise ask the user to confirm "
+    "candidate places. Never present an image-inferred location as certain.\n\n"
     "After useful tool work is complete, provide one concise user-facing "
     "answer and stop."
 )

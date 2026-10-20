@@ -59,6 +59,8 @@ TraceKind = Literal[
     "finalization_completed",
     "vision_attached",
     "capture_missing",
+    "user_image_attached",
+    "user_image_unsupported",
 ]
 
 ###############################################################################

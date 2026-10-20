@@ -28,6 +28,7 @@ import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
 import { formatCompactTokenCount } from '../core/token-format';
 import { postRenderCapture, type RenderCapturePayload } from '../core/api';
+import { prepareImageAttachment, type PreparedImageAttachment } from '../core/image-attachment';
 import {
   parseRunCompletionPayload,
   parseRunEvent,
@@ -127,6 +128,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   composerError = '';
   assistantDraft = '';
   composerDraft = '';
+  composerImage?: PreparedImageAttachment;
   transcriptScrollTop = 0;
   agentReadiness = INITIAL_AGENT_READINESS_STATE;
   catalog?: CatalogResponse;
@@ -940,6 +942,33 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     void this.sendMessage();
   }
 
+  get imageAttachDisabledReason(): string | null {
+    if (this.agentReadiness.supportsVision === false) {
+      return 'The selected model cannot view images. Choose a vision model in Settings to attach one.';
+    }
+    return this.isLoading ? 'Wait for the current request to finish before attaching an image.' : null;
+  }
+
+  async onComposerImageSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    try {
+      this.composerImage = await prepareImageAttachment(file);
+      this.composerError = '';
+    } catch (error: unknown) {
+      this.composerImage = undefined;
+      this.composerError = error instanceof Error ? error.message : 'The image could not be attached.';
+    }
+  }
+
+  removeComposerImage(): void {
+    this.composerImage = undefined;
+  }
+
   async sendMessage(): Promise<void> {
     const trimmed = this.composerDraft.trim();
     if (!trimmed) {
@@ -1024,12 +1053,25 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.pendingRun = pendingRun;
       this.lastRunSequence = 0;
       this.syncState();
+      // Images travel over HTTP: they exceed the realtime frame bound.
+      const image = this.composerImage;
+      const attachmentId = image
+        ? await this.apiClient.uploadChatAttachment({
+          conversation_id: conversation.conversation_id,
+          mime_type: image.mimeType,
+          image_base64: image.base64,
+          width: image.width,
+          height: image.height,
+        })
+        : undefined;
+      this.composerImage = undefined;
       this.realtimeService.setResumeCursor(undefined, 0);
       this.realtimeService.connect(conversation.conversation_id);
       this.realtimeService.sendRunStart(
         message,
         pendingRun.clientRequestId,
         Intl.DateTimeFormat().resolvedOptions().timeZone,
+        attachmentId,
       );
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(

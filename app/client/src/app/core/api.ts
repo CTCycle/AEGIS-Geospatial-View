@@ -1,5 +1,6 @@
 import {
   API_BASE_URL,
+  API_CHAT_ATTACHMENTS_PATH,
   API_CHAT_MODELS_PATH,
   API_CHAT_SETTINGS_PATH,
   API_CHAT_TURN_PATH,
@@ -19,6 +20,7 @@ import {
 } from './constants';
 import {
   parseCatalogResponse,
+  parseChatAttachmentResponse,
   parseChatTurnApiResponse,
   parseConversationCreateResponse,
   parseConversationListResponse,
@@ -316,6 +318,23 @@ export const updateRuntimeSettings = async (
 export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_REFRESH_PATH}`, { method: 'POST' });
   return parseOllamaRefreshResponse(data);
+};
+
+export interface ChatAttachmentPayload {
+  conversation_id: string;
+  mime_type: 'image/jpeg' | 'image/png' | 'image/webp';
+  image_base64: string;
+  width: number;
+  height: number;
+}
+
+export const postChatAttachment = async (payload: ChatAttachmentPayload): Promise<string> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_ATTACHMENTS_PATH}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseChatAttachmentResponse(data);
 };
 
 export interface RenderCapturePayload {

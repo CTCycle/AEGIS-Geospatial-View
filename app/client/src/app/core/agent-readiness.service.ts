@@ -12,6 +12,8 @@ export interface AgentReadinessState {
   status: AgentReadinessStatus;
   label: string;
   message: string;
+  /** Catalog-reported image input support; absent or null when unknown. */
+  supportsVision?: boolean | null;
 }
 
 export const INITIAL_AGENT_READINESS_STATE: AgentReadinessState = {
@@ -126,6 +128,7 @@ export class AgentReadinessService {
       status: 'active',
       label: 'Configured',
       message: `${this.describeActiveAgent(settings)} Model metadata reports tool calling support; normal workspace requests exercise live behavior.`,
+      supportsVision: descriptor.supports_vision ?? null,
     };
   }
 

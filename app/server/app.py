@@ -172,6 +172,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
         run_orchestrator=run_orchestrator,
+        attachment_store=render_capture_store,
     )
     chat_streaming_service = ChatStreamingService(
         lifecycle_service=run_lifecycle_service,
