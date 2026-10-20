@@ -282,9 +282,17 @@ def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEnt
             if key in seen:
                 raise ValueError(f"Duplicate macro-region alias: {alias}")
             seen.add(key)
-        region = MacroRegionEntry.model_validate({"id": region_id, "name": name, "aliases": aliases, "bbox": item.get("bbox"), "kind": _require_string(item.get("kind"), field_name="macro_region.kind")})
+        region = MacroRegionEntry.model_validate({"id": region_id, "name": name, "aliases": aliases, "bbox": item.get("bbox"), "kind": _require_string(item.get("kind"), field_name="macro_region.kind"), "countries": _parse_string_list(item.get("countries", []), field_name="macro_region.countries")})
         w, south, e, north = region.bbox
         if not (-180 <= w < e <= 180 and -85 <= south < north <= 85):
             raise ValueError(f"Invalid macro-region bbox: {name}")
         regions.append(region)
     return tuple(regions)
+
+
+def find_macro_region_entry(text: str) -> MacroRegionEntry | None:
+    key = text.strip().casefold()
+    for region in load_macro_regions():
+        if key in {alias.casefold() for alias in (region.name, *region.aliases)}:
+            return region
+    return None

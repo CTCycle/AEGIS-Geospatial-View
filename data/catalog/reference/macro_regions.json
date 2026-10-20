@@ -27,7 +27,60 @@
         45,
         72
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "AL",
+        "AD",
+        "AT",
+        "BY",
+        "BE",
+        "BA",
+        "BG",
+        "HR",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "DE",
+        "GR",
+        "HU",
+        "IS",
+        "IE",
+        "IT",
+        "XK",
+        "LV",
+        "LI",
+        "LT",
+        "LU",
+        "MT",
+        "MD",
+        "MC",
+        "ME",
+        "NL",
+        "MK",
+        "NO",
+        "PL",
+        "PT",
+        "RO",
+        "RU",
+        "SM",
+        "RS",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
+        "CH",
+        "UA",
+        "GB",
+        "VA",
+        "FO",
+        "AX",
+        "IM",
+        "JE",
+        "GG"
+      ]
     },
     {
       "id": "africa",
@@ -39,7 +92,64 @@
         52,
         38
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "DZ",
+        "AO",
+        "BJ",
+        "BW",
+        "BF",
+        "BI",
+        "CV",
+        "CM",
+        "CF",
+        "TD",
+        "KM",
+        "CD",
+        "CG",
+        "CI",
+        "DJ",
+        "EG",
+        "GQ",
+        "ER",
+        "SZ",
+        "ET",
+        "GA",
+        "GM",
+        "GH",
+        "GN",
+        "GW",
+        "KE",
+        "LS",
+        "LR",
+        "LY",
+        "MG",
+        "MW",
+        "ML",
+        "MR",
+        "MU",
+        "MA",
+        "MZ",
+        "NA",
+        "NE",
+        "NG",
+        "RW",
+        "ST",
+        "SN",
+        "SC",
+        "SL",
+        "SO",
+        "ZA",
+        "SS",
+        "SD",
+        "TZ",
+        "TG",
+        "TN",
+        "UG",
+        "ZM",
+        "ZW",
+        "EH"
+      ]
     },
     {
       "id": "asia",
@@ -51,7 +161,60 @@
         180,
         85
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "AF",
+        "AM",
+        "AZ",
+        "BH",
+        "BD",
+        "BT",
+        "BN",
+        "KH",
+        "CN",
+        "GE",
+        "IN",
+        "ID",
+        "IR",
+        "IQ",
+        "IL",
+        "JP",
+        "JO",
+        "KZ",
+        "KW",
+        "KG",
+        "LA",
+        "LB",
+        "MY",
+        "MV",
+        "MN",
+        "MM",
+        "NP",
+        "KP",
+        "OM",
+        "PK",
+        "PS",
+        "PH",
+        "QA",
+        "SA",
+        "SG",
+        "KR",
+        "LK",
+        "SY",
+        "TW",
+        "TJ",
+        "TH",
+        "TL",
+        "TR",
+        "TM",
+        "AE",
+        "UZ",
+        "VN",
+        "YE",
+        "RU",
+        "HK",
+        "MO"
+      ]
     },
     {
       "id": "north_america",
@@ -63,7 +226,47 @@
         -50,
         85
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "US",
+        "CA",
+        "MX",
+        "GL",
+        "BM",
+        "BZ",
+        "CR",
+        "SV",
+        "GT",
+        "HN",
+        "NI",
+        "PA",
+        "AG",
+        "BS",
+        "BB",
+        "CU",
+        "DM",
+        "DO",
+        "GD",
+        "HT",
+        "JM",
+        "KN",
+        "LC",
+        "VC",
+        "TT",
+        "PR",
+        "VI",
+        "KY",
+        "VG",
+        "TC",
+        "AW",
+        "CW",
+        "SX",
+        "MF",
+        "BL",
+        "AI",
+        "MS",
+        "PM"
+      ]
     },
     {
       "id": "south_america",
@@ -75,7 +278,23 @@
         -34,
         13
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "AR",
+        "BO",
+        "BR",
+        "CL",
+        "CO",
+        "EC",
+        "GY",
+        "PY",
+        "PE",
+        "SR",
+        "UY",
+        "VE",
+        "FK",
+        "FR"
+      ]
     },
     {
       "id": "oceania",
@@ -89,7 +308,27 @@
         180,
         30
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "AU",
+        "NZ",
+        "PG",
+        "FJ",
+        "SB",
+        "VU",
+        "NC",
+        "WS",
+        "TO",
+        "KI",
+        "FM",
+        "MH",
+        "PW",
+        "NR",
+        "TV",
+        "GU",
+        "MP",
+        "NF"
+      ]
     },
     {
       "id": "antarctica",
@@ -101,7 +340,10 @@
         180,
         -60
       ],
-      "kind": "continent"
+      "kind": "continent",
+      "countries": [
+        "AQ"
+      ]
     },
     {
       "id": "western_europe",
@@ -113,7 +355,23 @@
         16,
         61
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "AT",
+        "BE",
+        "FR",
+        "DE",
+        "LI",
+        "LU",
+        "MC",
+        "NL",
+        "CH",
+        "GB",
+        "IE",
+        "IM",
+        "JE",
+        "GG"
+      ]
     },
     {
       "id": "eastern_europe",
@@ -125,7 +383,19 @@
         45,
         65
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "BY",
+        "BG",
+        "CZ",
+        "HU",
+        "MD",
+        "PL",
+        "RO",
+        "RU",
+        "SK",
+        "UA"
+      ]
     },
     {
       "id": "northern_europe",
@@ -137,7 +407,24 @@
         32,
         72
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "DK",
+        "EE",
+        "FI",
+        "IS",
+        "IE",
+        "LV",
+        "LT",
+        "NO",
+        "SE",
+        "GB",
+        "FO",
+        "AX",
+        "IM",
+        "JE",
+        "GG"
+      ]
     },
     {
       "id": "southern_europe",
@@ -149,7 +436,25 @@
         30,
         47
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "AL",
+        "AD",
+        "BA",
+        "HR",
+        "GR",
+        "IT",
+        "MT",
+        "ME",
+        "MK",
+        "PT",
+        "SM",
+        "RS",
+        "SI",
+        "ES",
+        "VA",
+        "XK"
+      ]
     },
     {
       "id": "central_europe",
@@ -161,7 +466,18 @@
         25,
         55
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "AT",
+        "CZ",
+        "DE",
+        "HU",
+        "LI",
+        "PL",
+        "SK",
+        "SI",
+        "CH"
+      ]
     },
     {
       "id": "scandinavia",
@@ -173,7 +489,12 @@
         32,
         72
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "DK",
+        "NO",
+        "SE"
+      ]
     },
     {
       "id": "balkans",
@@ -187,7 +508,19 @@
         30,
         47
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "AL",
+        "BA",
+        "BG",
+        "HR",
+        "GR",
+        "XK",
+        "ME",
+        "MK",
+        "RS",
+        "SI"
+      ]
     },
     {
       "id": "iberian_peninsula",
@@ -201,7 +534,12 @@
         4.5,
         44.5
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "ES",
+        "PT",
+        "AD"
+      ]
     },
     {
       "id": "british_isles",
@@ -213,7 +551,14 @@
         2,
         61
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "GB",
+        "IE",
+        "IM",
+        "JE",
+        "GG"
+      ]
     },
     {
       "id": "mediterranean",
@@ -239,7 +584,26 @@
         63,
         42
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "BH",
+        "CY",
+        "EG",
+        "IR",
+        "IQ",
+        "IL",
+        "JO",
+        "KW",
+        "LB",
+        "OM",
+        "PS",
+        "QA",
+        "SA",
+        "SY",
+        "TR",
+        "AE",
+        "YE"
+      ]
     },
     {
       "id": "southeast_asia",
@@ -254,7 +618,20 @@
         142,
         29
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "BN",
+        "KH",
+        "ID",
+        "LA",
+        "MY",
+        "MM",
+        "PH",
+        "SG",
+        "TH",
+        "TL",
+        "VN"
+      ]
     },
     {
       "id": "east_asia",
@@ -266,7 +643,17 @@
         146,
         54
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "CN",
+        "JP",
+        "KP",
+        "KR",
+        "MN",
+        "TW",
+        "HK",
+        "MO"
+      ]
     },
     {
       "id": "central_america",
@@ -278,7 +665,16 @@
         -77,
         19
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "BZ",
+        "CR",
+        "SV",
+        "GT",
+        "HN",
+        "NI",
+        "PA"
+      ]
     },
     {
       "id": "caribbean",
@@ -290,7 +686,36 @@
         -59,
         28
       ],
-      "kind": "subregion"
+      "kind": "subregion",
+      "countries": [
+        "AG",
+        "BS",
+        "BB",
+        "CU",
+        "DM",
+        "DO",
+        "GD",
+        "HT",
+        "JM",
+        "KN",
+        "LC",
+        "VC",
+        "TT",
+        "PR",
+        "VI",
+        "KY",
+        "VG",
+        "TC",
+        "AW",
+        "CW",
+        "SX",
+        "MF",
+        "BL",
+        "AI",
+        "MS",
+        "FR",
+        "NL"
+      ]
     }
   ]
 }

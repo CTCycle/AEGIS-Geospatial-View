@@ -113,7 +113,7 @@
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Area queries sample at most 100 grid points of model estimates and may miss local extremes."]
+    "knownLimitations": ["Area queries sample up to 300 land points of model estimates inside the region, plus refined points around the strongest cells; extremes between samples can still be missed."]
   },
   "cachePolicy": {
     "mode": "memory",
@@ -136,7 +136,7 @@
     "output_geometry_type": "Point",
     "render_support": "vector",
     "coverage": "global",
-    "limitations": ["Area queries sample at most 100 grid points of model estimates; point queries sample the location. No area raster is provided."],
+    "limitations": ["Area queries sample up to 300 land points of model estimates masked to the region's member countries, with local refinement; point queries sample the location. No area raster is provided."],
     "fallback_ids": []
   }
 }

@@ -20,20 +20,19 @@ from server.domain.agent.decision import (
 from server.common.identifiers import normalize_target_key
 from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
-from server.services.catalog.loader import load_macro_regions
+from server.services.catalog.loader import find_macro_region_entry
 
 def find_macro_region(text: str) -> ResolvedLocation | None:
-    key = text.strip().casefold()
-    for region in load_macro_regions():
-        if key in {alias.casefold() for alias in (region.name, *region.aliases)}:
-            w, south, e, north = region.bbox
-            return ResolvedLocation(
-                label=region.name, latitude=(south + north) / 2,
-                longitude=(w + e) / 2, bbox=list(region.bbox),
-                location_type="macro_region", source="aegis_macro_regions",
-                bbox_source="aegis_macro_regions", confidence=1.0,
-            )
-    return None
+    region = find_macro_region_entry(text)
+    if region is None:
+        return None
+    w, south, e, north = region.bbox
+    return ResolvedLocation(
+        label=region.name, latitude=(south + north) / 2,
+        longitude=(w + e) / 2, bbox=list(region.bbox),
+        location_type="macro_region", source="aegis_macro_regions",
+        bbox_source="aegis_macro_regions", confidence=1.0,
+    )
 
 
 ###############################################################################
