@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-09-28
+Last updated: 2026-10-20
 
 ## Purpose
 
@@ -31,6 +31,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `fema` | National Flood Hazard Layer map context | public |
 | `gbif` | biodiversity occurrence records | public |
 | `noaa` | CONUS weather radar and observations | public |
+| `emsc` | Euro-Mediterranean earthquake catalog (SeismicPortal FDSN) | public |
 
 ## Basemaps
 
@@ -83,6 +84,7 @@ Representative implemented layers include:
 - `noaa_coops_water_levels`
 - `openchargemap_ev_charging`
 - `opentripmap_tourism_pois`
+- `emsc_earthquakes`
 - `usgs_earthquakes`
 - `usgs_water_gauges`
 - `gtfs_static`
