@@ -39,3 +39,11 @@ class ReferenceCatalog(BaseModel):
     geospatial_layers: tuple[GeospatialLayerReferenceEntry, ...] = ()
     gibs_tile_matrix_sets: tuple[GibsTileMatrixSetReferenceEntry, ...] = ()
     gibs_layer_defaults: tuple[GibsLayerDefaultReferenceEntry, ...] = ()
+
+
+class MacroRegionEntry(BaseModel):
+    id: str
+    name: str
+    aliases: tuple[str, ...]
+    bbox: tuple[float, float, float, float]
+    kind: str

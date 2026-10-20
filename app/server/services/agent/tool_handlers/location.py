@@ -29,6 +29,7 @@ _LOCATION_TYPES = frozenset(
         "landmark",
         "poi",
         "region",
+    "macro_region",
         "river",
         "road",
         "street",

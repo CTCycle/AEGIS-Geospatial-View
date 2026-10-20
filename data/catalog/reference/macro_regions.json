@@ -1,0 +1,296 @@
+{
+  "macro_regions": [
+    {
+      "id": "world",
+      "name": "World",
+      "aliases": [
+        "global",
+        "worldwide"
+      ],
+      "bbox": [
+        -180,
+        -85,
+        180,
+        85
+      ],
+      "kind": "world"
+    },
+    {
+      "id": "europe",
+      "name": "Europe",
+      "aliases": [
+        "europa"
+      ],
+      "bbox": [
+        -25,
+        34,
+        45,
+        72
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "africa",
+      "name": "Africa",
+      "aliases": [],
+      "bbox": [
+        -18,
+        -35,
+        52,
+        38
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "asia",
+      "name": "Asia",
+      "aliases": [],
+      "bbox": [
+        25,
+        -10,
+        180,
+        85
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "north_america",
+      "name": "North America",
+      "aliases": [],
+      "bbox": [
+        -170,
+        5,
+        -50,
+        85
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "south_america",
+      "name": "South America",
+      "aliases": [],
+      "bbox": [
+        -82,
+        -56,
+        -34,
+        13
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "oceania",
+      "name": "Oceania",
+      "aliases": [
+        "Australasia"
+      ],
+      "bbox": [
+        110,
+        -50,
+        180,
+        30
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "antarctica",
+      "name": "Antarctica",
+      "aliases": [],
+      "bbox": [
+        -180,
+        -85,
+        180,
+        -60
+      ],
+      "kind": "continent"
+    },
+    {
+      "id": "western_europe",
+      "name": "Western Europe",
+      "aliases": [],
+      "bbox": [
+        -11,
+        42,
+        16,
+        61
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "eastern_europe",
+      "name": "Eastern Europe",
+      "aliases": [],
+      "bbox": [
+        15,
+        40,
+        45,
+        65
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "northern_europe",
+      "name": "Northern Europe",
+      "aliases": [],
+      "bbox": [
+        -25,
+        54,
+        32,
+        72
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "southern_europe",
+      "name": "Southern Europe",
+      "aliases": [],
+      "bbox": [
+        -10,
+        34,
+        30,
+        47
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "central_europe",
+      "name": "Central Europe",
+      "aliases": [],
+      "bbox": [
+        5,
+        45,
+        25,
+        55
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "scandinavia",
+      "name": "Scandinavia",
+      "aliases": [],
+      "bbox": [
+        4,
+        54,
+        32,
+        72
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "balkans",
+      "name": "Balkans",
+      "aliases": [
+        "Balkan Peninsula"
+      ],
+      "bbox": [
+        13,
+        35,
+        30,
+        47
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "iberian_peninsula",
+      "name": "Iberian Peninsula",
+      "aliases": [
+        "Iberia"
+      ],
+      "bbox": [
+        -10,
+        35,
+        4.5,
+        44.5
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "british_isles",
+      "name": "British Isles",
+      "aliases": [],
+      "bbox": [
+        -11,
+        49,
+        2,
+        61
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "mediterranean",
+      "name": "Mediterranean",
+      "aliases": [
+        "Mediterranean region"
+      ],
+      "bbox": [
+        -6,
+        30,
+        37,
+        46
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "middle_east",
+      "name": "Middle East",
+      "aliases": [],
+      "bbox": [
+        25,
+        12,
+        63,
+        42
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "southeast_asia",
+      "name": "Southeast Asia",
+      "aliases": [
+        "South East Asia",
+        "South-East Asia"
+      ],
+      "bbox": [
+        92,
+        -11,
+        142,
+        29
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "east_asia",
+      "name": "East Asia",
+      "aliases": [],
+      "bbox": [
+        73,
+        18,
+        146,
+        54
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "central_america",
+      "name": "Central America",
+      "aliases": [],
+      "bbox": [
+        -93,
+        7,
+        -77,
+        19
+      ],
+      "kind": "subregion"
+    },
+    {
+      "id": "caribbean",
+      "name": "Caribbean",
+      "aliases": [],
+      "bbox": [
+        -90,
+        9,
+        -59,
+        28
+      ],
+      "kind": "subregion"
+    }
+  ]
+}

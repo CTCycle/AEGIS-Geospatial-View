@@ -19,6 +19,7 @@ LocationSignalType = Literal[
     "feature",
     "landmark",
     "region",
+    "macro_region",
     "river",
     "road",
     "street",

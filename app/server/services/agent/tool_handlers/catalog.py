@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from server.domain.agent.capability_domains import CapabilityDomain
+from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -57,6 +58,9 @@ class CatalogToolHandler:
             if state.active_map_session is not None
             else None
         )
+        if route is not None and route.location_mode == "search_area":
+            location = next((item for key, item in state.location_refs.items()
+                             if any(location_ref_matches(ref, key, item.label) for ref in route.target_refs)), None)
         query_values = (
             list(route.capability_queries)
             if catalog_discovery and route is not None
