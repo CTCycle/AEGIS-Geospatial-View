@@ -22,6 +22,9 @@ from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 from server.services.catalog.loader import find_macro_region_entry
 
+_ORDINAL_SUFFIX = re.compile(r"\b(\d+)(?:st|nd|rd|th|e|er|re|eme|ere|o|a)\b")
+
+
 def find_macro_region(text: str) -> ResolvedLocation | None:
     region = find_macro_region_entry(text)
     if region is None:
@@ -1284,8 +1287,12 @@ class LocationResolver:
             # Keep the geocoder's configured normalizer when available, but
             # fall back to the same shared canonical identity used by request
             # compilation so lookup keys cannot diverge between services.
-            return str(normalizer(value))
-        return normalize_target_key(value)
+            normalized = str(normalizer(value))
+        else:
+            normalized = normalize_target_key(value)
+        # Local-language ordinals (signage "7e Arrondissement", "1er", "3º")
+        # must match the geocoder's English display ("7th Arrondissement").
+        return _ORDINAL_SUFFIX.sub(r"\1", normalized)
 
     # -------------------------------------------------------------------------
     def _canonical_context_value(self, signal_type: str, value: str) -> str:
