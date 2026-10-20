@@ -398,7 +398,7 @@ export const getOverlayLayerIds = (overlay: OverlayEntry): string[] => {
   const renderingMode = String(
     overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
   ).toLowerCase();
-  if (overlay.value_encoding?.mode === 'heatmap') return [`${layerId}-heatmap`];
+  if (overlay.value_encoding?.mode === 'heatmap') return [`${layerId}-heatmap`, `${layerId}-centres`];
   if (renderingMode === 'clustered-points' && !overlay.value_encoding) {
     return [
       `${layerId}-clusters`,
@@ -494,6 +494,12 @@ const addGeoJsonOverlayLayer = (
       map.addLayer({id: `${layerId}-heatmap`, source: sourceId, type: 'heatmap', paint: {
         'heatmap-weight': encoding.min === encoding.max ? 1 : ['interpolate', ['linear'], value, encoding.min, 0, encoding.max, 1],
         'heatmap-radius': 30, 'heatmap-opacity': opacity,
+      }});
+      // Visible bin centres keep sparse heatmaps inspectable and provide
+      // queryable rendered geometry (MapLibre heatmaps do not expose hits).
+      map.addLayer({id: `${layerId}-centres`, source: sourceId, type: 'circle', paint: {
+        'circle-radius': 3, 'circle-color': '#ffffff', 'circle-opacity': opacity,
+        'circle-stroke-width': 1, 'circle-stroke-color': '#334155',
       }});
     } else {
       map.addLayer({id: layerId, source: sourceId, type: 'circle', paint: {

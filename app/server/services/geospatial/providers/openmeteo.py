@@ -142,6 +142,7 @@ class OpenMeteoProvider(GeospatialProvider):
             windows.append((start, end))
             features.append({
                 "id": f"openmeteo:grid:{index}", "latitude": latitude, "longitude": longitude,
+                "name": f"{latitude:.5f}, {longitude:.5f}", "label_kind": "coordinates",
                 "precipitation_sum_mm": sum(float(value) for value in rain if value is not None), "temperature_2m_max_c": max(float(value) for value in heat if value is not None),
                 "temperature_2m_current_c": current["temperature_2m"], "elevation": payload.get("elevation"),
                 "window_start": start, "window_end": end, "timezone": payload.get("timezone"),
@@ -150,10 +151,11 @@ class OpenMeteoProvider(GeospatialProvider):
         units = {"precipitation_sum_mm": "mm", "temperature_2m_max_c": "\u00b0C", "temperature_2m_current_c": "\u00b0C", "elevation": "m"}
         coverage: dict[str, Any] = {"type": "grid_sample", "bbox": list(request.bbox), "point_count": len(features),
                     "requested_point_count": len(points), "spacing_deg": spacing, "excluded_sea_points": excluded,
-                    "temporal_scope_satisfied": not partial and (request.time is None or now - request.time <= timedelta(days=14)),
+                    "temporal_scope_satisfied": request.time is None or now - request.time <= timedelta(days=14),
+                    "missing_point_count": len(points) - excluded - len(features),
                     "window_start": min((w[0] for w in windows), default=None),
                     "window_end": max((w[1] for w in windows), default=None),
-                    "value_kind": "model_estimate"}
+                    "value_kind": "model_estimate", "location_labels": "coordinates_only"}
         return ProviderResponse(
             capability_id=request.capability_id, provider_id=self.provider_id,
             payload={"features": features, "renderingMode": "circles", "value_kind": "model_estimate", "units": units, "coverage": coverage},

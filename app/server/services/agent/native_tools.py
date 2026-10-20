@@ -699,6 +699,12 @@ def _map_plan_semantic_validator(
                 f"evidence_ref '{action.evidence_ref}' must exactly match a successful "
                 "evidence-producing tool result in the current run."
             )
+        if state.route is not None and state.route.analysis is not None:
+            derived_refs = {ref for result in state.tool_results
+                            if result.tool_name == "transform_evidence"
+                            and result.status == "success" for ref in result.evidence_refs}
+            if action.evidence_ref not in derived_refs:
+                errors.append("Analysis maps must use located derived evidence from transform_evidence; for valid_empty use fit_location without an evidence layer.")
 
     contract = state.completion_contract
     if (

@@ -53,7 +53,7 @@ describe('map-preview-rendering', () => {
         expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status).toBe('loaded');
         expect(sources[0]['cluster']).toBeUndefined();
         expect(layers[0]['type']).toBe(mode === 'heatmap' ? 'heatmap' : 'circle');
-        expect(getOverlayLayerIds(overlay)).toEqual([String(layers[0]['id'])]);
+        expect(getOverlayLayerIds(overlay)).toEqual(layers.map((layer) => String(layer['id'])));
         const paint = layers[0]['paint'] as Record<string, unknown>;
         const encoded = paint[mode === 'heatmap' ? 'heatmap-weight' : 'circle-radius'];
         expect(Array.isArray(encoded)).toBe(max !== 0);

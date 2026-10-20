@@ -533,6 +533,21 @@ getLayer: jasmine.Spy;
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
   });
 
+  it('applies heatmap opacity without writing circle paint to a heatmap', () => {
+    component.payload = { map_session: makeMapSession({overlays: [{
+      id: 'hotspots', label: 'Hotspots', type: 'geojson', provider: 'usgs',
+      rendering_mode: 'circles', geometry_type: 'Point',
+      data: {type: 'FeatureCollection', features: []},
+      value_encoding: {mode: 'heatmap', field: 'count', min: 1, max: 10},
+    }]}) as never };
+    fixture.detectChanges();
+    fakeMap.setPaintProperty.calls.reset();
+    component.setOverlayOpacity('hotspots', '50');
+    expect(fakeMap.setPaintProperty).toHaveBeenCalledWith('overlay-layer-hotspots-heatmap', 'heatmap-opacity', 0.5);
+    expect(fakeMap.setPaintProperty).toHaveBeenCalledWith('overlay-layer-hotspots-centres', 'circle-opacity', 0.5);
+    expect(fakeMap.setPaintProperty).not.toHaveBeenCalledWith('overlay-layer-hotspots-heatmap', 'circle-opacity', 0.5);
+  });
+
   it('restores and emits a reconciled order for the active session', () => {
     component.initialOverlayOrder = ['vector', 'removed'];
     component.payload = {
