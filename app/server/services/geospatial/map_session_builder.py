@@ -36,6 +36,8 @@ from server.services.geospatial.raster_tiles import (
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
+# A single point (or tight cluster) fits to about city scale, not street level.
+MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
 _GEOJSON_RENDERING_MODES = frozenset(
     {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points", "circles"}
 )
@@ -324,7 +326,10 @@ class MapSessionBuilder:
         if action.strategy == "fit_evidence":
             bbox = _evidence_bbox(evidence)
             if bbox is not None:
-                viewport = _viewport_for_bbox(bbox, session.viewport)
+                viewport = _viewport_for_bbox(
+                    _with_min_span(bbox, MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES),
+                    session.viewport,
+                )
                 return _with_viewport(session, viewport)
         if action.strategy == "fit_location":
             return _with_viewport(
@@ -713,6 +718,21 @@ def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
     ):
         return None
     return bbox
+
+###############################################################################
+def _with_min_span(bbox: list[float], span: float) -> list[float]:
+    min_lon, min_lat, max_lon, max_lat = bbox
+    if min(max_lon - min_lon, max_lat - min_lat) >= span:
+        return bbox
+    half_lon = max(max_lon - min_lon, span) / 2
+    half_lat = max(max_lat - min_lat, span) / 2
+    center_lon, center_lat = (min_lon + max_lon) / 2, (min_lat + max_lat) / 2
+    return [
+        max(-180.0, center_lon - half_lon),
+        max(-90.0, center_lat - half_lat),
+        min(180.0, center_lon + half_lon),
+        min(90.0, center_lat + half_lat),
+    ]
 
 ###############################################################################
 def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportPolicy:

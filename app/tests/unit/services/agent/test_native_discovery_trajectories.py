@@ -218,4 +218,7 @@ async def test_discovery_reaches_derived_map_without_location_turn(area: str | N
     assert state.prepared_map_session is not None
     descriptor = state.prepared_map_session.overlay_collection.instances[-1].descriptor
     assert descriptor["value_encoding"]["max"] == (1 if seismic else 100)
+    # One derived point fits at city scale rather than maximum zoom.
+    viewport_bbox = state.prepared_map_session.viewport.bbox
+    assert viewport_bbox is not None and min(viewport_bbox[2] - viewport_bbox[0], viewport_bbox[3] - viewport_bbox[1]) >= 0.25
     assert evidence.records["evidence-2"][0].provenance["units"][field]
