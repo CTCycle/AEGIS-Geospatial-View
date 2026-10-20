@@ -34,7 +34,7 @@ def native_response(payload: ChatTurnRequest) -> ChatTurnResponse:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="answer",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
     )
     return ChatTurnResponse(
         request_id=payload.request_id or "chat-req",
@@ -52,7 +52,7 @@ def native_response(payload: ChatTurnRequest) -> ChatTurnResponse:
             task_mode="answer",
             presentation="text",
             operation="answer",
-            requires_location=False,
+            location_mode="none",
         ),
         completion_contract=CompletionContract(operation="answer"),
         conversation_state=ConversationState.empty(payload.conversation_id),

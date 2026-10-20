@@ -107,7 +107,7 @@ def test_exposure_is_phase_and_prerequisite_bound() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
     )
     state.evidence_refs = ["evidence:1"]
     state.tool_results = [

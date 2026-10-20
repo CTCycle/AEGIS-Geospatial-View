@@ -154,7 +154,7 @@ def _route_call() -> LLMResult:
                     "primary_domain": "data_retrieval",
                     "task_mode": "execute",
                     "presentation": "text",
-                    "requires_location": False,
+                    "location_mode": "none",
                     "capability_queries": ["hospitals"],
                 },
             )
@@ -197,7 +197,7 @@ async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
             "primary_domain": "map_rendering",
             "task_mode": "execute",
             "presentation": "map",
-            "requires_location": False,
+            "location_mode": "none",
         },
     )
     response = await _run(_Provider([route, LLMResult(content="Map ready.")]))
@@ -266,7 +266,7 @@ async def test_native_runner_resumes_a_valid_checkpoint_without_rerouting() -> N
             primary_domain=CapabilityDomain.DATA_RETRIEVAL,
             task_mode="execute",
             presentation="text",
-            requires_location=False,
+            location_mode="none",
             capability_queries=["hospitals"],
         ),
         capability_ids=["places:hospitals"],

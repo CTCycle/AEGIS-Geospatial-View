@@ -798,7 +798,7 @@ def _controlled_socket(
                         task_mode="execute",
                         presentation="map",
                         operation="render",
-                        requires_location=True,
+                        location_mode="target",
                         capability_query="earthquakes",
                         target_refs=["location:rome"],
                     ),
@@ -806,7 +806,7 @@ def _controlled_socket(
                         task_mode="execute",
                         presentation="map",
                         operation="render",
-                        requires_location=True,
+                        location_mode="target",
                         goal="Show recent earthquakes around Rome",
                     ),
                     "completion_contract": {

@@ -2317,7 +2317,7 @@ class AgentLoop:
         if (
             route is None
             or route.task_mode != "execute"
-            or not route.requires_location
+            or route.location_mode == "none"
             or (
                 route.primary_domain
                 in {CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE}
@@ -2864,7 +2864,7 @@ class AgentLoop:
         )
         filters = dict(route.filters)
         requirements: list[str] = []
-        if route.requires_location:
+        if route.location_mode != "none":
             requirements.append("location_resolved")
         route_domains = {route.primary_domain, *route.secondary_domains}
         text_location_resolution_only = (
@@ -2918,7 +2918,8 @@ class AgentLoop:
             task_mode=route.task_mode,
             presentation=route.presentation,
             operation=operation,
-            requires_location=route.requires_location,
+            location_mode=route.location_mode,
+            analysis=route.analysis,
             target_ids=target_ids,
             temporal_scope=temporal_scope,
             spatial_scope=spatial_scope,
@@ -2928,7 +2929,7 @@ class AgentLoop:
             operation=operation,
             data_requirement=("provider_data" if requires_provider_data else "none"),
             requirements=list(state.completion_requirements),
-            location_required=route.requires_location,
+            location_required=route.location_mode != "none",
             evidence_required="required_data_retrieved" in state.completion_requirements,
             map_preparation_required="map_candidate_prepared"
             in state.completion_requirements,
@@ -3072,7 +3073,8 @@ class AgentLoop:
             "task_mode": state.goal.task_mode,
             "presentation": state.goal.presentation,
             "operation": state.goal.operation,
-            "requires_location": state.goal.requires_location,
+            "location_mode": state.goal.location_mode,
+            "analysis": state.goal.analysis.model_dump(mode="json") if state.goal.analysis else None,
             "target_ids": list(state.goal.target_ids[:16]),
             "temporal_scope": state.goal.temporal_scope,
             "spatial_scope": list(state.goal.spatial_scope[:16]),
@@ -3110,7 +3112,8 @@ class AgentLoop:
             "secondary_domains": [item.value for item in state.route.secondary_domains[:3]],
             "task_mode": state.route.task_mode,
             "presentation": state.route.presentation,
-            "requires_location": state.route.requires_location,
+            "location_mode": state.route.location_mode,
+            "analysis": state.route.analysis.model_dump(mode="json") if state.route.analysis else None,
             "capability_queries": list(state.route.capability_queries[:4]),
             "explicit_capability_ids": list(state.route.explicit_capability_ids[:8]),
             "operation": state.route.operation,

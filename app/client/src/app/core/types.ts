@@ -767,7 +767,8 @@ export interface AgentGoal {
   task_mode: 'answer' | 'execute' | 'clarify';
   presentation: 'text' | 'map' | 'both';
   operation: string;
-  requires_location: boolean;
+  analysis?: { kind: 'rank' | 'hotspot' | 'threshold'; metric: string; order: string; top_k: number } | null;
+  location_mode: 'none' | 'target' | 'search_area';
   target_ids: string[];
   temporal_scope: Record<string, JsonValue>;
   spatial_scope: Array<Record<string, JsonValue>>;
@@ -864,7 +865,8 @@ export interface NativeCapabilityRoute {
   secondary_domains: string[];
   task_mode: 'answer' | 'execute' | 'clarify';
   presentation: 'text' | 'map' | 'both';
-  requires_location: boolean;
+  analysis?: { kind: 'rank' | 'hotspot' | 'threshold'; metric: string; order: string; top_k: number } | null;
+  location_mode: 'none' | 'target' | 'search_area';
   capability_queries: string[];
   explicit_capability_ids: string[];
   clarification_question?: string | null;

@@ -1157,7 +1157,8 @@ export const parseNativeGoal = (value: unknown, endpoint = 'native agent'): Agen
     task_mode: taskMode as AgentGoal['task_mode'],
     presentation: presentation as AgentGoal['presentation'],
     operation: requireApiString(record, 'operation', endpoint),
-    requires_location: requireApiBoolean(record, 'requires_location', endpoint),
+    location_mode: parseLocationMode(record.location_mode, endpoint),
+    analysis: parseAnalysisIntent(record.analysis, endpoint),
     target_ids: requireApiStringArray(record, 'target_ids', endpoint),
     temporal_scope: requireApiJsonObject(record.temporal_scope, endpoint, 'temporal_scope'),
     spatial_scope: requireApiArray(record.spatial_scope, endpoint, 'spatial_scope')
@@ -1735,7 +1736,8 @@ export const parseNativeRoute = (value: unknown, endpoint: string): NativeCapabi
     secondary_domains: requireApiStringArray(route, 'secondary_domains', endpoint),
     task_mode: taskMode as NativeCapabilityRoute['task_mode'],
     presentation: presentation as NativeCapabilityRoute['presentation'],
-    requires_location: requireApiBoolean(route, 'requires_location', endpoint),
+    location_mode: parseLocationMode(route.location_mode, endpoint),
+    analysis: parseAnalysisIntent(route.analysis, endpoint),
     capability_queries: requireApiStringArray(route, 'capability_queries', endpoint),
     explicit_capability_ids: requireApiStringArray(route, 'explicit_capability_ids', endpoint),
     clarification_question: optionalApiString(route, 'clarification_question', endpoint),
@@ -2316,3 +2318,19 @@ export const parseAgentRunSnapshot = (value: unknown): AgentRunSnapshot => {
     task_state: taskState,
   };
 };
+
+function parseLocationMode(value: unknown, endpoint: string): 'none' | 'target' | 'search_area' {
+  if (value === 'none' || value === 'target' || value === 'search_area') return value;
+  return apiContract(endpoint, 'location_mode is unsupported', value);
+}
+
+function parseAnalysisIntent(value: unknown, endpoint: string): AgentGoal['analysis'] {
+  if (value == null) return null;
+  const item = requireApiRecord(value, endpoint, 'analysis');
+  const kind = requireApiString(item, 'kind', endpoint);
+  const top = item['top_k'];
+  if (!['rank', 'hotspot', 'threshold'].includes(kind) || typeof top !== 'number' || !Number.isInteger(top) || top < 1 || top > 25) {
+    return apiContract(endpoint, 'analysis is invalid', value);
+  }
+  return {kind: kind as 'rank' | 'hotspot' | 'threshold', metric: requireApiString(item, 'metric', endpoint), order: requireApiString(item, 'order', endpoint), top_k: top};
+}

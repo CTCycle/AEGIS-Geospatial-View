@@ -14,6 +14,18 @@ from server.domain.agent.tool_result import ModelObservation, ToolResult
 from server.domain.agent.vision_policy import VisionState
 
 ###############################################################################
+class AgentAnalysisIntent(BaseModel):
+    """Provider-neutral analysis selected from the user's objective."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["rank", "hotspot", "threshold"]
+    metric: str = Field(min_length=1, max_length=120)
+    order: str = Field(default="descending", max_length=40)
+    top_k: int = Field(default=5, ge=1, le=25)
+
+
+###############################################################################
 class CapabilityRoute(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -23,7 +35,8 @@ class CapabilityRoute(BaseModel):
     )
     task_mode: Literal["answer", "execute", "clarify"]
     presentation: Literal["text", "map", "both"]
-    requires_location: bool
+    location_mode: Literal["none", "target", "search_area"]
+    analysis: AgentAnalysisIntent | None = None
     capability_queries: list[str] = Field(
         default_factory=lambda: list[str](), max_length=4
     )
@@ -95,7 +108,8 @@ class AgentGoal(BaseModel):
     task_mode: Literal["answer", "execute", "clarify"]
     presentation: Literal["text", "map", "both"]
     operation: str
-    requires_location: bool
+    location_mode: Literal["none", "target", "search_area"]
+    analysis: AgentAnalysisIntent | None = None
     target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     temporal_scope: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
@@ -134,6 +148,7 @@ CompletionRequirementKind = Literal[
     "capability_discovery",
     "provider_data",
     "evidence_inspection",
+    "evidence_analysis",
     "temporal_scope",
     "spatial_scope",
     "map_candidate",

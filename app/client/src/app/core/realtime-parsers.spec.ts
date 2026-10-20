@@ -171,7 +171,7 @@ describe('realtime parsers', () => {
         secondary_domains: [],
         task_mode: 'execute',
         presentation: 'text',
-        requires_location: false,
+        location_mode: "none",
         capability_queries: ['evidence'],
         explicit_capability_ids: [],
         clarification_question: null,

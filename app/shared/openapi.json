@@ -1894,6 +1894,46 @@
         ],
         "title": "ActiveConversationRunSnapshot"
       },
+      "AgentAnalysisIntent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rank",
+              "hotspot",
+              "threshold"
+            ],
+            "title": "Kind"
+          },
+          "metric": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Metric"
+          },
+          "order": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Order",
+            "default": "descending"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "metric"
+        ],
+        "title": "AgentAnalysisIntent",
+        "description": "Provider-neutral analysis selected from the user's objective."
+      },
       "AgentGoal": {
         "properties": {
           "goal": {
@@ -1922,9 +1962,24 @@
             "type": "string",
             "title": "Operation"
           },
-          "requires_location": {
-            "type": "boolean",
-            "title": "Requires Location"
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "target",
+              "search_area"
+            ],
+            "title": "Location Mode"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentAnalysisIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "target_ids": {
             "items": {
@@ -1961,7 +2016,7 @@
           "task_mode",
           "presentation",
           "operation",
-          "requires_location"
+          "location_mode"
         ],
         "title": "AgentGoal",
         "description": "Server-owned goal details derived from a validated native route."
@@ -2977,9 +3032,24 @@
             ],
             "title": "Presentation"
           },
-          "requires_location": {
-            "type": "boolean",
-            "title": "Requires Location"
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "target",
+              "search_area"
+            ],
+            "title": "Location Mode"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentAnalysisIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "capability_queries": {
             "items": {
@@ -3055,7 +3125,7 @@
           "primary_domain",
           "task_mode",
           "presentation",
-          "requires_location"
+          "location_mode"
         ],
         "title": "CapabilityRoute"
       },
@@ -3461,6 +3531,7 @@
                   "capability_discovery",
                   "provider_data",
                   "evidence_inspection",
+                  "evidence_analysis",
                   "temporal_scope",
                   "spatial_scope",
                   "map_candidate",

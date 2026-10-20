@@ -156,7 +156,7 @@ def test_answer_and_clarify_routes_expose_no_execution_tools(task_mode: str) -> 
         primary_domain=CapabilityDomain.CONVERSATION,
         task_mode=task_mode,  # type: ignore[arg-type]
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         clarification_question=("Which source should I use?" if task_mode == "clarify" else None),
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
@@ -202,7 +202,7 @@ def test_map_only_routes_expose_map_preparation_without_data_execution() -> None
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["Vermont state map"],
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
@@ -220,14 +220,14 @@ def test_map_only_routes_expose_map_preparation_without_data_execution() -> None
 
 
 ###############################################################################
-def test_new_route_target_requires_location_resolution_even_with_active_map() -> None:
+def test_new_route_target_location_mode_resolution_even_with_active_map() -> None:
     registry = _registry()
     state = _state()
     state.route = CapabilityRoute(
         primary_domain=CapabilityDomain.MAP_STATE,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         target_refs=["Salta, Argentina"],
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
@@ -254,7 +254,7 @@ def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() ->
         secondary_domains=(CapabilityDomain.MAP_RENDERING,),
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="add_layer",
         target_refs=["Zurich, Switzerland", "Lisbon, Portugal"],
         capability_queries=["precipitation radar"],
@@ -280,7 +280,7 @@ def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None
         primary_domain=CapabilityDomain.MAP_STATE,
         task_mode="execute",
         presentation="map",
-        requires_location=False,
+        location_mode="none",
         operation="remove_layer",
         target_refs=["earthquake layer"],
     )
@@ -307,7 +307,7 @@ def test_capability_discovery_route_does_not_expose_data_execution() -> None:
         ],
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["geospatial data layers"],
         operation="discover_available_map_data",
         target_refs=["Florence, Italy"],
@@ -332,7 +332,7 @@ def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> N
         primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         operation="discover_available_map_data",
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
@@ -397,7 +397,7 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
         task_mode="execute",
         presentation="map",
         operation="search",
-        requires_location=True,
+        location_mode="target",
         target_ids=["zurich"],
         temporal_scope={
             "mode": "forecast",
@@ -457,7 +457,7 @@ def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
         task_mode="execute",
         presentation="map",
         operation="show_basemap",
-        requires_location=True,
+        location_mode="target",
         target_ids=["sicily"],
         spatial_scope=[{"kind": "administrative_geometry", "relationship": "in"}],
     )
@@ -488,7 +488,7 @@ def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None
         task_mode="execute",
         presentation="both",
         operation="retrieve_active_water_gauges",
-        requires_location=True,
+        location_mode="target",
         target_ids=["USGS water gauges", "Austin, Texas"],
         spatial_scope=[
             {
@@ -518,7 +518,7 @@ def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> Non
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="both",
-        requires_location=True,
+        location_mode="target",
         operation="show",
     )
     state.completion_contract = CompletionContract(
@@ -570,7 +570,7 @@ def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
         task_mode="execute",
         presentation="text",
         operation="search",
-        requires_location=True,
+        location_mode="target",
         target_ids=["zurich"],
     )
 
@@ -613,7 +613,7 @@ def _route() -> CapabilityRoute:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="both",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["hospitals"],
     )
 
@@ -673,7 +673,7 @@ def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="retrieve",
         capability_queries=["earthquakes"],
     )
@@ -703,7 +703,7 @@ def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
         secondary_domains=(CapabilityDomain.DATA_RETRIEVAL,),
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="add_layer",
         capability_queries=["earthquakes"],
     )
@@ -732,7 +732,7 @@ def test_map_add_route_ignores_capability_target_for_location_prerequisite() -> 
         secondary_domains=(CapabilityDomain.DATA_RETRIEVAL,),
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="add_layer",
         target_refs=["earthquakes", "Japan"],
         spatial_scope={
@@ -838,7 +838,7 @@ def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.capability_ids = ["places:hospitals"]
@@ -869,7 +869,7 @@ def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None
         secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.capability_ids = ["places:hospitals"]
@@ -941,7 +941,7 @@ def test_location_reference_also_matches_the_resolved_label() -> None:
         task_mode="execute",
         presentation="map",
         operation="add_layer",
-        requires_location=True,
+        location_mode="target",
         target_ids=["Zurich, Switzerland", "Lisbon, Portugal"],
     )
     by_key = ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="lisbon")
@@ -1004,7 +1004,7 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
         primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         capability_queries=["obscure layer"],
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
@@ -1020,7 +1020,7 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         capability_queries=["obscure layer"],
     )
     assert "discover_geospatial_provider_layers" not in {

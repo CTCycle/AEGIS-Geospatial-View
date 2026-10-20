@@ -17,7 +17,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
         secondary_domains=[CapabilityDomain.MAP_RENDERING],
         task_mode="execute",
         presentation="both",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["hospitals"],
     )
 
@@ -29,7 +29,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
             primary_domain="not-a-domain",
             task_mode="execute",
             presentation="text",
-            requires_location=False,
+            location_mode="none",
         )
 
     with pytest.raises(ValidationError):
@@ -37,7 +37,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
             primary_domain="conversation",
             task_mode="execute",
             presentation="text",
-            requires_location=False,
+            location_mode="none",
             unexpected=True,
         )
 

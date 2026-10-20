@@ -141,14 +141,14 @@ class ToolRegistry:
             if prerequisite == "location" and not has_location:
                 return False
             if prerequisite == "location_required" and (
-                state.route is None or not state.route.requires_location
+                state.route is None or state.route.location_mode == "none"
             ):
                 return False
             if prerequisite == "location_missing" and has_location:
                 return False
             if prerequisite == "location_if_required" and (
                 state.route is not None
-                and state.route.requires_location
+                and state.route.location_mode != "none"
                 and not has_location
             ):
                 return False
@@ -323,7 +323,7 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
     route = state.route
     route_domains = _route_domains(state)
     if registered.definition.name == "resolve_geospatial_location":
-        return route.requires_location and not _route_target_location_available(state)
+        return route.location_mode != "none" and not _route_target_location_available(state)
     if registered.definition.name == "apply_map_plan":
         return route.presentation in {"map", "both"}
     if route.primary_domain is CapabilityDomain.MAP_STATE:

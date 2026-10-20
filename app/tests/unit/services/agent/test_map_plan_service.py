@@ -444,7 +444,7 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
         task_mode="execute",
         presentation="both",
         operation="retrieve_recent_hospitals",
-        requires_location=True,
+        location_mode="target",
         target_ids=["Zurich"],
         temporal_scope={"mode": "historical", "granularity": "recent"},
         spatial_scope=[
@@ -637,7 +637,7 @@ async def test_active_map_move_uses_the_validated_new_route_target() -> None:
         primary_domain=CapabilityDomain.MAP_STATE,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         target_refs=["Salta, Argentina"],
     )
     state.location_refs = {"salta, argentina": salta}
@@ -674,7 +674,7 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
         primary_domain=CapabilityDomain.MAP_STATE,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         target_refs=["Salta, Argentina"],
     )
 
@@ -713,7 +713,7 @@ async def test_data_layer_plan_uses_spatial_scope_location_target() -> None:
         secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="add_layer",
         target_refs=["USGS Earthquakes"],
         spatial_scope={
