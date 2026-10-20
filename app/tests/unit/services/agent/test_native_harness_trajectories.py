@@ -131,7 +131,7 @@ def _route_call(*, complex_route: bool = False) -> LLMResult:
         "primary_domain": "data_retrieval",
         "task_mode": "execute",
         "presentation": "text",
-        "requires_location": False,
+        "location_mode": "none",
         "capability_queries": ["obscure geospatial data"],
     }
     if complex_route:

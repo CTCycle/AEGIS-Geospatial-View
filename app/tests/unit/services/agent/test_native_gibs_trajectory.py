@@ -167,7 +167,7 @@ async def test_manifest_backed_gibs_layer_reaches_map_preparation() -> None:
                     "secondary_domains": ["map_rendering"],
                     "task_mode": "execute",
                     "presentation": "map",
-                    "requires_location": True,
+                    "location_mode": "target",
                     "capability_queries": ["SRTM_Color_Index"],
                     "operation": "show",
                     "target_refs": ["rome-italy"],

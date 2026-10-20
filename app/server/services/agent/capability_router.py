@@ -7,6 +7,7 @@ import re
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentRunState,
+    AgentSpatialScope,
     CapabilityRoute,
     CapabilityRouteDecision,
 )
@@ -77,6 +78,8 @@ _LOCATION_MAP_DATA_TERMS = frozenset(
         "stations",
         "data",
         "points",
+        "most", "highest", "hottest", "wettest", "rain", "temperature",
+        "seismic", "earthquake", "hotspot",
     }
 )
 _PLACE_SEARCH_DATA_TERMS = frozenset(
@@ -114,7 +117,7 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
         secondary_domains=[CapabilityDomain.MAP_RENDERING],
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["place search", "map viewport"],
         operation="show_location_on_map",
     )
@@ -191,8 +194,8 @@ class CapabilityRouter:
                 reason_codes=list(dict.fromkeys([*reasons, *contract_reasons])),
             )
         active_map_update = _is_active_map_update(proposed, active_state)
-        if active_map_update and proposed.requires_location:
-            proposed = proposed.model_copy(update={"requires_location": False})
+        if active_map_update and proposed.location_mode != "none":
+            proposed = proposed.model_copy(update={"location_mode": "none"})
             reasons.append("active_map_update_uses_current_map")
         for capability_id in proposed.explicit_capability_ids:
             normalized_id = capability_id.strip()
@@ -235,18 +238,34 @@ class CapabilityRouter:
             proposed.task_mode == "execute"
             and proposed.presentation in {"map", "both"}
             and active_state.active_map_session is None
-            and not proposed.requires_location
+            and proposed.location_mode == "none"
         ):
-            proposed = proposed.model_copy(update={"requires_location": True})
+            proposed = proposed.model_copy(update={"location_mode": "search_area" if proposed.analysis else "target"})
             reasons.append("location_required_for_new_map")
         if (
             proposed.task_mode == "execute"
             and (proposed.target_refs or proposed.spatial_scope is not None)
-            and not proposed.requires_location
+            and proposed.location_mode == "none"
             and not active_map_update
         ):
-            proposed = proposed.model_copy(update={"requires_location": True})
+            proposed = proposed.model_copy(update={"location_mode": "target"})
             reasons.append("location_required_for_semantic_scope")
+
+        if proposed.analysis is not None and proposed.location_mode == "target" and (
+            proposed.spatial_scope is None
+            or proposed.spatial_scope.relationship not in {"near", "around", "within_distance"}
+        ):
+            proposed = proposed.model_copy(update={"location_mode": "search_area"})
+        if proposed.location_mode == "search_area":
+            refs = proposed.target_refs or (
+                proposed.spatial_scope.target_refs if proposed.spatial_scope else []
+            ) or ["World"]
+            proposed = proposed.model_copy(update={
+                "target_refs": refs,
+                "spatial_scope": proposed.spatial_scope or AgentSpatialScope(
+                    kind="bbox", relationship="in", target_refs=refs
+                ),
+            })
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
         if proposed.primary_domain is CapabilityDomain.MAP_STATE:
@@ -432,8 +451,10 @@ def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
         reasons.append("route_task_mode_requires_conversation_domain")
     if route.secondary_domains:
         reasons.append("route_task_mode_disallows_secondary_domains")
-    if route.requires_location:
+    if route.location_mode != "none":
         reasons.append("route_task_mode_disallows_location_requirement")
+    if route.analysis is not None:
+        reasons.append("route_task_mode_disallows_analysis")
     if route.presentation != "text":
         reasons.append("route_task_mode_disallows_map_presentation")
     if route.capability_queries:
@@ -792,7 +813,7 @@ def _normalize_text_only_coordinate_route(
                 "operation": "resolve_location",
                 "capability_queries": [],
                 "explicit_capability_ids": [],
-                "requires_location": True,
+                "location_mode": "target",
                 "spatial_scope": None,
                 "filters": {},
             }
@@ -828,7 +849,7 @@ def _normalize_text_evidence_inspection_route(
                 "operation": "inspect_evidence",
                 "capability_queries": [],
                 "explicit_capability_ids": [],
-                "requires_location": False,
+                "location_mode": "none",
                 "spatial_scope": None,
                 "temporal_scope": route.temporal_scope.model_copy(
                     update={

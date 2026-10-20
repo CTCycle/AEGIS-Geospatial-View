@@ -60,7 +60,7 @@ describe('e2e/geospatial browser smoke', () => {
       secondary_domains: [],
       task_mode: 'execute',
       presentation: 'map',
-      requires_location: true,
+      location_mode: "target",
       capability_queries: ['mocked_map'],
       explicit_capability_ids: [],
       clarification_question: null,

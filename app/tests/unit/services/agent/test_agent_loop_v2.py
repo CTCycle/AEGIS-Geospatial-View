@@ -70,7 +70,7 @@ async def test_catalog_pages_continue_without_additional_model_calls() -> None:
     state = _state()
     state.phase = AgentPhase.UPDATE_STATE
     state.route = CapabilityRoute(primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
-        task_mode="execute", presentation="text", operation="discover_available_map_data", requires_location=False)
+        task_mode="execute", presentation="text", operation="discover_available_map_data", location_mode="none")
     AgentLoop._compile_native_goal(state, state.route)
     state.max_iterations = 12
     state.model_calls = 1
@@ -244,7 +244,7 @@ def _route_call() -> LLMResult:
                     "primary_domain": "data_retrieval",
                     "task_mode": "execute",
                     "presentation": "text",
-                    "requires_location": False,
+                    "location_mode": "none",
                     "capability_queries": ["hospitals"],
                 },
             )
@@ -369,11 +369,11 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         capability_queries=["weather"],
     )
     complex_route = simple_route.model_copy(
-        update={"presentation": "map", "requires_location": True}
+        update={"presentation": "map", "location_mode": "target"}
     )
 
     assert AgentLoop._budget_profile(simple_route) == "simple"  # pyright: ignore[reportPrivateUsage]
@@ -393,7 +393,7 @@ def test_verified_render_closes_map_completion_contract() -> None:
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["map"],
     )
     state.completion_contract = CompletionContract(
@@ -479,7 +479,7 @@ def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["map"],
     )
     state.render_observations = [
@@ -558,7 +558,7 @@ async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correctio
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="map",
-        requires_location=False,
+        location_mode="none",
         capability_queries=["map"],
     )
     state.render_observations = [
@@ -697,7 +697,7 @@ async def test_verified_map_state_finalization_uses_committed_overlays() -> None
         primary_domain=CapabilityDomain.MAP_STATE,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="remove_layer",
     )
     state.active_map_session = MapSession(
@@ -739,7 +739,7 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="both",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["hospitals"],
         operation="filter",
         target_refs=["target-1"],
@@ -786,7 +786,7 @@ def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None
         primary_domain=CapabilityDomain.PLACE_SEARCH,
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         operation="resolve_location",
         target_refs=["Colosseum, Rome"],
     )
@@ -834,7 +834,7 @@ def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> N
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
         operation="inspect_evidence",
     )
 
@@ -873,7 +873,7 @@ def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary()
         secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["earthquakes"],
         operation="add_layer",
         target_refs=["earthquakes", "Japan"],
@@ -902,7 +902,7 @@ def test_capability_discovery_route_completes_on_catalog_result() -> None:
         ],
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["geospatial data layers", "points of interest"],
         operation="discover_available_map_data",
         target_refs=["Florence, Italy"],
@@ -963,7 +963,7 @@ def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
         primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         operation="discover_available_map_data",
     )
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
@@ -994,7 +994,7 @@ def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> N
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="show_on_map",
     )
     coverage = "Capability is outside its declared geographic coverage."
@@ -1041,7 +1041,7 @@ def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None
         primary_domain=CapabilityDomain.PLACE_SEARCH,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         operation="find_nearby",
     )
     state.discovery_attempts = 2
@@ -1111,7 +1111,7 @@ def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None
         primary_domain=CapabilityDomain.PLACE_SEARCH,
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["geocode"],
         operation="geocode",
         target_refs=["Rome, Italy"],
@@ -1161,7 +1161,7 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["place search", "map viewport"],
     )
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
@@ -1203,7 +1203,7 @@ def test_location_only_map_recovery_accepts_duplicate_same_location_results() ->
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["place search", "map viewport"],
     )
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
@@ -1245,7 +1245,7 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["basemap", "location map view"],
     )
     state = _state()
@@ -1321,7 +1321,7 @@ async def test_location_only_map_recovery_runs_after_a_location_tool_result(
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["location map"],
     )
     state.location_refs["florence, tuscany, italy"] = ResolvedLocation(
@@ -1399,7 +1399,7 @@ def test_location_only_map_recovery_uses_the_current_location_result() -> None:
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["basemap", "map rendering"],
     )
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
@@ -1442,7 +1442,7 @@ def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> N
         primary_domain=CapabilityDomain.MAP_RENDERING,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["geocode place name", "basemap"],
         target_refs=["Kolkatta, India"],
     )
@@ -1818,7 +1818,7 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
                             "primary_domain": "map_rendering",
                             "task_mode": "execute",
                             "presentation": "text",
-                            "requires_location": False,
+                            "location_mode": "none",
                             "capability_queries": ["hospitals"],
                         },
                     )
@@ -1951,7 +1951,7 @@ def test_working_state_remains_valid_json_when_compacted() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="text",
-        requires_location=False,
+        location_mode="none",
     )
     state.tool_results = [
         ToolResult(
@@ -1979,7 +1979,7 @@ def test_compacted_working_state_retains_goal_and_completion_invariants() -> Non
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["rainfall"],
     )
     state.goal = AgentGoal(
@@ -1987,7 +1987,7 @@ def test_compacted_working_state_retains_goal_and_completion_invariants() -> Non
         task_mode="execute",
         presentation="text",
         operation="show",
-        requires_location=True,
+        location_mode="target",
         target_ids=["lugano"],
     )
     state.completion_contract = CompletionContract(
@@ -2126,7 +2126,7 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
                             "primary_domain": "map_rendering",
                             "task_mode": "execute",
                             "presentation": "map",
-                            "requires_location": False,
+                            "location_mode": "none",
                             "capability_queries": ["basemap"],
                         },
                     )
@@ -2157,9 +2157,9 @@ def test_completion_requires_verified_scope_for_every_requested_source(coverage,
     from server.services.agent.completion import CompletionEvaluator
     state = _state()
     state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
-        presentation='text', requires_location=False, explicit_capability_ids=['first', 'second'])
+        presentation='text', location_mode="none", explicit_capability_ids=['first', 'second'])
     state.goal = AgentGoal(goal='Compare both sources', task_mode='execute', presentation='text',
-        operation='compare', requires_location=False, temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
+        operation='compare', location_mode="none", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
     state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
         temporal_scope_required=True, spatial_scope_required=True)
     def result(capability):
@@ -2188,7 +2188,7 @@ def test_completion_checks_date_only_range_against_aware_observation(observed, e
     from server.services.agent.completion import CompletionEvaluator
     state = _state()
     state.goal = AgentGoal(goal='March quakes', task_mode='execute', presentation='map',
-        operation='show', requires_location=False,
+        operation='show', location_mode="none",
         temporal_scope={'start_time_iso': '2024-03-01', 'end_time_iso': '2024-03-31'})
     state.completion_contract = CompletionContract(operation='show', evidence_required=True,
         temporal_scope_required=True)

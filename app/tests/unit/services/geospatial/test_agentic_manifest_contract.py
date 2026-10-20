@@ -267,7 +267,7 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["traffic"],
     )
 

@@ -191,7 +191,7 @@ def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
         secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
         task_mode="execute",
         presentation="map",
-        requires_location=True,
+        location_mode="target",
     )
 
     result = asyncio.run(

@@ -30,7 +30,7 @@ def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_cont
     repository, publisher, _, run_id = render_context
     state = AgentRunState(request_id="request", conversation_id="conversation", user_message="Show data", phase="update_state")
     state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL,
-        task_mode="execute", presentation="map", requires_location=False, explicit_capability_ids=["missing"])
+        task_mode="execute", presentation="map", location_mode="none", explicit_capability_ids=["missing"])
     state.completion_contract = CompletionContract(operation="show", evidence_required=True,
         requirements=["required_data_retrieved"])
     service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
@@ -169,7 +169,7 @@ def _goal(
         task_mode="execute",
         presentation="map",
         operation="geospatial_data_retrieval",
-        requires_location=True,
+        location_mode="target",
         target_ids=["target-rome"],
         temporal_scope=temporal_scope or {},
         spatial_scope=spatial_scope or [],
@@ -667,7 +667,7 @@ def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
                 task_mode="execute",
                 presentation="map",
                 operation="geospatial_data_retrieval",
-                requires_location=True,
+                location_mode="target",
                 target_ids=["target-rome"],
             ).model_dump(mode="json"),
             "completion_contract": _contract(

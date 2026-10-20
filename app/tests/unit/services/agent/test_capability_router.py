@@ -95,7 +95,7 @@ def _route(**overrides: Any) -> CapabilityRoute:
         "primary_domain": CapabilityDomain.DATA_RETRIEVAL,
         "task_mode": "execute",
         "presentation": "map",
-        "requires_location": True,
+        "location_mode": "target",
         "capability_queries": ["traffic"],
     }
     values.update(overrides)
@@ -215,7 +215,7 @@ def test_router_rejects_answer_route_with_execution_intent() -> None:
             primary_domain=CapabilityDomain.DATA_RETRIEVAL,
             task_mode="answer",
             presentation="text",
-            requires_location=False,
+            location_mode="none",
             capability_queries=["traffic"],
         ),
         user_message="Show traffic.",
@@ -234,7 +234,7 @@ def test_router_rejects_clarify_route_that_attempts_execution() -> None:
             primary_domain=CapabilityDomain.CONVERSATION,
             task_mode="clarify",
             presentation="text",
-            requires_location=False,
+            location_mode="none",
             capability_queries=["traffic"],
             clarification_question="Which region do you mean?",
         ),
@@ -260,7 +260,7 @@ def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
 ###############################################################################
 def test_router_requires_active_map_for_map_state_follow_up() -> None:
     decision = _router().validate_route(
-        _route(primary_domain=CapabilityDomain.MAP_STATE, requires_location=False),
+        _route(primary_domain=CapabilityDomain.MAP_STATE, location_mode="none"),
         user_message="Hide the layer.",
         active_state=_state(),
     )
@@ -306,7 +306,7 @@ def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> N
         secondary_domains=[CapabilityDomain.PLACE_SEARCH, CapabilityDomain.MAP_RENDERING],
         task_mode="execute",
         presentation="text",
-        requires_location=True,
+        location_mode="target",
         capability_queries=["map data", "basemaps", "geospatial layers"],
         target_refs=["Florence, Italy"],
         spatial_scope={"kind": "point", "target_refs": ["Florence, Italy"]},
@@ -392,13 +392,13 @@ def test_router_returns_boundary_limitation_without_replacing_active_map() -> No
 ###############################################################################
 def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
     decision = _router().validate_route(
-        _route(requires_location=False),
+        _route(location_mode="none"),
         user_message="Show traffic on a new map.",
         active_state=_state(),
     )
 
     assert decision.status == "accepted"
-    assert decision.route.requires_location is True
+    assert decision.route.location_mode != "none"
     assert "location_required_for_new_map" in decision.reason_codes
     assert "osm_default" not in decision.capability_ids
 
@@ -411,7 +411,7 @@ def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> Non
     assert fallback.primary_domain is CapabilityDomain.PLACE_SEARCH
     assert fallback.secondary_domains == [CapabilityDomain.MAP_RENDERING]
     assert fallback.presentation == "map"
-    assert fallback.requires_location is True
+    assert fallback.location_mode != "none"
 
     assert build_location_map_fallback_route("Show hospitals near Springfield") is None
 
@@ -427,7 +427,7 @@ def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
     decision = _router().validate_route(
         _route(
             primary_domain=CapabilityDomain.MAP_STATE,
-            requires_location=True,
+            location_mode="target",
             capability_queries=["remove overlay layer", "map layer management"],
             operation="remove_layer",
             target_refs=["earthquake layer"],
@@ -437,7 +437,7 @@ def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
     )
 
     assert decision.status in {"accepted", "discovery_required"}
-    assert decision.route.requires_location is False
+    assert decision.route.location_mode == "none"
     assert "active_map_update_uses_current_map" in decision.reason_codes
 
 
@@ -583,7 +583,7 @@ def test_router_keeps_text_only_coordinate_lookup_free_of_provider_data() -> Non
     assert decision.route.secondary_domains == []
     assert decision.route.operation == "resolve_location"
     assert decision.route.capability_queries == []
-    assert decision.route.requires_location is True
+    assert decision.route.location_mode != "none"
     assert decision.capability_ids == []
     assert "text_only_coordinate_lookup_route_normalized" in decision.reason_codes
 
@@ -598,7 +598,7 @@ def test_router_normalizes_saved_evidence_inspection_without_provider_lookup() -
             secondary_domains=[CapabilityDomain.MAP_RENDERING],
             presentation="text",
             operation="retrieve",
-            requires_location=True,
+            location_mode="target",
             capability_queries=["pharmacy near the Colosseum"],
             target_refs=["Colosseum", "pharmacies"],
             filters={"category": "pharmacy"},
@@ -616,7 +616,7 @@ def test_router_normalizes_saved_evidence_inspection_without_provider_lookup() -
     assert decision.route.operation == "inspect_evidence"
     assert decision.route.capability_queries == []
     assert decision.route.explicit_capability_ids == []
-    assert decision.route.requires_location is False
+    assert decision.route.location_mode == "none"
     assert decision.route.spatial_scope is None
     assert decision.route.target_refs == []
     assert decision.route.filters == {}
@@ -754,3 +754,24 @@ def test_router_preserves_dated_historical_scope() -> None:
     assert decision.status == "discovery_required"
     assert decision.route.temporal_scope.mode == "historical"
     assert "recent_scope_normalized_to_current" not in decision.reason_codes
+
+
+@pytest.mark.parametrize("mode,refs,analysis", [
+    ("none", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
+    ("target", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
+    ("search_area", [], {"kind": "hotspot", "metric": "count"}),
+])
+def test_router_normalizes_discovery_area(mode: str, refs: list[str], analysis: dict[str, str]) -> None:
+    decision = _router().validate_route(
+        _route(location_mode=mode, target_refs=refs, analysis=analysis),
+        user_message="Where did it rain most?", active_state=_state(),
+    )
+    assert decision.route.location_mode == "search_area"
+    assert decision.route.target_refs == (refs or ["World"])
+    assert decision.route.spatial_scope is not None
+    assert decision.route.spatial_scope.kind == "bbox"
+    assert decision.route.spatial_scope.relationship == "in"
+
+
+def test_location_fallback_does_not_swallow_analysis_query() -> None:
+    assert build_location_map_fallback_route("Show me where in Europe it rained most") is None

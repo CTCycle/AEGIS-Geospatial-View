@@ -62,7 +62,7 @@ def _turn_payload() -> dict[str, Any]:
             task_mode="execute",
             presentation="map",
             operation="render",
-            requires_location=True,
+            location_mode="target",
             capability_query="visual_fixture_map",
             target_refs=["location:rome"],
         ),
@@ -70,7 +70,7 @@ def _turn_payload() -> dict[str, Any]:
             task_mode="execute",
             presentation="map",
             operation="render",
-            requires_location=True,
+            location_mode="target",
             goal="show fixture map",
         ),
         "completion_contract": {
