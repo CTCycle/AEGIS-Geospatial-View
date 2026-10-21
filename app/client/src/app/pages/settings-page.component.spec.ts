@@ -33,6 +33,9 @@ describe('pages/settings-page.component', () => {
   let fetchGeospatialProviderAccountSetupsMock: jasmine.Spy;
   let fetchRuntimeSettingsMock: jasmine.Spy;
   let updateRuntimeSettingsMock: jasmine.Spy;
+  let fetchDatabaseSettingsMock: jasmine.Spy;
+  let testDatabaseConnectionMock: jasmine.Spy;
+  let updateDatabaseSettingsMock: jasmine.Spy;
 
   const runtimeSettingsResponse = (): RuntimeSettingsResponse => ({
     schema_version: 1,
@@ -85,6 +88,9 @@ describe('pages/settings-page.component', () => {
       'fetchGeospatialProviderAccountSetups',
       'fetchRuntimeSettings',
       'updateRuntimeSettings',
+      'fetchDatabaseSettings',
+      'testDatabaseConnection',
+      'updateDatabaseSettings',
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'cloud',
@@ -109,6 +115,14 @@ describe('pages/settings-page.component', () => {
     fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({ providers: [] });
     fetchRuntimeSettingsMock = jasmine.createSpy('fetchRuntimeSettings').and.resolveTo(runtimeSettingsResponse());
     updateRuntimeSettingsMock = jasmine.createSpy('updateRuntimeSettings').and.callFake(async () => runtimeSettingsResponse());
+    fetchDatabaseSettingsMock = jasmine.createSpy('fetchDatabaseSettings').and.resolveTo({
+      backend: 'sqlite',
+      database_path: 'C:\\aegis-test\\active.db',
+      sqlite_lock_timeout_seconds: 60,
+      active: true,
+    });
+    testDatabaseConnectionMock = jasmine.createSpy('testDatabaseConnection').and.rejectWith(new Error('connection unavailable'));
+    updateDatabaseSettingsMock = jasmine.createSpy('updateDatabaseSettings').and.rejectWith(new Error('connection unavailable'));
 
     apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
     apiClient.fetchChatModels.and.callFake((provider) => fetchChatModelsMock(provider));
@@ -119,6 +133,9 @@ describe('pages/settings-page.component', () => {
     apiClient.fetchGeospatialProviderAccountSetups.and.callFake(() => fetchGeospatialProviderAccountSetupsMock());
     apiClient.fetchRuntimeSettings.and.callFake(() => fetchRuntimeSettingsMock());
     apiClient.updateRuntimeSettings.and.callFake((payload) => updateRuntimeSettingsMock(payload));
+    apiClient.fetchDatabaseSettings.and.callFake(() => fetchDatabaseSettingsMock());
+    apiClient.testDatabaseConnection.and.callFake((payload) => testDatabaseConnectionMock(payload));
+    apiClient.updateDatabaseSettings.and.callFake((payload) => updateDatabaseSettingsMock(payload));
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -552,7 +569,63 @@ describe('pages/settings-page.component', () => {
     expect(component.modelProviderHealth('opencode-go')).toContain('readable');
   });
 
-  it('requires an explicit clear action and treats a blank draft as no replacement', async () => {
+  it('autosaves the latest model-provider key after a short debounce', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const updated = {
+      ...component.settings,
+      credentials: { 'opencode-go': { api_key: true } },
+      credential_health: { 'opencode-go': { api_key: 'healthy' } },
+    };
+    updateChatSettingsMock.and.resolveTo(updated);
+
+    jasmine.clock().install();
+    try {
+      component.onCloudCredentialInput('opencode-go', 'first-key-value-12345');
+      jasmine.clock().tick(250);
+      component.onCloudCredentialInput('opencode-go', 'latest-key-value-12345');
+      jasmine.clock().tick(399);
+      expect(updateChatSettingsMock).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+    expect(updateChatSettingsMock).toHaveBeenCalledTimes(1);
+    expect(updateChatSettingsMock.calls.mostRecent().args[0].credentials).toEqual({
+      'opencode-go': { api_key: 'latest-key-value-12345' },
+    });
+    expect(component.opencodeGoKey).toBe('');
+    expect(component.statusText).toContain('saved');
+  });
+
+  it('keeps a credential draft visible and reports when autosave fails', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    updateChatSettingsMock.and.rejectWith(new Error('write failed'));
+
+    jasmine.clock().install();
+    try {
+      component.onCloudCredentialInput('opencode-go', 'pending-key-value-12345');
+      jasmine.clock().tick(400);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+    expect(component.opencodeGoKey).toBe('pending-key-value-12345');
+    expect(component.settings.credentials['opencode-go']).toBeUndefined();
+    expect(component.statusText).toContain('Could not save the OpenCode Go key');
+  });
+
+  it('keeps blank key drafts unchanged and persists a direct clear action', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -569,7 +642,8 @@ describe('pages/settings-page.component', () => {
     await component.saveCloudProvider('opencode-go');
 
     expect(updateChatSettingsMock.calls.count()).toBe(updateCallsBeforeBlankSave);
-    expect(component.keyValidationErrors['opencode-go']).toContain('Clear saved key');
+    expect(component.keyValidationErrors['opencode-go']).toBeUndefined();
+    expect(component.isCloudCredentialConfigured('opencode-go')).toBeTrue();
 
     updateChatSettingsMock.and.resolveTo({
       ...configured,
@@ -608,6 +682,82 @@ describe('pages/settings-page.component', () => {
     expect(payload.credential_health).toBeUndefined();
   });
 
+  it('autosaves Ollama URL edits without waiting for blur', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    updateChatSettingsMock.and.resolveTo({ ...component.settings, ollama_url: 'http://localhost:11435' });
+
+    jasmine.clock().install();
+    try {
+      component.onOllamaUrlDraftChanged('http://localhost:11435');
+      jasmine.clock().tick(399);
+      expect(updateChatSettingsMock).not.toHaveBeenCalled();
+      jasmine.clock().tick(1);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+    expect(updateChatSettingsMock).toHaveBeenCalledTimes(1);
+    expect(updateChatSettingsMock.calls.mostRecent().args[0]).toEqual({
+      ollama_url: 'http://localhost:11435',
+      credentials: {},
+    });
+  });
+
+  it('keeps database configuration draft-only until the explicit switch action', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.activeSection = 'database';
+    component.databaseSettingsDraft.database_path = 'C:\\aegis-test\\target.db';
+    component.onDatabaseSettingsDraftChanged();
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    buttons.find((button) => button.textContent?.includes('Test connection'))?.click();
+    await fixture.whenStable();
+    expect(testDatabaseConnectionMock).toHaveBeenCalledTimes(1);
+    expect(updateDatabaseSettingsMock).not.toHaveBeenCalled();
+    expect(component.databaseSettings?.database_path).toBe('C:\\aegis-test\\active.db');
+
+    buttons.find((button) => button.textContent?.includes('Apply and switch'))?.click();
+    await fixture.whenStable();
+    expect(updateDatabaseSettingsMock).toHaveBeenCalledTimes(1);
+    expect(updateDatabaseSettingsMock.calls.mostRecent().args[0].database_path).toBe('C:\\aegis-test\\target.db');
+    expect(component.databaseSettings?.database_path).toBe('C:\\aegis-test\\active.db');
+    expect(component.databaseSettingsError).toContain('Could not switch the active database');
+  });
+
+  it('reserves Save, Apply, and Cancel actions for the database category', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const ordinarySections = [
+      'models',
+      'model-providers',
+      'geospatial-access',
+      'application',
+      'map-search',
+      'data-sources',
+      'agent-runtime',
+    ] as const;
+    for (const section of ordinarySections) {
+      fixture.componentInstance.activeSection = section;
+      fixture.detectChanges();
+      const labels = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+        .map((button) => button.textContent?.trim() ?? '');
+      expect(labels.some((label) => /^(save|apply|cancel)\b/i.test(label))).withContext(section).toBeFalse();
+    }
+    fixture.componentInstance.activeSection = 'database';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Apply and switch');
+  });
+
   it('autosaves only changed runtime settings after the debounce', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -633,6 +783,78 @@ describe('pages/settings-page.component', () => {
     expect(updateRuntimeSettingsMock.calls.mostRecent().args[0]).toEqual({
       chat: { max_history_messages: 23 },
     });
+  });
+
+  it('keeps the restart notice after a later hot-applied agent settings save', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const defaults = runtimeSettingsResponse();
+    updateRuntimeSettingsMock.and.returnValues(
+      Promise.resolve({
+        ...defaults,
+        map: { ...defaults.map, tiles: 'Updated tiles' },
+        restart_required: true,
+      }),
+      Promise.resolve({
+        ...defaults,
+        map: { ...defaults.map, tiles: 'Updated tiles' },
+        agent_execution: { ...defaults.agent_execution, max_iterations: 13 },
+        restart_required: true,
+      }),
+      Promise.resolve({
+        ...defaults,
+        agent_execution: { ...defaults.agent_execution, max_iterations: 13 },
+        restart_required: false,
+      }),
+    );
+
+    component.runtimeSettingsDraft.map.tiles = 'Updated tiles';
+    await component.saveRuntimeSettings();
+    expect(component.runtimeRestartRequired).toBeTrue();
+
+    component.runtimeSettingsDraft.agent_execution.max_iterations = 13;
+    await component.saveRuntimeSettings();
+    expect(component.runtimeRestartRequired).toBeTrue();
+
+    component.runtimeSettingsDraft.map.tiles = defaults.map.tiles;
+    await component.saveRuntimeSettings();
+    expect(component.runtimeRestartRequired).toBeFalse();
+  });
+
+  it('keeps rapid runtime edits ordered and exposes failed writes beside the draft', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    let resolveFirst: (value: RuntimeSettingsResponse) => void = () => undefined;
+    updateRuntimeSettingsMock.and.callFake((patch) => {
+      if (updateRuntimeSettingsMock.calls.count() === 1) {
+        return new Promise<RuntimeSettingsResponse>((resolve) => { resolveFirst = resolve; });
+      }
+      const next = runtimeSettingsResponse();
+      return Promise.resolve({ ...next, chat: { ...next.chat, ...patch.chat } });
+    });
+
+    component.runtimeSettingsDraft.chat.max_history_messages = 18;
+    const firstWrite = component.saveRuntimeSettings();
+    component.runtimeSettingsDraft.chat.max_history_messages = 19;
+    await component.saveRuntimeSettings();
+    resolveFirst({ ...runtimeSettingsResponse(), chat: { ...runtimeSettingsResponse().chat, max_history_messages: 18 } });
+    await firstWrite;
+    await fixture.whenStable();
+
+    expect(updateRuntimeSettingsMock.calls.count()).toBe(2);
+    expect(updateRuntimeSettingsMock.calls.mostRecent().args[0]).toEqual({ chat: { max_history_messages: 19 } });
+    expect(component.runtimeSettings.chat.max_history_messages).toBe(19);
+
+    updateRuntimeSettingsMock.and.rejectWith(new Error('write failed'));
+    component.runtimeSettingsDraft.chat.max_history_messages = 20;
+    await component.saveRuntimeSettings();
+    expect(component.runtimeSettingsError).toContain('Could not save runtime settings');
+    expect(component.runtimeSettingsDraft.chat.max_history_messages).toBe(20);
+    expect(component.runtimeSettings.chat.max_history_messages).toBe(19);
   });
 
   it('reports unreadable credential health in model provider state', async () => {
@@ -747,7 +969,7 @@ describe('pages/settings-page.component', () => {
     expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
   });
 
-  it('normalizes the Settings query and exposes the persistent sidebar sections', async () => {
+  it('normalizes the Settings query and exposes all eight persistent sections', async () => {
     window.history.replaceState({}, '', '/settings?tab=unknown');
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -756,7 +978,7 @@ describe('pages/settings-page.component', () => {
 
     const sections = Array.from(fixture.nativeElement.querySelectorAll('.settings-sidebar__item')) as HTMLButtonElement[];
     expect(fixture.componentInstance.activeSection).toBe('models');
-    expect(sections).toHaveSize(7);
+    expect(sections).toHaveSize(8);
     expect(sections[0].getAttribute('aria-current')).toBe('page');
     expect(fixture.nativeElement.querySelector('[role="tab"]')).toBeNull();
   });
@@ -836,7 +1058,7 @@ describe('pages/settings-page.component', () => {
     expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 
-  it('keeps seven Settings destinations and collapses advanced Agent Runtime controls', async () => {
+  it('keeps eight Settings destinations and collapses advanced Agent Runtime controls', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -854,6 +1076,7 @@ describe('pages/settings-page.component', () => {
       'Map & Search',
       'Data Sources',
       'Agent Runtime',
+      'Database',
     ]);
 
     const disclosures = Array.from(
