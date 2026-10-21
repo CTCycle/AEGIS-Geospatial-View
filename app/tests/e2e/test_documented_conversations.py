@@ -323,7 +323,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
 
     search = page.get_by_placeholder("Search models")
     search.fill("gpt")
-    page.locator(".model-grid-scroll").evaluate("node => { node.scrollTop = 220; }")
+    page.locator(".model-list-scroll").evaluate("node => { node.scrollTop = 220; }")
     write_snapshot(page, dirs["screenshots"], "01-settings-filtered")
 
     page.get_by_role("link", name="Search").click()
@@ -335,7 +335,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     page.get_by_role("link", name="Settings", exact=True).click()
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
     expect(page).to_have_url(re.compile(r".*/settings\?q=gpt"))
-    scroll_top = page.locator(".model-grid-scroll").evaluate("node => node.scrollTop")
+    scroll_top = page.locator(".model-list-scroll").evaluate("node => node.scrollTop")
     assert float(scroll_top) >= 0
     write_snapshot(page, dirs["screenshots"], "03-settings-restored")
 

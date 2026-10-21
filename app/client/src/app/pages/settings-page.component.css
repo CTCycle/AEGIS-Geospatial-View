@@ -695,14 +695,6 @@
     opacity: 0.8;
 }
 
-.model-grid-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: var(--space-2);
-}
-
 .settings-empty-state {
     display: grid;
     gap: 0.55rem;
@@ -729,28 +721,153 @@
     line-height: 1.45;
 }
 
-.model-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
-    align-items: stretch;
-    grid-auto-rows: 1fr;
-}
-
 .settings-page__right-column {
     padding-top: 0.2rem;
 }
 
-.model-grid-provider { margin-bottom: var(--space-3); }
-
-.model-grid-provider__heading {
+.model-browser {
     display: flex;
-    align-items: center;
-    min-height: 1.5rem;
-    margin: var(--space-2) 0 var(--space-2);
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid var(--settings-border);
+    border-radius: var(--settings-radius);
+    background: var(--settings-surface);
+    overflow: hidden;
 }
 
-.model-grid-provider__heading p {
+.model-toolbar {
+    display: grid;
+    gap: 0.55rem;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--settings-border);
+    background: #0f1a21;
+}
+
+.model-toolbar__row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.model-toolbar__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 14rem;
+    min-width: 0;
+    color: #77909c;
+}
+
+.model-toolbar__search svg {
+    position: absolute;
+    left: 0.6rem;
+    pointer-events: none;
+}
+
+.model-toolbar__search .model-search-bar {
+    width: 100%;
+    padding-left: 1.9rem;
+}
+
+.model-toolbar__count {
+    color: #8fa6b0;
+    font-size: 0.74rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.model-toolbar__chips {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.model-chip {
+    border: 1px solid #314753;
+    border-radius: 999px;
+    background: transparent;
+    color: #b7c8d0;
+    height: 1.55rem;
+    padding: 0 0.7rem;
+    font-size: 0.72rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+.model-chip:hover {
+    border-color: #52717e;
+}
+
+.model-chip.active {
+    border-color: #2f9bd7;
+    background: #16415a;
+    color: #f6fbff;
+}
+
+.model-toolbar__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    color: #8fa6b0;
+    font-size: 0.72rem;
+}
+
+.model-toolbar__sort select {
+    border: 1px solid #344953;
+    border-radius: 0.35rem;
+    background: #0f1a21;
+    color: #e5f0f4;
+    height: 1.55rem;
+    padding: 0 0.4rem;
+    font-size: 0.76rem;
+}
+
+.model-list-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr) 4.5rem minmax(0, 9.5rem);
+    gap: var(--space-3);
+    padding: 0.35rem var(--space-3);
+    border-bottom: 1px solid var(--settings-border);
+    background: #0d171d;
+    color: #8fa6b0;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.model-list-header span:nth-child(3),
+.model-list-header span:nth-child(4) {
+    text-align: right;
+}
+
+.model-list-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.model-list-scroll .settings-empty-state {
+    margin: var(--space-3);
+}
+
+.model-list-group__heading {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    min-height: 1.6rem;
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--settings-border);
+    background: #0d171d;
+}
+
+.model-list-group__heading p {
     margin: 0;
     font-size: 0.7rem;
     letter-spacing: 0.1em;
@@ -758,6 +875,12 @@
     color: #8fa6b0;
     font-weight: 700;
     white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+    .model-list-header {
+        display: none;
+    }
 }
 
 @keyframes settings-page__refresh-spin {
@@ -822,18 +945,6 @@
 
 .provider-signup-modal__actions {
   padding-top: var(--space-2);
-}
-
-@media (max-width: 1250px) {
-  .model-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1080px) {
-  .model-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 900px) {

@@ -4,20 +4,20 @@ import { ModelCardDescriptor } from '../core/types';
 import { formatCompactTokenCount } from '../core/token-format';
 
 @Component({
-  selector: 'article[appModelCard]',
+  selector: 'article[appModelRow]',
   standalone: true,
   imports: [],
-  templateUrl: './model-card.component.html',
-  styleUrl: './model-card.component.css',
+  templateUrl: './model-row.component.html',
+  styleUrl: './model-row.component.css',
   changeDetection: ChangeDetectionStrategy.Eager,
   host: {
-    class: 'model-card',
-    '[class.model-card--local]': 'isLocal',
-    '[class.model-card--selected]': 'isSelected',
-    '[class.model-card--disabled]': '!!disabledReason',
+    class: 'model-row',
+    '[class.model-row--local]': 'isLocal',
+    '[class.model-row--selected]': 'isSelected',
+    '[class.model-row--disabled]': '!!disabledReason',
   },
 })
-export class ModelCardComponent {
+export class ModelRowComponent {
   @Input({ required: true }) model!: ModelCardDescriptor;
   @Input({ required: true }) description = '';
   @Input() isLocal = false;
@@ -32,7 +32,14 @@ export class ModelCardComponent {
     return formatCompactTokenCount(value);
   }
 
-  onCardSelected(): void {
+  get toolSupportLabel(): string {
+    if (this.model.supports_tools === true) {
+      return 'Tool support: detected';
+    }
+    return this.model.supports_tools === false ? 'Tool support: unavailable' : 'Tool support: not verified';
+  }
+
+  onRowSelected(): void {
     if (this.disabledReason) {
       return;
     }

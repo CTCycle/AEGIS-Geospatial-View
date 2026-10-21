@@ -181,6 +181,26 @@ describe('pages/settings-page.component', () => {
     expect(component.displayedModels.length).toBe(1);
   });
 
+  it('capability filters narrow models and context sort orders them', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const all = component.displayedModels;
+    expect(all.length).toBeGreaterThan(0);
+
+    component.toggleCapabilityFilter('supports_embeddings');
+    expect(component.displayedModels.every((model) => model.supports_embeddings === true)).toBeTrue();
+    component.toggleCapabilityFilter('supports_embeddings');
+    expect(component.displayedModels.length).toBe(all.length);
+
+    component.setSortKey('context');
+    const contexts = component.displayedModels.map((model) => model.context_window_tokens ?? 0);
+    expect(contexts).toEqual([...contexts].sort((a, b) => b - a));
+    component.resetModelFilters();
+    expect(component.hasActiveModelFilters).toBeFalse();
+  });
+
   it('loads DeepSeek models when the DeepSeek filter is selected with a saved key', async () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatSettingsMock.and.resolveTo({
@@ -965,7 +985,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelectorAll('article.model-row').length).toBeGreaterThan(0);
   });
 
   it('normalizes the Settings query and exposes all eight persistent sections', async () => {

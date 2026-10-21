@@ -126,7 +126,7 @@ class TestChatFlow:
     def test_model_selection_persists(self, page: Page, base_url: str):
         page.goto(base_url)
         page.get_by_role("link", name="Settings", exact=True).click()
-        first_card_button = page.locator("button.model-card__select:not([disabled])").first
+        first_card_button = page.locator("button.model-row__select:not([disabled])").first
         if first_card_button.count() == 0:
             expect(page.locator(".settings-empty-state").first).to_be_visible()
             return

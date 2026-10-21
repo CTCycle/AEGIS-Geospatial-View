@@ -46,75 +46,102 @@
         <div class="settings-page__layout">
           <section class="settings-page__left-column">
             <h2 class="page-title">Models</h2>
-            <section class="settings-page__controls settings-page__controls--navbar" aria-label="Model catalog controls">
-              <div class="settings-page__controls-left">
-                <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
-                  <button type="button" [class.active]="providerFilter === 'all'" [attr.aria-pressed]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
-                  <button type="button" [class.active]="providerFilter === 'ollama'" [attr.aria-pressed]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
-                  <button type="button" [class.active]="providerFilter === 'openai'" [attr.aria-pressed]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
-                  <button type="button" [class.active]="providerFilter === 'google'" [attr.aria-pressed]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
-                  <button type="button" [class.active]="providerFilter === 'deepseek'" [attr.aria-pressed]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
-                  <button type="button" [class.active]="providerFilter === 'opencode'" [attr.aria-pressed]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
-                  <button type="button" [class.active]="providerFilter === 'opencode-go'" [attr.aria-pressed]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
+            <div class="model-browser">
+              <section class="model-toolbar" aria-label="Model catalog controls">
+                <div class="model-toolbar__row">
+                  <div class="model-toolbar__search">
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                      <path d="M10 4a6 6 0 1 0 3.7 10.7l4.8 4.8 1.4-1.4-4.8-4.8A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" fill="currentColor" />
+                    </svg>
+                    <input
+                      class="model-search-bar"
+                      type="search"
+                      placeholder="Search models"
+                      aria-label="Search models"
+                      [ngModel]="searchText"
+                      (ngModelChange)="setSearchText($event)"
+                    />
+                  </div>
+                  <span class="model-toolbar__count" aria-live="polite">{{ displayedModels.length }} {{ displayedModels.length === 1 ? 'model' : 'models' }}</span>
+                  <button
+                    type="button"
+                    class="settings-page__refresh"
+                    aria-label="Refresh from Ollama API"
+                    [attr.aria-busy]="isRefreshingOllama"
+                    [disabled]="isRefreshingOllama"
+                    [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
+                    (click)="refreshOllamaLibrary()"
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                      <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
+                    </svg>
+                  </button>
                 </div>
-              </div>
 
-              <div class="settings-page__controls-right">
-                <button
-                  type="button"
-                  class="settings-page__refresh"
-                  aria-label="Refresh from Ollama API"
-                  [attr.aria-busy]="isRefreshingOllama"
-                  [disabled]="isRefreshingOllama"
-                  [attr.title]="isRefreshingOllama ? 'Refreshing available Ollama models' : 'Refresh from Ollama API'"
-                  (click)="refreshOllamaLibrary()"
-                >
-                  <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
-                    <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
-                  </svg>
-                </button>
-                <input
-                  class="model-search-bar"
-                  type="search"
-                  placeholder="Search models"
-                  aria-label="Search models"
-                  [ngModel]="searchText"
-                  (ngModelChange)="setSearchText($event)"
-                />
-              </div>
-            </section>
-
-            <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
-              @if (isLoadingModels) {
-                <section class="settings-empty-state" aria-live="polite">
-                  <h2>Loading model catalog</h2>
-                  <p>Fetching model assignments and provider metadata.</p>
-                </section>
-              } @else if (isLoadingDynamicProviderModels) {
-                <section class="settings-empty-state" aria-live="polite">
-                  <h2>Loading {{ dynamicProviderLabel }} models</h2>
-                  <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
-                </section>
-              } @else if (!hasDisplayedModels) {
-                <section class="settings-empty-state" aria-live="polite">
-                  <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
-                  <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
-                  @if (dynamicProviderLoadFailed) {
-                    <button type="button" class="settings-page__inline-link" (click)="setSettingsSection('model-providers')">Open Model Providers</button>
-                  }
-                </section>
-              } @else {
-                @for (provider of providerKeys; track trackProviderGroup(provider)) {
-                  <section class="model-grid-provider">
-                    @if (providerKeys.length > 1) {
-                      <header class="model-grid-provider__heading">
-                        <p>{{ providerLabel(provider) }}</p>
-                      </header>
+                <div class="model-toolbar__row">
+                  <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
+                    @for (option of providerFilterOptions; track option.value) {
+                      <button type="button" [class.active]="providerFilter === option.value" [attr.aria-pressed]="providerFilter === option.value" (click)="setProviderFilter(option.value)">{{ option.label }}</button>
                     }
-                    <div class="model-grid">
+                  </div>
+                </div>
+
+                <div class="model-toolbar__row">
+                  <div class="model-toolbar__chips" role="group" aria-label="Capability filter">
+                    @for (option of capabilityFilterOptions; track option.key) {
+                      <button type="button" class="model-chip" [class.active]="capabilityFilters.has(option.key)" [attr.aria-pressed]="capabilityFilters.has(option.key)" (click)="toggleCapabilityFilter(option.key)">{{ option.label }}</button>
+                    }
+                  </div>
+                  <label class="model-toolbar__sort">
+                    <span>Sort</span>
+                    <select aria-label="Sort models" [ngModel]="sortKey" (ngModelChange)="setSortKey($event)">
+                      <option value="name">Name</option>
+                      <option value="context">Context window</option>
+                    </select>
+                  </label>
+                  @if (hasActiveModelFilters) {
+                    <button type="button" class="settings-page__inline-link" (click)="resetModelFilters()">Reset</button>
+                  }
+                </div>
+              </section>
+
+              <div class="model-list-header" aria-hidden="true">
+                <span>Model</span>
+                <span>Capabilities</span>
+                <span>Context</span>
+                <span>Status</span>
+              </div>
+
+              <div #modelGridScroll class="model-list-scroll" (scroll)="onModelGridScroll($event)">
+                @if (isLoadingModels) {
+                  <section class="settings-empty-state" aria-live="polite">
+                    <h2>Loading model catalog</h2>
+                    <p>Fetching model assignments and provider metadata.</p>
+                  </section>
+                } @else if (isLoadingDynamicProviderModels) {
+                  <section class="settings-empty-state" aria-live="polite">
+                    <h2>Loading {{ dynamicProviderLabel }} models</h2>
+                    <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
+                  </section>
+                } @else if (!hasDisplayedModels) {
+                  <section class="settings-empty-state" aria-live="polite">
+                    <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
+                    <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs, capability filters, or search query to show available models.' }}</p>
+                    @if (dynamicProviderLoadFailed) {
+                      <button type="button" class="settings-page__inline-link" (click)="setSettingsSection('model-providers')">Open Model Providers</button>
+                    }
+                  </section>
+                } @else {
+                  @for (provider of providerKeys; track trackProviderGroup(provider)) {
+                    <section class="model-list-group">
+                      @if (providerKeys.length > 1) {
+                        <header class="model-list-group__heading">
+                          <p>{{ providerLabel(provider) }}</p>
+                        </header>
+                      }
                       @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
                         <article
-                          appModelCard
+                          appModelRow
                           [model]="model"
                           [description]="modelDescription(model)"
                           [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
@@ -125,10 +152,10 @@
                           (pullRequested)="pullLocalModel($event)"
                         ></article>
                       }
-                    </div>
-                  </section>
+                    </section>
+                  }
                 }
-              }
+              </div>
             </div>
           </section>
 
