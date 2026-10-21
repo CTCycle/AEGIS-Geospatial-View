@@ -32,31 +32,12 @@ describe('components/map-preview.component', () => {
       inspections: Array.isArray(overlay.inspections) ? overlay.inspections : [],
     };
   };
+  const makeOverlayCollection = (descriptors: Record<string, unknown>[] = []) => ({
+    collection_id: 'active-map',
+    revision: 0,
+    instances: descriptors.map(makeOverlayInstance),
+  });
   const makeMapSession = (overrides: Record<string, unknown> = {}) => {
-    const overlayFixtures = Array.isArray(overrides.overlays)
-      ? overrides.overlays.filter((item): item is Record<string, unknown> => (
-        item !== null && typeof item === 'object'
-      ))
-      : [];
-    const overlayIds = Array.isArray(overrides.overlay_ids)
-      ? overrides.overlay_ids.filter((item): item is string => typeof item === 'string')
-      : [];
-    const explicitCollection = overrides.overlay_collection;
-    const overlayCollection = explicitCollection && typeof explicitCollection === 'object'
-      ? explicitCollection
-      : {
-        collection_id: 'active-map',
-        revision: 0,
-        instances: overlayFixtures.length > 0
-          ? overlayFixtures.map(makeOverlayInstance)
-          : overlayIds.map((id) => makeOverlayInstance({ id })),
-      };
-    const {
-      overlays: _legacyOverlays,
-      overlay_ids: _legacyOverlayIds,
-      overlay_collection: _explicitCollection,
-      ...canonicalOverrides
-    } = overrides;
     return {
       session_id: 'map-1',
       resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
@@ -70,8 +51,8 @@ describe('components/map-preview.component', () => {
       },
       viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
       center: { latitude: 41.9, longitude: 12.5 },
-      overlay_collection: overlayCollection,
-      ...canonicalOverrides,
+      overlay_collection: makeOverlayCollection(),
+      ...overrides,
     };
   };
   let fakeMap: {
@@ -79,8 +60,9 @@ describe('components/map-preview.component', () => {
     addLayer: jasmine.Spy;
     addControl: jasmine.Spy;
     on: jasmine.Spy;
+    off: jasmine.Spy;
     fitBounds: jasmine.Spy;
-getLayer: jasmine.Spy;
+    getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
     moveLayer: jasmine.Spy;
@@ -97,7 +79,13 @@ getLayer: jasmine.Spy;
       addSource: jasmine.createSpy('addSource'),
       addLayer: jasmine.createSpy('addLayer'),
       addControl: jasmine.createSpy('addControl'),
-      on: jasmine.createSpy('on').and.callFake((_: string, callback: () => void) => callback()),
+      on: jasmine.createSpy('on').and.callFake((event: string, layerOrListener: string | (() => void), listener?: () => void) => {
+        if (event === 'load' || event === 'idle') {
+          const callback = typeof layerOrListener === 'function' ? layerOrListener : listener;
+          callback?.();
+        }
+      }),
+      off: jasmine.createSpy('off'),
       fitBounds: jasmine.createSpy('fitBounds'),
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
@@ -136,7 +124,7 @@ getLayer: jasmine.Spy;
     component.initialOverlayOpacity = { weather: 0.33 };
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'fixture', visible: true, default_opacity: 0.65 }],
+        overlay_collection: makeOverlayCollection([{ id: 'weather', label: 'Weather', type: 'tile', provider: 'fixture', visible: true, default_opacity: 0.65 }]),
       }) as never,
     };
 
@@ -174,9 +162,9 @@ getLayer: jasmine.Spy;
 
   it('disposes a pending candidate and ignores its late load callback after teardown', () => {
     let loadCallback: (() => void) | undefined;
-    fakeMap.on.and.callFake((event: string, callback: () => void) => {
+    fakeMap.on.and.callFake((event: string, layerOrListener: string | (() => void), listener?: () => void) => {
       if (event === 'load') {
-        loadCallback = callback;
+        loadCallback = typeof layerOrListener === 'function' ? layerOrListener : listener;
       }
     });
     const states: string[] = [];
@@ -202,7 +190,15 @@ getLayer: jasmine.Spy;
       on: jasmine.createSpy('candidateOn'),
       remove: jasmine.createSpy('candidateRemove'),
     };
-    candidateMap.on.and.callFake((event: string, callback: (value?: unknown) => void) => {
+    candidateMap.on.and.callFake((
+      event: string,
+      layerOrListener: string | ((value?: unknown) => void),
+      listener?: (value?: unknown) => void,
+    ) => {
+      const callback = typeof layerOrListener === 'function' ? layerOrListener : listener;
+      if (!callback) {
+        return;
+      }
       if (event === 'error') {
         candidateError = callback as (event: unknown) => void;
       }
@@ -296,9 +292,13 @@ getLayer: jasmine.Spy;
       on: jasmine.createSpy('candidateOn'),
       remove: jasmine.createSpy('candidateRemove'),
     };
-    candidateMap.on.and.callFake((event: string, callback: () => void) => {
+    candidateMap.on.and.callFake((
+      event: string,
+      layerOrListener: string | (() => void),
+      listener?: () => void,
+    ) => {
       if (event === 'load') {
-        candidateLoad = callback;
+        candidateLoad = typeof layerOrListener === 'function' ? layerOrListener : listener;
       }
     });
     (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
@@ -358,13 +358,13 @@ getLayer: jasmine.Spy;
   it('honors an overlay fit zoom hint without changing the default map cap', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{
+        overlay_collection: makeOverlayCollection([{
           id: 'rainviewer_precipitation_radar',
           provider: 'rainviewer',
           type: 'metadata-only',
           rendering_mode: 'metadata-only',
           fit_max_zoom: 6,
-        }],
+        }]),
         bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
       }) as never,
     };
@@ -380,7 +380,7 @@ getLayer: jasmine.Spy;
   it('zooms a scale-dependent raster overlay to its declared minimum zoom', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{
+        overlay_collection: makeOverlayCollection([{
           id: 'fema_nfhl_flood_zones',
           provider: 'fema',
           type: 'raster-overlay',
@@ -394,7 +394,7 @@ getLayer: jasmine.Spy;
             tile_url_template: '/api/geospatial/tiles/fema_nfhl_flood_zones/{z}/{x}/{y}.png',
             min_zoom: 14,
           },
-        }],
+        }]),
         bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
       }) as never,
     };
@@ -408,7 +408,7 @@ getLayer: jasmine.Spy;
   it('does not zoom an overlay whose minimum zoom is already reached', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{
+        overlay_collection: makeOverlayCollection([{
           id: 'esa_worldcover',
           provider: 'esa',
           type: 'raster-overlay',
@@ -420,7 +420,7 @@ getLayer: jasmine.Spy;
             rendering_mode: 'wms',
             tile_url_template: '/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png',
           },
-        }],
+        }]),
         bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
       }) as never,
     };
@@ -458,7 +458,7 @@ getLayer: jasmine.Spy;
     component.initialOverlayOpacity = { stale_overlay: 0.2 };
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{ id: 'openaq', label: 'OpenAQ', type: 'tile', provider: 'openaq', url: 'https://x/{z}/{x}/{y}.png' }],
+        overlay_collection: makeOverlayCollection([{ id: 'openaq', label: 'OpenAQ', type: 'tile', provider: 'openaq', url: 'https://x/{z}/{x}/{y}.png' }]),
       }) as never,
     };
     fixture.detectChanges();
@@ -472,7 +472,7 @@ getLayer: jasmine.Spy;
     fixture.componentRef.setInput('payload', {
       map_session: makeMapSession({
         session_id: 'map-1',
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+        overlay_collection: makeOverlayCollection([{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }]),
       }) as never,
     });
     fixture.detectChanges();
@@ -482,7 +482,7 @@ getLayer: jasmine.Spy;
     fixture.componentRef.setInput('payload', {
       map_session: makeMapSession({
         session_id: 'map-1',
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+        overlay_collection: makeOverlayCollection([{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }]),
       }) as never,
     });
     fixture.detectChanges();
@@ -493,7 +493,7 @@ getLayer: jasmine.Spy;
     fixture.componentRef.setInput('payload', {
       map_session: makeMapSession({
         session_id: 'map-2',
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }],
+        overlay_collection: makeOverlayCollection([{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true, default_opacity: 0.65 }]),
       }) as never,
     });
     fixture.detectChanges();
@@ -505,7 +505,7 @@ getLayer: jasmine.Spy;
   it('keeps a local visibility toggle when the parent echoes map state', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }],
+        overlay_collection: makeOverlayCollection([{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }]),
       }) as never,
     };
     fixture.detectChanges();
@@ -523,7 +523,7 @@ getLayer: jasmine.Spy;
     component.overlayStateChange.subscribe((value) => emitted.push(value));
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }],
+        overlay_collection: makeOverlayCollection([{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }]),
       }) as never,
     };
     fixture.detectChanges();
@@ -534,12 +534,12 @@ getLayer: jasmine.Spy;
   });
 
   it('applies heatmap opacity without writing circle paint to a heatmap', () => {
-    component.payload = { map_session: makeMapSession({overlays: [{
+    component.payload = { map_session: makeMapSession({overlay_collection: makeOverlayCollection([{
       id: 'hotspots', label: 'Hotspots', type: 'geojson', provider: 'usgs',
       rendering_mode: 'circles', geometry_type: 'Point',
       data: {type: 'FeatureCollection', features: []},
       value_encoding: {mode: 'heatmap', field: 'count', min: 1, max: 10},
-    }]}) as never };
+    }])}) as never };
     fixture.detectChanges();
     fakeMap.setPaintProperty.calls.reset();
     component.setOverlayOpacity('hotspots', '50');
@@ -552,11 +552,11 @@ getLayer: jasmine.Spy;
     component.initialOverlayOrder = ['vector', 'removed'];
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           { id: 'raster', label: 'Raster', type: 'tile', provider: 'fixture' },
           { id: 'vector', label: 'Vector', type: 'geojson', provider: 'fixture' },
           { id: 'new', label: 'New', type: 'tile', provider: 'fixture' },
-        ],
+        ]),
       }) as never,
     };
     const emitted: string[][] = [];
@@ -572,10 +572,10 @@ getLayer: jasmine.Spy;
   it('applies user order to MapLibre layers from back to front', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           { id: 'raster', label: 'Raster', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
           { id: 'vector', label: 'Vector', type: 'tile', rendering_mode: 'raster-tile', url: 'https://tiles.example/{z}/{x}/{y}.png', provider: 'fixture' },
-        ],
+        ]),
       }) as never,
     };
 
@@ -592,7 +592,7 @@ getLayer: jasmine.Spy;
   it('clamps and ignores invalid overlay opacity values', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }],
+        overlay_collection: makeOverlayCollection([{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }]),
       }) as never,
     };
     fixture.detectChanges();
@@ -616,7 +616,7 @@ getLayer: jasmine.Spy;
   it('builds raster, WMS, and WMTS source URLs', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           { id: 'tile_1', label: 'Tile', type: 'tile', provider: 'x', url: 'https://tiles/{z}/{x}/{y}.png' },
           {
             id: 'wms_1',
@@ -637,7 +637,7 @@ getLayer: jasmine.Spy;
             layer_id: 'layer',
             tile_matrix_set: 'EPSG:3857',
           },
-        ],
+        ]),
       }) as never,
     };
     fixture.detectChanges();
@@ -653,9 +653,9 @@ getLayer: jasmine.Spy;
   it('ignores malformed overlays without preventing the base map from rendering', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           { id: 'broken_overlay', label: 'Broken overlay', provider: 'fixture', type: 'mystery' },
-        ],
+        ]),
       }) as never,
     };
 
@@ -676,7 +676,7 @@ getLayer: jasmine.Spy;
   it('renders GeoJSON overlay sources as vector layers', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'census_hydro',
             label: 'Hydro',
@@ -686,7 +686,7 @@ getLayer: jasmine.Spy;
             data_format: 'GeoJSON',
             geometry_type: 'LineString',
           },
-        ],
+        ]),
       }) as never,
     };
     fixture.detectChanges();
@@ -699,7 +699,7 @@ getLayer: jasmine.Spy;
   it('renders choropleth and camera point modes with distinct map layers', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'demographics',
             label: 'Demographics',
@@ -720,7 +720,7 @@ getLayer: jasmine.Spy;
             data_format: 'GeoJSON',
             geometry_type: 'Point',
           },
-        ],
+        ]),
       }) as never,
     };
     fixture.detectChanges();
@@ -732,7 +732,7 @@ getLayer: jasmine.Spy;
   it('renders vector tile overlays and exposes metadata-only notices', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'natural_earth',
             label: 'Natural Earth',
@@ -752,7 +752,7 @@ getLayer: jasmine.Spy;
             rendering_mode: 'metadata-only',
             provider: 'local_open_data',
           },
-        ],
+        ]),
       }) as never,
     };
     fixture.detectChanges();
@@ -800,7 +800,7 @@ getLayer: jasmine.Spy;
     component.payload = {
       map_session: makeMapSession({
         bounds: [12.4, 41.8, 12.6, 42.0],
-        overlays: [{
+        overlay_collection: makeOverlayCollection([{
           id: 'empty_flood_zones',
           label: 'Flood Zones',
           type: 'geojson',
@@ -810,7 +810,7 @@ getLayer: jasmine.Spy;
           geometry_type: 'Polygon',
           result_status: 'valid_empty',
           data: { type: 'FeatureCollection', features: [] },
-        }],
+        }]),
       }) as never,
     };
 
@@ -846,7 +846,7 @@ getLayer: jasmine.Spy;
   it('renders attribution labels as links when a safe attribution URL is provided', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'rainviewer_precipitation_radar',
             label: 'RainViewer Recent Precipitation Radar',
@@ -857,7 +857,7 @@ getLayer: jasmine.Spy;
             attribution: '© RainViewer',
             attribution_url: 'https://www.rainviewer.com/api.html',
           },
-        ],
+        ]),
       }) as never,
     };
 
@@ -871,7 +871,7 @@ getLayer: jasmine.Spy;
   it('surfaces a layer-specific failure when vector source_layer metadata is missing', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'broken_vector',
             label: 'Broken vector',
@@ -880,7 +880,7 @@ getLayer: jasmine.Spy;
             provider: 'fixture',
             url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
           },
-        ],
+        ]),
       }) as never,
     };
 
@@ -899,7 +899,7 @@ getLayer: jasmine.Spy;
   it('disables opacity controls for metadata-only overlays', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'metadata_only',
             label: 'Metadata only',
@@ -907,7 +907,7 @@ getLayer: jasmine.Spy;
             rendering_mode: 'metadata-only',
             provider: 'fixture',
           },
-        ],
+        ]),
       }) as never,
     };
 
@@ -942,13 +942,13 @@ getLayer: jasmine.Spy;
     };
     component.payload = {
       map_session: makeMapSession({
-        overlays: [{
+        overlay_collection: makeOverlayCollection([{
           id: 'hospitals',
           label: 'Hospitals',
           type: 'geojson',
           provider: 'overpass',
           inspections: [inspection],
-        }],
+        }]),
       }) as never,
     };
     fixture.detectChanges();
@@ -956,7 +956,7 @@ getLayer: jasmine.Spy;
     expect(component.selectedInspection?.inspection_id).toBe('hospital-1');
 
     fixture.componentRef.setInput('payload', {
-      map_session: makeMapSession({ overlays: [] }) as never,
+      map_session: makeMapSession({ overlay_collection: makeOverlayCollection([]) }) as never,
     });
     fixture.detectChanges();
 
@@ -966,7 +966,7 @@ getLayer: jasmine.Spy;
   it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {
     component.payload = {
       map_session: makeMapSession({
-        overlays: [
+        overlay_collection: makeOverlayCollection([
           {
             id: 'safe_overlay',
             label: 'Safe overlay',
@@ -976,7 +976,7 @@ getLayer: jasmine.Spy;
             data_format: 'GeoJSON',
             geometry_type: 'Point',
           },
-        ],
+        ]),
       }) as never,
     };
 

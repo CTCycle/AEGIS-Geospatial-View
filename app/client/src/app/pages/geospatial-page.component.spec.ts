@@ -1628,9 +1628,14 @@ describe('pages/geospatial-page.component', () => {
       session_id: 'map-1',
       resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
       basemap_id: 'osm_default',
-      overlay_ids: [],
       viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
-      overlays: [],
+      basemap: {
+        id: 'osm_default',
+        label: 'OpenStreetMap',
+        provider: 'openstreetmap',
+        tile_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      },
+      overlay_collection: { collection_id: 'active-map', revision: 0, instances: [] },
     } as never;
     component.onBasemapChange('esri_world_imagery');
 

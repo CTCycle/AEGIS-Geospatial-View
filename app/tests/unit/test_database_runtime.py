@@ -135,18 +135,18 @@ async def test_failed_activation_rolls_runtime_and_file_configuration_back(
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_database_switch_is_rejected_while_requests_or_jobs_are_active(
+async def test_database_switch_is_rejected_while_requests_or_runs_are_active(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     manager, previous, published, shutdown = _manager(
         monkeypatch,
         tmp_path,
-        busy_reasons=lambda _: ["background jobs"],
+        busy_reasons=lambda _: ["active agent runs"],
     )
     target = DatabaseConfiguration(database_path=str(tmp_path / "busy.sqlite"))
 
-    with pytest.raises(DatabaseRuntimeBusyError, match="background jobs"):
+    with pytest.raises(DatabaseRuntimeBusyError, match="active agent runs"):
         await manager.switch_database(target)
 
     assert manager.configuration == previous
@@ -207,7 +207,7 @@ def test_database_settings_api_reports_connection_and_busy_switch(
     manager, previous, _, _ = _manager(
         monkeypatch,
         tmp_path,
-        busy_reasons=lambda _: ["background jobs"],
+        busy_reasons=lambda _: ["active agent runs"],
     )
     application = FastAPI()
     application.add_middleware(
@@ -230,7 +230,7 @@ def test_database_settings_api_reports_connection_and_busy_switch(
     assert tested.status_code == 200
     assert tested.json()["schema_status"] == "empty"
     assert switched.status_code == 409
-    assert "background jobs" in switched.json()["detail"]
+    assert "active agent runs" in switched.json()["detail"]
     assert current.status_code == 200
     assert current.json()["database_path"] == previous.database_path
 

@@ -168,14 +168,22 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         raise AssertionError("Missing provider unexpectedly resolved.")
 
 ###############################################################################
-def test_provider_registry_accepts_nasa_gibs_discovery_alias() -> None:
+def test_provider_registry_uses_canonical_gibs_id_only() -> None:
     registry = ProviderRegistry(providers=[_LayerProvider()])
 
     layers = run_async_in_thread(
-        registry.list_layers("nasa_gibs", query="SRTM", limit=20, refresh=False)
+        registry.list_layers("gibs", query="SRTM", limit=20, refresh=False)
     )
 
     assert layers == []
+    try:
+        run_async_in_thread(
+            registry.list_layers("nasa_gibs", query="SRTM", limit=20, refresh=False)
+        )
+    except ProviderNotRegisteredError as exc:
+        assert "nasa_gibs" in str(exc)
+    else:
+        raise AssertionError("Retired NASA GIBS provider alias unexpectedly resolved.")
 
 ###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:

@@ -1,45 +1,20 @@
 from __future__ import annotations
 
+import pytest
+
 from server.domain.agent.conversation import ConversationState, PendingClarification
 
 ###############################################################################
-def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
-    state = ConversationState.from_persisted(
-        "conversation-1",
-        {
-            "schema_version": 1,
-            "conversation_id": "conversation-1",
-            "unresolved_questions": ["Which country contains Lake Bracciano?"],
-        },
-    )
-
-    assert state.schema_version == 2
-    assert state.pending_clarification is not None
-    assert state.pending_clarification.status == "active"
-    assert state.context_projection("Add an environmental layer")[
-        "pending_clarification"
-    ] is None
-    projection = state.context_projection("Italy")
-    assert projection["pending_clarification"]["question"] == (
-        "Which country contains Lake Bracciano?"
-    )
-    assert "unresolved_questions" not in projection
-    assert "unresolved_questions" not in state.model_dump(mode="json")
-
-###############################################################################
-def test_future_conversation_state_schema_is_rejected() -> None:
-    try:
-        ConversationState.from_persisted(
-            "conversation-future",
-            {
-                "schema_version": 3,
-                "conversation_id": "conversation-future",
-            },
-        )
-    except ValueError as exc:
-        assert str(exc) == "Unsupported conversation state schema version."
-    else:
-        raise AssertionError("Future conversation state schema was accepted.")
+def test_other_conversation_state_schema_versions_are_rejected() -> None:
+    for schema_version in (1, 3):
+        with pytest.raises(ValueError, match="schema_version"):
+            ConversationState.from_persisted(
+                "conversation-future",
+                {
+                    "schema_version": schema_version,
+                    "conversation_id": "conversation-future",
+                },
+            )
 
 ###############################################################################
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:

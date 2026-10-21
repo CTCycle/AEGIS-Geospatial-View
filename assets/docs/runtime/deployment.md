@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-09-28
+Last updated: 2026-10-21
 
 ## Backend persistence
 
@@ -8,11 +8,13 @@ AEGIS is a local SQLite application. The database file defaults to
 `<repo>/data/runtime/database.db` and can be moved by setting
 `AEGIS_DATA_DIR` to a directory that the application can read and write.
 
-An empty database file is created, migrated to the Alembic head, and seeded on
-first startup. Versioned files receive pending migrations. A populated file
-without an Alembic revision is rejected; startup never stamps, deletes, or
-silently replaces existing data. The migration workflow takes a temporary
-backup and restores it if migration or first-start seeding fails.
+An empty database file is initialized at the current Alembic head,
+`202608200001`, and seeded on first startup. Existing files must use that same
+revision; unknown and retired revisions are rejected and require an explicit
+rebuild or separately reviewed migration. A populated file without an Alembic
+revision is rejected; startup never stamps, deletes, or silently replaces
+existing data. The migration workflow takes a temporary backup and restores it
+if migration or first-start seeding fails.
 
 Back up the SQLite file before upgrading the application. If a legacy or
 corrupt file cannot be opened, preserve it for investigation and create a new
@@ -29,7 +31,8 @@ data directory only after the original has been safely copied.
 
 - SQLite permits one writer at a time; AEGIS uses WAL, a busy timeout, short
   transactions, and per-operation sessions for normal local concurrency;
-- background jobs are in-process and do not survive backend restart;
+- active run execution occurs in the backend process; run state and event
+  history are persisted in SQLite;
 - cancellation is cooperative;
 - external data sources influence runtime reliability based on network and
   credential state;

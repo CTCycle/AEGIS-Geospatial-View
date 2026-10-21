@@ -186,12 +186,6 @@ class ModelContextProfileResolver:
         return profile
 
     # -------------------------------------------------------------------------
-    def refresh(self, provider: str, model: str) -> ModelContextProfile | None:
-        """Compatibility-named alias for selected-model hydration."""
-
-        return self.resolve_selected(provider, model)
-
-    # -------------------------------------------------------------------------
     def request_metadata(self, provider: str, model: str) -> dict[str, Any]:
         profile = self.resolve(provider, model)
         if profile is None:

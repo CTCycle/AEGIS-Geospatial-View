@@ -1,6 +1,6 @@
 # Tier 1 application foundations
 
-Last updated: 2026-09-23
+Last updated: 2026-10-21
 
 Tier 1 is the application-foundation gate. It must establish that the shell,
 state, persistence, realtime lifecycle, Settings, model selection, and context
@@ -17,7 +17,7 @@ claims are expanded.
 | `T1-04` | Realtime connect/replay/deduplication | Heartbeat, reconnect cursor, ordered replay, duplicate suppression, malformed envelope, and origin rejection. | Realtime API/service/parser suites plus one normal browser run. |
 | `T1-05` | Run start/steer/cancel/idempotency | Version changes, duplicate request IDs, stale work protection, and terminal cancellation. | Run lifecycle/orchestrator suites and a post-cancel normal run. |
 | `T1-06` | Synchronous `/api/chat/turn` contract | Distinguish terminal `200`, accepted `202`, genuine conflict `409`, missing `404`, and unusable-provider `503`. | Chat API contract suite plus exact live response matrix. |
-| `T1-07` | Background chat jobs | Queue/progress/completion/cancel/unknown-job behavior, shutdown boundary, and no false restart persistence. | Job service/API suites and one normal job. |
+| `T1-07` | Historical background chat jobs (retired) | Historical queue/progress/completion/cancel behavior and process-restart boundary. | Dated T1-07 report and job evidence; not a current API contract. |
 | `T1-08` | Runtime Settings API/persistence | Typed defaults, partial merge, atomic update, invalid values, restart metadata, and reread. | Runtime Settings API/repository tests plus isolated restart. |
 | `T1-09` | Seven-section Settings navigation/drafts | URL-authoritative section selection, invalid tab fallback, dirty draft behavior, save, and return. | Settings component suite plus all seven rendered sections. |
 | `T1-10` | Credential lifecycle | Masked state, safe save/clear, blank-draft safety, invalid input, undecryptable state, and API failure. | Credential/crypto suites plus safe fixture browser flow; never use real secrets. |
@@ -60,14 +60,13 @@ omitted nullable fields. At the T1-06 source boundary, Tier 1 was `PARTIAL` at
 51 `UNRUN`. These results retain their dated source boundaries.
 
 The 2026-09-23 [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md)
-passes the mounted job API and worker lifecycle cases (11/11 focused tests),
-the full backend unit suite (918/918), and one successful live background job
-on the exact `opencode-go / deepseek-v4.1-flash` lane. Cooperative shutdown
-waited for active work to finish; after an official-launcher restart against
-the same isolated runtime, the former job returned `404` for status, events,
-and cancellation. Tier 1 is now `PARTIAL` at 10 `PASS` / 2 `PARTIAL`; the
-campaign is 15 `PASS` / 2 `PARTIAL` / 51 `UNRUN`. The tested source boundary
-is implementation commit `3fd0c820c2d4de0fb06120b6feac80b199d57f26`.
+is a historical result for the then-mounted job API and worker. It passed the
+job lifecycle cases (11/11 focused tests), the full backend unit suite
+(918/918), and one live job on the exact `opencode-go / deepseek-v4.1-flash`
+lane. That API has since been retired in favor of the persisted conversation
+run lifecycle. The dated evidence remains available; it does not describe the
+current API surface. The tested source boundary was implementation commit
+`3fd0c820c2d4de0fb06120b6feac80b199d57f26`.
 
 The 2026-09-21 headless run's missing `.maplibregl-canvas` remains historical
 evidence; the current headed Chrome run verified the T1-02 reload and visible

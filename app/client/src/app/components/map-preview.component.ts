@@ -528,15 +528,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     const nextVisibility: Record<string, boolean> = {};
     overlays.forEach((overlay) => {
-      // The backend collection is authoritative. Local/session storage
-      // preferences are only fallbacks for payloads without an explicit
-      // visibility value.
+      // Canonical overlay instances always include visibility. Persisted
+      // preferences override the backend value only when restoring the page.
       nextVisibility[overlay.id] =
         preferInitialState && typeof this.initialOverlayVisibility[overlay.id] === 'boolean'
           ? this.initialOverlayVisibility[overlay.id]
-          : typeof overlay.visible === 'boolean'
-          ? overlay.visible
-          : this.overlayVisibility[overlay.id] ?? this.initialOverlayVisibility[overlay.id] ?? true;
+          : overlay.visible ?? true;
     });
     this.overlayVisibility = recordBooleanEqual(this.overlayVisibility, nextVisibility) ? this.overlayVisibility : nextVisibility;
 
@@ -1453,27 +1450,11 @@ private fitMaxZoom(defaultMaxZoom: number): number {
   }
 
   private registerLayerClickListener(map: Map, layerId: string, handler: (event: unknown) => void): void {
-    if (typeof map.on !== 'function') {
-      return;
-    }
-    // MapLibre exposes a three-argument layer overload. Keep a small fallback
-    // for lightweight map doubles used by the component tests and integrations.
-    if (map.on.length >= 3) {
-      map.on('click', layerId, handler as never);
-    } else {
-      map.on('click', handler as never);
-    }
+    map.on('click', layerId, handler as never);
   }
 
   private unregisterLayerClickListener(map: Map, layerId: string, handler: (event: unknown) => void): void {
-    if (typeof map.off !== 'function') {
-      return;
-    }
-    if (map.off.length >= 3) {
-      map.off('click', layerId, handler as never);
-    } else {
-      map.off('click', handler as never);
-    }
+    map.off('click', layerId, handler as never);
   }
 
   private inspectionForFeature(

@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## SQLite-only relational storage
 
@@ -72,9 +72,11 @@ not used.
 Alembic under `app/server/migrations` is the production schema mechanism;
 runtime code never calls `Base.metadata.create_all()`.
 
-- an empty file is upgraded to the single Alembic head and seeded;
-- a versioned file receives pending migrations and idempotent seeds;
-- an unknown revision fails without changing the file;
+- an empty file is created at the single current Alembic revision,
+  `202608200001`, and seeded;
+- an existing file at `202608200001` is validated and seeded idempotently;
+- any other or unknown revision fails closed; old schemas require an explicit
+  rebuild or a separately reviewed migration before activation;
 - a populated file without `alembic_version` fails without stamping or deleting
   data;
 - migration and first-start seeding run under a neighboring file lock;
@@ -90,12 +92,10 @@ active-run relationship directly; there are no `chat_sessions` or
 
 ## Stored domains
 
-Core relational storage covers conversations and messages, agent runs and
-events, steering messages, model settings, encrypted model credentials,
-application runtime settings, and seeded geospatial reference data. Existing
-SQLite files may retain rows from the historical model-probe table; current
-application code does not read or write those rows, and this change does not
-delete them.
+The current relational schema is defined by one squashed Alembic baseline,
+`202608200001`. It contains conversations and messages, agent runs and events,
+steering messages, model settings, encrypted model credentials, application
+runtime settings, and seeded geospatial reference data.
 Conversation-scoped native-agent evidence is
 stored in compressed `agent_evidence` rows with bounded summaries, provenance,
 checksums, and parent references; conversation deletion cascades metadata and
@@ -113,25 +113,27 @@ only bootstrap and deployment values such as the data root and service ports.
 
 ## Runtime database switching
 
-Settings tests the selected SQLite file for integrity and a recognized Alembic
-revision before activation. Empty files are initialized and recognized older
-schemas are migrated by the existing guarded initializer. A candidate runtime
-is built before the active runtime is replaced; activation failures restore the
-previous connection configuration and runtime. The app rejects a switch while
-API or WebSocket work, queued or running jobs, or active agent runs are in
-flight. Each database retains its own settings and data. Switching does not
+Settings tests the selected SQLite file for integrity and the current Alembic
+revision before activation. Empty files are initialized at the baseline;
+existing files must already use revision `202608200001`. Unknown or retired
+revisions fail closed and require an explicit rebuild or separately reviewed
+migration. A candidate runtime is built before the active runtime is replaced;
+activation failures restore the previous connection configuration and runtime.
+The app rejects a switch while API or WebSocket work or active agent runs are
+in flight. Each database retains its own settings and data. Switching does not
 copy records between files, and the browser reloads its client stores after a
 successful switch. Changing the data-root environment or process-level service
 configuration still requires restarting the application.
 
 ### Native conversation and presentation contracts
 
-`conversation_state` is always persisted and returned as schema version 2.
-`pending_clarification` is the sole durable clarification field;
-`unresolved_questions` is accepted only while migrating an older payload and
-is removed before a repository read or write returns. Conversation-state
-writes validate the typed contract and set the state revision to the same
-optimistic context revision that commits the write.
+`conversation_state` is persisted and returned only as schema version 2. The
+typed contract forbids extra fields, and `pending_clarification` is the sole
+durable clarification field. Payloads containing the retired
+`unresolved_questions` field or any other unknown field are rejected rather
+than migrated. Conversation-state writes validate the typed contract and set
+the state revision to the same optimistic context revision that commits the
+write.
 
 Agent-run terminal transitions close an in-flight presentation in the same
 transaction as the run state. A failed, cancelled, superseded, or timed-out
@@ -150,13 +152,12 @@ It invokes the repository seeder after migrations complete.
 
 ## Frontend persistence
 
-- storage key: `aegis:webapp-state:v5`
+- storage key: `aegis:webapp-ui-state:v1`
 - storage type: `sessionStorage`
 - TTL: 6 hours
 - implementation: `app/client/src/app/core/app-state.ts`
 
-The v5 frontend boundary invalidates pre-collection active-map/task snapshots;
-conversation messages are retained during the one-time migration. The backend
-keeps the active overlay collection and revision in the map-session memory
-snapshot, while durable conversation messages retain the typed turn contract
-and mutation result for replay and audit.
+The version 1 frontend state stores chat and settings view preferences only.
+Malformed, expired, or unsupported-version state is discarded; there is no
+legacy-state migration. Conversation history, active runs, and map sessions
+are loaded through their current API contracts rather than this session cache.

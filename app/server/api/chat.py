@@ -38,6 +38,7 @@ from server.services.geospatial.render_capture import RenderCaptureStore
 from server.domain.agent.trace import public_protocol_projection
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
+from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.exceptions import (
     RunAccessError,
     RunAttachmentError,

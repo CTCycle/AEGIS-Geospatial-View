@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Purpose
 
@@ -163,11 +163,6 @@ conversation-scoped `agent_evidence` store rather than model messages.
   Unified Models, Model Providers, and Geospatial Access settings controls.
 - `user/troubleshooting.md`
   Troubleshooting basics and operational notes for end users.
-
-### Operations
-
-- `operations/background_jobs.md`
-  In-process job lifecycle, cancellation model, and operational constraints.
 
 ## Documentation Rules
 

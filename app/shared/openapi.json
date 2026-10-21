@@ -5,47 +5,6 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/api/chat/jobs": {
-      "post": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Create Chat Job",
-        "operationId": "create_chat_job_api_chat_jobs_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatTurnRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BackgroundJobCreateResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/chat/turn": {
       "post": {
         "tags": [
@@ -134,45 +93,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/ChatAttachmentResponse"
                 }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/stream": {
-      "post": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Chat Stream",
-        "operationId": "chat_stream_api_chat_stream_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatTurnRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -723,132 +643,6 @@
         }
       }
     },
-    "/api/jobs/{job_id}": {
-      "get": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Get Job",
-        "operationId": "get_job_api_jobs__job_id__get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BackgroundJobStatusResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/events": {
-      "get": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Get Job Events",
-        "operationId": "get_job_events_api_jobs__job_id__events_get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BackgroundJobEventsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/cancel": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Cancel Job",
-        "operationId": "cancel_job_api_jobs__job_id__cancel_post",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobCancelResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/geospatial/capabilities": {
       "get": {
         "tags": [
@@ -884,189 +678,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GeospatialLayersResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/geospatial/providers/{provider_id}/layers": {
-      "get": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "List Provider Layers",
-        "operationId": "list_provider_layers_api_geospatial_providers__provider_id__layers_get",
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Query"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 250,
-              "minimum": 1,
-              "default": 100,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "refresh",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Refresh"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GeospatialProviderLayersResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/geospatial/providers/{provider_id}/layers/{layer_id}": {
-      "get": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "Get Provider Layer",
-        "operationId": "get_provider_layer_api_geospatial_providers__provider_id__layers__layer_id__get",
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          },
-          {
-            "name": "layer_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Layer Id"
-            }
-          },
-          {
-            "name": "refresh",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Refresh"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GeospatialProviderLayerResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/geospatial/layers/{layer_id}/health": {
-      "get": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "Get Layer Health",
-        "operationId": "get_layer_health_api_geospatial_layers__layer_id__health_get",
-        "parameters": [
-          {
-            "name": "layer_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Layer Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GeospatialLayerHealthResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1635,48 +1246,6 @@
         }
       }
     },
-    "/api/geospatial/cameras/{camera_id}": {
-      "get": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "Get Geospatial Camera",
-        "operationId": "get_geospatial_camera_api_geospatial_cameras__camera_id__get",
-        "parameters": [
-          {
-            "name": "camera_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Camera Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GeospatialCameraDetailResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/geospatial/sources/{provider_id}/credential-status": {
       "get": {
         "tags": [
@@ -1740,69 +1309,6 @@
         }
       }
     },
-    "/api/geospatial/providers/{provider_id}/account-setup": {
-      "get": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "Get Provider Account Setup",
-        "operationId": "get_provider_account_setup_api_geospatial_providers__provider_id__account_setup_get",
-        "parameters": [
-          {
-            "name": "provider_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Provider Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GeospatialProviderAccountSetupResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/geospatial/audit": {
-      "post": {
-        "tags": [
-          "geospatial"
-        ],
-        "summary": "Audit Geospatial Sources",
-        "operationId": "audit_geospatial_sources_api_geospatial_audit_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LayerAuditReport"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/settings/runtime": {
       "get": {
         "tags": [
@@ -1846,6 +1352,107 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RuntimeSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/database": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Database Settings",
+        "operationId": "get_database_settings_api_settings_database_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Switch Database",
+        "operationId": "switch_database_api_settings_database_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/database/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Database Connection",
+        "operationId": "test_database_connection_api_settings_database_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseConnectionTestResponse"
                 }
               }
             }
@@ -2545,7 +2152,7 @@
           "root_task_id"
         ],
         "title": "AgentTaskState",
-        "description": "Typed projection of the run-scoped task ledger.\n\nThe durable ``AgentRunState.task_state`` field intentionally remains a\nJSON object for checkpoint compatibility with older native runs.  This\nmodel is the schema and normalization boundary for that object."
+        "description": "Typed projection of the run-scoped task ledger.\n\nThe durable ``AgentRunState.task_state`` JSON object carries both the\nconversation-state projection and this task ledger, so the typed view\ndeliberately ignores the conversation keys and claims its own namespace."
       },
       "AgentTemporalScope": {
         "properties": {
@@ -2678,285 +2285,6 @@
         "title": "AgentToolResultSummary",
         "description": "Bounded model-independent summary of one native tool result."
       },
-      "BackgroundJobCreateResponse": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "job_type": {
-            "type": "string",
-            "const": "chat_turn",
-            "title": "Job Type"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "title": "Status"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "poll_interval": {
-            "type": "number",
-            "title": "Poll Interval",
-            "default": 1.0
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "job_id",
-          "job_type",
-          "status",
-          "request_id",
-          "message"
-        ],
-        "title": "BackgroundJobCreateResponse"
-      },
-      "BackgroundJobEvent": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "event_type": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "started",
-              "status",
-              "parsed",
-              "policy",
-              "tool_call",
-              "tool_result",
-              "map_session",
-              "completed",
-              "failed",
-              "cancelled"
-            ],
-            "title": "Event Type"
-          },
-          "sequence": {
-            "type": "integer",
-            "title": "Sequence"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "payload_json": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Payload Json"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "job_id",
-          "event_type",
-          "sequence",
-          "created_at"
-        ],
-        "title": "BackgroundJobEvent"
-      },
-      "BackgroundJobEventsResponse": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "events": {
-            "items": {
-              "$ref": "#/components/schemas/BackgroundJobEvent"
-            },
-            "type": "array",
-            "title": "Events"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "job_id"
-        ],
-        "title": "BackgroundJobEventsResponse"
-      },
-      "BackgroundJobStatusResponse": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "job_type": {
-            "type": "string",
-            "const": "chat_turn",
-            "title": "Job Type"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "title": "Status"
-          },
-          "request_id": {
-            "type": "string",
-            "title": "Request Id"
-          },
-          "parent_job_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parent Job Id"
-          },
-          "priority": {
-            "type": "integer",
-            "title": "Priority",
-            "default": 0
-          },
-          "progress_percent": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Progress Percent"
-          },
-          "status_message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status Message"
-          },
-          "result_json": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Result Json"
-          },
-          "error_json": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error Json"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "started_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Started At"
-          },
-          "completed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
-          },
-          "cancel_requested_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cancel Requested At"
-          },
-          "attempt_count": {
-            "type": "integer",
-            "title": "Attempt Count",
-            "default": 0
-          },
-          "max_attempts": {
-            "type": "integer",
-            "title": "Max Attempts",
-            "default": 1
-          },
-          "last_heartbeat_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Heartbeat At"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "job_id",
-          "job_type",
-          "status",
-          "request_id",
-          "created_at"
-        ],
-        "title": "BackgroundJobStatusResponse"
-      },
       "CapabilityDomain": {
         "type": "string",
         "enum": [
@@ -2971,77 +2299,6 @@
           "mixed"
         ],
         "title": "CapabilityDomain"
-      },
-      "CapabilityImplementationStatus": {
-        "properties": {
-          "capability_id": {
-            "type": "string",
-            "title": "Capability Id"
-          },
-          "provider_id": {
-            "type": "string",
-            "title": "Provider Id"
-          },
-          "schema_valid": {
-            "type": "boolean",
-            "title": "Schema Valid",
-            "default": true
-          },
-          "runtime_registered": {
-            "type": "boolean",
-            "title": "Runtime Registered"
-          },
-          "provider_fetch_implemented": {
-            "type": "boolean",
-            "title": "Provider Fetch Implemented"
-          },
-          "normalizer_implemented": {
-            "type": "boolean",
-            "title": "Normalizer Implemented"
-          },
-          "cache_implemented": {
-            "type": "boolean",
-            "title": "Cache Implemented"
-          },
-          "api_endpoint_covered": {
-            "type": "boolean",
-            "title": "Api Endpoint Covered"
-          },
-          "client_renderer_covered": {
-            "type": "boolean",
-            "title": "Client Renderer Covered"
-          },
-          "unit_tested": {
-            "type": "boolean",
-            "title": "Unit Tested"
-          },
-          "visual_tested": {
-            "type": "boolean",
-            "title": "Visual Tested"
-          },
-          "placeholder_statuses": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Placeholder Statuses"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "capability_id",
-          "provider_id",
-          "runtime_registered",
-          "provider_fetch_implemented",
-          "normalizer_implemented",
-          "cache_implemented",
-          "api_endpoint_covered",
-          "client_renderer_covered",
-          "unit_tested",
-          "visual_tested"
-        ],
-        "title": "CapabilityImplementationStatus"
       },
       "CapabilityRoute": {
         "properties": {
@@ -4495,71 +3752,102 @@
         "title": "ConversationSummary",
         "description": "Searchable, bounded conversation listing item."
       },
-      "GeospatialCameraDetailResponse": {
+      "DatabaseConnectionTestResponse": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
           },
-          "status": {
+          "backend": {
             "type": "string",
-            "title": "Status"
+            "const": "sqlite",
+            "title": "Backend"
           },
-          "provider": {
+          "database_path": {
             "type": "string",
-            "title": "Provider"
+            "title": "Database Path"
+          },
+          "schema_status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "upgradable",
+              "empty"
+            ],
+            "title": "Schema Status"
           },
           "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Message"
-          },
-          "camera": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Camera"
-          },
-          "attribution": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Attribution"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          },
-          "stale": {
-            "type": "boolean",
-            "title": "Stale",
-            "default": false
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "id",
-          "status",
-          "provider"
+          "ok",
+          "backend",
+          "database_path",
+          "schema_status",
+          "message"
         ],
-        "title": "GeospatialCameraDetailResponse"
+        "title": "DatabaseConnectionTestResponse"
+      },
+      "DatabaseSettingsRequest": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "const": "sqlite",
+            "title": "Backend",
+            "default": "sqlite"
+          },
+          "database_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Database Path"
+          },
+          "sqlite_lock_timeout_seconds": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sqlite Lock Timeout Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "database_path",
+          "sqlite_lock_timeout_seconds"
+        ],
+        "title": "DatabaseSettingsRequest"
+      },
+      "DatabaseSettingsResponse": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "const": "sqlite",
+            "title": "Backend"
+          },
+          "database_path": {
+            "type": "string",
+            "title": "Database Path"
+          },
+          "sqlite_lock_timeout_seconds": {
+            "type": "integer",
+            "title": "Sqlite Lock Timeout Seconds"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "backend",
+          "database_path",
+          "sqlite_lock_timeout_seconds"
+        ],
+        "title": "DatabaseSettingsResponse"
       },
       "GeospatialCatalogResponse": {
         "properties": {
@@ -4647,230 +3935,6 @@
           "configured"
         ],
         "title": "GeospatialCredentialStatusResponse"
-      },
-      "GeospatialLayerHealthResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "provider": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
-          },
-          "reliability": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Reliability"
-          },
-          "runtime": {
-            "title": "Runtime"
-          },
-          "available": {
-            "type": "boolean",
-            "title": "Available",
-            "default": false
-          },
-          "availability_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Availability Reason"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id"
-        ],
-        "title": "GeospatialLayerHealthResponse"
-      },
-      "GeospatialLayerRenderDescriptor": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          },
-          "layer_id": {
-            "type": "string",
-            "title": "Layer Id"
-          },
-          "rendering_mode": {
-            "type": "string",
-            "title": "Rendering Mode"
-          },
-          "source_protocol": {
-            "type": "string",
-            "title": "Source Protocol"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          },
-          "tile_url_template": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tile Url Template"
-          },
-          "crs": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Crs"
-          },
-          "format": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Format"
-          },
-          "style": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style"
-          },
-          "time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Time"
-          },
-          "default_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Time"
-          },
-          "tile_matrix_set": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tile Matrix Set"
-          },
-          "tile_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tile Size"
-          },
-          "min_zoom": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Zoom"
-          },
-          "max_zoom": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Zoom"
-          },
-          "attribution": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Attribution"
-          },
-          "attribution_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Attribution Url"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "layer_id",
-          "rendering_mode",
-          "source_protocol"
-        ],
-        "title": "GeospatialLayerRenderDescriptor"
       },
       "GeospatialLayersResponse": {
         "properties": {
@@ -5006,194 +4070,6 @@
           "credential_label"
         ],
         "title": "GeospatialProviderAccountSetupResponse"
-      },
-      "GeospatialProviderLayerDescriptor": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          },
-          "layer_id": {
-            "type": "string",
-            "title": "Layer Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "abstract": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Abstract"
-          },
-          "rendering_mode": {
-            "type": "string",
-            "title": "Rendering Mode"
-          },
-          "source_protocol": {
-            "type": "string",
-            "title": "Source Protocol"
-          },
-          "data_format": {
-            "type": "string",
-            "title": "Data Format"
-          },
-          "geometry_type": {
-            "type": "string",
-            "title": "Geometry Type"
-          },
-          "queryable": {
-            "type": "boolean",
-            "title": "Queryable",
-            "default": false
-          },
-          "crs": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Crs"
-          },
-          "formats": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Formats"
-          },
-          "styles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Styles"
-          },
-          "time_extent": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Time Extent"
-          },
-          "default_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Time"
-          },
-          "tile_matrix_sets": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tile Matrix Sets"
-          },
-          "render": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/GeospatialLayerRenderDescriptor"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "attribution": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Attribution"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "layer_id",
-          "title",
-          "rendering_mode",
-          "source_protocol",
-          "data_format",
-          "geometry_type"
-        ],
-        "title": "GeospatialProviderLayerDescriptor"
-      },
-      "GeospatialProviderLayerResponse": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          },
-          "layer": {
-            "$ref": "#/components/schemas/GeospatialProviderLayerDescriptor"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "layer"
-        ],
-        "title": "GeospatialProviderLayerResponse"
-      },
-      "GeospatialProviderLayersResponse": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          },
-          "layers": {
-            "items": {
-              "$ref": "#/components/schemas/GeospatialProviderLayerDescriptor"
-            },
-            "type": "array",
-            "title": "Layers"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "layers"
-        ],
-        "title": "GeospatialProviderLayersResponse"
       },
       "GeospatialProviderPayloadResponse": {
         "properties": {
@@ -5568,30 +4444,6 @@
         ],
         "title": "InspectionField",
         "description": "A bounded, allowlisted scalar exposed by the map inspection UI."
-      },
-      "JobCancelResponse": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "job_id",
-          "success",
-          "message"
-        ],
-        "title": "JobCancelResponse"
       },
       "JsonAgentExecutionSettings": {
         "properties": {
@@ -6000,19 +4852,6 @@
         "type": "object",
         "title": "JsonGeospatialSettings"
       },
-      "JsonJobsSettings": {
-        "properties": {
-          "polling_interval": {
-            "type": "number",
-            "minimum": 0.1,
-            "title": "Polling Interval",
-            "default": 1.0
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "JsonJobsSettings"
-      },
       "JsonMapSettings": {
         "properties": {
           "default_size_m": {
@@ -6203,112 +5042,6 @@
         "additionalProperties": false,
         "type": "object",
         "title": "JsonRainViewerSettings"
-      },
-      "LayerAuditIssue": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "manifest_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Manifest Id"
-          },
-          "severity": {
-            "type": "string",
-            "title": "Severity"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "path",
-          "severity",
-          "message"
-        ],
-        "title": "LayerAuditIssue"
-      },
-      "LayerAuditReport": {
-        "properties": {
-          "manifest_count": {
-            "type": "integer",
-            "title": "Manifest Count",
-            "default": 0
-          },
-          "error_count": {
-            "type": "integer",
-            "title": "Error Count",
-            "default": 0
-          },
-          "warning_count": {
-            "type": "integer",
-            "title": "Warning Count",
-            "default": 0
-          },
-          "schema_coverage": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Schema Coverage"
-          },
-          "provider_coverage": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Provider Coverage"
-          },
-          "renderer_coverage": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Renderer Coverage"
-          },
-          "auth_coverage": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Auth Coverage"
-          },
-          "source_doc_coverage": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Source Doc Coverage"
-          },
-          "issues": {
-            "items": {
-              "$ref": "#/components/schemas/LayerAuditIssue"
-            },
-            "type": "array",
-            "title": "Issues"
-          },
-          "implementation_statuses": {
-            "items": {
-              "$ref": "#/components/schemas/CapabilityImplementationStatus"
-            },
-            "type": "array",
-            "title": "Implementation Statuses"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "LayerAuditReport"
       },
       "LocationHierarchy": {
         "properties": {
@@ -7364,7 +6097,7 @@
           "question"
         ],
         "title": "PendingClarification",
-        "description": "A clarification tied to the request that produced it.\n\nThe legacy ``unresolved_questions`` value is read only while hydrating\npre-schema-v2 persisted state.  This record is the durable source of\ntruth: status and source terms let a later turn consume the clarification\nwithout making it a global blocker for unrelated work."
+        "description": "A clarification tied to the request that produced it.\n\nThis record is the durable source of truth: status and source terms let a\nlater turn consume the clarification without making it a global blocker\nfor unrelated work."
       },
       "RenderCaptureCreateRequest": {
         "properties": {
@@ -7889,9 +6622,6 @@
           "map": {
             "$ref": "#/components/schemas/JsonMapSettings"
           },
-          "jobs": {
-            "$ref": "#/components/schemas/JsonJobsSettings"
-          },
           "chat": {
             "$ref": "#/components/schemas/JsonChatRuntimeSettings"
           },
@@ -7933,7 +6663,6 @@
           "nominatim",
           "geospatial",
           "map",
-          "jobs",
           "chat",
           "openmeteo",
           "overpass",
@@ -7980,18 +6709,6 @@
               }
             ],
             "title": "Map"
-          },
-          "jobs": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Jobs"
           },
           "chat": {
             "anyOf": [

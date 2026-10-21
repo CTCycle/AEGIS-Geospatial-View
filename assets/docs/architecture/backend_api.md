@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-10-19
+Last updated: 2026-10-21
 
 ## Mounting
 
@@ -8,17 +8,6 @@ All routers are mounted with `/api` prefix in `app/server/app.py`.
 
 `GET /api/health` returns `{"status": "ok"}` for launcher readiness checks.
 It is intentionally excluded from the generated OpenAPI schema.
-
-## Job Routes
-
-Defined in `app/server/api/jobs.py`:
-
-- `GET /api/jobs/{job_id}`
-  Returns `BackgroundJobStatusResponse`.
-- `GET /api/jobs/{job_id}/events`
-  Returns `BackgroundJobEventsResponse`.
-- `POST /api/jobs/{job_id}/cancel`
-  Returns `JobCancelResponse`.
 
 ## Geospatial Routes
 
@@ -28,8 +17,6 @@ Defined in `app/server/api/geospatial.py`:
   Returns `GeospatialCatalogResponse`.
 - `GET /api/geospatial/layers`
   Returns `GeospatialLayersResponse`.
-- `GET /api/geospatial/layers/{layer_id}/health`
-  Returns `GeospatialLayerHealthResponse`.
 - `GET /api/geospatial/layers/{layer_id}/features`
   Returns `GeospatialProviderPayloadResponse`. A capability that is disabled
   for the deployment (for example a `restricted_usage_opt_in` source without
@@ -39,10 +26,6 @@ Defined in `app/server/api/geospatial.py`:
 - `GET /api/geospatial/layers/{layer_id}/geojson`
   Returns raw GeoJSON `FeatureCollection` for map rendering, with the same
   `403` rule for disabled capabilities.
-- `GET /api/geospatial/providers/{provider_id}/layers`
-  Returns normalized live provider-native layer descriptors. NASA GIBS uses WMS/WMTS XML capabilities and does not expose raw XML to the frontend.
-- `GET /api/geospatial/providers/{provider_id}/layers/{layer_id}`
-  Returns one normalized live provider layer descriptor with render metadata when available.
 - `GET /api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png`
   Proxies manifest-backed raster tiles.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`
@@ -51,16 +34,10 @@ Defined in `app/server/api/geospatial.py`:
   Returns camera-network payloads.
 - `GET /api/geospatial/cameras.geojson`
   Returns raw GeoJSON `FeatureCollection` for camera-point rendering.
-- `GET /api/geospatial/cameras/{camera_id}`
-  Returns `GeospatialCameraDetailResponse`.
 - `GET /api/geospatial/sources/{provider_id}/credential-status`
   Returns `GeospatialCredentialStatusResponse`.
 - `GET /api/geospatial/providers/account-setup`
   Returns provider account-setup metadata.
-- `GET /api/geospatial/providers/{provider_id}/account-setup`
-  Returns provider-specific account-setup metadata.
-- `POST /api/geospatial/audit`
-  Returns `LayerAuditReport`.
 
 Geospatial credential status and provider execution use the same
 `GeospatialCredentialResolver`. It reads the active encrypted SQLite credential,
@@ -82,10 +59,6 @@ Defined in `app/server/api/chat.py`:
   for a genuine active-run/idempotency/ownership conflict. A message that is
   empty or longer than 12,000 characters returns `422` with a sanitized
   validation detail (never `404`).
-- `POST /api/chat/jobs`
-  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
-- `POST /api/chat/stream`
-  Streams NDJSON chat events. `conversation_id` is required.
 - `GET /api/chat/models`
   Returns available cloud and local models.
   Optional query: `provider=deepseek`, `provider=opencode`, or
@@ -166,22 +139,6 @@ An accepted active run is polled with:
   the same serialized terminal chat response that a synchronous `200` would
   have returned. The snapshot remains the source of truth when realtime events
   arrive out of order or a websocket reconnects.
-
-### Chat Stream Events
-
-`POST /api/chat/stream` emits NDJSON `ChatStreamEvent` objects.
-
-Current event sequence is lifecycle-oriented rather than token-oriented.
-
-Supported event names:
-
-- `status`
-- `context_usage`
-- `stage`
-- `final`
-- `error`
-
-`final` carries the full serialized `ChatTurnResponse`, including `operation`.
 
 `POST /api/chat/turn` returns `503` when the selected provider credentials or
 local provider configuration cannot be used. Dynamic model catalog requests

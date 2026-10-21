@@ -1,12 +1,12 @@
 # Comprehensive validation strategy
 
-Last updated: 2026-10-19
+Last updated: 2026-10-21
 
 The [2026-10-19 F-19 / T4-09 slice](../../QA/validation-20261019-f19-t4-09/report.md) passes `T4-09` (exact OpenCode Go lane) and closes F-19; `T4-10` to `T4-13`, `T5-11` and `T5-13` stay `UNRUN`.
 
 The [2026-10-19 Tier 5 accessibility and performance slice](../../QA/validation-20261019-tier5-perf-a11y/report.md) authors the missing contracts and passes `T5-10` (axe-core over nine views at desktop width plus keyboard focus; nine accessibility defects fixed) and `T5-09` (API p95 under 30 ms, 368 kB initial transfer, Rome and Naples renders). `T5-11` and `T5-13` stay `UNRUN`; Tier 4B is unchanged.
 
-The [2026-10-19 Tier 5 recovery slice](../../QA/validation-20261019-tier5-recovery/report.md) passes `T5-04` outages, `T5-05` restart recovery and `T5-06` repetition (reconstructed mapping, LOW confidence), extends `T5-07` to the stream and job routes after fixing a validation defect there, and confirms F-13 live. `T5-09`, `T5-10`, `T5-11` and `T5-13` remain `UNRUN`.
+The [2026-10-19 Tier 5 recovery slice](../../QA/validation-20261019-tier5-recovery/report.md) passes `T5-04` outages, `T5-05` restart recovery and `T5-06` repetition (reconstructed mapping, LOW confidence), and confirms F-13 live. Its `T5-07` checks covered stream and job adapters that have since been retired; current chat and run contracts are documented in [backend_api.md](../architecture/backend_api.md). `T5-09`, `T5-10`, `T5-11` and `T5-13` remain `UNRUN`.
 
 The [2026-10-19 leftover and Tier 5 slice](../../QA/validation-20261019-leftovers-tier5/report.md) opens Tier 5 under a reconstructed ID-to-theme mapping (LOW confidence; `T5-13` unresolved): `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` pass, and `T5-12` passes on hosted CI run 39212579230. It also fixes Census timeouts, the imagery temporal-scope failure, F-13 point-scope routing, F-25, failed-materialization rollback and an over-long-message 404 defect.
 

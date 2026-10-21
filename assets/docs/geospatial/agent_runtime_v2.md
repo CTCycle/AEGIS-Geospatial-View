@@ -1,6 +1,6 @@
 # AEGIS native-agent harness reference
 
-Last updated: 2026-09-30
+Last updated: 2026-10-21
 
 AEGIS keeps one orchestrating agent.  Planning, scheduling, validation, and
 checkpointing are ordinary typed Python services; no LangGraph/LangChain agent
@@ -71,8 +71,9 @@ conversation projection, completion reason, model/tool counts, and operational
 decisions. Native checkpoints are bounded and reloadable for active-run
 restart. Operational traces redact reasoning and credentials. Private provider
 continuation retains opaque SDK parts required for protocol correctness;
-REST, polling, streaming, realtime, and trace projections omit that continuation.
-Internal checkpoints are not fanned out to the user stream.
+chat-turn responses, run-status responses, realtime events, and trace
+projections omit that continuation. Internal checkpoints are not sent in
+user-visible realtime events.
 
 ## Provider contract
 

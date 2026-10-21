@@ -25,6 +25,7 @@ import {
   parseConversationSnapshotResponse,
   parseGeospatialProviderPayload,
   parseModelSettingsResponse,
+  parseRunTraceResponse,
 } from './api-parsers';
 
 const catalogEntry = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -333,6 +334,28 @@ describe('core/api', () => {
       .toBe(`${API_BASE_URL}${API_CONVERSATION_RUN_STATUS_PATH('conv-abc', 'run-abc')}`);
   });
 
+  it('parses run trace events and rejects retired entries and trace fields', () => {
+    const event = {
+      event_id: 'event-1',
+      sequence: 1,
+      run_id: 'run-1',
+      run_version: 1,
+      kind: 'tool_started',
+      timestamp: '2026-10-21T12:00:00Z',
+    };
+    const response = {
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      events: [event],
+    };
+
+    expect(parseRunTraceResponse(response).entries).toEqual([jasmine.objectContaining(event)]);
+    expect(() => parseRunTraceResponse({ ...response, events: undefined, entries: [event] }))
+      .toThrowError(/entries must be an array/);
+    expect(() => parseRunTraceResponse({ ...response, events: undefined, trace: [event] }))
+      .toThrowError(/entries must be an array/);
+  });
+
   it('preserves provider provenance metadata instead of dropping it at the API boundary', () => {
     const parsed = parseGeospatialProviderPayload({
       status: 'ok',
@@ -383,6 +406,9 @@ describe('core/api', () => {
       resolved_location: { label: 'Rome', latitude: 141.9, longitude: 12.5 },
     })).toBeNull();
     expect(normalizeMapSession({ ...validSession, bounds: [12.6, 41.8, 12.4, 42] })).toBeNull();
+    expect(normalizeMapSession({ ...validSession, overlay_ids: [] })).toBeNull();
+    expect(normalizeMapSession({ ...validSession, overlays: [] })).toBeNull();
+    expect(normalizeMapSession({ ...validSession, requested_overlay_ids: [] })).toBeNull();
     expect(normalizeMapOverlayEntry({
       id: 'broken',
       label: 'Broken',

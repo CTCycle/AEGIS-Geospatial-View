@@ -1,6 +1,6 @@
 # Webcams
 
-Last updated: 2026-09-28
+Last updated: 2026-10-21
 
 ## Scope
 
@@ -23,10 +23,9 @@ Rules:
 ## API Contracts
 
 - `GET /api/geospatial/cameras?bbox=&provider=&camera_type=`
-- `GET /api/geospatial/cameras/{camera_id}`
 - `GET /api/geospatial/sources/windy_webcams/credential-status`
 
-Provider-backed camera detail lookup is required for `GET /api/geospatial/cameras/{camera_id}`. The backend resolves provider-prefixed IDs safely and returns access-needed or not-found states instead of raw provider errors.
+The current camera route returns the metadata and preview fields used by the map; there is no separate camera-detail endpoint.
 
 ## Public Camera Templates
 

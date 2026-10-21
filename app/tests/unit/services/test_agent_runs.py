@@ -516,34 +516,6 @@ def test_conversation_context_state_survives_repository_restart(
         )
 
 ###############################################################################
-def test_conversation_repository_canonicalizes_legacy_state_on_write(
-    run_repositories,
-) -> None:
-    conversations = run_repositories["conversations"]
-    conversation = conversations.create_conversation("Legacy state")
-
-    revision = conversations.write_state(
-        conversation.id,
-        expected_revision=1,
-        conversation_state={
-            "schema_version": 1,
-            "conversation_id": conversation.id,
-            "revision": 1,
-            "unresolved_questions": ["Which country contains Lake Bracciano?"],
-        },
-    )
-
-    persisted = conversations.read_state(conversation.id)
-    assert revision == 2
-    assert persisted["conversation_state"]["schema_version"] == 2
-    assert persisted["conversation_state"]["revision"] == 2
-    assert "unresolved_questions" not in persisted["conversation_state"]
-    assert (
-        persisted["conversation_state"]["pending_clarification"]["question"]
-        == "Which country contains Lake Bracciano?"
-    )
-
-###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     lifecycle, steering, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")
