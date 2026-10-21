@@ -127,7 +127,7 @@ AEGIS restarts or the values return to the configuration loaded at startup.
   capability summary, and Ollama model pull actions.
 - Model Providers section: inline masked credentials for OpenAI, Google, DeepSeek,
   OpenCode Zen, and OpenCode Go that autosave after a short pause, with a direct
-  Clear saved key action; Ollama URL autosave, health, refresh, and model pull
+  Clear saved key action; Ollama URL autosave, health, and model refresh
   controls. The default local loopback URL is `http://127.0.0.1:11434`.
 - Geospatial Access section: manifest-driven provider setup notes, documentation
   links, guided setup, and masked credentials that autosave after a short pause,

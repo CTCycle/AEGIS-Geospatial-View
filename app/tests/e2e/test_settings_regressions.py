@@ -1106,6 +1106,7 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
         "restart_required": False,
         "message": None,
     }
+    startup_runtime_settings = json.loads(json.dumps(runtime_settings))
     captured_patches: list[dict[str, Any]] = []
 
     def handle_runtime_settings(route: Route) -> None:
@@ -1118,8 +1119,19 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
             for block_name, block_patch in patch.items():
                 if isinstance(block_patch, dict):
                     runtime_settings[block_name].update(block_patch)
-            runtime_settings["restart_required"] = bool(patch)
-            runtime_settings["message"] = "Settings saved."
+            runtime_settings["restart_required"] = any(
+                block_name != "agent_execution"
+                and runtime_settings[block_name] != startup_runtime_settings[block_name]
+                for block_name in startup_runtime_settings
+                if block_name not in {"schema_version", "restart_required", "message"}
+            )
+            runtime_settings["message"] = (
+                "Settings saved. Restart AEGIS to apply runtime changes."
+                if runtime_settings["restart_required"]
+                else "Agent settings saved. New runs use these values; active runs retain their original limits."
+                if "agent_execution" in patch
+                else None
+            )
             _json_ok(route, runtime_settings)
             return
         route.fulfill(status=405, body="Method not allowed")
@@ -1205,6 +1217,12 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
 
     page.reload()
     page.wait_for_load_state("networkidle")
+    expect(
+        page.get_by_text(
+            "Runtime settings saved. Restart AEGIS to apply the changes to active services.",
+            exact=True,
+        )
+    ).to_be_visible()
     for label, section_id in sections:
         page.get_by_role("button", name=label, exact=True).click()
         panel = page.locator(f"#settings-panel-{section_id}")
