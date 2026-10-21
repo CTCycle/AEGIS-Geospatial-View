@@ -9,13 +9,9 @@ from fastapi.testclient import TestClient
 
 from server.api.chat import (
     get_chat_runtime,
-    get_chat_streaming_service,
-    get_job_service,
     router,
 )
 from server.common.paths import (
-    CHAT_JOBS_ROUTE,
-    CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
 )
 from server.contracts.chat import (
@@ -54,8 +50,6 @@ def test_chat_response_openapi_marks_conversation_id_required() -> None:
 
     assert "conversation_id" in request_schema["required"]
     assert "/api/chat/turn" in schema["paths"]
-    assert "/api/chat/jobs" in schema["paths"]
-    assert "/api/chat/stream" in schema["paths"]
 
 ###############################################################################
 def test_chat_settings_update_uses_patch_semantics() -> None:
@@ -138,7 +132,7 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert orchestrator_called is False
 
 ###############################################################################
-@pytest.mark.parametrize("route", [CHAT_TURN_ROUTE, CHAT_STREAM_ROUTE, CHAT_JOBS_ROUTE])
+@pytest.mark.parametrize("route", [CHAT_TURN_ROUTE])
 def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -> None:
     runtime = SimpleNamespace(
         conversation_repository=SimpleNamespace(
@@ -147,9 +141,7 @@ def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -
     )
     application = _app()
     application.dependency_overrides[get_chat_runtime] = lambda: runtime
-    # Neither service may be reached: validation happens before a job or stream exists.
-    application.dependency_overrides[get_job_service] = lambda: object()
-    application.dependency_overrides[get_chat_streaming_service] = lambda: object()
+    # Validation happens before any run is created.
 
     response = TestClient(application).post(
         f"/api/chat{route}",

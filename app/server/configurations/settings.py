@@ -46,11 +46,6 @@ class MapSettings:
 
 ###############################################################################
 @dataclass(frozen=True)
-class JobsSettings:
-    polling_interval: float
-
-###############################################################################
-@dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
     application_timezone: str = "UTC"
@@ -152,7 +147,6 @@ class ServerSettings:
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
     map: MapSettings
-    jobs: JobsSettings
     chat: ChatRuntimeSettings
     openmeteo: OpenMeteoSettings
     overpass: OverpassSettings
@@ -193,10 +187,6 @@ class JsonMapSettings(StrictJsonSettings):
     default_size_m: float = Field(default=500.0, ge=1.0)
     render_delay_s: float = Field(default=1.0, ge=0.0)
     tiles: str = "OpenStreetMap"
-
-###############################################################################
-class JsonJobsSettings(StrictJsonSettings):
-    polling_interval: float = Field(default=1.0, ge=0.1)
 
 ###############################################################################
 class JsonChatRuntimeSettings(StrictJsonSettings):
@@ -319,7 +309,6 @@ RUNTIME_SETTING_BLOCKS = (
     "nominatim",
     "geospatial",
     "map",
-    "jobs",
     "chat",
     "openmeteo",
     "overpass",
@@ -352,7 +341,6 @@ class AppSettings(BaseSettings):
     nominatim: JsonNominatimSettings = Field(default_factory=JsonNominatimSettings)
     geospatial: JsonGeospatialSettings = Field(default_factory=JsonGeospatialSettings)
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
-    jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
     openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
@@ -407,9 +395,6 @@ class AppSettings(BaseSettings):
                 default_size_m=self.map.default_size_m,
                 render_delay_s=self.map.render_delay_s,
                 tiles=self.map.tiles,
-            ),
-            jobs=JobsSettings(
-                polling_interval=self.jobs.polling_interval,
             ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,

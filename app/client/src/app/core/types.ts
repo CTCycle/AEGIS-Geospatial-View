@@ -900,21 +900,6 @@ export interface ChatTurnResponse {
 
 export type ChatTurnApiResponse = ChatTurnResponse | AgentRunAcceptedResponse;
 
-export type ChatStreamEventType =
-  | 'status'
-  | 'context_usage'
-  | 'tool_call_started'
-  | 'tool_call_completed'
-  | 'map_session_created'
-  | 'stage'
-  | 'final'
-  | 'error';
-
-export interface ChatStreamEvent {
-  event: ChatStreamEventType;
-  data: Record<string, JsonValue>;
-}
-
 export type ModelProviderMode = 'local' | 'cloud';
 
 export interface ModelCardDescriptor {
@@ -1003,10 +988,6 @@ export interface RuntimeMapSettings {
   default_size_m: number;
   render_delay_s: number;
   tiles: string;
-}
-
-export interface RuntimeJobsSettings {
-  polling_interval: number;
 }
 
 export interface RuntimeChatSettings {
@@ -1112,7 +1093,6 @@ export interface RuntimeSettingsResponse {
   nominatim: RuntimeNominatimSettings;
   geospatial: RuntimeGeospatialSettings;
   map: RuntimeMapSettings;
-  jobs: RuntimeJobsSettings;
   chat: RuntimeChatSettings;
   openmeteo: RuntimeOpenMeteoSettings;
   overpass: RuntimeOverpassSettings;
@@ -1127,7 +1107,6 @@ export interface RuntimeSettingsUpdateRequest {
   nominatim?: Partial<RuntimeNominatimSettings>;
   geospatial?: Partial<RuntimeGeospatialSettings>;
   map?: Partial<RuntimeMapSettings>;
-  jobs?: Partial<RuntimeJobsSettings>;
   chat?: Partial<RuntimeChatSettings>;
   openmeteo?: Partial<RuntimeOpenMeteoSettings>;
   overpass?: Partial<RuntimeOverpassSettings>;

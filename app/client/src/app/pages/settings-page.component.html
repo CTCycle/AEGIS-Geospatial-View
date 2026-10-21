@@ -292,7 +292,7 @@
           <header class="settings-section__header">
             <div>
               <h2 id="application-settings-heading">Application</h2>
-              <p>Conversation history, time zone, and background job polling.</p>
+              <p>Conversation history and time zone.</p>
             </div>
           </header>
           <div class="runtime-settings__fields">
@@ -301,9 +301,6 @@
             </label>
             <label>Application timezone
               <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
-            </label>
-            <label>Job polling interval (seconds)
-              <input class="settings-control" type="number" min="0.1" step="0.1" [(ngModel)]="runtimeSettingsDraft.jobs.polling_interval" />
             </label>
           </div>
         </section>
@@ -675,7 +672,7 @@
             </label>
           </div>
           <p class="settings-hint">When applying a new path, AEGIS initializes an empty database or upgrades a recognized schema. It never copies settings or records from the current database.</p>
-          <p class="settings-hint">Switching is blocked while requests, open WebSockets, background jobs, or agent runs are active. Retry when the app is idle.</p>
+          <p class="settings-hint">Switching is blocked while requests, open WebSockets, or agent runs are active. Retry when the app is idle.</p>
           <div class="settings-actions">
             <button
               type="button"

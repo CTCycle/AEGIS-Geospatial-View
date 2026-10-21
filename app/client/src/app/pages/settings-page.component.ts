@@ -99,7 +99,6 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
     max_mercator_extent: 20037508.3427892,
   },
   map: { default_size_m: 500, render_delay_s: 1, tiles: 'OpenStreetMap' },
-  jobs: { polling_interval: 1 },
   chat: { max_history_messages: 12, application_timezone: 'UTC' },
   openmeteo: {
     weather_base_url: 'https://api.open-meteo.com/v1/forecast',
