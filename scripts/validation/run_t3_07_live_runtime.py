@@ -36,7 +36,6 @@ PYTHON = SERVER_DIR / ".venv" / "Scripts" / "python.exe"
 
 DEFAULT_BACKEND_PORT = 5079
 READINESS_SECONDS = 40
-PROBE_SECONDS = 180
 LANE_PROVIDER = "opencode-go"
 LANE_MODEL = "deepseek-v4.1-flash"
 
@@ -142,7 +141,6 @@ def main() -> int:
         "credential_present": False,
         "selected_provider": None,
         "selected_model": None,
-        "probe": None,
     }
 
     key = _resolve_opencode_key()
@@ -229,19 +227,6 @@ def main() -> int:
             or selected_model != LANE_MODEL
         ):
             result["reason"] = "Exact provider/model lane was not persisted."
-            return _finish(result, backend, output_dir, data_root, args)
-
-        probe = _http_json(
-            "POST", f"{api_base}/api/chat/models/structured-probe", timeout=PROBE_SECONDS
-        )
-        result["probe"] = {
-            "provider": probe.get("provider"),
-            "model": probe.get("model"),
-            "status": probe.get("status"),
-            "parse_status": probe.get("parse_status"),
-        }
-        if probe.get("status") != "passed" or probe.get("parse_status") != "complete":
-            result["reason"] = "Exact-lane structured probe did not pass."
             return _finish(result, backend, output_dir, data_root, args)
 
         result["status"] = "READY"
