@@ -1633,7 +1633,6 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
       ['min_timeline_year', 'max_lat', 'min_lat', 'max_lon', 'min_lon', 'max_mercator_extent'],
     ),
     map: parseRuntimeBlock<RuntimeSettingsResponse['map']>(record.map, endpoint, 'map', ['tiles'], ['default_size_m', 'render_delay_s']),
-    jobs: parseRuntimeBlock<RuntimeSettingsResponse['jobs']>(record.jobs, endpoint, 'jobs', [], ['polling_interval']),
     chat: parseRuntimeBlock<RuntimeSettingsResponse['chat']>(record.chat, endpoint, 'chat', ['application_timezone'], ['max_history_messages']),
     openmeteo: parseRuntimeBlock<RuntimeSettingsResponse['openmeteo']>(
       record.openmeteo,

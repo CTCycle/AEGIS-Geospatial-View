@@ -1,31 +1,26 @@
 from __future__ import annotations
 
-import json
 import logging
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from server.common.paths import (
     CHAT_ATTACHMENTS_ROUTE,
-    CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
     CHAT_OLLAMA_REFRESH_ROUTE,
     CHAT_ROUTER_PREFIX,
     CHAT_SETTINGS_ROUTE,
-    CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
 )
 from server.contracts.chat import (
     AgentRunAcceptedResponse,
     ChatAttachmentCreateRequest,
     ChatAttachmentResponse,
-    ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
     ModelLibraryResponse,
@@ -38,21 +33,17 @@ from server.contracts.chat import (
 )
 from server.contracts.runs import AgentRunCreateRequest
 from server.contracts.runs import AgentRunState
-from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
 from server.services.geospatial.render_capture import RenderCaptureStore
 from server.domain.agent.trace import public_protocol_projection
 from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
-from server.services.chat.streaming import ChatStreamingService
-from server.services.jobs import BackgroundJobService
 from server.services.agent_runs.exceptions import (
     RunAccessError,
     RunAttachmentError,
     RunConflictError,
     RunNotFoundError,
 )
-from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.llm.errors import (
     LLMConfigurationError,
     LLMProviderRequestError,
@@ -67,36 +58,8 @@ def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
 
 ###############################################################################
-def get_job_service(request: Request) -> BackgroundJobService:
-    return request.app.state.job_service
-
-###############################################################################
-def get_chat_streaming_service(request: Request) -> ChatStreamingService:
-    return request.app.state.chat_streaming_service
-
-###############################################################################
-def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
-    return getattr(request.app.state, "run_lifecycle_service", None)
-
-###############################################################################
-def _stream_event(event: ChatStreamEvent) -> str:
-    return json.dumps(public_protocol_projection(event.model_dump(mode="json"))) + "\n"
-
-###############################################################################
-async def _serialize_chat_event_stream(
-    streaming_service: ChatStreamingService,
-    payload: ChatTurnRequest,
-    owner_user_id: str | None = None,
-) -> AsyncIterator[str]:
-    async for event in streaming_service.stream_turn(
-        payload,
-        owner_user_id=owner_user_id,
-    ):
-        yield _stream_event(event)
-
-###############################################################################
 def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
-    # Reject unusable input before any run, job, or stream is created; the
+    # Reject unusable input before any run is created; the
     # error detail omits the submitted value so an oversize message is not echoed.
     try:
         return AgentRunCreateRequest(
@@ -112,19 +75,6 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
                 include_url=False, include_context=False, include_input=False
             ),
         ) from exc
-
-###############################################################################
-@router.post(
-    CHAT_JOBS_ROUTE,
-    response_model=BackgroundJobCreateResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def create_chat_job(
-    payload: ChatTurnRequest,
-    job_service: BackgroundJobService = Depends(get_job_service),
-) -> BackgroundJobCreateResponse:
-    _build_run_request(payload)
-    return job_service.create_chat_job(payload)
 
 ###############################################################################
 @router.post(
@@ -269,27 +219,6 @@ async def create_chat_attachment(
     return ChatAttachmentResponse(
         attachment_id=attachment_id,
         expires_in_seconds=int(store.ttl_seconds),
-    )
-
-###############################################################################
-@router.post(
-    CHAT_STREAM_ROUTE,
-    status_code=status.HTTP_200_OK,
-)
-async def chat_stream(
-    payload: ChatTurnRequest,
-    request: Request,
-    streaming_service: ChatStreamingService = Depends(get_chat_streaming_service),
-) -> StreamingResponse:
-    _build_run_request(payload)
-    owner_user_id = getattr(request.state, "user_id", None)
-    return StreamingResponse(
-        _serialize_chat_event_stream(
-            streaming_service,
-            payload,
-            str(owner_user_id).strip() if owner_user_id is not None else None,
-        ),
-        media_type="application/x-ndjson",
     )
 
 ###############################################################################

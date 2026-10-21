@@ -15,7 +15,6 @@ def _settings():  # noqa: ANN202
         database=SimpleNamespace(
             database_path="test.db",
         ),
-        jobs=SimpleNamespace(polling_interval=1.0),
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
@@ -84,8 +83,6 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     )
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
     assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
-    assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
-    assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
 
 ###############################################################################
 def test_create_app_uses_only_canonical_router_composition(monkeypatch) -> None:
@@ -102,7 +99,6 @@ def test_create_app_uses_only_canonical_router_composition(monkeypatch) -> None:
         in route_paths
     )
     assert f"{FASTAPI_API_PREFIX}/realtime/metrics" in route_paths
-    assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
     assert f"{FASTAPI_API_PREFIX}/geospatial/capabilities" in route_paths
     assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
 
@@ -178,20 +174,10 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
     )
     assert (
         _response_schema_ref(
-            schema, f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}", "get", "200"
-        )
-        == "#/components/schemas/BackgroundJobStatusResponse"
-    )
-    assert (
-        _response_schema_ref(
             schema, f"{FASTAPI_API_PREFIX}/geospatial/capabilities", "get", "200"
         )
         == "#/components/schemas/GeospatialCatalogResponse"
     )
-    stream_schema = schema["paths"][f"{FASTAPI_API_PREFIX}/chat/stream"]["post"][
-        "responses"
-    ]["200"]
-    assert "$ref" not in str(stream_schema)
     assert schema["info"]["version"] == "1.0.0"
 
 ###############################################################################
@@ -199,10 +185,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
     chat_runtime = _build_chat_runtime(call_order)
     geospatial_runtime = _build_geospatial_runtime()
-    job_service = SimpleNamespace(
-        start=lambda: call_order.append("job_service.start"),
-        stop=lambda: call_order.append("job_service.stop"),
-    )
     database = SimpleNamespace(
         engine=SimpleNamespace(
             dispose=lambda: call_order.append("sqlite.dispose"),
@@ -264,12 +246,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         lambda: realtime_connections,
     )
     monkeypatch.setattr(
-        app_module, "BackgroundJobService", lambda **kwargs: job_service
-    )
-    monkeypatch.setattr(
-        app_module, "ChatStreamingService", lambda *args, **kwargs: object()
-    )
-    monkeypatch.setattr(
         app_module,
         "run_startup_validations",
         lambda snapshot: (
@@ -285,17 +261,14 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     with TestClient(created):
         assert created.state.chat_runtime is chat_runtime
         assert created.state.geospatial_runtime is geospatial_runtime
-        assert created.state.job_service is job_service
 
     assert call_order == [
         "initialize_database",
         "build_geospatial_runtime",
         "build_chat_runtime",
-        "job_service.start",
         "settings_service.validate_persisted_settings",
         "run_startup_validations",
         "realtime.close_all",
-        "job_service.stop",
         "run_lifecycle.shutdown",
         "sqlite.dispose",
     ]
@@ -306,10 +279,6 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     chat_runtime = _build_chat_runtime(call_order)
     lifecycle = _LifecycleStub(call_order)
     geospatial_runtime = _build_geospatial_runtime()
-    job_service = SimpleNamespace(
-        start=lambda: call_order.append("job_service.start"),
-        stop=lambda: call_order.append("job_service.stop"),
-    )
 
     monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
     monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
@@ -348,12 +317,6 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     )
     monkeypatch.setattr(app_module, "RunLifecycleService", lambda **kwargs: lifecycle)
     monkeypatch.setattr(
-        app_module, "BackgroundJobService", lambda **kwargs: job_service
-    )
-    monkeypatch.setattr(
-        app_module, "ChatStreamingService", lambda *args, **kwargs: object()
-    )
-    monkeypatch.setattr(
         app_module,
         "run_startup_validations",
         lambda snapshot: (_ for _ in ()).throw(RuntimeError("startup failure")),
@@ -365,8 +328,6 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
             pass
 
     assert call_order == [
-        "job_service.start",
         "settings_service.validate_persisted_settings",
-        "job_service.stop",
         "run_lifecycle.shutdown",
     ]

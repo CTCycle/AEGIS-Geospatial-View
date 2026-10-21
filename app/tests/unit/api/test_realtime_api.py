@@ -30,8 +30,7 @@ from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.steering import RunSteeringService
 from server.domain.realtime import RealtimeServerMessage
-from server.api.chat import _stream_event
-from server.contracts.chat import ChatStreamEvent
+from server.domain.agent.trace import public_protocol_projection
 
 
 ###############################################################################
@@ -41,7 +40,7 @@ def test_public_transports_omit_private_provider_continuation_without_mutation()
     websocket = RealtimeServerMessage(type="run.completed", conversation_id="conversation", payload=private)
     output = websocket.model_dump(mode="json")
     assert "provider_continuation" not in output["payload"]["execution_trace"]["checkpoint"]
-    assert "opaque" not in _stream_event(ChatStreamEvent(event="final", data=private))
+    assert "opaque" not in public_protocol_projection(private)
     assert "provider_continuation" in private["execution_trace"]["checkpoint"]
     assert output["payload"]["execution_trace"]["checkpoint"]["execution_policy"] == {"max_iterations": 12}
 

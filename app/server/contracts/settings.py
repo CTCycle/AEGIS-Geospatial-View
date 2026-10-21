@@ -9,7 +9,6 @@ from server.configurations.settings import (
     JsonChatRuntimeSettings,
     JsonGeospatialSettings,
     JsonGIBSSettings,
-    JsonJobsSettings,
     JsonMapSettings,
     JsonNominatimSettings,
     JsonOpenMeteoSettings,
@@ -26,7 +25,6 @@ class RuntimeSettingsResponse(BaseModel):
     nominatim: JsonNominatimSettings
     geospatial: JsonGeospatialSettings
     map: JsonMapSettings
-    jobs: JsonJobsSettings
     chat: JsonChatRuntimeSettings
     openmeteo: JsonOpenMeteoSettings
     overpass: JsonOverpassSettings
@@ -46,7 +44,6 @@ class RuntimeSettingsUpdateRequest(BaseModel):
     nominatim: dict[str, Any] | None = None
     geospatial: dict[str, Any] | None = None
     map: dict[str, Any] | None = None
-    jobs: dict[str, Any] | None = None
     chat: dict[str, Any] | None = None
     openmeteo: dict[str, Any] | None = None
     overpass: dict[str, Any] | None = None

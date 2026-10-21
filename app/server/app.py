@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -20,7 +19,6 @@ from server.api.conversations import router as conversations_router
 from server.api.realtime import metrics_router as realtime_metrics_router
 from server.api.realtime import router as realtime_router
 from server.api.geospatial import router as geospatial_router
-from server.api.jobs import router as jobs_router
 from server.api.settings import router as settings_router
 from server.common.constants import AEGIS_VERSION
 from server.common.paths import (
@@ -41,7 +39,6 @@ from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.services.chat.composition import build_chat_runtime
-from server.services.chat.streaming import ChatStreamingService
 from server.services.chat.conversation_snapshot import ConversationSnapshotService
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
@@ -53,7 +50,6 @@ from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
 from server.services.geospatial.render_capture import RenderCaptureStore
-from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
@@ -114,11 +110,9 @@ class _RuntimeBundle:
     render_completion_service: RenderCompletionService
     run_orchestrator: AgentRunOrchestrator
     run_lifecycle_service: RunLifecycleService
-    chat_streaming_service: ChatStreamingService
     run_steering_service: RunSteeringService
     realtime_connections: RealtimeConnectionRegistry
     realtime_metrics: RealtimeMetrics
-    job_service: BackgroundJobService
     runtime_settings_service: RuntimeSettingsService
 
 
@@ -192,10 +186,6 @@ def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle
         run_orchestrator=run_orchestrator,
         attachment_store=render_capture_store,
     )
-    chat_streaming_service = ChatStreamingService(
-        lifecycle_service=run_lifecycle_service,
-        event_publisher=run_event_publisher,
-    )
     run_steering_service = RunSteeringService(
         run_repository=run_repository,
         steering_repository=steering_repository,
@@ -205,10 +195,6 @@ def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle
     )
     realtime_connections = RealtimeConnectionRegistry()
     realtime_metrics = RealtimeMetrics()
-    job_service = BackgroundJobService(
-        chat_streaming_service=chat_streaming_service,
-        polling_interval=settings.jobs.polling_interval,
-    )
     return _RuntimeBundle(
         database=database,
         runtime_repository=runtime_repository,
@@ -227,11 +213,9 @@ def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle
         render_completion_service=render_completion_service,
         run_orchestrator=run_orchestrator,
         run_lifecycle_service=run_lifecycle_service,
-        chat_streaming_service=chat_streaming_service,
         run_steering_service=run_steering_service,
         realtime_connections=realtime_connections,
         realtime_metrics=realtime_metrics,
-        job_service=job_service,
         runtime_settings_service=runtime_settings_service,
     )
 
@@ -255,7 +239,6 @@ def _publish_runtime_bundle(application: FastAPI, bundle: _RuntimeBundle) -> Non
     application.state.database = bundle.database
     application.state.chat_runtime = bundle.chat_runtime
     application.state.geospatial_runtime = bundle.geospatial_runtime
-    application.state.chat_streaming_service = bundle.chat_streaming_service
     application.state.run_lifecycle_service = bundle.run_lifecycle_service
     application.state.run_steering_service = bundle.run_steering_service
     application.state.conversation_repository = bundle.conversation_repository
@@ -268,20 +251,17 @@ def _publish_runtime_bundle(application: FastAPI, bundle: _RuntimeBundle) -> Non
     application.state.render_capture_store = bundle.render_capture_store
     application.state.realtime_connections = bundle.realtime_connections
     application.state.realtime_metrics = bundle.realtime_metrics
-    application.state.job_service = bundle.job_service
     application.state.runtime_settings_service = bundle.runtime_settings_service
 
 
 ###############################################################################
 async def _activate_runtime_bundle(bundle: _RuntimeBundle) -> None:
-    bundle.job_service.start()
     bundle.run_lifecycle_service.resume_active_runs()
 
 
 ###############################################################################
 async def _shutdown_runtime_bundle(bundle: _RuntimeBundle) -> None:
     await bundle.realtime_connections.close_all()
-    await asyncio.to_thread(bundle.job_service.stop)
     await bundle.run_lifecycle_service.shutdown()
     _dispose_sqlite_engine(bundle.database)
 
@@ -295,8 +275,6 @@ def _validate_runtime_bundle(bundle: _RuntimeBundle) -> None:
 ###############################################################################
 def _database_busy_reasons(bundle: _RuntimeBundle) -> list[str]:
     reasons: list[str] = []
-    if bundle.job_service.has_nonterminal_jobs:
-        reasons.append("background jobs")
     if bundle.run_repository.has_active_runs():
         reasons.append("agent runs")
     return reasons
@@ -364,7 +342,6 @@ def create_app() -> FastAPI:
     application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(realtime_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(realtime_metrics_router, prefix=FASTAPI_API_PREFIX)
-    application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(settings_router, prefix=FASTAPI_API_PREFIX)
     application.add_api_route(

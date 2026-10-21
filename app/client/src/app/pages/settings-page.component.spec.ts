@@ -42,7 +42,6 @@ describe('pages/settings-page.component', () => {
     nominatim: { base_url: 'https://nominatim.example/search', user_agent: 'AEGIS-test', timeout: 10 },
     geospatial: { min_timeline_year: 1900, max_lat: 90, min_lat: -90, max_lon: 180, min_lon: -180, max_mercator_extent: 20037508 },
     map: { default_size_m: 500, render_delay_s: 1, tiles: 'OpenStreetMap' },
-    jobs: { polling_interval: 1 },
     chat: { max_history_messages: 12, application_timezone: 'UTC' },
     openmeteo: { weather_base_url: 'https://weather.example', air_quality_base_url: 'https://air.example', user_agent: 'AEGIS-test', timeout: 15, cache_ttl_s: 600, min_call_interval_s: 0.15 },
     overpass: { base_url: 'https://overpass.example', user_agent: 'AEGIS-test', timeout: 20, cache_ttl_s: 600, min_call_interval_s: 0.2, default_radius_m: 2500, default_limit: 30 },
