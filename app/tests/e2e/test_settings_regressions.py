@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -294,6 +295,18 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
     page: Page, base_url: str
 ) -> None:
     _setup_stub_harness(page)
+    page.route(
+        re.compile(r".*/api/settings/database$"),
+        lambda route: _json_ok(
+            route,
+            {
+                "backend": "sqlite",
+                "database_path": "C:/AEGIS/test/database.db",
+                "sqlite_lock_timeout_seconds": 60,
+                "active": True,
+            },
+        ),
+    )
     page.set_viewport_size({"width": 1366, "height": 900})
     page.goto(f"{base_url.rstrip('/')}/settings?tab=models")
 
@@ -317,13 +330,22 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
         ("Map & Search", "map-search", "settings-panel-map-search"),
         ("Data Sources", "data-sources", "settings-panel-data-sources"),
         ("Agent Runtime", "agent-runtime", "settings-panel-agent-runtime"),
+        ("Database", "database", "settings-panel-database"),
     ]
     SETTINGS_METADATA_REVIEW_QA_DIR.mkdir(parents=True, exist_ok=True)
     for section, slug, panel_id in sections:
         page.get_by_role("button", name=section, exact=True).click()
+        expected_url = (
+            f"{base_url.rstrip('/')}/settings"
+            if slug == "models"
+            else f"{base_url.rstrip('/')}/settings?tab={slug}"
+        )
+        expect(page).to_have_url(expected_url)
         expect(page.locator(f"#{panel_id}")).to_be_visible(timeout=10000)
         page.screenshot(path=str(SETTINGS_METADATA_REVIEW_QA_DIR / f"{slug}.png"))
 
+    page.get_by_role("button", name="Agent Runtime", exact=True).click()
+    expect(page.locator("#settings-panel-agent-runtime")).to_be_visible()
     disclosures = page.locator("details.runtime-settings__disclosure")
     expect(disclosures).to_have_count(3)
     expect(page.locator("details.runtime-settings__disclosure[open]")).to_have_count(0)
@@ -438,7 +460,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
             full_page=True,
         )
 
-        page.get_by_role("button", name="Cancel guided setup").click()
+        page.get_by_role("button", name="Close guided setup").click()
         expect(dialog).to_be_hidden(timeout=5000)
 
 
@@ -605,8 +627,12 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     assert len(patch_payloads) == 1
 
     fixture_key = "sk-fixturekey12345"
-    key_input.fill(fixture_key)
-    key_input.press("Enter")
+    with page.expect_response(
+        lambda response: response.request.method == "PATCH"
+        and response.url.endswith("/api/chat/settings")
+    ) as failed_key_save:
+        key_input.fill(fixture_key)
+    assert failed_key_save.value.status == 503
     expect(
         page.get_by_text("Synthetic credential update failure.", exact=True)
     ).to_be_visible()
@@ -690,6 +716,29 @@ def test_model_provider_credential_safe_save_clear_and_reload(
 
 
 ###############################################################################
+def test_ollama_url_autosaves_without_confirmation_and_restores_after_reload(
+    page: Page, base_url: str
+) -> None:
+    patch_payloads: list[dict[str, Any]] = []
+    _setup_stub_harness(page, patch_payloads=patch_payloads)
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=model-providers")
+    url_input = page.get_by_label("Ollama server URL")
+
+    with page.expect_response(
+        lambda response: response.request.method == "PATCH"
+        and response.url.endswith("/api/chat/settings")
+    ) as save_response:
+        url_input.fill("http://127.0.0.1:11435")
+    assert save_response.value.ok, save_response.value.status
+    expect(page.locator(".settings-page__status")).to_contain_text("Ollama URL saved.")
+    assert patch_payloads[-1]["ollama_url"] == "http://127.0.0.1:11435"
+
+    page.reload()
+    page.get_by_role("button", name="Model Providers").click()
+    expect(page.get_by_label("Ollama server URL")).to_have_value("http://127.0.0.1:11435")
+
+
+###############################################################################
 def test_geospatial_credential_safe_save_clear_and_reload(
     page: Page, base_url: str
 ) -> None:
@@ -712,7 +761,6 @@ def test_geospatial_credential_safe_save_clear_and_reload(
 
     fixture_key = "synthetic-tomtom-fixture"
     key_input.fill(fixture_key)
-    key_input.press("Enter")
     expect(
         page.get_by_text(
             "TomTom key saved. Provider access has not been validated.", exact=True
@@ -774,7 +822,6 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
 
     fixture_key = "synthetic-tomtom-replacement"
     key_input.fill(fixture_key)
-    key_input.press("Enter")
     expect(
         page.get_by_text("Synthetic credential update failure.", exact=True)
     ).to_be_visible()
@@ -897,10 +944,22 @@ def test_settings_query_params_do_not_leak_back_to_chat(
 
 
 ###############################################################################
-def test_settings_sections_preserve_drafts_save_and_return(
+def test_settings_sections_preserve_drafts_autosave_and_return(
     page: Page, base_url: str
 ) -> None:
     _setup_stub_harness(page)
+    page.route(
+        re.compile(r".*/api/settings/database$"),
+        lambda route: _json_ok(
+            route,
+            {
+                "backend": "sqlite",
+                "database_path": "C:/AEGIS/test/database.db",
+                "sqlite_lock_timeout_seconds": 60,
+                "active": True,
+            },
+        ),
+    )
     page.set_viewport_size({"width": 1366, "height": 768})
 
     runtime_settings = {
@@ -955,12 +1014,13 @@ def test_settings_sections_preserve_drafts_save_and_return(
         (
             "Geospatial Access",
             "/settings?tab=geospatial-access",
-            "Optional provider credentials",
+            "Geospatial access",
         ),
         ("Application", "/settings?tab=application", "Application"),
         ("Map & Search", "/settings?tab=map-search", "Map & Search"),
         ("Data Sources", "/settings?tab=data-sources", "Data Sources"),
         ("Agent Runtime", "/settings?tab=agent-runtime", "Agent Runtime"),
+        ("Database", "/settings?tab=database", "Database"),
     )
     t1_09_qa_dir = (
         Path(__file__).resolve().parents[3]
@@ -987,13 +1047,11 @@ def test_settings_sections_preserve_drafts_save_and_return(
         )
 
     page.go_back()
-    expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=data-sources")
-    expect(page.get_by_role("heading", name="Data Sources", exact=True)).to_be_visible()
-    page.go_forward()
     expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=agent-runtime")
-    expect(
-        page.get_by_role("heading", name="Agent Runtime", exact=True)
-    ).to_be_visible()
+    expect(page.get_by_role("heading", name="Agent Runtime", exact=True)).to_be_visible()
+    page.go_forward()
+    expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=database")
+    expect(page.get_by_role("heading", name="Database", exact=True)).to_be_visible()
 
     page.get_by_role("button", name="Application", exact=True).click()
     history_limit = page.get_by_label("Maximum history messages")
@@ -1023,6 +1081,208 @@ def test_settings_sections_preserve_drafts_save_and_return(
     page.screenshot(
         path=str(screenshot_dir / "application-saved-after-return.png"), full_page=True
     )
+
+
+###############################################################################
+def test_runtime_settings_autosave_each_control_and_restore_after_reload(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+    page.route(
+        re.compile(r".*/api/settings/database$"),
+        lambda route: _json_ok(
+            route,
+            {
+                "backend": "sqlite",
+                "database_path": "C:/AEGIS/test/database.db",
+                "sqlite_lock_timeout_seconds": 60,
+                "active": True,
+            },
+        ),
+    )
+    runtime_settings: dict[str, Any] = {
+        "schema_version": 1,
+        **AppSettings.model_construct().runtime_payload(),
+        "restart_required": False,
+        "message": None,
+    }
+    captured_patches: list[dict[str, Any]] = []
+
+    def handle_runtime_settings(route: Route) -> None:
+        if route.request.method.upper() == "GET":
+            _json_ok(route, runtime_settings)
+            return
+        if route.request.method.upper() == "PATCH":
+            patch = _request_json(route)
+            captured_patches.append(patch)
+            for block_name, block_patch in patch.items():
+                if isinstance(block_patch, dict):
+                    runtime_settings[block_name].update(block_patch)
+            runtime_settings["restart_required"] = bool(patch)
+            runtime_settings["message"] = "Settings saved."
+            _json_ok(route, runtime_settings)
+            return
+        route.fulfill(status=405, body="Method not allowed")
+
+    page.route(re.compile(r".*/settings/runtime(?:\?.*)?$"), handle_runtime_settings)
+    page.set_viewport_size({"width": 1366, "height": 900})
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=application")
+
+    sections = (
+        ("Application", "application"),
+        ("Map & Search", "map-search"),
+        ("Data Sources", "data-sources"),
+        ("Agent Runtime", "agent-runtime"),
+    )
+    expected_values: dict[str, list[tuple[int, str, Any]]] = {}
+    for label, section_id in sections:
+        page.get_by_role("button", name=label, exact=True).click()
+        panel = page.locator(f"#settings-panel-{section_id}")
+        expect(panel).to_be_visible()
+        expect(panel).not_to_have_attribute("aria-busy", "true")
+        for disclosure in panel.locator("details.runtime-settings__disclosure").all():
+            disclosure.evaluate("element => { element.open = true; }")
+
+        controls = panel.locator("input, select")
+        changed: list[tuple[int, str, Any]] = []
+        count = controls.count()
+        patch_start = len(captured_patches)
+        with page.expect_response(
+            lambda response: response.request.method == "PATCH"
+            and response.url.endswith("/settings/runtime")
+        ) as patch_response:
+            for index in range(count):
+                control = controls.nth(index)
+                if control.is_disabled():
+                    continue
+                tag = control.evaluate("element => element.tagName.toLowerCase()")
+                kind = control.get_attribute("type") or tag
+                if kind == "checkbox":
+                    value = not control.is_checked()
+                    control.set_checked(value)
+                    changed.append((index, kind, value))
+                elif tag == "select":
+                    options = control.locator("option").evaluate_all(
+                        "items => items.filter(item => !item.disabled).map(item => item.value)"
+                    )
+                    current = control.input_value()
+                    replacement = next((value for value in options if value != current), None)
+                    if replacement is not None:
+                        control.select_option(value=replacement)
+                        changed.append((index, kind, replacement))
+                elif kind == "number":
+                    current = float(control.input_value() or "0")
+                    minimum_attr = control.get_attribute("min")
+                    maximum_attr = control.get_attribute("max")
+                    step_attr = control.get_attribute("step")
+                    minimum = float(minimum_attr) if minimum_attr is not None else float("-inf")
+                    maximum = float(maximum_attr) if maximum_attr is not None else float("inf")
+                    step = float(step_attr) if step_attr not in (None, "any") else 1.0
+                    step_base = float(minimum_attr or control.get_attribute("value") or "0")
+                    replacement = step_base + (math.floor((current - step_base) / step) + 1) * step
+                    if replacement > maximum:
+                        replacement = step_base + math.floor((maximum - step_base) / step) * step
+                    if replacement < minimum or replacement > maximum:
+                        continue
+                    value = f"{replacement:.8g}"
+                    control.fill(value)
+                    changed.append((index, kind, replacement))
+                else:
+                    if kind == "url":
+                        value = f"https://settings-autosave.example/{section_id}/{index}"
+                    else:
+                        value = control.input_value() + "-autosave"
+                    control.fill(value)
+                    changed.append((index, kind, value))
+
+        response = patch_response.value
+        assert response.ok, response.status
+        page.wait_for_load_state("networkidle")
+        section_patches = captured_patches[patch_start:]
+        assert section_patches
+        assert changed, f"No editable controls were exercised in {section_id}."
+        expected_values[section_id] = changed
+
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    for label, section_id in sections:
+        page.get_by_role("button", name=label, exact=True).click()
+        panel = page.locator(f"#settings-panel-{section_id}")
+        expect(panel).to_be_visible()
+        for disclosure in panel.locator("details.runtime-settings__disclosure").all():
+            disclosure.evaluate("element => { element.open = true; }")
+        controls = panel.locator("input, select")
+        for index, kind, expected in expected_values[section_id]:
+            control = controls.nth(index)
+            if kind == "checkbox":
+                assert control.is_checked() is expected, (
+                    f"{section_id} control {index} did not restore checkbox value {expected}."
+                )
+            elif kind == "number":
+                actual = control.input_value()
+                assert actual and round(float(actual), 6) == round(expected, 6), (
+                    f"{section_id} control {index} ({control.locator('xpath=..').inner_text().strip()}) "
+                    f"did not restore numeric value {expected}; got {actual!r}. "
+                    f"Saved runtime block: {runtime_settings.get('agent_execution') if section_id == 'agent-runtime' else 'not shown'}."
+                )
+            else:
+                assert control.input_value() == expected, (
+                    f"{section_id} control {index} did not restore {expected!r}."
+                )
+
+
+###############################################################################
+def test_database_settings_change_only_after_explicit_apply_and_fail_safely(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+    active_database = {
+        "backend": "sqlite",
+        "database_path": "C:/AEGIS/test/active.db",
+        "sqlite_lock_timeout_seconds": 60,
+        "active": True,
+    }
+    calls: list[str] = []
+
+    def handle_database(route: Route) -> None:
+        method = route.request.method.upper()
+        if method == "GET":
+            _json_ok(route, active_database)
+            return
+        if route.request.url.endswith("/test"):
+            calls.append("test")
+            route.fulfill(
+                status=400,
+                content_type="application/json",
+                body=json.dumps({"detail": "Synthetic database connection failure."}),
+            )
+            return
+        if method == "PUT":
+            calls.append("switch")
+            route.fulfill(
+                status=503,
+                content_type="application/json",
+                body=json.dumps({"detail": "Synthetic database activation failure."}),
+            )
+            return
+        route.fulfill(status=405, body="Method not allowed")
+
+    page.route(re.compile(r".*/api/settings/database(?:/test)?$"), handle_database)
+    page.goto(f"{base_url.rstrip('/')}/settings?tab=database")
+    path_input = page.get_by_label("Database file path")
+    path_input.fill("C:/AEGIS/test/target.db")
+    expect(page.get_by_text("C:/AEGIS/test/active.db", exact=True)).to_be_visible()
+    assert calls == []
+
+    page.get_by_role("button", name="Test connection").click()
+    expect(page.get_by_role("alert")).to_contain_text("Synthetic database connection failure")
+    assert calls == ["test"]
+    expect(page.get_by_text("C:/AEGIS/test/active.db", exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Apply and switch").click()
+    expect(page.get_by_role("alert")).to_contain_text("Synthetic database activation failure")
+    assert calls == ["test", "switch"]
+    expect(page.get_by_text("C:/AEGIS/test/active.db", exact=True)).to_be_visible()
 
 
 ###############################################################################

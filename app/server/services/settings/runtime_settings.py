@@ -15,15 +15,26 @@ class RuntimeSettingsService:
 
     def __init__(self, repository: RuntimeSettingsRepository) -> None:
         self.repository = repository
+        self._startup_payload = repository.get_required().runtime_payload()
 
     def get_settings(self) -> RuntimeSettingsResponse:
-        return self._response(self.repository.get_required())
+        settings = self.repository.get_required()
+        restart_required = self._restart_required(settings)
+        return self._response(
+            settings,
+            restart_required=restart_required,
+            message=(
+                "Settings saved. Restart AEGIS to apply runtime changes."
+                if restart_required
+                else None
+            ),
+        )
 
     def update_settings(
         self, patch: Mapping[str, Any]
     ) -> RuntimeSettingsResponse:
         updated = self.repository.update(patch)
-        restart_required = any(key != "agent_execution" and bool(value) for key, value in patch.items())
+        restart_required = self._restart_required(updated)
         return self._response(
             updated,
             restart_required=restart_required,
@@ -34,6 +45,13 @@ class RuntimeSettingsService:
                 if patch.get("agent_execution")
                 else None
             ),
+        )
+
+    def _restart_required(self, settings: AppSettings) -> bool:
+        current_payload = settings.runtime_payload()
+        return any(
+            block != "agent_execution" and current_payload[block] != startup_value
+            for block, startup_value in self._startup_payload.items()
         )
 
     @staticmethod

@@ -60,6 +60,63 @@ def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -
     assert repository.get_required().chat.max_history_messages == 24
 
 
+def test_restart_requirement_survives_get_and_clears_when_values_return_to_startup(
+    tmp_path: Path,
+) -> None:
+    client, repository = _client(tmp_path)
+
+    changed = client.patch(
+        "/api/settings/runtime",
+        json={"chat": {"max_history_messages": 24}},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["restart_required"] is True
+
+    reloaded = client.get("/api/settings/runtime")
+    assert reloaded.status_code == 200
+    assert reloaded.json()["restart_required"] is True
+    assert "Restart AEGIS" in reloaded.json()["message"]
+
+    reverted = client.patch(
+        "/api/settings/runtime",
+        json={"chat": {"max_history_messages": 12}},
+    )
+    assert reverted.status_code == 200
+    assert reverted.json()["restart_required"] is False
+    assert client.get("/api/settings/runtime").json()["restart_required"] is False
+
+
+def test_runtime_settings_survive_database_reopen_after_patch(tmp_path: Path) -> None:
+    database_path = tmp_path / "runtime-restart.db"
+    database = SQLiteRepository(DatabaseSettings(str(database_path)))
+    Base.metadata.create_all(database.engine)
+    repository = RuntimeSettingsRepository(database)
+    repository.initialize_defaults()
+    application = FastAPI()
+    application.include_router(router, prefix="/api")
+    application.state.runtime_settings_service = RuntimeSettingsService(repository)
+    client = TestClient(application)
+
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"chat": {"max_history_messages": 31}},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["chat"]["max_history_messages"] == 31
+    client.close()
+    database.engine.dispose()
+
+    restarted_database = SQLiteRepository(DatabaseSettings(str(database_path)))
+    restarted_repository = RuntimeSettingsRepository(restarted_database)
+    assert restarted_repository.get_required().chat.max_history_messages == 31
+    restarted_settings_service = RuntimeSettingsService(restarted_repository)
+    restarted_settings = restarted_settings_service.get_settings()
+    assert restarted_settings.chat.max_history_messages == 31
+    assert restarted_settings.restart_required is False
+    restarted_database.engine.dispose()
+
+
 def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
     response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}})

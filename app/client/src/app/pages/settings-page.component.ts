@@ -16,7 +16,6 @@ import {
   ApiKeyValidationErrors,
   CloudCredentialProvider,
   ModelProviderFilter,
-  buildSettingsUpdateBase,
 } from '../core/chat-settings-update';
 import { CredentialSettingsService } from '../core/credential-settings.service';
 import {
@@ -76,7 +75,7 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string 
   { id: 'database', label: 'Database' },
 ];
 
-const RUNTIME_AUTOSAVE_DELAY_MS = 400;
+const SETTINGS_AUTOSAVE_DELAY_MS = 400;
 
 const normalizeSettingsSection = (value: string | null | undefined): SettingsSectionId => (
   SETTINGS_SECTIONS.some((section) => section.id === value)
@@ -331,6 +330,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private isDestroyed = false;
   private runtimeAutosaveTimer: ReturnType<typeof setTimeout> | null = null;
   private runtimeSaveQueued = false;
+  private readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly autosaveActions = new Map<string, (revision: number) => void | Promise<void>>();
+  private readonly autosaveRevisions = new Map<string, number>();
+  private modelSettingsWriteQueue: Promise<void> = Promise.resolve();
+  private modelSettingsWriteRevision = 0;
+  private activeCredentialWrites = 0;
+  private activeGeospatialCredentialWrites = 0;
   private routerEventsSubscription?: Subscription;
   private readonly onWindowPopState = (): void => {
     if (typeof window !== 'undefined' && window.location.pathname === '/settings') {
@@ -383,6 +389,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.flushPendingAutosaves();
     if (this.runtimeAutosaveTimer !== null) {
       // Flush the edit that is waiting for its debounce before the draft is lost.
       clearTimeout(this.runtimeAutosaveTimer);
@@ -662,26 +669,55 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   commitOllamaUrl(): void {
     const draft = this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434';
     if (draft !== this.settings.ollama_url) {
+      this.cancelAutosave('ollama-url');
       void this.saveOllamaSettings();
     }
   }
 
+  onOllamaUrlDraftChanged(value: string): void {
+    this.ollamaUrlDraft = value;
+    if (!value.trim()) {
+      this.cancelAutosave('ollama-url');
+      return;
+    }
+    this.scheduleAutosave('ollama-url', () => this.saveOllamaSettings());
+  }
+
   async saveOllamaSettings(): Promise<void> {
+    const draftAtSend = this.ollamaUrlDraft;
+    const nextUrl = draftAtSend.trim() || 'http://127.0.0.1:11434';
     try {
-      const updated = await this.apiClient.updateChatSettings({
-        ...this.settingsUpdateBase(),
-        ollama_url: this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434',
-      });
+      const updated = await this.enqueueModelSettingsWrite(
+        () => this.apiClient.updateChatSettings({ ollama_url: nextUrl, credentials: {} }),
+      );
+      if (this.isDestroyed) return;
       this.settings = updated;
-      this.ollamaUrlDraft = updated.ollama_url;
-      await this.reloadOllamaCatalog();
-      this.statusText = 'Ollama settings saved';
-      this.ollamaStatusText = 'Ollama settings saved.';
-      this.syncState();
+      if (this.ollamaUrlDraft === draftAtSend) {
+        this.ollamaUrlDraft = updated.ollama_url;
+      }
+      try {
+        await this.reloadOllamaCatalog();
+      } catch (error: unknown) {
+        if (this.isDestroyed) return;
+        const detail = this.getOllamaFailureMessage(error);
+        this.statusText = `Ollama URL saved. Model catalog refresh failed: ${detail}`;
+        this.ollamaStatusText = detail;
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+        return;
+      }
+      if (this.ollamaUrlDraft === updated.ollama_url) {
+        this.statusText = 'Ollama URL saved.';
+        this.ollamaStatusText = 'Ollama URL saved.';
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+      }
     } catch (error: unknown) {
+      if (this.isDestroyed) return;
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaStatusText = detail;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -735,13 +771,23 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.selectedProviderAccountSetup = setup;
     this.signupKeyInput = '';
     this.signupModalError = '';
+    this.signupModalMessage = '';
     this.isSignupModalOpen = true;
   }
 
   closeProviderSignup(): void {
+    const setup = this.selectedProviderAccountSetup;
+    const value = this.signupKeyInput.trim();
+    if (setup && value) {
+      this.cancelAutosave(`signup:${setup.credentialStorageKey}`);
+      void this.persistGeospatialCredential(setup.credentialStorageKey, value);
+    } else if (setup) {
+      this.cancelAutosave(`signup:${setup.credentialStorageKey}`);
+    }
     this.isSignupModalOpen = false;
     this.selectedProviderAccountSetup = undefined;
     this.signupModalError = '';
+    this.signupModalMessage = '';
     this.signupKeyInput = '';
   }
 
@@ -758,29 +804,42 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   commitGeoCredential(provider: string): void {
+    this.cancelAutosave(`geo:${provider}`);
     if (this.geoCredentialDrafts[provider]?.trim()) {
       void this.saveGeoProvider(provider);
     }
   }
 
-  async saveGeoProvider(provider: string): Promise<void> {
+  onGeoCredentialInput(provider: string, value: string): void {
+    this.setGeoCredentialDraft(provider, value);
+    if (!value.trim()) {
+      this.cancelAutosave(`geo:${provider}`);
+      return;
+    }
+    this.scheduleAutosave(`geo:${provider}`, (revision) => this.saveGeoProvider(provider, revision));
+  }
+
+  async saveGeoProvider(provider: string, revision?: number): Promise<void> {
     const setup = this.geoProviderSetup(provider);
-    if (!setup || !setup.requiresCredentials || this.isSavingGeospatialCredential) {
+    if (!setup || !setup.requiresCredentials) {
       return;
     }
     const draft = this.geoCredentialDrafts[provider]?.trim() ?? '';
     if (!draft) {
-      this.statusText = `Enter a ${setup.name} API key before saving, or clear the saved key.`;
       return;
     }
-    await this.persistGeospatialCredential(provider, draft);
+    const currentRevision = this.autosaveRevisions.get(`geo:${provider}`) ?? 0;
+    if (revision !== undefined && revision !== currentRevision) return;
+    await this.persistGeospatialCredential(provider, draft, `geo:${provider}`, currentRevision);
   }
 
   async clearGeoProvider(provider: string): Promise<void> {
     const setup = this.geoProviderSetup(provider);
-    if (!setup || !this.geoProviderConfigured(provider) || this.isSavingGeospatialCredential) {
+    if (!setup || !this.geoProviderConfigured(provider)) {
       return;
     }
+    this.cancelAutosave(`geo:${provider}`);
+    this.geoCredentialDrafts[provider] = '';
     await this.persistGeospatialCredential(provider, '');
   }
 
@@ -788,6 +847,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setGeoCredentialDraft(provider: string, value: string): void {
     this.geoCredentialDrafts[provider] = value;
+  }
+
+  onSignupCredentialChanged(value: string, setup: GeospatialProviderAccountSetup): void {
+    this.signupKeyInput = value;
+    this.signupModalError = '';
+    this.signupModalMessage = '';
+    const key = `signup:${setup.credentialStorageKey}`;
+    if (!value.trim()) {
+      this.cancelAutosave(key);
+      return;
+    }
+    this.scheduleAutosave(key, (revision) => this.saveSignupCredential(setup, revision));
+  }
+
+  commitSignupCredential(setup: GeospatialProviderAccountSetup): void {
+    const key = `signup:${setup.credentialStorageKey}`;
+    this.cancelAutosave(key);
+    if (this.signupKeyInput.trim()) {
+      void this.saveSignupCredential(setup);
+    }
   }
 
   supportLabel(setup: GeospatialProviderAccountSetup): string {
@@ -800,19 +879,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return labels[setup.automation.support] ?? setup.automation.support;
   }
 
-  async saveGeneratedCredential(setup: GeospatialProviderAccountSetup): Promise<void> {
+  private async saveSignupCredential(setup: GeospatialProviderAccountSetup, revision?: number): Promise<void> {
     if (setup.automation.support === 'unsupported') {
       this.signupModalError = 'This provider is documentation-only until automation support is verified.';
       return;
     }
     const value = this.signupKeyInput.trim();
     if (!value) {
-      this.signupModalError = 'Paste the generated API key before saving.';
       return;
     }
-    if (await this.persistGeospatialCredential(setup.credentialStorageKey, value)) {
-      this.closeProviderSignup();
-    }
+    const key = `signup:${setup.credentialStorageKey}`;
+    const currentRevision = this.autosaveRevisions.get(key) ?? 0;
+    if (revision !== undefined && revision !== currentRevision) return;
+    await this.persistGeospatialCredential(setup.credentialStorageKey, value, key, currentRevision);
   }
 
   onModelSelected(model: ModelCardDescriptor): Promise<void> {
@@ -856,6 +935,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.keyValidationErrors[provider] = undefined;
   }
 
+  onCloudCredentialInput(provider: CloudCredentialProvider, value: string): void {
+    this.setCloudCredentialValue(provider, value);
+    const key = `cloud:${provider}`;
+    if (!value.trim()) {
+      this.cancelAutosave(key);
+      return;
+    }
+    this.scheduleAutosave(key, (revision) => this.saveCloudProvider(provider, revision));
+  }
+
   cloudCredentialValidationError(provider: CloudCredentialProvider): string | undefined {
     return this.keyValidationErrors[provider];
   }
@@ -874,60 +963,76 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   commitCloudCredential(provider: CloudCredentialProvider): void {
-    // An untouched or emptied field is not a save request; clearing stays explicit.
+    this.cancelAutosave(`cloud:${provider}`);
     if (this.cloudCredentialValue(provider).trim()) {
       void this.saveCloudProvider(provider);
     }
   }
 
-  async saveCloudProvider(provider: CloudCredentialProvider): Promise<void> {
-    if (!this.settings || this.isSavingCredential) {
+  async saveCloudProvider(provider: CloudCredentialProvider, revision?: number): Promise<void> {
+    if (!this.settings) {
       return;
     }
     const value = this.cloudCredentialValue(provider).trim();
     if (!value) {
-      this.keyValidationErrors[provider] = 'Enter a key before saving, or use Clear saved key.';
-      this.statusText = `Enter a ${providerDisplayLabel(provider)} API key before saving.`;
       return;
     }
+    const key = `cloud:${provider}`;
+    const currentRevision = this.autosaveRevisions.get(key) ?? 0;
+    if (revision !== undefined && revision !== currentRevision) return;
     const validation = this.validateCloudCredential(provider, value);
     if (validation) {
       this.keyValidationErrors[provider] = validation;
       this.statusText = validation;
       return;
     }
+    const revisionAtSend = currentRevision;
+    this.activeCredentialWrites += 1;
     this.isSavingCredential = true;
     try {
-      const updated = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, value);
+      const updated = await this.enqueueModelSettingsWrite(
+        () => this.credentialSettingsService.saveProviderCredential(this.settings, provider, value),
+      );
       if (this.isDestroyed) return;
       this.settings = updated;
-      this.setCloudCredentialValue(provider, '');
+      if (revisionAtSend === (this.autosaveRevisions.get(key) ?? 0)
+        && this.cloudCredentialValue(provider).trim() === value) {
+        this.setCloudCredentialValue(provider, '');
+      }
       if (isDynamicCloudProvider(provider)) {
         await this.ensureProviderModelsLoaded(provider, true);
       }
-      this.statusText = `${providerDisplayLabel(provider)} key saved. Provider access has not been validated.`;
+      if (revisionAtSend === (this.autosaveRevisions.get(key) ?? 0)) {
+        this.statusText = `${providerDisplayLabel(provider)} key saved. Provider access has not been validated.`;
+      }
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) return;
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not save the ${providerDisplayLabel(provider)} key right now.`,
       );
     } finally {
-      this.isSavingCredential = false;
-      this.changeDetectorRef.detectChanges();
+      this.activeCredentialWrites = Math.max(0, this.activeCredentialWrites - 1);
+      this.isSavingCredential = this.activeCredentialWrites > 0;
+      if (!this.isDestroyed) this.changeDetectorRef.detectChanges();
     }
   }
 
   async clearCloudProvider(provider: CloudCredentialProvider): Promise<void> {
-    if (!this.settings || this.isSavingCredential || !this.isCloudCredentialConfigured(provider)) {
+    if (!this.settings || !this.isCloudCredentialConfigured(provider)) {
       return;
     }
+    this.cancelAutosave(`cloud:${provider}`);
+    this.setCloudCredentialValue(provider, '');
+    this.activeCredentialWrites += 1;
     this.isSavingCredential = true;
     try {
-      const updated = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, '');
+      const updated = await this.enqueueModelSettingsWrite(
+        () => this.credentialSettingsService.saveProviderCredential(this.settings, provider, ''),
+      );
       if (this.isDestroyed) return;
       this.settings = updated;
-      this.setCloudCredentialValue(provider, '');
       if (isDynamicCloudProvider(provider)) {
         this.cloudModels = this.cloudModels.filter((model) => model.provider !== provider);
         this.setDynamicProviderStatus(provider, { ok: false, message: `Add a ${providerDisplayLabel(provider)} API key to load ${providerDisplayLabel(provider)} models.` });
@@ -935,13 +1040,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.statusText = `${providerDisplayLabel(provider)} key cleared.`;
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) return;
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not clear the ${providerDisplayLabel(provider)} key right now.`,
       );
     } finally {
-      this.isSavingCredential = false;
-      this.changeDetectorRef.detectChanges();
+      this.activeCredentialWrites = Math.max(0, this.activeCredentialWrites - 1);
+      this.isSavingCredential = this.activeCredentialWrites > 0;
+      if (!this.isDestroyed) this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -952,6 +1059,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedProviderAccountSetup?: GeospatialProviderAccountSetup;
   isSignupModalOpen = false;
   signupModalError = '';
+  signupModalMessage = '';
   signupKeyInput = '';
 
   requiresPull(model: ModelCardDescriptor): boolean {
@@ -1015,29 +1123,59 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private async persistGeospatialCredential(provider: string, apiKey: string): Promise<boolean> {
+  private async persistGeospatialCredential(
+    provider: string,
+    apiKey: string,
+    draftKey?: string,
+    draftRevision?: number,
+  ): Promise<boolean> {
     if (!this.settings) {
       return false;
     }
     const setup = this.geoProviderSetup(provider);
+    const revisionAtSend = draftRevision ?? (draftKey ? this.autosaveRevisions.get(draftKey) ?? 0 : 0);
+    this.activeGeospatialCredentialWrites += 1;
     this.isSavingGeospatialCredential = true;
     try {
-      this.settings = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey);
-      this.geoCredentialDrafts[provider] = '';
-      this.statusText = apiKey
-        ? `${setup?.name ?? provider} key saved. Provider access has not been validated.`
-        : `${setup?.name ?? provider} key cleared. Optional capabilities are disabled.`;
+      const updated = await this.enqueueModelSettingsWrite(
+        () => this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey),
+      );
+      if (this.isDestroyed) return true;
+      this.settings = updated;
+      const isCurrentDraft = !draftKey
+        || (revisionAtSend === (this.autosaveRevisions.get(draftKey) ?? 0)
+          && (draftKey.startsWith('signup:')
+            ? this.signupKeyInput.trim() === apiKey
+            : (this.geoCredentialDrafts[provider] ?? '').trim() === apiKey));
+      if (isCurrentDraft) {
+        this.geoCredentialDrafts[provider] = '';
+        if (draftKey?.startsWith('signup:')) {
+          this.signupKeyInput = '';
+          this.signupModalMessage = `${setup?.name ?? provider} key saved automatically. Provider access has not been validated.`;
+          this.signupModalError = '';
+        }
+      }
+      if (!draftKey || isCurrentDraft) {
+        this.statusText = apiKey
+          ? `${setup?.name ?? provider} key saved. Provider access has not been validated.`
+          : `${setup?.name ?? provider} key cleared. Optional capabilities are disabled.`;
+      }
       this.syncState();
       return true;
     } catch (error: unknown) {
+      if (this.isDestroyed) return false;
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not update ${setup?.name ?? provider} access.`,
       );
+      if (draftKey?.startsWith('signup:')) {
+        this.signupModalError = this.statusText;
+      }
       return false;
     } finally {
-      this.isSavingGeospatialCredential = false;
-      this.changeDetectorRef.detectChanges();
+      this.activeGeospatialCredentialWrites = Math.max(0, this.activeGeospatialCredentialWrites - 1);
+      this.isSavingGeospatialCredential = this.activeGeospatialCredentialWrites > 0;
+      if (!this.isDestroyed) this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -1053,6 +1191,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async loadData(): Promise<void> {
+    const settingsRevisionAtStart = this.modelSettingsWriteRevision;
     this.isLoadingModels = true;
     this.statusText = 'Loading model settings';
     this.syncState();
@@ -1061,7 +1200,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.apiClient.fetchChatSettings(),
         this.apiClient.fetchChatModels(),
       ]);
-      const dynamicProvider = this.dynamicProviderForSettings(nextSettings);
+      const settingsToUse = settingsRevisionAtStart === this.modelSettingsWriteRevision
+        ? nextSettings
+        : this.settings;
+      const dynamicProvider = this.dynamicProviderForSettings(settingsToUse);
       let modelLibrary = baseLibrary;
       if (dynamicProvider) {
         const dynamicLibrary = await this.apiClient.fetchChatModels(dynamicProvider);
@@ -1070,14 +1212,18 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) {
         return;
       }
-      this.settings = nextSettings;
-      this.ollamaUrlDraft = nextSettings.ollama_url;
+      if (settingsRevisionAtStart === this.modelSettingsWriteRevision) {
+        this.settings = nextSettings;
+        this.ollamaUrlDraft = nextSettings.ollama_url;
+      }
       this.applyModelLibrary(modelLibrary);
       const dynamicProviderFailed = dynamicProvider && modelLibrary.sources[dynamicProvider]?.ok === false;
-      if (dynamicProviderFailed) {
+      if (settingsRevisionAtStart === this.modelSettingsWriteRevision && dynamicProviderFailed) {
         this.statusText = modelLibrary.sources[dynamicProvider]?.message || `Could not load ${providerDisplayLabel(dynamicProvider)} models right now.`;
       }
-      if (this.statusText === 'Loading model settings' && !dynamicProviderFailed) {
+      if (settingsRevisionAtStart === this.modelSettingsWriteRevision
+        && this.statusText === 'Loading model settings'
+        && !dynamicProviderFailed) {
         this.statusText = 'Model settings loaded';
       }
       this.syncQueryState();
@@ -1162,9 +1308,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.databaseSettingsError = '';
     this.databaseSettingsMessage = '';
     this.databaseConnectionTest = null;
+    const request = this.databaseSettingsRequest();
     try {
-      const result = await this.apiClient.testDatabaseConnection(this.databaseSettingsRequest());
+      const result = await this.apiClient.testDatabaseConnection(request);
       if (this.isDestroyed) {
+        return;
+      }
+      if (JSON.stringify(this.databaseSettingsRequest()) !== JSON.stringify(request)) {
         return;
       }
       this.databaseConnectionTest = result;
@@ -1233,13 +1383,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onRuntimeSettingChanged(): void {
+    this.runtimeSettingsError = '';
+    this.statusText = '';
     if (this.runtimeAutosaveTimer !== null) {
       clearTimeout(this.runtimeAutosaveTimer);
     }
     this.runtimeAutosaveTimer = setTimeout(() => {
       this.runtimeAutosaveTimer = null;
       void this.saveRuntimeSettings();
-    }, RUNTIME_AUTOSAVE_DELAY_MS);
+    }, SETTINGS_AUTOSAVE_DELAY_MS);
   }
 
   async saveRuntimeSettings(): Promise<void> {
@@ -1257,7 +1409,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const sentDraft = JSON.stringify(this.runtimeSettingsDraft);
     this.isSavingRuntimeSettings = true;
     this.runtimeSettingsError = '';
-    this.statusText = 'Saving runtime settings...';
     try {
       const saved = await this.apiClient.updateRuntimeSettings(patch);
       if (this.isDestroyed) {
@@ -1279,12 +1430,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       this.statusText = this.runtimeSettingsError;
     } finally {
+      this.isSavingRuntimeSettings = false;
+      if (this.runtimeSaveQueued) {
+        this.runtimeSaveQueued = false;
+        void this.saveRuntimeSettings();
+      }
       if (!this.isDestroyed) {
-        this.isSavingRuntimeSettings = false;
-        if (this.runtimeSaveQueued) {
-          this.runtimeSaveQueued = false;
-          void this.saveRuntimeSettings();
-        }
         this.changeDetectorRef.detectChanges();
       }
     }
@@ -1455,11 +1606,49 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
-    return this.apiClient.updateChatSettings(payload);
+    return this.enqueueModelSettingsWrite(() => this.apiClient.updateChatSettings(payload));
   }
 
-  private settingsUpdateBase(): ModelSettingsUpdateRequest {
-    return buildSettingsUpdateBase(this.settings);
+  private enqueueModelSettingsWrite(
+    operation: () => Promise<ModelSettingsResponse>,
+  ): Promise<ModelSettingsResponse> {
+    this.modelSettingsWriteRevision += 1;
+    const next = this.modelSettingsWriteQueue.then(operation, operation);
+    this.modelSettingsWriteQueue = next.then(() => undefined, () => undefined);
+    return next;
+  }
+
+  private scheduleAutosave(
+    key: string,
+    action: (revision: number) => void | Promise<void>,
+  ): void {
+    this.cancelAutosave(key);
+    const revision = (this.autosaveRevisions.get(key) ?? 0) + 1;
+    this.autosaveRevisions.set(key, revision);
+    const timer = setTimeout(() => {
+      if (this.autosaveTimers.get(key) !== timer) return;
+      this.autosaveTimers.delete(key);
+      this.autosaveActions.delete(key);
+      void action(revision);
+    }, SETTINGS_AUTOSAVE_DELAY_MS);
+    this.autosaveTimers.set(key, timer);
+    this.autosaveActions.set(key, action);
+  }
+
+  private cancelAutosave(key: string): void {
+    const timer = this.autosaveTimers.get(key);
+    if (timer !== undefined) clearTimeout(timer);
+    this.autosaveTimers.delete(key);
+    this.autosaveActions.delete(key);
+    this.autosaveRevisions.set(key, (this.autosaveRevisions.get(key) ?? 0) + 1);
+  }
+
+  private flushPendingAutosaves(): void {
+    for (const [key, action] of [...this.autosaveActions.entries()]) {
+      this.cancelAutosave(key);
+      const revision = this.autosaveRevisions.get(key) ?? 0;
+      void action(revision);
+    }
   }
 
   private resetModelGridScroll(): void {

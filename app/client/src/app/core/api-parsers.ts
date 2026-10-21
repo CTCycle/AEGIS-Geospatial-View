@@ -1676,7 +1676,7 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
         'initial_run_seconds', 'simple_seconds', 'complex_seconds', 'context_assembly_seconds',
         'native_model_call_seconds', 'tool_execution_seconds', 'tool_absolute_seconds',
         'map_assembly_seconds', 'persistence_seconds', 'render_ack_seconds', 'max_tool_result_chars',
-        'max_iterations', 'max_render_attempts', 'max_no_progress_corrections', 'simple_max_model_calls',
+        'max_iterations', 'max_render_attempts', 'max_discovery_attempts', 'max_no_progress_corrections', 'simple_max_model_calls',
         'complex_max_model_calls', 'simple_max_tool_calls', 'complex_max_tool_calls',
         'simple_max_state_transitions', 'complex_max_state_transitions', 'max_parallel_tool_calls',
         'max_consecutive_tool_failures', 'max_same_failed_fingerprint', 'max_route_corrections',

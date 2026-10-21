@@ -143,12 +143,14 @@
       <section
         id="settings-panel-model-providers"
         class="settings-page__section-panel settings-page__section-panel--providers"
+        [attr.inert]="isLoadingModels ? '' : null"
+        [attr.aria-busy]="isLoadingModels ? 'true' : null"
       >
         <section class="settings-section" aria-labelledby="model-provider-heading">
           <header class="settings-section__header">
             <div>
               <h2 id="model-provider-heading">Model providers</h2>
-              <p>Save a key to discover account-visible models. Saved values stay masked; a readable key does not confirm the endpoint is reachable.</p>
+              <p>Enter a key to discover account-visible models. It saves automatically after a short pause. Saved values stay masked; a readable key does not confirm the endpoint is reachable.</p>
             </div>
           </header>
           <div class="settings-provider-list">
@@ -170,7 +172,7 @@
                   [value]="cloudCredentialValue(provider.id)"
                   [credentialHealth]="credentialHealthForTemplate(provider.id)"
                   [validationError]="cloudCredentialValidationError(provider.id)"
-                  (valueChange)="setCloudCredentialValue(provider.id, $event)"
+                  (valueChange)="onCloudCredentialInput(provider.id, $event)"
                   (commit)="commitCloudCredential(provider.id)"
                 ></app-settings-api-key-field>
                 <footer class="settings-actions">
@@ -194,7 +196,7 @@
           <div class="settings-runtime-form">
             <label>
               Ollama server URL
-              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" (change)="commitOllamaUrl()" name="ollama_server_url" autocomplete="off" />
+              <input class="settings-control" [ngModel]="ollamaUrlDraft" (ngModelChange)="onOllamaUrlDraftChanged($event)" (change)="commitOllamaUrl()" name="ollama_server_url" autocomplete="off" />
             </label>
             <div class="settings-actions">
               <button type="button" class="secondary-button" (click)="checkOllamaConnection()">Check connection</button>
@@ -212,6 +214,8 @@
       <section
         id="settings-panel-geospatial-access"
         class="settings-page__section-panel settings-page__section-panel--providers"
+        [attr.inert]="isLoadingModels || isLoadingAccountSetups ? '' : null"
+        [attr.aria-busy]="isLoadingModels || isLoadingAccountSetups ? 'true' : null"
       >
         <section class="settings-section" aria-labelledby="geospatial-access-heading">
           <header class="settings-section__header">
@@ -260,7 +264,7 @@
                       [placeholder]="provider.placeholder"
                       [value]="geoCredentialDrafts[provider.id] ?? ''"
                       [credentialHealth]="geoProviderCredentialHealth(provider.id)"
-                      (valueChange)="setGeoCredentialDraft(provider.id, $event)"
+                      (valueChange)="onGeoCredentialInput(provider.id, $event)"
                       (commit)="commitGeoCredential(provider.id)"
                     ></app-settings-api-key-field>
                     <footer class="settings-actions">
@@ -283,8 +287,8 @@
     }
 
     @if (activeSection === 'application') {
-      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="application-settings-heading">
-        <section class="settings-section" (change)="onRuntimeSettingChanged()">
+      <section id="settings-panel-application" class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="application-settings-heading" [attr.inert]="isLoadingRuntimeSettings ? '' : null" [attr.aria-busy]="isLoadingRuntimeSettings ? 'true' : null">
+        <section class="settings-section" (input)="onRuntimeSettingChanged()" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <h2 id="application-settings-heading">Application</h2>
@@ -307,8 +311,8 @@
     }
 
     @if (activeSection === 'map-search') {
-      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="map-search-settings-heading">
-        <section class="settings-section" (change)="onRuntimeSettingChanged()">
+      <section id="settings-panel-map-search" class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="map-search-settings-heading" [attr.inert]="isLoadingRuntimeSettings ? '' : null" [attr.aria-busy]="isLoadingRuntimeSettings ? 'true' : null">
+        <section class="settings-section" (input)="onRuntimeSettingChanged()" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <h2 id="map-search-settings-heading">Map &amp; Search</h2>
@@ -371,8 +375,8 @@
     }
 
     @if (activeSection === 'data-sources') {
-      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="data-source-settings-heading">
-        <section class="settings-section" (change)="onRuntimeSettingChanged()">
+      <section id="settings-panel-data-sources" class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="data-source-settings-heading" [attr.inert]="isLoadingRuntimeSettings ? '' : null" [attr.aria-busy]="isLoadingRuntimeSettings ? 'true' : null">
+        <section class="settings-section" (input)="onRuntimeSettingChanged()" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <h2 id="data-source-settings-heading">Data Sources</h2>
@@ -526,8 +530,8 @@
     }
 
     @if (activeSection === 'agent-runtime') {
-      <section class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="agent-runtime-settings-heading">
-        <section class="settings-section" (change)="onRuntimeSettingChanged()">
+      <section id="settings-panel-agent-runtime" class="settings-page__section-panel settings-page__section-panel--runtime" aria-labelledby="agent-runtime-settings-heading" [attr.inert]="isLoadingRuntimeSettings ? '' : null" [attr.aria-busy]="isLoadingRuntimeSettings ? 'true' : null">
+        <section class="settings-section" (input)="onRuntimeSettingChanged()" (change)="onRuntimeSettingChanged()">
           <header class="settings-section__header">
             <div>
               <h2 id="agent-runtime-settings-heading">Agent Runtime</h2>
@@ -621,6 +625,8 @@
         id="settings-panel-database"
         class="settings-page__section-panel settings-page__section-panel--runtime"
         aria-labelledby="database-settings-heading"
+        [attr.inert]="isLoadingDatabaseSettings ? '' : null"
+        [attr.aria-busy]="isLoadingDatabaseSettings ? 'true' : null"
       >
         <h2 class="page-title" id="database-settings-heading">Database</h2>
         <p class="settings-intro">Choose the database AEGIS uses for application settings and data. Each database remains independent; switching does not copy data.</p>
@@ -649,7 +655,7 @@
                 autocomplete="off"
                 spellcheck="false"
                 required
-                [disabled]="isLoadingDatabaseSettings || isSavingDatabaseSettings"
+                [disabled]="isLoadingDatabaseSettings || isTestingDatabaseConnection || isSavingDatabaseSettings"
                 [(ngModel)]="databaseSettingsDraft.database_path"
                 (ngModelChange)="onDatabaseSettingsDraftChanged()"
               />
@@ -662,7 +668,7 @@
                 min="1"
                 step="1"
                 required
-                [disabled]="isLoadingDatabaseSettings || isSavingDatabaseSettings"
+                [disabled]="isLoadingDatabaseSettings || isTestingDatabaseConnection || isSavingDatabaseSettings"
                 [(ngModel)]="databaseSettingsDraft.sqlite_lock_timeout_seconds"
                 (ngModelChange)="onDatabaseSettingsDraftChanged()"
               />
@@ -762,20 +768,23 @@
               autocomplete="off"
               [attr.aria-label]="'Generated API key for ' + setup.name"
               [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
-              [(ngModel)]="signupKeyInput"
+              [ngModel]="signupKeyInput"
+              (ngModelChange)="onSignupCredentialChanged($event, setup)"
+              (change)="commitSignupCredential(setup)"
               name="guided_signup_api_key"
             />
           </label>
         }
 
+        @if (signupModalMessage) {
+          <p class="settings-inline-status" role="status" aria-live="polite">{{ signupModalMessage }}</p>
+        }
+
         <div class="settings-actions provider-signup-modal__actions">
-          <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup">Cancel</button>
+          <button type="button" class="secondary-button" (click)="closeProviderSignup()" aria-label="Close guided setup">Close</button>
           <button type="button" class="secondary-button" (click)="openProviderPortal(setup)">
             {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
           </button>
-          @if (setup.automation.support !== 'unsupported') {
-            <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential" (click)="saveGeneratedCredential(setup)">Save generated API key</button>
-          }
         </div>
       </div>
     </app-settings-modal-shell>
