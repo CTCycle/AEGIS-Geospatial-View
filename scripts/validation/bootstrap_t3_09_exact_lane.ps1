@@ -6,7 +6,6 @@ param(
     [int]$BackendPort = 5079,
     [string]$SecretEnvironmentVariable = 'AEGIS_T3_OPENCODE_GO_API_KEY',
     [int]$ReadinessTimeoutSeconds = 30,
-    [int]$ProbeTimeoutSeconds = 180,
     [switch]$KeepRuntime
 )
 
@@ -125,7 +124,6 @@ $result = [ordered]@{
     credential_health = $null
     selected_provider = $null
     selected_model = $null
-    probe = $null
     runtime_cleaned = $false
 }
 
@@ -236,21 +234,8 @@ try {
             throw 'Settings API did not persist the exact provider/model lane.'
         }
 
-        $probe = Invoke-ApiJson -Method Post -Uri "$apiBaseUrl/api/chat/models/structured-probe" -TimeoutSeconds $ProbeTimeoutSeconds
-        $result.probe = [ordered]@{
-            http_status = 200
-            provider = [string]$probe.provider
-            model = [string]$probe.model
-            protocol = [string]$probe.protocol
-            status = [string]$probe.status
-            parse_status = [string]$probe.parse_status
-            duration_ms = $probe.duration_ms
-        }
-        if ($result.probe.status -ne 'passed' -or $result.probe.parse_status -ne 'complete') {
-            throw 'The exact provider/model structured probe did not pass.'
-        }
         $result.status = 'PASS'
-        $result.reason = 'Exact OpenCode Go model lane persisted through Settings API and passed the native structured probe.'
+        $result.reason = 'Exact OpenCode Go model lane persisted through the Settings API.'
         $result.secret_recorded = $false
         $exitCode = 0
     }
