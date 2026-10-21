@@ -1,0 +1,63 @@
+<button
+  type="button"
+  class="model-row__select"
+  [disabled]="!!disabledReason"
+  [attr.aria-pressed]="isSelected"
+  [attr.aria-label]="(isSelected ? 'Selected agent model: ' : 'Select as agent model: ') + model.name"
+  (click)="onRowSelected()"
+>
+  <span class="model-row__identity">
+    <span class="model-row__title">{{ model.name }}</span>
+    <span class="model-row__description" [attr.title]="description">{{ description }}</span>
+  </span>
+
+  <span class="model-row__capabilities" aria-label="Model capabilities">
+    @if (model.supports_tools) {
+      <span [attr.title]="toolSupportLabel">Tools</span>
+    } @else if (model.supports_tools === null || model.supports_tools === undefined) {
+      <span class="model-row__chip--muted" [attr.title]="toolSupportLabel">Tools?</span>
+    }
+    @if (model.supports_structured_output) {
+      <span>Structured</span>
+    }
+    @if (model.supports_vision) {
+      <span>Vision</span>
+    }
+    @if (model.supports_embeddings) {
+      <span>Embeddings</span>
+    }
+  </span>
+
+  <span
+    class="model-row__context"
+    [attr.title]="model.context_window_tokens ? 'Max context: ' + formatContextWindow(model.context_window_tokens) + ' tokens' : 'Provider limit not reported'"
+  >
+    {{ model.context_window_tokens ? formatContextWindow(model.context_window_tokens) : '—' }}
+  </span>
+
+  <span
+    class="model-row__status"
+    [class.model-row__status--pull]="model.provider === 'ollama' && requiresPull"
+    [attr.title]="disabledReason"
+    aria-live="polite"
+  >
+    @if (disabledReason) {
+      @if (isSelected) {
+        <strong class="model-row__pill">Selected</strong>
+      }
+      <span class="model-row__reason">{{ disabledReason }}</span>
+    } @else if (isSelected) {
+      <strong class="model-row__pill">Selected</strong>
+    } @else {
+      <span class="model-row__cta">Select</span>
+    }
+  </span>
+</button>
+
+@if (model.provider === 'ollama' && requiresPull) {
+  <button type="button" class="model-row__pull" (click)="onPullRequested()" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path d="M12 3.5a1 1 0 0 1 1 1v8l2.7-2.7a1 1 0 1 1 1.4 1.4l-4.4 4.4a1 1 0 0 1-1.4 0l-4.4-4.4a1 1 0 0 1 1.4-1.4L11 12.5v-8a1 1 0 0 1 1-1zm-6 14h12a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2z" fill="currentColor" />
+    </svg>
+  </button>
+}

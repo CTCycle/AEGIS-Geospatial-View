@@ -14,8 +14,8 @@ providers stay manual.
 
 1. Open Settings and choose Models.
 2. Choose Cloud or Local mode through provider selection.
-3. Search or filter models.
-4. Select one model card as the AEGIS agent model.
+3. Search, filter by provider or capability, and sort models.
+4. Select one model row as the AEGIS agent model.
 5. Review the selected-model summary for tool calling, structured output, vision,
    and the source of the tool-support metadata.
 6. For local mode, manage Ollama URL, check connection, refresh models, or pull a model.
@@ -125,7 +125,7 @@ AEGIS restarts or the values return to the configuration loaded at startup.
 
 ### Settings Controls
 
-- Models section: model search, provider filters, model cards, selected-agent
+- Models section: model search, provider and capability filters, sorting, a scrollable model row list, selected-agent
   capability summary, and Ollama model pull actions.
 - Model Providers section: inline masked credentials for OpenAI, Google, DeepSeek,
   OpenCode Zen, and OpenCode Go that autosave after a short pause, with a direct

@@ -61,7 +61,7 @@ than wrapping, resizing, or displacing the controls.
   and full-width status footer
 - `/settings`
   persistent Models, Model Providers, Geospatial Access, Application,
-  Map & Search, Data Sources, and Agent Runtime navigation; model cards,
+  Map & Search, Data Sources, and Agent Runtime navigation; a scrollable model row list,
   inline provider credentials, local Ollama controls, and typed runtime forms
 - `/geodata`
   grouped manifest-backed capability tables

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 
-import { ModelCardComponent } from '../components/model-card.component';
+import { ModelRowComponent } from '../components/model-row.component';
 import { SelectedModelSummaryComponent } from '../components/selected-model-summary.component';
 import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
@@ -53,6 +53,9 @@ import {
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
+
+type ModelCapabilityKey = 'supports_tools' | 'supports_structured_output' | 'supports_vision' | 'supports_embeddings';
+type ModelSortKey = 'name' | 'context';
 
 export type SettingsSectionId =
   | 'models'
@@ -234,7 +237,7 @@ interface GeoProviderAccess {
   imports: [
     CommonModule,
     FormsModule,
-    ModelCardComponent,
+    ModelRowComponent,
     SettingsApiKeyFieldComponent,
     SettingsModalShellComponent,
     SettingsWarningBannerComponent,
@@ -326,6 +329,23 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   isSavingDatabaseSettings = false;
 
   providerFilter: ModelProviderFilter = 'all';
+  readonly providerFilterOptions: { value: ModelProviderFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'ollama', label: 'Ollama' },
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'google', label: 'Google' },
+    { value: 'deepseek', label: 'DeepSeek' },
+    { value: 'opencode', label: 'OpenCode Zen' },
+    { value: 'opencode-go', label: 'OpenCode Go' },
+  ];
+  readonly capabilityFilterOptions: { key: ModelCapabilityKey; label: string }[] = [
+    { key: 'supports_tools', label: 'Tools' },
+    { key: 'supports_structured_output', label: 'Structured' },
+    { key: 'supports_vision', label: 'Vision' },
+    { key: 'supports_embeddings', label: 'Embeddings' },
+  ];
+  capabilityFilters = new Set<ModelCapabilityKey>();
+  sortKey: ModelSortKey = 'name';
   private isDestroyed = false;
   private runtimeAutosaveTimer: ReturnType<typeof setTimeout> | null = null;
   private runtimeSaveQueued = false;
@@ -422,7 +442,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       : source;
 
     const query = this.searchText.trim().toLowerCase();
-    return visibleSource.filter((model) => {
+    const filtered = visibleSource.filter((model) => {
+      if ([...this.capabilityFilters].some((key) => model[key] !== true)) {
+        return false;
+      }
       if (!query) {
         return true;
       }
@@ -430,6 +453,36 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         || model.description.toLowerCase().includes(query)
         || model.provider.toLowerCase().includes(query);
     });
+    if (this.sortKey === 'context') {
+      return [...filtered].sort(
+        (a, b) => (b.context_window_tokens ?? 0) - (a.context_window_tokens ?? 0) || a.name.localeCompare(b.name),
+      );
+    }
+    return filtered;
+  }
+
+  get hasActiveModelFilters(): boolean {
+    return this.capabilityFilters.size > 0 || this.sortKey !== 'name' || this.searchText.trim() !== '';
+  }
+
+  toggleCapabilityFilter(key: ModelCapabilityKey): void {
+    const next = new Set(this.capabilityFilters);
+    if (!next.delete(key)) {
+      next.add(key);
+    }
+    this.capabilityFilters = next;
+    this.resetModelGridScroll();
+  }
+
+  setSortKey(value: string): void {
+    this.sortKey = value === 'context' ? 'context' : 'name';
+  }
+
+  resetModelFilters(): void {
+    this.capabilityFilters = new Set();
+    this.sortKey = 'name';
+    this.setSearchText('');
+    this.resetModelGridScroll();
   }
 
   get groupedDisplayedModels(): Record<string, ModelCardDescriptor[]> {

@@ -250,7 +250,7 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
 
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
 
-    expect(page.locator(".model-card").first).to_be_visible(timeout=15000)
+    expect(page.locator(".model-row").first).to_be_visible(timeout=15000)
     expect(
         page.get_by_role("complementary", name="Selected agent model")
     ).to_be_visible(timeout=15000)
@@ -304,10 +304,10 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
     page.set_viewport_size({"width": 1366, "height": 900})
     page.goto(f"{base_url.rstrip('/')}/settings?tab=models")
 
-    expect(page.locator(".model-card").first).to_be_visible(timeout=15000)
+    expect(page.locator(".model-row").first).to_be_visible(timeout=15000)
     expect(page.get_by_role("button", name="Test selected model")).to_have_count(0)
     model_card = (
-        page.locator("article.model-card")
+        page.locator("article.model-row")
         .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
         .first
     )
@@ -472,7 +472,7 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     page.goto(f"{base_url.rstrip('/')}/settings")
 
     model_card = (
-        page.locator("article.model-card")
+        page.locator("article.model-row")
         .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
         .first
     )

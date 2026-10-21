@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ModelCardComponent } from './model-card.component';
+import { ModelRowComponent } from './model-row.component';
 
-describe('ModelCardComponent', () => {
-  let fixture: ComponentFixture<ModelCardComponent>;
-  let component: ModelCardComponent;
+describe('ModelRowComponent', () => {
+  let fixture: ComponentFixture<ModelRowComponent>;
+  let component: ModelRowComponent;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ModelCardComponent],
+      imports: [ModelRowComponent],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(ModelCardComponent);
+    fixture = TestBed.createComponent(ModelRowComponent);
     component = fixture.componentInstance;
     component.model = {
       id: 'gpt-4.1-mini',
@@ -40,7 +40,7 @@ describe('ModelCardComponent', () => {
     spyOn(component.modelSelected, 'emit');
     fixture.detectChanges();
 
-    const button = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
+    const button = fixture.nativeElement.querySelector('.model-row__select') as HTMLButtonElement;
     button.click();
 
     expect(component.modelSelected.emit).toHaveBeenCalledOnceWith(component.model);
@@ -51,21 +51,21 @@ describe('ModelCardComponent', () => {
     component.disabledReason = 'Agent model requires structured output.';
     fixture.detectChanges();
 
-    const button = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
+    const button = fixture.nativeElement.querySelector('.model-row__select') as HTMLButtonElement;
     button.click();
 
     expect(component.modelSelected.emit).not.toHaveBeenCalled();
     expect(button.disabled).toBeTrue();
   });
 
-  it('emits pull without selecting the card', () => {
+  it('emits pull without selecting the row', () => {
     spyOn(component.pullRequested, 'emit');
     spyOn(component.modelSelected, 'emit');
     component.requiresPull = true;
     component.model.provider = 'ollama';
     fixture.detectChanges();
 
-    const button = fixture.nativeElement.querySelector('.model-card__pull') as HTMLButtonElement;
+    const button = fixture.nativeElement.querySelector('.model-row__pull') as HTMLButtonElement;
     button.click();
 
     expect(component.pullRequested.emit).toHaveBeenCalledWith(component.model);
@@ -77,8 +77,8 @@ describe('ModelCardComponent', () => {
     component.model.provider = 'ollama';
     fixture.detectChanges();
 
-    const selection = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
-    const pull = fixture.nativeElement.querySelector('.model-card__pull') as HTMLButtonElement;
+    const selection = fixture.nativeElement.querySelector('.model-row__select') as HTMLButtonElement;
+    const pull = fixture.nativeElement.querySelector('.model-row__pull') as HTMLButtonElement;
 
     expect(selection.contains(pull)).toBeFalse();
   });
@@ -87,7 +87,7 @@ describe('ModelCardComponent', () => {
     component.isSelected = true;
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Selected agent model');
+    expect(fixture.nativeElement.textContent).toContain('Selected');
   });
 
   it('explains why a selected model is disabled', () => {
@@ -96,7 +96,7 @@ describe('ModelCardComponent', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Selected agent model');
+    expect(text).toContain('Selected');
     expect(text).toContain('not present in the live provider catalog');
   });
 });
