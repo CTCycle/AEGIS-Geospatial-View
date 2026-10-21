@@ -10,7 +10,7 @@ reconstructing semantic state from a recent-message suffix.
 from __future__ import annotations
 
 import re
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,10 +45,9 @@ _INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
 class PendingClarification(BaseModel):
     """A clarification tied to the request that produced it.
 
-    The legacy ``unresolved_questions`` value is read only while hydrating
-    pre-schema-v2 persisted state.  This record is the durable source of
-    truth: status and source terms let a later turn consume the clarification
-    without making it a global blocker for unrelated work.
+    This record is the durable source of truth: status and source terms let a
+    later turn consume the clarification without making it a global blocker
+    for unrelated work.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -94,11 +93,6 @@ class PendingClarification(BaseModel):
             kind=inferred_kind,
             options=list(dict.fromkeys(inferred_options))[:12],
         )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def from_legacy(cls, question: str) -> "PendingClarification":
-        return cls(question=question.strip(), source_turn_index=0)
 
     # -------------------------------------------------------------------------
     def applies_to(self, message: str) -> bool:
@@ -187,42 +181,7 @@ class ConversationState(BaseModel):
 
         if payload is None:
             return cls.empty(conversation_id, revision=revision)
-        if isinstance(payload, dict):
-            raw_payload = cast(dict[str, Any], payload)
-            migrated: dict[str, Any] = dict(raw_payload)
-            schema_version = migrated.get("schema_version", 2)
-            if type(schema_version) is not int or schema_version not in {1, 2}:
-                raise ValueError(
-                    "Unsupported conversation state schema version."
-                )
-            pending: Any = migrated.get("pending_clarification")
-            if pending is None:
-                legacy_questions_value: Any = migrated.get("unresolved_questions")
-                if isinstance(legacy_questions_value, list):
-                    legacy_questions: list[Any] = cast(
-                        list[Any], legacy_questions_value
-                    )
-                    first = next(
-                        (
-                            str(item).strip()
-                            for item in legacy_questions
-                            if str(item).strip()
-                        ),
-                        "",
-                    )
-                    if first:
-                        migrated["pending_clarification"] = (
-                            PendingClarification.from_legacy(first).model_dump(
-                                mode="json"
-                            )
-                        )
-            migrated["schema_version"] = 2
-            # The old key is a migration input only; never retain it in the
-            # validated durable/public contract.
-            migrated.pop("unresolved_questions", None)
-            state = cls.model_validate(migrated)
-        else:
-            state = cls.model_validate(payload)
+        state = cls.model_validate(payload)
         if state.conversation_id != conversation_id:
             raise ValueError("Conversation state belongs to another conversation.")
         return state.model_copy(update={"revision": max(state.revision, revision)})

@@ -423,7 +423,6 @@ class AgentLoop:
         state = request.state
         self._ensure_run_control(request)
         state.current_iteration = iteration + 1
-        state.iteration = state.current_iteration
         self._sync_task_state(state)
         iteration_started: dict[str, object] = {
             "iteration": state.current_iteration,

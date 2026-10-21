@@ -224,24 +224,15 @@ class AgentTask(BaseModel):
     result: dict[str, object] | None = None
     failure_code: str | None = Field(default=None, max_length=120)
 
-    # -------------------------------------------------------------------------
-    @property
-    def id(self) -> str:
-        """Compatibility/readability alias for consumers that call it ``id``."""
-
-        return self.task_id
-
 ###############################################################################
 class AgentTaskState(BaseModel):
     """Typed projection of the run-scoped task ledger.
 
-    The durable ``AgentRunState.task_state`` field intentionally remains a
-    JSON object for checkpoint compatibility with older native runs.  This
-    model is the schema and normalization boundary for that object.
+    The durable ``AgentRunState.task_state`` JSON object carries both the
+    conversation-state projection and this task ledger, so the typed view
+    deliberately ignores the conversation keys and claims its own namespace.
     """
 
-    # Conversation-state fields may coexist in the legacy JSON projection;
-    # they are deliberately ignored by this task-ledger view.
     model_config = ConfigDict(extra="ignore")
 
     root_task_id: str = Field(min_length=1, max_length=160)
@@ -318,18 +309,18 @@ class AgentTaskState(BaseModel):
         description: str = "Native agent request",
         max_iterations: int = 1,
     ) -> "AgentTaskState":
-        """Normalize a legacy or partially populated task JSON object."""
+        """Normalize a task JSON object into the typed ledger.
+
+        Runs whose context projection has not initialized the ledger yet get a
+        deterministic root task; a malformed persisted projection raises so
+        corruption is surfaced instead of silently restarting progress.
+        """
 
         payload_object = (
             cast(dict[str, object], payload) if isinstance(payload, dict) else {}
         )
         if payload_object.get("root_task_id"):
-            try:
-                return cls.model_validate(payload_object)
-            except Exception:
-                # A malformed persisted projection must not make a run
-                # unrecoverable; rebuild the bounded root ledger below.
-                pass
+            return cls.model_validate(payload_object)
         return cls.create(
             run_id=run_id,
             description=description,
@@ -489,11 +480,8 @@ class AgentRunState(BaseModel):
     consecutive_tool_failures: int = Field(default=0, ge=0)
     route_corrections: int = Field(default=0, ge=0)
     validation_corrections: int = Field(default=0, ge=0)
-    # Iterations are one-based once the first model decision starts.  Keeping
-    # the explicit alias makes checkpoints and diagnostics readable while
-    # retaining ``current_iteration`` as the canonical field.
+    # Iterations are one-based once the first model decision starts.
     current_iteration: int = Field(default=0, ge=0)
-    iteration: int = Field(default=0, ge=0)
     max_iterations: int = Field(default=12, ge=1, le=100)
     finalization_attempted: bool = False
     iteration_trace: list[dict[str, object]] = Field(
@@ -519,9 +507,9 @@ class AgentRunState(BaseModel):
     def typed_task_state(self) -> AgentTaskState:
         """Return the validated task ledger for this run.
 
-        Older checkpoints and callers may still supply arbitrary task JSON;
-        the normalization helper gives them a safe root task without mutating
-        the canonical state until the loop explicitly persists it.
+        A run whose context projection has not initialized the ledger yet
+        receives a safe root task without mutating the canonical state until
+        the loop explicitly persists it.
         """
 
         return AgentTaskState.from_payload(
@@ -570,21 +558,7 @@ class AgentRunState(BaseModel):
     def from_checkpoint(cls, payload: dict[str, Any]) -> "AgentRunState":
         """Restore one validated native run checkpoint."""
 
-        state = cls.model_validate(payload)
-        # Checkpoints written by the earlier native harness used ``iteration``
-        # (and the task ledger) as the progress counter.  Reconcile all three
-        # representations so a resumed run cannot silently restart at one.
-        task_iteration = 0
-        try:
-            task_iteration = state.typed_task_state().current_iteration
-        except Exception:
-            task_iteration = 0
-        cumulative = max(
-            int(state.current_iteration), int(state.iteration), int(task_iteration)
-        )
-        state.current_iteration = cumulative
-        state.iteration = cumulative
-        return state
+        return cls.model_validate(payload)
 
 ###############################################################################
 def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:

@@ -349,34 +349,7 @@ class ChatHistoryRepository:
         return {
             "messages": matches,
             "pagination": pagination,
-            # These top-level aliases make the page convenient for thin API
-            # adapters while keeping ``pagination`` the canonical shape.
-            "next_cursor": next_cursor,
-            "has_more": next_cursor is not None,
-            "total": total,
         }
-
-    # -------------------------------------------------------------------------
-    def search_messages(
-        self,
-        *,
-        conversation_id: str,
-        query: str,
-        before_turn_index: int | None = None,
-        cursor: str | None = None,
-        limit: int = 8,
-        excerpt_chars: int = MAX_EXCERPT_CHARS,
-    ) -> dict[str, Any]:
-        """Compatibility spelling for repository/API adapters."""
-
-        return self.search_conversation_history(
-            conversation_id,
-            query,
-            before_turn_index=before_turn_index,
-            cursor=cursor,
-            limit=limit,
-            excerpt_chars=excerpt_chars,
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -411,9 +384,6 @@ class ChatHistoryRepository:
         return {
             "messages": [],
             "pagination": pagination,
-            "next_cursor": None,
-            "has_more": False,
-            "total": 0,
         }
 
 ###############################################################################
