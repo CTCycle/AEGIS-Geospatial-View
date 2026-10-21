@@ -446,6 +446,7 @@ def _filter_features_to_radius(
     ]
 
 
+###############################################################################
 async def _filter_features_to_region(
     features: list[dict[str, object]], request: ProviderRequest
 ) -> tuple[list[dict[str, object]], dict[str, Any]]:
@@ -469,6 +470,7 @@ async def _filter_features_to_region(
                   "excluded_outside_region_events": len(features) - len(kept)}
 
 
+###############################################################################
 def _min_magnitude(request: ProviderRequest) -> float | None:
     filters = request.params.get("filters")
     value = filters.get("min_magnitude") if is_json_object(filters) else None
@@ -483,6 +485,7 @@ def _min_magnitude(request: ProviderRequest) -> float | None:
     return number
 
 
+###############################################################################
 def _earthquake_coverage(request: ProviderRequest, *, truncated: bool, note: str) -> dict[str, Any]:
     return {"bbox": list(request.bbox) if request.bbox else None,
             "min_magnitude": _min_magnitude(request), "truncated": truncated,

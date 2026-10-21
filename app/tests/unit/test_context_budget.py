@@ -105,7 +105,6 @@ def test_context_profile_normalizer_rejects_malformed_token_counts(value: object
         is None
     )
 
-
 ###############################################################################
 def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_authority() -> None:
     assert (
@@ -138,7 +137,6 @@ def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_au
     assert profile.maximum_output_tokens == 512
     assert profile.metadata_authority == "provider"
     assert profile_to_request_metadata(profile)["context_profile_model"] == "runtime-model"
-
 
 ###############################################################################
 def test_provider_usage_cannot_erase_canonical_model_limit() -> None:

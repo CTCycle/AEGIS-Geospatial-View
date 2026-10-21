@@ -17,7 +17,6 @@ TERMINAL_CALL_KIND = "terminal"
 
 _TERMINAL_CALL_KINDS = frozenset({TERMINAL_CALL_KIND})
 
-
 ###############################################################################
 class VisionPolicyEngine:
     """Deterministic vision-attachment decisions for the native agent loop.
@@ -27,6 +26,7 @@ class VisionPolicyEngine:
     degrades cleanly (no image) whenever the capture or capability is missing.
     """
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

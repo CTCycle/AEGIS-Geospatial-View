@@ -283,7 +283,10 @@ def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() ->
         for hour in range(24)
     ]
 
+    ###############################################################################
     class _HourlyWeatherService(_OpenMeteoService):
+
+        # -------------------------------------------------------------------------
         async def get_weather_forecast(self, *, latitude: float, longitude: float):
             return {
                 "kind": "weather_forecast",
@@ -308,6 +311,7 @@ def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() ->
     assert len(response.payload["features"]) == 1
 
 
+###############################################################################
 def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]

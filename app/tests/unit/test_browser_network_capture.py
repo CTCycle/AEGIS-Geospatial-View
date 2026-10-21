@@ -11,6 +11,7 @@ from tests.e2e.test_live_raster_diagnostics import _raster_transport as raster_t
 from tests.e2e.test_route_matrix_live import _raster_transport as route_transport
 
 
+###############################################################################
 def test_request_counts_survive_event_truncation() -> None:
     capture = NetworkCapture(max_events=1)
     capture._append(
@@ -41,6 +42,7 @@ def test_request_counts_survive_event_truncation() -> None:
     assert capture.proxy_requests_by_capability == {"eea_noise_end2022": 1}
 
 
+###############################################################################
 @pytest.mark.parametrize("transport", [raster_transport, route_transport])
 def test_capture_recognizes_eea_and_fema_relay(transport: Any) -> None:
     for host in ("noise.discomap.eea.europa.eu", "hazards-fema.maps.arcgis.com"):
@@ -51,32 +53,48 @@ def test_capture_recognizes_eea_and_fema_relay(transport: Any) -> None:
         )
 
 
+###############################################################################
 def test_failed_scenario_saves_capture_and_closes_context(tmp_path: Path) -> None:
     calls: list[str] = []
 
+    ###############################################################################
     class FakePage:
+
+        # -------------------------------------------------------------------------
         def screenshot(self, **kwargs: Any) -> None:
             calls.append("failure_screenshot")
 
+    ###############################################################################
     class FakeContext:
+
+        # -------------------------------------------------------------------------
         def __enter__(self) -> "FakeContext":
             return self
 
+        # -------------------------------------------------------------------------
         def __exit__(self, *args: Any) -> None:
             calls.append("closed")
 
+        # -------------------------------------------------------------------------
         def route(self, *args: Any) -> None:
             calls.append("cache_disabled")
 
+        # -------------------------------------------------------------------------
         def new_page(self) -> FakePage:
             return FakePage()
 
+    ###############################################################################
     class FakeBrowser:
+
+        # -------------------------------------------------------------------------
         def new_context(self, **kwargs: Any) -> FakeContext:
             assert kwargs["service_workers"] == "block"
             return FakeContext()
 
+    ###############################################################################
     class Capture(NetworkCapture):
+
+        # -------------------------------------------------------------------------
         def attach(self, page: Any) -> None:
             calls.append("attached")
 

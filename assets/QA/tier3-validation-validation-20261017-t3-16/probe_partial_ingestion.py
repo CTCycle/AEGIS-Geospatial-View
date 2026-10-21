@@ -19,6 +19,7 @@ from server.services.geospatial.live_validator import PROVIDER_SMOKE_CHECKS, val
 from server.services.geospatial.provider_registry import ProviderRegistry
 
 
+###############################################################################
 async def probe(provider, capability, url):
     try:
         result = await asyncio.wait_for(provider.fetch(ProviderRequest(
@@ -37,6 +38,7 @@ async def probe(provider, capability, url):
         return {"status": "BLOCKED", "url": url, "error_type": type(exc).__name__, "message": str(exc)[:200]}
 
 
+###############################################################################
 async def main():
     with urllib.request.urlopen("http://127.0.0.1:5079/api/geospatial/capabilities") as response:
         catalog = json.load(response)

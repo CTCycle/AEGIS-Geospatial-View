@@ -11,7 +11,6 @@ from server.services.geospatial.render_capture import (
     RenderCaptureStore,
 )
 
-
 ###############################################################################
 def _png_base64() -> str:
     # Minimal 1x1 PNG payload.
@@ -22,7 +21,6 @@ def _png_base64() -> str:
             "bfabd40000000049454e44ae426082"
         )
     ).decode("ascii")
-
 
 ###############################################################################
 def test_save_and_get_round_trips_by_run_identity() -> None:
@@ -50,7 +48,6 @@ def test_save_and_get_round_trips_by_run_identity() -> None:
 
     assert store.get("run-1", "map-1", 3) is None
     assert store.get("run-2", "map-1", 2) is None
-
 
 ###############################################################################
 def test_save_rejects_invalid_mime_size_base64_and_identity() -> None:
@@ -107,7 +104,6 @@ def test_save_rejects_invalid_mime_size_base64_and_identity() -> None:
             height=10,
         )
 
-
 ###############################################################################
 def test_delete_for_run_removes_all_captures_for_that_run() -> None:
     store = RenderCaptureStore()
@@ -120,7 +116,6 @@ def test_delete_for_run_removes_all_captures_for_that_run() -> None:
     assert len(store) == 1
     assert store.get("run-1", "map-1", 1) is None
     assert store.get("run-2", "map-1", 1) is not None
-
 
 ###############################################################################
 def test_ttl_expiry_reclaims_stale_captures() -> None:
@@ -145,14 +140,12 @@ def test_ttl_expiry_reclaims_stale_captures() -> None:
     assert stale.get("run-1", "map-1", 1) is None
     assert len(stale) == 0
 
-
 ###############################################################################
 def test_clear_empties_the_store() -> None:
     store = RenderCaptureStore()
     store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=_png_base64(), width=10, height=10)
     store.clear()
     assert len(store) == 0
-
 
 ###############################################################################
 def test_user_attachment_binds_once_to_a_run_of_its_conversation() -> None:

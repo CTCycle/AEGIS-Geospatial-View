@@ -50,7 +50,6 @@ def _json_list(value: object) -> list[Any]:
         return cast(list[Any], value)
     return []
 
-
 ###############################################################################
 def _finalize_pending_presentation(
     value: object,
@@ -332,6 +331,7 @@ class AgentRunRepository:
             )
         return record_id is not None
 
+    # -------------------------------------------------------------------------
     def list_runs_for_conversation(
         self,
         conversation_id: str,
@@ -1540,6 +1540,7 @@ class AgentRunRepository:
         features = data.get("features")
         return isinstance(features, list) and len(cast(list[Any], features)) > 0
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _candidate_is_valid_empty(instance: dict[str, Any]) -> bool:
         descriptor = _json_object(instance.get("descriptor"))
@@ -1554,6 +1555,7 @@ class AgentRunRepository:
             "empty",
         }
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _candidate_is_raster(cls, instance: dict[str, Any]) -> bool:
         rendering_mode = str(instance.get("rendering_mode") or "").casefold()
@@ -1814,7 +1816,6 @@ def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
         if isinstance(candidate, dict):
             return dict(cast(dict[str, Any], candidate))
     return None
-
 
 ###############################################################################
 def _terminal_task_state_payload(

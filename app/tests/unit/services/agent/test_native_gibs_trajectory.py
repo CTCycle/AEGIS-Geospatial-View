@@ -22,25 +22,36 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 class _ScriptedProvider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self._results = deque(results)
 
+    # -------------------------------------------------------------------------
     async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
         del request, kwargs
         return self._results.popleft()
 
 
+###############################################################################
 class _ProviderFactory:
+
+    # -------------------------------------------------------------------------
     def __init__(self, provider: _ScriptedProvider) -> None:
         self.provider = provider
 
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> _ScriptedProvider:
         del provider
         return self.provider
 
 
+###############################################################################
 class _FakeLocationResolver:
+
+    # -------------------------------------------------------------------------
     async def resolve_location_signals(
         self, signals: Any, memory_snapshot: Any
     ) -> ResolvedLocation:
@@ -57,10 +68,14 @@ class _FakeLocationResolver:
         )
 
 
+###############################################################################
 class _FakeProviderRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.requests: list[Any] = []
 
+    # -------------------------------------------------------------------------
     async def fetch(self, provider_id: str, request: Any) -> ProviderResponse:
         self.requests.append((provider_id, request))
         return ProviderResponse(
@@ -80,10 +95,14 @@ class _FakeProviderRegistry:
         )
 
 
+###############################################################################
 class _FakeEvidenceRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._records: dict[str, tuple[AgentEvidenceSummary, bytes]] = {}
 
+    # -------------------------------------------------------------------------
     def create(
         self,
         *,
@@ -113,6 +132,7 @@ class _FakeEvidenceRepository:
         self._records[evidence_id] = (record, raw)
         return record
 
+    # -------------------------------------------------------------------------
     def get_summary(
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> AgentEvidenceSummary | None:
@@ -120,6 +140,7 @@ class _FakeEvidenceRepository:
         record = self._records.get(evidence_id)
         return record[0] if record else None
 
+    # -------------------------------------------------------------------------
     def get_payload(
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> tuple[AgentEvidenceSummary, bytes] | None:
@@ -127,6 +148,7 @@ class _FakeEvidenceRepository:
         return self._records.get(evidence_id)
 
 
+###############################################################################
 def _call(call_id: str, name: str, arguments: dict[str, Any]) -> LLMResult:
     return LLMResult(
         content="",
@@ -134,6 +156,7 @@ def _call(call_id: str, name: str, arguments: dict[str, Any]) -> LLMResult:
     )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_manifest_backed_gibs_layer_reaches_map_preparation() -> None:
     capability_registry = CapabilityRegistry()

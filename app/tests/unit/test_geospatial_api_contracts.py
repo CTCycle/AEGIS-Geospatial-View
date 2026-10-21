@@ -603,8 +603,10 @@ def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() ->
 def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
     captured: dict[str, str] = {}
 
+    ###############################################################################
     class GibsRegistry:
 
+        # -------------------------------------------------------------------------
         async def describe_layer(self, provider_id: str, layer_id: str):
             assert provider_id == "gibs"
             assert layer_id == "MODIS_Terra_NDVI_8Day"
@@ -664,8 +666,10 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
 def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> None:
     captured: dict[str, str] = {}
 
+    ###############################################################################
     class GibsRegistry:
 
+        # -------------------------------------------------------------------------
         async def describe_layer(self, provider_id: str, layer_id: str):
             assert provider_id == "gibs"
             assert layer_id == "MODIS_Combined_Thermal_Anomalies_All"
@@ -862,6 +866,7 @@ def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> N
     assert "provider error" not in response.text
 
 
+###############################################################################
 def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_response(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
@@ -1008,6 +1013,7 @@ def test_rainviewer_tile_proxy_uses_cached_latest_metadata_and_same_origin_route
     ]
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "suffix",
     ["/8/128/128.png", "/7/64/48.png?time=2026-09-30T12:00:00Z"],
@@ -1043,6 +1049,7 @@ def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
 def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> None:
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class MetadataRegistry:
 
         # -------------------------------------------------------------------------

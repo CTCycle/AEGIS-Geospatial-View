@@ -135,6 +135,7 @@ SCENARIOS = (
 )
 
 
+###############################################################################
 def _transport(url: str) -> str | None:
     parsed = urlsplit(url)
     if parsed.path.startswith("/api/geospatial/tiles/"):
@@ -144,6 +145,7 @@ def _transport(url: str) -> str | None:
     return None
 
 
+###############################################################################
 def _proxy_capability_id(url: str) -> str | None:
     path_parts = [unquote(part) for part in urlsplit(url).path.split("/")]
     try:
@@ -156,16 +158,21 @@ def _proxy_capability_id(url: str) -> str | None:
     return capability_id or None
 
 
+###############################################################################
 class _VectorPointCapture:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
         self.console: list[dict[str, str]] = []
         self.page_errors: list[str] = []
 
+    # -------------------------------------------------------------------------
     def _append(self, event: dict[str, Any]) -> None:
         if len(self.events) < MAX_EVENTS:
             self.events.append(event)
 
+    # -------------------------------------------------------------------------
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
             transport = _transport(request.url)
@@ -233,6 +240,7 @@ class _VectorPointCapture:
         page.on("pageerror", on_page_error)
 
 
+###############################################################################
 def _expand_overlay_controls(page: Page) -> None:
     toggle = page.locator(".overlay-controls__toggle")
     if not toggle.count():
@@ -242,6 +250,7 @@ def _expand_overlay_controls(page: Page) -> None:
         page.wait_for_timeout(500)
 
 
+###############################################################################
 def _map_evidence(page: Page, hints: tuple[str, ...]) -> dict[str, Any]:
     map_count = page.locator(".maplibregl-map").count()
     canvas_count = page.locator(".maplibregl-canvas").count()
@@ -276,6 +285,7 @@ def _map_evidence(page: Page, hints: tuple[str, ...]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _classify(
     scenario_id: str,
     expected_kind: str,
@@ -308,6 +318,7 @@ def _classify(
     return "map_render_ack_unobserved"
 
 
+###############################################################################
 def _scenario_result(
     page: Page,
     capture: _VectorPointCapture,
@@ -390,6 +401,7 @@ def _scenario_result(
     }
 
 
+###############################################################################
 def test_live_vector_point_matrix_diagnostics(
     page: Page,
     base_url: str,

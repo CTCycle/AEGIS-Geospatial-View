@@ -136,6 +136,7 @@ def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
     assert result["hourly_forecast"][-1]["time"] == timeline[-1]
 
 
+###############################################################################
 def test_overpass_direct_service_marks_limited_results_as_partial() -> None:
     service = OverpassService(
         base_url="https://overpass.example/api/interpreter",

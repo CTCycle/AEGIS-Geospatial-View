@@ -104,6 +104,7 @@ class EvidenceAssessment(BaseModel):
     reasons: list[str] = Field(default_factory=list, max_length=8)
 
 
+###############################################################################
 class ToolResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -416,7 +417,6 @@ def _project_result_data(
         return None, False
     return _fit_projection(bounded, max_chars=max_chars)
 
-
 ###############################################################################
 def _fit_projection(
     value: dict[str, Any] | list[Any] | None,
@@ -471,7 +471,6 @@ def _fit_projection(
         truncated = True
     return bounded, truncated
 
-
 ###############################################################################
 def _bounded_json_value(
     value: Any,
@@ -522,7 +521,6 @@ def _bounded_json_value(
             for child in items[:list_limit]
         ]
     return str(value)[:string_limit]
-
 
 ###############################################################################
 def _bounded_strings(value: Any, *, limit: int, item_chars: int) -> list[str]:

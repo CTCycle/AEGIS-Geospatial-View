@@ -25,6 +25,7 @@ from server.services.catalog.loader import find_macro_region_entry
 _ORDINAL_SUFFIX = re.compile(r"\b(\d+)(?:st|nd|rd|th|e|er|re|eme|ere|o|a)\b")
 
 
+###############################################################################
 def find_macro_region(text: str) -> ResolvedLocation | None:
     region = find_macro_region_entry(text)
     if region is None:
@@ -36,7 +37,6 @@ def find_macro_region(text: str) -> ResolvedLocation | None:
         location_type="macro_region", source="aegis_macro_regions",
         bbox_source="aegis_macro_regions", confidence=1.0,
     )
-
 
 ###############################################################################
 class LocationResolver:

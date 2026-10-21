@@ -95,6 +95,7 @@ class OpenMeteoService:
         self._last_call_by_key: dict[str, float] = {}
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
+    # -------------------------------------------------------------------------
     async def get_weather_grid(self, points: list[tuple[float, float]], past_days: int) -> list[dict[str, Any]]:
         """Fetch a grid in cached multi-location calls of at most 100 points."""
         if not points:

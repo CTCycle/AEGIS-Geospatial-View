@@ -112,6 +112,7 @@ def test_rainviewer_rejects_untrusted_metadata_hosts(host: str) -> None:
         asyncio.run(RainViewerService(fetcher=fetcher).get_latest_radar_metadata())
 
 
+###############################################################################
 def test_rainviewer_ignores_invalid_frame_paths_and_keeps_latest_safe_frame() -> None:
     async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
         return {
@@ -132,6 +133,7 @@ def test_rainviewer_ignores_invalid_frame_paths_and_keeps_latest_safe_frame() ->
     )
 
 
+###############################################################################
 def test_rainviewer_forces_universal_blue_color_scheme() -> None:
     async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
         return {
@@ -146,8 +148,13 @@ def test_rainviewer_forces_universal_blue_color_scheme() -> None:
     assert "/2/1_1.png" in result["tile_url_template"]
 
 
+###############################################################################
 def test_rainviewer_provider_reports_server_bound_scope_evidence() -> None:
+
+    ###############################################################################
     class _Service:
+
+        # -------------------------------------------------------------------------
         async def get_latest_radar_metadata(self) -> dict[str, Any]:
             return {
                 "tile_url_template": "https://tilecache.rainviewer.com/v2/radar/200/256/{z}/{x}/{y}/2/1_1.png",

@@ -58,6 +58,7 @@ def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:
     assert feature["metadata"]["windArrow"] == {"speed": 7, "direction": 270}
 
 
+###############################################################################
 @pytest.mark.parametrize("bbox", [(-180, -85, 180, 85), (-25, 34, 45, 72), (8, 45, 8.1, 70)])
 def test_weather_grid_cap_and_interior_centres(bbox):
     points, spacing, excluded = grid_points(bbox)
@@ -65,6 +66,7 @@ def test_weather_grid_cap_and_interior_centres(bbox):
     assert all(bbox[0] < lon < bbox[2] and bbox[1] < lat < bbox[3] for lat, lon in points)
 
 
+###############################################################################
 def test_region_mask_excludes_sea_and_non_member_land():
     europe = find_macro_region_entry("Europe")
     assert europe is not None
@@ -78,16 +80,22 @@ def test_region_mask_excludes_sea_and_non_member_land():
     assert all(mask.contains(Point(lon, lat)) for lat, lon in points)
 
 
+###############################################################################
 def test_macro_region_members_have_shapes():
     shapes = country_shapes()
     assert all(code in shapes for region in load_macro_regions() for code in region.countries)
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_weather_grid_region_refinement_future_hours_and_provenance():
     requested: list[list[tuple[float, float]]] = []
+
+    ###############################################################################
     class Service:
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+        # -------------------------------------------------------------------------
         async def get_weather_grid(self, points, past_days):
             requested.append(points)
             row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 30},
@@ -113,6 +121,7 @@ async def test_weather_grid_region_refinement_future_hours_and_provenance():
     assert result.units["precipitation_sum_mm"] == "mm"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_weather_grid_batches_requests_under_8kb():
     service = OpenMeteoService()

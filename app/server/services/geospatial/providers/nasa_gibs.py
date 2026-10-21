@@ -473,6 +473,7 @@ class NASAGIBSProvider(GeospatialProvider):
             "image/jpg": "jpg",
         }.get(image_format.lower(), "png")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _max_zoom_for_matrix_set(matrix_set: str) -> int:
         match = re.search(r"(?:^|[_:])level(\d+)$", matrix_set, re.IGNORECASE)

@@ -222,7 +222,6 @@ def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
         return None
     return latitude, longitude
 
-
 ###############################################################################
 def _search_text_coordinates(text: str) -> re.Match[str] | None:
     """Find a coordinate pair in free text, ignoring calendar dates ("March 7, 2024")."""
@@ -231,7 +230,6 @@ def _search_text_coordinates(text: str) -> re.Match[str] | None:
         if _MONTH_BEFORE_RE.search(text[: match.start()]) is None:
             return match
     return None
-
 
 ###############################################################################
 def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:

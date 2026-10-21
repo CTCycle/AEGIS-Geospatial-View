@@ -104,7 +104,6 @@ class AgentProviderFactory(Protocol):
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> AgentProvider: ...
 
-
 ###############################################################################
 class AgentRunControlSignal(RuntimeError):
     """Internal stop signal for cancellation or version supersession."""
@@ -184,7 +183,6 @@ class AgentLoopOutcome:
     # Set only when the loop suspends for a render handshake: whether the
     # browser should capture the rendered map for a vision-enabled model step.
     vision_capture_requested: bool = False
-
 
 ###############################################################################
 class AgentLoop:
@@ -2894,6 +2892,7 @@ class AgentLoop:
             if location is not None:
                 state.location_refs[ref] = location
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _budget_profile(route: CapabilityRoute) -> str:
         if (
@@ -3467,7 +3466,6 @@ class AgentLoop:
             "The last-known-good map was left unchanged."
         )
         return f"{text.rstrip()}\n\n{suffix}" if text.strip() else suffix
-
 
 ###############################################################################
 def _is_location_only_map_request(

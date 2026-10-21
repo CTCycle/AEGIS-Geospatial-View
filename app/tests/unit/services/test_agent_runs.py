@@ -145,7 +145,6 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
-
 ###############################################################################
 def test_event_repository_loads_latest_native_checkpoint_for_run_version(
     run_repositories,
@@ -279,7 +278,6 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
         )
     assert first.state == "pending"
 
-
 ###############################################################################
 def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     run_repositories,
@@ -340,7 +338,6 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     assert cancelled.presentation["status"] == "failed"
     assert "pending_response" not in cancelled.presentation
 
-
 ###############################################################################
 def test_explicit_pending_failure_status_is_normalized_atomically(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -370,7 +367,6 @@ def test_explicit_pending_failure_status_is_normalized_atomically(run_repositori
     assert transitioned is True
     assert failed.state == AgentRunState.FAILED
     assert failed.presentation_status == "failed"
-
 
 ###############################################################################
 def test_superseding_pending_render_closes_the_old_presentation(
@@ -416,7 +412,6 @@ def test_superseding_pending_render_closes_the_old_presentation(
     assert superseded.presentation_status == "not_required"
     assert superseded.presentation is None
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
@@ -461,6 +456,7 @@ def test_run_start_binds_a_known_attachment_and_rejects_an_unknown_one(run_repos
     assert store.attachment_for_run(result.run_id) is not None
 
 
+###############################################################################
 def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Idempotency")
@@ -518,7 +514,6 @@ def test_conversation_context_state_survives_repository_restart(
             expected_revision=initial["context_revision"],
             conversation_state=state.model_dump(mode="json"),
         )
-
 
 ###############################################################################
 def test_conversation_repository_canonicalizes_legacy_state_on_write(

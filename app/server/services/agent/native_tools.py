@@ -85,7 +85,6 @@ def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]
         }
     )
 
-
 ###############################################################################
 def _map_plan_schema(
     input_model: type[BaseModel], basemap_ids: list[str]
@@ -428,7 +427,6 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
 
     return execute
 
-
 ###############################################################################
 def _bind_execute_request(
     request: ExecuteCapabilityInput, state: AgentRunState
@@ -493,7 +491,6 @@ def _bind_execute_request(
         bound = bound.model_copy(update={"bbox": list(extent.bbox)})
     return bound
 
-
 ###############################################################################
 def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Keep semantic provider arguments while removing invariant aliases."""
@@ -523,14 +520,12 @@ def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         if str(key).strip().casefold() not in owned
     }
 
-
 ###############################################################################
 def _optional_string(value: Any) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
-
 
 ###############################################################################
 def _positive_float(value: Any) -> float | None:
@@ -539,7 +534,6 @@ def _positive_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) and number > 0 else None
-
 
 ###############################################################################
 def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]:
@@ -554,7 +548,6 @@ def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]
         min(180.0, location.longitude + longitude_delta),
         min(90.0, location.latitude + latitude_delta),
     ]
-
 
 ###############################################################################
 def _lower_execution_extent(
@@ -721,7 +714,6 @@ def _map_plan_semantic_validator(
         )
     return errors[:8]
 
-
 ###############################################################################
 def _valid_empty_data_only(state: AgentRunState) -> bool:
     """Allow a location-only map when the provider found no matching data."""
@@ -737,7 +729,6 @@ def _valid_empty_data_only(state: AgentRunState) -> bool:
     return bool(data_results) and all(
         result.status == "valid_empty" for result in data_results
     )
-
 
 ###############################################################################
 async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> ToolResult:
@@ -824,7 +815,6 @@ def _capability_semantic_validator(
                 )
     return errors[:8]
 
-
 ###############################################################################
 def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Remove route-owned aliases before applying the manifest schema."""
@@ -853,7 +843,6 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         for key, value in arguments.items()
         if str(key).strip().casefold() not in owned
     }
-
 
 ###############################################################################
 def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
@@ -944,7 +933,6 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
             errors.append(f"{path}: number is at or above the exclusive maximum.")
     return errors[:8]
 
-
 ###############################################################################
 def _json_type_matches(value: Any, schema_type: Any) -> bool:
     if schema_type == "object":
@@ -962,7 +950,6 @@ def _json_type_matches(value: Any, schema_type: Any) -> bool:
     if schema_type == "null":
         return value is None
     return True
-
 
 ###############################################################################
 def _execute_argument_schema_provider(

@@ -65,16 +65,13 @@ from server.services.database_runtime import (
     DatabaseRuntimeManager,
 )
 
-
 ###############################################################################
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
-
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
-
 
 ###############################################################################
 def _dispose_sqlite_engine(database: object) -> None:
@@ -82,7 +79,6 @@ def _dispose_sqlite_engine(database: object) -> None:
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
-
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -98,6 +94,7 @@ def _resolve_client_file(full_path: str) -> Path | None:
     return None
 
 
+###############################################################################
 @dataclass
 class _RuntimeBundle:
     database: SQLiteRepository
@@ -125,6 +122,7 @@ class _RuntimeBundle:
     runtime_settings_service: RuntimeSettingsService
 
 
+###############################################################################
 def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle:
     database = SQLiteRepository(database_settings)
     try:
@@ -238,6 +236,7 @@ def _build_runtime_bundle(database_settings: DatabaseSettings) -> _RuntimeBundle
     )
 
 
+###############################################################################
 def _build_validated_runtime_bundle(
     database_settings: DatabaseSettings,
 ) -> _RuntimeBundle:
@@ -250,6 +249,7 @@ def _build_validated_runtime_bundle(
     return bundle
 
 
+###############################################################################
 def _publish_runtime_bundle(application: FastAPI, bundle: _RuntimeBundle) -> None:
     application.state.runtime_bundle = bundle
     application.state.database = bundle.database
@@ -272,11 +272,13 @@ def _publish_runtime_bundle(application: FastAPI, bundle: _RuntimeBundle) -> Non
     application.state.runtime_settings_service = bundle.runtime_settings_service
 
 
+###############################################################################
 async def _activate_runtime_bundle(bundle: _RuntimeBundle) -> None:
     bundle.job_service.start()
     bundle.run_lifecycle_service.resume_active_runs()
 
 
+###############################################################################
 async def _shutdown_runtime_bundle(bundle: _RuntimeBundle) -> None:
     await bundle.realtime_connections.close_all()
     await asyncio.to_thread(bundle.job_service.stop)
@@ -284,11 +286,13 @@ async def _shutdown_runtime_bundle(bundle: _RuntimeBundle) -> None:
     _dispose_sqlite_engine(bundle.database)
 
 
+###############################################################################
 def _validate_runtime_bundle(bundle: _RuntimeBundle) -> None:
     bundle.chat_runtime.settings_service.validate_persisted_settings()
     run_startup_validations(bundle.geospatial_runtime.catalog_snapshot)
 
 
+###############################################################################
 def _database_busy_reasons(bundle: _RuntimeBundle) -> list[str]:
     reasons: list[str] = []
     if bundle.job_service.has_nonterminal_jobs:
@@ -297,11 +301,9 @@ def _database_busy_reasons(bundle: _RuntimeBundle) -> list[str]:
         reasons.append("agent runs")
     return reasons
 
-
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
-
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -310,11 +312,9 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
-
 
 ###############################################################################
 @asynccontextmanager
@@ -347,7 +347,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     finally:
         active_bundle = getattr(application.state, "runtime_bundle", bundle)
         await _shutdown_runtime_bundle(active_bundle)
-
 
 ###############################################################################
 def create_app() -> FastAPI:

@@ -284,6 +284,7 @@ class AgentResponseBuilder:
         )
 
 
+###############################################################################
 def _latest_context_usage(
     trace: list[dict[str, Any]],
 ) -> ContextUsageResponse | None:

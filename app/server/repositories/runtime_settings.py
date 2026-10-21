@@ -13,12 +13,15 @@ from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
 RUNTIME_SETTINGS_SCHEMA_VERSION = 1
 
 
+###############################################################################
 class RuntimeSettingsRepository:
     """Typed persistence boundary for application-editable runtime settings."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
+    # -------------------------------------------------------------------------
     def get(self) -> AppSettings | None:
         with self._session_factory() as session:
             record = session.get(ApplicationRuntimeSettingsRecord, 1)
@@ -26,6 +29,7 @@ class RuntimeSettingsRepository:
                 return None
             return self._validate_record(record)
 
+    # -------------------------------------------------------------------------
     def get_required(self) -> AppSettings:
         settings = self.get()
         if settings is None:
@@ -34,6 +38,7 @@ class RuntimeSettingsRepository:
             )
         return settings
 
+    # -------------------------------------------------------------------------
     def initialize_defaults(self) -> AppSettings:
         existing = self.get()
         if existing is not None:
@@ -57,9 +62,11 @@ class RuntimeSettingsRepository:
 
         return self.get_required()
 
+    # -------------------------------------------------------------------------
     def seed_required(self) -> AppSettings:
         return self.initialize_defaults()
 
+    # -------------------------------------------------------------------------
     def replace(self, settings: AppSettings | Mapping[str, Any]) -> AppSettings:
         candidate = self._coerce_settings(settings)
         payload = self._validated_payload(candidate.runtime_payload())
@@ -75,6 +82,7 @@ class RuntimeSettingsRepository:
             session.commit()
         return self.get_required()
 
+    # -------------------------------------------------------------------------
     def update(self, patch: Mapping[str, Any]) -> AppSettings:
         current = self.get_required()
         merged = deepcopy(current.runtime_payload())
@@ -100,6 +108,7 @@ class RuntimeSettingsRepository:
             typed_block_payload.update(nested)
         return self.replace(merged)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _coerce_settings(settings: AppSettings | Mapping[str, Any]) -> AppSettings:
         if isinstance(settings, AppSettings):
@@ -109,6 +118,7 @@ class RuntimeSettingsRepository:
         except ValidationError as exc:
             raise ValueError(f"Invalid application runtime settings: {exc}") from exc
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _validated_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         missing = sorted(set(RUNTIME_SETTING_BLOCKS) - set(payload.keys()))
@@ -127,6 +137,7 @@ class RuntimeSettingsRepository:
             raise ValueError(f"Invalid application runtime settings: {exc}") from exc
         return settings.runtime_payload()
 
+    # -------------------------------------------------------------------------
     def _validate_record(self, record: ApplicationRuntimeSettingsRecord) -> AppSettings:
         if record.schema_version != RUNTIME_SETTINGS_SCHEMA_VERSION:
             raise RuntimeError(

@@ -18,7 +18,6 @@ InspectionAssociation = Literal[
     "non_spatial",
 ]
 
-
 ###############################################################################
 class ViewportIntent(BaseModel):
     """Presentation hint for the map viewport selected by the harness."""

@@ -314,6 +314,7 @@ def test_catalog_public_raster_descriptors_use_backend_proxy(
 class _GibsProvider:
     provider_id = "gibs"
 
+    # -------------------------------------------------------------------------
     async def describe_layer(self, layer_id: str, *, refresh: bool = False):
         del refresh
         assert layer_id == "MODIS_Terra_NDVI_8Day"

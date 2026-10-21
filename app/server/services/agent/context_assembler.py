@@ -315,12 +315,10 @@ class AgentContextAssembler:
             ),
         )
 
-
 ###############################################################################
 def _bounded_object(value: object) -> dict[str, Any]:
     bounded = _bounded_json_value(value, depth=0)
     return bounded if is_json_object(bounded) else {}
-
 
 ###############################################################################
 def _bounded_map_memory(value: object) -> dict[str, Any]:
@@ -380,7 +378,6 @@ def _bounded_map_memory(value: object) -> dict[str, Any]:
     bounded["active_visualization"] = active_bounded
     return bounded
 
-
 ###############################################################################
 def select_pair_safe_messages(
     messages: list[dict[str, Any]],
@@ -432,7 +429,6 @@ def select_pair_safe_messages(
     selected_indices = sorted(index for group in selected for index in group)
     return [messages[index] for index in selected_indices]
 
-
 ###############################################################################
 def _message_groups(messages: list[dict[str, Any]]) -> list[list[int]]:
     """Build stable connected components for call/result message exchanges."""
@@ -473,7 +469,6 @@ def _message_groups(messages: list[dict[str, Any]]) -> list[list[int]]:
         grouped.setdefault(find(index), []).append(index)
     return sorted(grouped.values(), key=lambda item: item[0])
 
-
 ###############################################################################
 def _message_call_ids(message: dict[str, Any]) -> list[str]:
     """Return call identifiers present in one request or result item."""
@@ -504,7 +499,6 @@ def _message_call_ids(message: dict[str, Any]) -> list[str]:
                     break
     return list(dict.fromkeys(values))
 
-
 ###############################################################################
 def _group_is_pair_safe(messages: list[dict[str, Any]], group: list[int]) -> bool:
     call_ids: set[str] = set()
@@ -523,7 +517,6 @@ def _group_is_pair_safe(messages: list[dict[str, Any]], group: list[int]) -> boo
     # A group made from an assistant tool call and all matching results is
     # valid.  Reasoning-only items remain valid semantic context.
     return bool(call_ids) and call_ids == result_ids
-
 
 ###############################################################################
 def _group_has_tool_exchange(messages: list[dict[str, Any]], group: list[int]) -> bool:
@@ -551,7 +544,6 @@ _RELEVANCE_STOP_WORDS = frozenset(
         "within",
     }
 )
-
 
 ###############################################################################
 def _select_relevant_outcomes(
@@ -601,14 +593,12 @@ def _select_relevant_outcomes(
     selected = {index for _, index, _ in ranked[: min(32, len(ranked))]}
     return [item for index, item in enumerate(outcomes) if index in selected]
 
-
 ###############################################################################
 def json_text(value: object) -> str:
     try:
         return str(value) if isinstance(value, str) else json.dumps(value, default=str)
     except Exception:
         return str(value)
-
 
 ###############################################################################
 def _walk_values(value: object, *, keys: set[str]) -> list[object]:
@@ -625,7 +615,6 @@ def _walk_values(value: object, *, keys: set[str]) -> list[object]:
         for child in value:
             found.extend(_walk_values(child, keys=keys))
     return found
-
 
 ###############################################################################
 def _bounded_json_value(

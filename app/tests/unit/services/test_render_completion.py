@@ -26,6 +26,8 @@ from server.services.agent_runs.render_completion import (
     RenderAcknowledgementError,
     RenderCompletionService,
 )
+
+###############################################################################
 def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_context) -> None:
     repository, publisher, _, run_id = render_context
     state = AgentRunState(request_id="request", conversation_id="conversation", user_message="Show data", phase="update_state")
@@ -156,7 +158,6 @@ def _contract(*requirements: str) -> CompletionContract:
         requirements=list(requirements),
         map_preparation_required=True,
     )
-
 
 ###############################################################################
 def _goal(
@@ -764,7 +765,6 @@ def test_production_render_ack_persists_terminal_events_atomically() -> None:
     assert "pending_response" not in presentation
     assert len(presentation.get("durable_event_ids", [])) == 3
 
-
 ###############################################################################
 def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     render_context,
@@ -865,7 +865,6 @@ def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     assert duplicate.duplicate is True
     assert duplicate.resume_required is False
 
-
 ###############################################################################
 def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     render_context,
@@ -948,6 +947,7 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     assert result.observation.recovery == "revise_map"
     assert any(str(event[0]) == "render_observed" for event in publisher.events)
 
+###############################################################################
 @pytest.mark.parametrize('rendering_mode', ['raster-tile', 'tile', 'xyz', 'wms', 'wmts'])
 @pytest.mark.parametrize('visible', [None, False])
 def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(
@@ -976,6 +976,7 @@ def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(
     assert duplicate.duplicate is True
 
 
+###############################################################################
 def test_valid_empty_raster_does_not_require_visible_pixels(render_context) -> None:
     repository, publisher, conversation_id, run_id = render_context
     service = RenderCompletionService(

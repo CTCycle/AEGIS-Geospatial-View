@@ -478,11 +478,13 @@ def _failure(
 __all__ = ["EvidenceToolHandler"]
 
 
+###############################################################################
 def _properties(item: dict[str, Any]) -> dict[str, Any]:
     properties = item.get("properties")
     return properties if is_json_object(properties) else item
 
 
+###############################################################################
 def _numeric(value: Any) -> float | None:
     if isinstance(value, bool) or value is None:
         return None
@@ -493,11 +495,13 @@ def _numeric(value: Any) -> float | None:
         return None
 
 
+###############################################################################
 def _sort_key(value: Any) -> tuple[int, Any]:
     number = _numeric(value)
     return (0, number) if number is not None else (1, str(value))
 
 
+###############################################################################
 def _timestamp(value: Any) -> float | None:
     if value is None or value == "":
         return None
@@ -508,6 +512,7 @@ def _timestamp(value: Any) -> float | None:
     return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).timestamp()
 
 
+###############################################################################
 def _record_point(item: dict[str, Any], *, field: str = "geometry") -> tuple[float, float] | None:
     geometry = item.get(field)
     coordinates = geometry.get("coordinates") if is_json_object(geometry) and geometry.get("type") == "Point" else geometry if is_json_array(geometry) else None
@@ -520,10 +525,12 @@ def _record_point(item: dict[str, Any], *, field: str = "geometry") -> tuple[flo
     return lon, lat
 
 
+###############################################################################
 def _compact_record(item: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in _properties(item).items() if not isinstance(value, (list, dict))}
 
 
+###############################################################################
 def _aggregate(values: list[float], metric: str) -> float:
     if metric == "count":
         return float(len(values))
@@ -536,6 +543,7 @@ def _aggregate(values: list[float], metric: str) -> float:
     return sum(values)
 
 
+###############################################################################
 def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) -> list[dict[str, Any]]:
     size = float(operation["cell_size_deg"])
     field = operation.get("value_field")

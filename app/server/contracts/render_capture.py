@@ -11,9 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # POST /api/geospatial/render-captures, keyed by the run identity tuple the
 # render handshake already carries.  The agent loop reads the capture back on
 # the next vision-enabled model step.
+
 ###############################################################################
-
-
 class RenderCaptureCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +27,7 @@ class RenderCaptureCreateRequest(BaseModel):
     viewport_bounds: list[float] | None = Field(default=None)
 
 
+###############################################################################
 class RenderCaptureResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

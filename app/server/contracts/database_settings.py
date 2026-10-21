@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from server.configurations.database_configuration import DatabaseConfiguration
 
 
+###############################################################################
 class DatabaseSettingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -14,6 +15,7 @@ class DatabaseSettingsRequest(BaseModel):
     database_path: str = Field(min_length=1)
     sqlite_lock_timeout_seconds: int = Field(ge=1)
 
+    # -------------------------------------------------------------------------
     @field_validator("database_path")
     @classmethod
     def require_nonblank_path(cls, value: str) -> str:
@@ -22,6 +24,7 @@ class DatabaseSettingsRequest(BaseModel):
             raise ValueError("database_path must not be blank")
         return normalized
 
+    # -------------------------------------------------------------------------
     def as_configuration(self) -> DatabaseConfiguration:
         return DatabaseConfiguration(
             backend=self.backend,
@@ -30,6 +33,7 @@ class DatabaseSettingsRequest(BaseModel):
         )
 
 
+###############################################################################
 class DatabaseSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -39,6 +43,7 @@ class DatabaseSettingsResponse(BaseModel):
     active: bool = True
 
 
+###############################################################################
 class DatabaseConnectionTestResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

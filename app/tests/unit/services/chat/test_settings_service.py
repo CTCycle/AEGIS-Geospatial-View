@@ -222,7 +222,6 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
             ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
         )
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "provider",

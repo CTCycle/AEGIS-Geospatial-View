@@ -32,7 +32,6 @@ class _Input(BaseModel):
 
     value: int
 
-
 ###############################################################################
 class _ManifestInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -138,7 +137,6 @@ def test_executor_validates_once_and_normalizes_success() -> None:
     assert state.tool_results == [result]
     assert state.tool_trace[0]["boundary"] == "tool_executor"
 
-
 ###############################################################################
 def test_tool_executor_normalizes_observed_discovery_alias() -> None:
     calls: list[int] = []
@@ -171,7 +169,6 @@ def test_tool_executor_normalizes_observed_discovery_alias() -> None:
     assert result.status == "success"
     assert result.tool_name == "discover_geospatial_capabilities"
     assert calls == [7]
-
 
 ###############################################################################
 def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
@@ -230,7 +227,6 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert result.error is not None
     assert result.error.error_type == "malformed_call"
     assert calls == []
-
 
 ###############################################################################
 def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
@@ -373,7 +369,6 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert map_result.error.error_type == "timeout"
     assert [item.stage for item in map_budget.observations] == ["map_assembly"]
 
-
 ###############################################################################
 def test_manifest_validation_correction_contains_bounded_applicable_schema() -> None:
     calls: list[int] = []
@@ -424,7 +419,6 @@ def test_manifest_validation_correction_contains_bounded_applicable_schema() -> 
     assert correction["canonical_arguments"]["arguments"] == {}
     assert len(correction["validation_errors"]) == 1
 
-
 ###############################################################################
 def test_execute_capability_accepts_route_temporal_hint() -> None:
     calls: list[ExecuteCapabilityInput] = []
@@ -462,7 +456,6 @@ def test_execute_capability_accepts_route_temporal_hint() -> None:
 
     assert result.status == "success"
     assert [item.temporal_mode for item in calls] == ["current"]
-
 
 ###############################################################################
 def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:

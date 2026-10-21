@@ -14,7 +14,6 @@ TimeoutOrigin = Literal[
     "unknown",
 ]
 
-
 ###############################################################################
 def _exception_chain(exc: BaseException) -> list[BaseException]:
     chain: list[BaseException] = []
@@ -25,7 +24,6 @@ def _exception_chain(exc: BaseException) -> list[BaseException]:
         chain.append(current)
         current = current.__cause__ or current.__context__
     return chain
-
 
 ###############################################################################
 def transport_diagnostics(
@@ -53,7 +51,6 @@ def transport_diagnostics(
         if match:
             diagnostics.setdefault("winerror", int(match.group(1)))
     return diagnostics
-
 
 ###############################################################################
 def safe_failure_detail(exc: BaseException, fallback: str) -> str:

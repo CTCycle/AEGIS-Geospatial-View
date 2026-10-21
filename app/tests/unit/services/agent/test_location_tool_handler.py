@@ -304,6 +304,7 @@ def test_unknown_location_type_is_not_accepted_as_a_legacy_alias() -> None:
         )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("text", "expected"),
     [

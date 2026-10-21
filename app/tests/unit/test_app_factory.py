@@ -56,6 +56,7 @@ class _LifecycleStub:
         self.call_order.append("run_lifecycle.shutdown")
 
 
+###############################################################################
 async def _record_async(call_order: list[str], label: str) -> None:
     call_order.append(label)
 

@@ -762,7 +762,6 @@ class AgentRunOrchestrator:
             return latest.content
         return snapshot.aggregated_request
 
-
 ###############################################################################
 def _hash_json(value: dict[str, Any]) -> str:
     return hashlib.sha256(
@@ -770,7 +769,6 @@ def _hash_json(value: dict[str, Any]) -> str:
             "utf-8"
         )
     ).hexdigest()
-
 
 ###############################################################################
 def _tool_label(tool_name: str | None) -> str:

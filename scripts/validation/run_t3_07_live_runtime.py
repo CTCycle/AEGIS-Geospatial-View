@@ -41,6 +41,7 @@ LANE_PROVIDER = "opencode-go"
 LANE_MODEL = "deepseek-v4.1-flash"
 
 
+###############################################################################
 def _is_within(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
@@ -49,6 +50,7 @@ def _is_within(path: Path, root: Path) -> bool:
         return False
 
 
+###############################################################################
 def _resolve_opencode_key() -> str | None:
     """Resolve the opencode-go api key from the canonical database in-process."""
 
@@ -82,6 +84,7 @@ def _resolve_opencode_key() -> str | None:
             os.environ["AEGIS_DATA_DIR"] = previous_data_dir
 
 
+###############################################################################
 def _http_json(method: str, url: str, *, body: dict | None = None, timeout: int = 30) -> dict:
     import urllib.request
 
@@ -99,6 +102,7 @@ def _http_json(method: str, url: str, *, body: dict | None = None, timeout: int 
         return json.loads(payload.decode("utf-8"))
 
 
+###############################################################################
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
@@ -265,6 +269,7 @@ def main() -> int:
                 backend.kill()
 
 
+###############################################################################
 def _finish(
     result: dict,
     backend: subprocess.Popen,
@@ -286,6 +291,7 @@ def _finish(
     return 0 if result.get("status") in {"READY", "STOPPED"} else 1
 
 
+###############################################################################
 def _write_result(output_dir: Path, result: dict) -> None:
     (output_dir / "live-runtime.json").write_text(
         json.dumps(result, indent=2, sort_keys=True), encoding="utf-8"

@@ -8,11 +8,13 @@ ROOT = Path(__file__).resolve().parent
 BASE = "http://127.0.0.1:5079"
 
 
+###############################################################################
 def read(path):
     with urllib.request.urlopen(BASE + path, timeout=30) as response:
         return json.load(response)
 
 
+###############################################################################
 def map_summary(value):
     return {
         key: value.get(key)

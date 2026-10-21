@@ -115,6 +115,7 @@ SCENARIOS = (
 )
 
 
+###############################################################################
 def _raster_transport(url: str) -> str | None:
     parsed = urlsplit(url)
     if (parsed.hostname or "").casefold() in ROUTE_UPSTREAM_HOSTS:
@@ -124,6 +125,7 @@ def _raster_transport(url: str) -> str | None:
     return None
 
 
+###############################################################################
 def _proxy_capability_id(url: str) -> str | None:
     path_parts = [unquote(part) for part in urlsplit(url).path.split("/")]
     try:
@@ -136,9 +138,11 @@ def _proxy_capability_id(url: str) -> str | None:
     return capability_id or None
 
 
+###############################################################################
 class _RouteCapture(NetworkCapture):
     upstream_hosts = frozenset(ROUTE_UPSTREAM_HOSTS)
 
+    # -------------------------------------------------------------------------
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
             transport = _raster_transport(request.url)
@@ -206,6 +210,7 @@ class _RouteCapture(NetworkCapture):
         page.on("pageerror", on_page_error)
 
 
+###############################################################################
 def _expand_overlay_controls(page: Page) -> None:
     toggle = page.locator(".overlay-controls__toggle")
     if not toggle.count():
@@ -215,6 +220,7 @@ def _expand_overlay_controls(page: Page) -> None:
         page.wait_for_timeout(500)
 
 
+###############################################################################
 def _map_evidence(page: Page, hints: tuple[str, ...]) -> dict[str, Any]:
     map_count = page.locator(".maplibregl-map").count()
     canvas_count = page.locator(".maplibregl-canvas").count()
@@ -249,6 +255,7 @@ def _map_evidence(page: Page, hints: tuple[str, ...]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _classify(
     scenario_id: str,
     expected_kind: str,
@@ -283,6 +290,7 @@ def _classify(
     return "map_render_ack_unobserved"
 
 
+###############################################################################
 def _scenario_result(
     page: Page,
     capture: _RouteCapture,
@@ -345,6 +353,7 @@ def _scenario_result(
     }
 
 
+###############################################################################
 def test_route_matrix_live_diagnostics(
     browser: Browser,
     base_url: str,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.domain.agent.conversation import ConversationState, PendingClarification
 
-
 ###############################################################################
 def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     state = ConversationState.from_persisted(
@@ -27,7 +26,6 @@ def test_legacy_unresolved_question_migrates_and_is_scoped() -> None:
     assert "unresolved_questions" not in projection
     assert "unresolved_questions" not in state.model_dump(mode="json")
 
-
 ###############################################################################
 def test_future_conversation_state_schema_is_rejected() -> None:
     try:
@@ -42,7 +40,6 @@ def test_future_conversation_state_schema_is_rejected() -> None:
         assert str(exc) == "Unsupported conversation state schema version."
     else:
         raise AssertionError("Future conversation state schema was accepted.")
-
 
 ###############################################################################
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
@@ -63,7 +60,6 @@ def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     assert state.pending_clarification is not None
     assert state.pending_clarification.question.endswith("Bracciano?")
 
-
 ###############################################################################
 def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     state = ConversationState.from_persisted(
@@ -81,7 +77,6 @@ def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     deferred = state.clarification_after_turn("Hello")
     assert deferred is not None
     assert deferred.status == "deferred"
-
 
 ###############################################################################
 def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
@@ -103,7 +98,6 @@ def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
     preserved = answered_state.clarification_after_turn("Hello")
     assert preserved is not None
     assert preserved.status == "answered"
-
 
 ###############################################################################
 def test_infrastructure_option_matching_uses_word_boundaries() -> None:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 import unicodedata
 
-
 ###############################################################################
 def normalize_target_key(value: str) -> str:
     """Return a punctuation- and accent-insensitive target identity."""
@@ -15,7 +14,6 @@ def normalize_target_key(value: str) -> str:
     ascii_text = re.sub(r"(?<=[A-Za-z0-9])\.(?=[A-Za-z0-9])", "", ascii_text)
     ascii_text = re.sub(r"[^A-Za-z0-9]+", " ", ascii_text)
     return " ".join(ascii_text.casefold().split())
-
 
 ###############################################################################
 def location_ref_matches(requested: str, key: str, label: str | None) -> bool:

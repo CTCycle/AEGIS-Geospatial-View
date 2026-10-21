@@ -16,7 +16,6 @@ down_revision: Union[str, None] = "202609150001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def _state(value: object) -> dict[str, Any] | None:
     if isinstance(value, dict):
@@ -32,7 +31,6 @@ def _state(value: object) -> dict[str, Any] | None:
             else None
         )
     return None
-
 
 ###############################################################################
 def upgrade() -> None:
@@ -65,7 +63,6 @@ def upgrade() -> None:
                 .where(conversations.c.id == row["id"])
                 .values(conversation_state=migrated)
             )
-
 
 ###############################################################################
 def downgrade() -> None:

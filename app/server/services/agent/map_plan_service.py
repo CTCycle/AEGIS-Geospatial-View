@@ -506,7 +506,6 @@ class MapPlanService:
 
 __all__ = ["MapPlanService"]
 
-
 ###############################################################################
 def _bounded_render_payload(value: Any) -> Any:
     """Keep only the normalized feature payload required by the map client."""

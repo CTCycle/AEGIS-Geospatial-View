@@ -18,7 +18,10 @@ from server.contracts.chat import ChatStreamEvent, ChatTurnRequest
 from server.services.jobs import BackgroundJobService
 
 
+###############################################################################
 class _ChatStreamingStub:
+
+    # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
         yield ChatStreamEvent(event="status", data={"request_id": payload.request_id})
         yield ChatStreamEvent(
@@ -51,7 +54,10 @@ class _ChatStreamingStub:
         )
 
 
+###############################################################################
 class _ErrorChatStreamingStub(_ChatStreamingStub):
+
+    # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
         _ = payload
         yield ChatStreamEvent(
@@ -63,11 +69,15 @@ class _ErrorChatStreamingStub(_ChatStreamingStub):
         )
 
 
+###############################################################################
 class _BlockingChatStreamingStub(_ChatStreamingStub):
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started = Event()
         self.release = Event()
 
+    # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
         self.started.set()
         yield ChatStreamEvent(event="status", data={"request_id": payload.request_id})
@@ -94,6 +104,7 @@ class _BlockingChatStreamingStub(_ChatStreamingStub):
         )
 
 
+###############################################################################
 def _create_app(service: BackgroundJobService) -> FastAPI:
     application = FastAPI()
     application.include_router(chat_router, prefix="/api")
@@ -103,6 +114,7 @@ def _create_app(service: BackgroundJobService) -> FastAPI:
     return application
 
 
+###############################################################################
 @contextmanager
 def _running_client(
     streaming_service: _ChatStreamingStub,
@@ -121,6 +133,7 @@ def _running_client(
         service.stop()
 
 
+###############################################################################
 def _wait_for_terminal_job(client: TestClient, job_id: str) -> dict[str, Any]:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
@@ -133,6 +146,7 @@ def _wait_for_terminal_job(client: TestClient, job_id: str) -> dict[str, Any]:
     raise AssertionError(f"Job {job_id} did not reach a terminal state")
 
 
+###############################################################################
 def _create_chat_job(client: TestClient, request_id: str) -> dict[str, Any]:
     response = client.post(
         "/api/chat/jobs",
@@ -146,6 +160,7 @@ def _create_chat_job(client: TestClient, request_id: str) -> dict[str, Any]:
     return response.json()
 
 
+###############################################################################
 def test_mounted_job_api_completes_with_progress_and_ordered_events() -> None:
     with _running_client(_ChatStreamingStub()) as (client, _service):
         created = _create_chat_job(client, "t1-07-api-success")
@@ -183,6 +198,7 @@ def test_mounted_job_api_completes_with_progress_and_ordered_events() -> None:
         )
 
 
+###############################################################################
 def test_mounted_job_api_cancels_a_running_job_cooperatively() -> None:
     streaming_service = _BlockingChatStreamingStub()
     with _running_client(streaming_service) as (client, _service):
@@ -200,6 +216,7 @@ def test_mounted_job_api_cancels_a_running_job_cooperatively() -> None:
         assert events[-1]["event_type"] == "cancelled"
 
 
+###############################################################################
 def test_mounted_job_api_returns_404_for_unknown_jobs() -> None:
     with _running_client(_ChatStreamingStub()) as (client, _service):
         assert client.get("/api/jobs/job-missing").status_code == 404
@@ -207,6 +224,7 @@ def test_mounted_job_api_returns_404_for_unknown_jobs() -> None:
         assert client.post("/api/jobs/job-missing/cancel").status_code == 404
 
 
+###############################################################################
 def test_mounted_job_api_sanitizes_stream_error_events() -> None:
     with _running_client(_ErrorChatStreamingStub()) as (client, _service):
         created = _create_chat_job(client, "t1-07-api-safe-error")
@@ -223,6 +241,7 @@ def test_mounted_job_api_sanitizes_stream_error_events() -> None:
         assert "provider.invalid" not in str(events)
 
 
+###############################################################################
 def test_mounted_job_api_does_not_persist_jobs_across_service_restart() -> None:
     with _running_client(_ChatStreamingStub()) as (first_client, _first_service):
         created = _create_chat_job(first_client, "t1-07-api-restart")

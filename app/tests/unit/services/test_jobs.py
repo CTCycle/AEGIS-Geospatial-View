@@ -95,6 +95,7 @@ class _UnexpectedFailureStub:
 ###############################################################################
 class _BlockingChatStreamingStub:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started = Event()
         self.release = Event()

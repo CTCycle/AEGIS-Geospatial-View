@@ -229,7 +229,6 @@ class CatalogToolHandler:
             ),
         )
 
-
 ###############################################################################
 def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     """Lower semantic route scope to the concrete catalog scope."""
@@ -240,7 +239,6 @@ def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     if kind in {"administrative_geometry", "feature_geometry", "point"}:
         return "bbox" if location is not None and location.bbox else None
     return kind
-
 
 ###############################################################################
 def _cursor_offset(cursor: str | None) -> int | None:

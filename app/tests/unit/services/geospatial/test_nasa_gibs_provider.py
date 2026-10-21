@@ -55,6 +55,7 @@ VECTOR_ONLY_WMTS_XML = WMTS_XML.replace(
 )
 
 
+###############################################################################
 def _large_wms_xml() -> str:
     layers = "".join(
         f"""
@@ -118,7 +119,6 @@ async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
 def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_parses_xml_and_prefers_wmts())
 
-
 ###############################################################################
 def test_nasa_gibs_provider_uses_the_advertised_wmts_zoom_ceiling() -> None:
     level_six_xml = WMTS_XML.replace(
@@ -143,7 +143,6 @@ def test_nasa_gibs_provider_uses_the_advertised_wmts_zoom_ceiling() -> None:
 ###############################################################################
 def test_nasa_gibs_provider_describes_one_layer() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_describes_one_layer())
-
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_renderable_raster_result() -> None:
@@ -210,7 +209,6 @@ def test_nasa_gibs_provider_falls_back_to_wms_without_web_mercator_wmts() -> Non
     assert layer.render.rendering_mode == "wms"
     assert layer.render.source_protocol == "wms"
     assert layer.default_time == "2026-06-18"
-
 
 ###############################################################################
 def test_nasa_gibs_provider_prefers_wms_when_wmts_is_vector_only() -> None:

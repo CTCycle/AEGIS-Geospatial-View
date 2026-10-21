@@ -102,7 +102,6 @@ def test_resolver_keeps_missing_dynamic_context_unknown() -> None:
     assert profile is None
     assert library.find_calls == 1
 
-
 ###############################################################################
 def test_resolver_selected_lookup_hydrates_once_and_caches_the_profile() -> None:
     library = _ModelLibrary(
@@ -129,7 +128,6 @@ def test_resolver_selected_lookup_hydrates_once_and_caches_the_profile() -> None
     assert first.context_window_tokens == 32_768
     assert second == first
     assert library.selected_calls == 1
-
 
 ###############################################################################
 def test_resolver_preserves_previous_profile_when_refresh_fails() -> None:

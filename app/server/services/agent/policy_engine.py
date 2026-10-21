@@ -14,7 +14,6 @@ from server.domain.agent.tools import RegisteredTool
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class PolicyEngine:
     """Authorize model actions after route and schema validation.

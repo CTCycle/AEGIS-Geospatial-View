@@ -7,7 +7,6 @@ import pytest
 from server.services.llm.errors import LLMProviderRequestError, safe_failure_detail
 from server.services.llm.transport import LLMTransportPolicy
 
-
 ###############################################################################
 def test_transport_policy_controls_timeout_retry_proxy_and_environment() -> None:
     policy = LLMTransportPolicy(
@@ -38,14 +37,12 @@ def test_transport_policy_controls_timeout_retry_proxy_and_environment() -> None
         "proxy": "http://proxy.test:8080",
     }
 
-
 ###############################################################################
 def test_transport_policy_rejects_invalid_values() -> None:
     with pytest.raises(ValueError, match="max_attempts"):
         LLMTransportPolicy(max_attempts=0)
     with pytest.raises(ValueError, match="proxy"):
         LLMTransportPolicy(proxy=42)  # type: ignore[arg-type]
-
 
 ###############################################################################
 def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
@@ -62,7 +59,6 @@ def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
     assert policy.stream_timeout_seconds == 7.5
     assert policy.max_attempts == 3
     assert policy.retry_delay(1) == 0.0
-
 
 ###############################################################################
 def test_winerror_10013_is_safe_and_not_retryable() -> None:

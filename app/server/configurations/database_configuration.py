@@ -16,10 +16,12 @@ from server.common.paths import (
 )
 
 
+###############################################################################
 class DatabaseConfigurationError(RuntimeError):
     """Raised when the independent database configuration cannot be loaded."""
 
 
+###############################################################################
 class DatabaseConfiguration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -30,6 +32,7 @@ class DatabaseConfiguration(BaseModel):
         default=DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS, ge=1
     )
 
+    # -------------------------------------------------------------------------
     @field_validator("database_path")
     @classmethod
     def normalize_database_path(cls, value: str) -> str:
@@ -42,6 +45,7 @@ class DatabaseConfiguration(BaseModel):
         return str(candidate.resolve())
 
 
+###############################################################################
 def load_database_configuration() -> DatabaseConfiguration:
     """Load or create the database-only configuration outside the database."""
 
@@ -73,6 +77,7 @@ def load_database_configuration() -> DatabaseConfiguration:
     return configuration
 
 
+###############################################################################
 def save_database_configuration(
     configuration: DatabaseConfiguration,
 ) -> DatabaseConfiguration:
@@ -87,6 +92,7 @@ def save_database_configuration(
     return validated
 
 
+###############################################################################
 def restore_database_configuration(
     configuration: DatabaseConfiguration,
 ) -> DatabaseConfiguration:
@@ -97,6 +103,7 @@ def restore_database_configuration(
     return validated
 
 
+###############################################################################
 def _read_configuration(path: Path) -> DatabaseConfiguration:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -107,18 +114,22 @@ def _read_configuration(path: Path) -> DatabaseConfiguration:
         ) from exc
 
 
+###############################################################################
 def _backup_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.bak")
 
 
+###############################################################################
 def _write_backup(destination: Path, configuration: DatabaseConfiguration) -> None:
     _atomic_write(destination, configuration)
 
 
+###############################################################################
 def _write_primary(path: Path, configuration: DatabaseConfiguration) -> None:
     _atomic_write(path, configuration)
 
 
+###############################################################################
 def _atomic_write(path: Path, configuration: DatabaseConfiguration) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")

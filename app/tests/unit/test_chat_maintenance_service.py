@@ -9,13 +9,12 @@ from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
-
 ###############################################################################
 class _UnusedProviderFactory:
+
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ANN201
         raise AssertionError(f"Unexpected provider lookup: {provider}")
-
 
 ###############################################################################
 def test_maintenance_service_delegates_to_ollama_provider() -> None:
@@ -23,6 +22,7 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
 
     ###############################################################################
     class _Provider:
+
         # -------------------------------------------------------------------------
         def __init__(self, *, base_url: str) -> None:
             provider_calls.append(("init", base_url))
@@ -79,7 +79,6 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
     assert isinstance(pull, OllamaPullResponse)
     assert health.ok is True
     assert ("pull_model", "llama3.2") in provider_calls
-
 
 ###############################################################################
 def test_maintenance_service_does_not_report_catalog_failure_as_success() -> None:

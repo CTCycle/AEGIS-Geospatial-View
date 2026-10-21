@@ -248,6 +248,7 @@ class RealtimeServerMessage(BaseModel):
     conversation_id: str
     payload: dict[str, Any] = Field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
     @field_serializer("payload")
     def serialize_public_payload(self, value: dict[str, Any]) -> dict[str, Any]:
         return public_protocol_projection(value)

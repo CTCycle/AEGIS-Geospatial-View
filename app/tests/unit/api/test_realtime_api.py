@@ -34,6 +34,7 @@ from server.api.chat import _stream_event
 from server.contracts.chat import ChatStreamEvent
 
 
+###############################################################################
 def test_public_transports_omit_private_provider_continuation_without_mutation() -> None:
     private = {"execution_trace": {"checkpoint": {"execution_policy": {"max_iterations": 12},
         "provider_continuation": [{"google_content": {"parts": [{"thought_signature": "opaque"}]}}]}}}

@@ -11,9 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # when the selected model supports vision.  "Relevant failures" are derived
 # from run state (failed render observations + failed map tool results) rather
 # than stored counters, so the policy survives checkpoints for free.
+
 ###############################################################################
-
-
 class VisionPolicy(str, Enum):
     DISABLED = "disabled"
     ALWAYS = "always"
@@ -25,6 +24,7 @@ VISION_POLICY_VALUES = tuple(item.value for item in VisionPolicy)
 VISION_POLICY_DEFAULT = VisionPolicy.DISABLED.value
 
 
+###############################################################################
 class VisionState(BaseModel):
     """Minimal persisted vision-usage tracking carried by ``AgentRunState``."""
 
@@ -36,6 +36,7 @@ class VisionState(BaseModel):
     vision_calls: int = Field(default=0, ge=0, le=64)
 
 
+###############################################################################
 def capture_ref_for(
     map_session_id: str,
     collection_revision: int,

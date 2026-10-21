@@ -41,7 +41,6 @@ _INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
     "other": ("other", "another", "different", "something else"),
 }
 
-
 ###############################################################################
 class PendingClarification(BaseModel):
     """A clarification tied to the request that produced it.
@@ -145,7 +144,6 @@ class PendingClarification(BaseModel):
             ):
                 return option
         return None
-
 
 ###############################################################################
 class ConversationState(BaseModel):

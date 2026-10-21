@@ -18,7 +18,6 @@ down_revision: Union[str, None] = "202609140001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 ###############################################################################
 def _json_value(value: Any) -> dict[str, Any] | list[Any] | None:
     if is_json_object(value) or is_json_array(value):
@@ -31,7 +30,6 @@ def _json_value(value: Any) -> dict[str, Any] | list[Any] | None:
         if is_json_object(parsed) or is_json_array(parsed):
             return parsed
     return None
-
 
 ###############################################################################
 def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
@@ -79,7 +77,6 @@ def _migrate_state(row: dict[str, Any]) -> dict[str, Any]:
 
     return state.model_dump(mode="json")
 
-
 ###############################################################################
 def upgrade() -> None:
     bind = op.get_bind()
@@ -124,7 +121,6 @@ def upgrade() -> None:
             "summary_through_turn_index",
         ):
             batch.drop_column(column)
-
 
 ###############################################################################
 def downgrade() -> None:

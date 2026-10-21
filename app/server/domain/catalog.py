@@ -41,6 +41,7 @@ class ReferenceCatalog(BaseModel):
     gibs_layer_defaults: tuple[GibsLayerDefaultReferenceEntry, ...] = ()
 
 
+###############################################################################
 class MacroRegionEntry(BaseModel):
     id: str
     name: str

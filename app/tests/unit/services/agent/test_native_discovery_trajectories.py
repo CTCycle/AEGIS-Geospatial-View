@@ -25,10 +25,14 @@ from server.services.geospatial.providers.base import ProviderUnavailableError
 from tests.unit.services.agent.test_native_gibs_trajectory import _call, _ProviderFactory, _ScriptedProvider
 
 
+###############################################################################
 class MemoryEvidence:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.records: dict[str, tuple[AgentEvidenceSummary, bytes]] = {}
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs: Any) -> AgentEvidenceSummary:
         ref = f"evidence-{len(self.records) + 1}"
         raw = json.dumps(kwargs["payload"]).encode()
@@ -40,19 +44,25 @@ class MemoryEvidence:
         self.records[ref] = summary, raw
         return summary
 
+    # -------------------------------------------------------------------------
     def get_payload(self, ref: str, **kwargs: Any) -> tuple[AgentEvidenceSummary, bytes] | None:
         return self.records.get(ref)
 
+    # -------------------------------------------------------------------------
     def get_summary(self, ref: str, **kwargs: Any) -> AgentEvidenceSummary | None:
         record = self.records.get(ref)
         return record[0] if record else None
 
 
+###############################################################################
 class DiscoveryProvider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, partial: bool = False) -> None:
         self.requests: list[Any] = []
         self.partial = partial
 
+    # -------------------------------------------------------------------------
     async def fetch(self, provider: str, request: Any) -> ProviderResponse:
         self.requests.append(request)
         seismic = provider == "usgs"
@@ -72,6 +82,7 @@ class DiscoveryProvider:
         )
 
 
+###############################################################################
 def make_loop(model: _ScriptedProvider, providers: Any, resolver: Any = None) -> AgentLoop:
     capabilities = CapabilityRegistry()
     runtime = RuntimeRegistry(catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None)
@@ -85,10 +96,15 @@ def make_loop(model: _ScriptedProvider, providers: Any, resolver: Any = None) ->
                      policy_engine=PolicyEngine(capability_registry=capabilities, runtime_registry=runtime)))
 
 
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("place", ["Springfield", "Florence"])
 async def test_ambiguous_place_still_clarifies(place: str) -> None:
+
+    ###############################################################################
     class Resolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, *args: Any, **kwargs: Any) -> ClarificationRequest:
             return ClarificationRequest(question=f"Which {place}?", reason="Ambiguous place", missing_fields=["location"])
     model = _ScriptedProvider([
@@ -103,9 +119,14 @@ async def test_ambiguous_place_still_clarifies(place: str) -> None:
     assert value.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_direct_paris_weather_map_is_unchanged() -> None:
+
+    ###############################################################################
     class Resolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, *args: Any, **kwargs: Any) -> ResolvedLocation:
             return ResolvedLocation(label="Paris", latitude=48.85, longitude=2.35, bbox=[2.2, 48.8, 2.5, 48.9])
     model = _ScriptedProvider([
@@ -126,9 +147,14 @@ async def test_direct_paris_weather_map_is_unchanged() -> None:
     assert not any(r.tool_name == "transform_evidence" for r in result.tool_results)
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_failed_discovery_provider_has_no_map() -> None:
+
+    ###############################################################################
     class FailingProvider:
+
+        # -------------------------------------------------------------------------
         async def fetch(self, *args: Any, **kwargs: Any) -> ProviderResponse:
             raise ProviderUnavailableError("unavailable")
     model = _ScriptedProvider([
@@ -145,9 +171,14 @@ async def test_failed_discovery_provider_has_no_map() -> None:
     assert value.prepared_map_session is None
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_stale_lyon_does_not_bind_italy_search_area() -> None:
+
+    ###############################################################################
     class Resolver:
+
+        # -------------------------------------------------------------------------
         async def resolve_location_signals(self, *args: Any, **kwargs: Any) -> ResolvedLocation:
             return ResolvedLocation(label="Italy", latitude=42, longitude=12, bbox=[6, 36, 19, 47])
     model = _ScriptedProvider([
@@ -168,6 +199,7 @@ async def test_stale_lyon_does_not_bind_italy_search_area() -> None:
     assert not providers.requests
 
 
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("area,seismic,partial", [("Europe", False, False), (None, False, False),
                                                  ("Europe", True, False), ("Europe", False, True)])

@@ -28,6 +28,7 @@ BytesFetcher = Callable[[str, dict[str, str] | None], Awaitable[bytes] | bytes]
 TextFetcher = Callable[[str, dict[str, str] | None], Awaitable[str] | str]
 
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class RasterHttpDiagnostic:
     """Safe operational metadata for a raster request failure."""
@@ -42,14 +43,17 @@ class RasterHttpDiagnostic:
     capability_id: str | None = None
 
 
+###############################################################################
 class RasterHttpError(ProviderError):
     """Internal raster error carrying sanitized upstream diagnostics."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, message: str, diagnostic: RasterHttpDiagnostic) -> None:
         super().__init__(message)
         self.diagnostic = diagnostic
 
 
+###############################################################################
 @dataclass(frozen=True, slots=True)
 class _RasterDiagnosticContext:
     provider_id: str
@@ -73,6 +77,7 @@ _REQUEST_TIMEOUT_SECONDS: ContextVar[float | None] = ContextVar(
 )
 
 
+###############################################################################
 @contextmanager
 def raster_diagnostic_scope(
     *, provider_id: str, capability_id: str
@@ -154,6 +159,7 @@ async def fetch_bytes_url(
         raise ProviderUnavailableError("Provider request failed.") from exc
 
 
+###############################################################################
 async def fetch_raster_image_url(
     url: str,
     headers: dict[str, str] | None = None,
@@ -415,6 +421,7 @@ async def fetch_raster_image_url(
         ) from exc
 
 
+###############################################################################
 def _raster_http_error(
     *,
     message: str,
@@ -441,6 +448,7 @@ def _raster_http_error(
     )
 
 
+###############################################################################
 def _status_category(status_code: int) -> str:
     if 300 <= status_code < 400:
         return "unexpected_redirect"
@@ -457,6 +465,7 @@ def _status_category(status_code: int) -> str:
     return "transport_error"
 
 
+###############################################################################
 def _content_length(value: str | None) -> int | None:
     if value is None:
         return None
@@ -467,12 +476,14 @@ def _content_length(value: str | None) -> int | None:
     return max(0, parsed)
 
 
+###############################################################################
 def _safe_content_type(value: str | None) -> str | None:
     if not value:
         return None
     return value.split(";", 1)[0].strip().lower()[:128] or None
 
 
+###############################################################################
 def _safe_upstream_url(url: str) -> str:
     parsed = urlsplit(url)
     host = parsed.hostname or ""
@@ -481,6 +492,7 @@ def _safe_upstream_url(url: str) -> str:
     return f"{parsed.scheme.lower()}://{host}{parsed.path or '/'}"
 
 
+###############################################################################
 def _looks_like_image(body: bytes) -> bool:
     return body.startswith(
         (

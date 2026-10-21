@@ -23,7 +23,6 @@ def test_execution_contract_is_read_from_the_manifest() -> None:
     assert contract["render_support"] == "vector"
     assert contract["output_geometry_type"] == "Point"
 
-
 ###############################################################################
 def test_execution_contract_is_not_inferred_for_an_incomplete_manifest() -> None:
     contract = normalized_execution_contract(

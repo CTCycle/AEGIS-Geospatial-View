@@ -28,14 +28,12 @@ from server.contracts.runs import AgentRunCreateResult, AgentRunSnapshot, AgentR
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
 
-
 ###############################################################################
 def _app() -> FastAPI:
     application = FastAPI()
     application.include_router(router, prefix="/api")
     application.dependency_overrides[get_chat_runtime] = lambda: object()
     return application
-
 
 ###############################################################################
 def test_chat_turn_requires_conversation_id_over_http() -> None:
@@ -49,7 +47,6 @@ def test_chat_turn_requires_conversation_id_over_http() -> None:
         error["loc"][-1] == "conversation_id" for error in response.json()["detail"]
     )
 
-
 ###############################################################################
 def test_chat_response_openapi_marks_conversation_id_required() -> None:
     schema = _app().openapi()
@@ -60,14 +57,12 @@ def test_chat_response_openapi_marks_conversation_id_required() -> None:
     assert "/api/chat/jobs" in schema["paths"]
     assert "/api/chat/stream" in schema["paths"]
 
-
 ###############################################################################
 def test_chat_settings_update_uses_patch_semantics() -> None:
     settings_path = _app().openapi()["paths"]["/api/chat/settings"]
 
     assert "patch" in settings_path
     assert "put" not in settings_path
-
 
 ###############################################################################
 def test_chat_turn_request_rejects_missing_conversation_id() -> None:
@@ -77,7 +72,6 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         assert "conversation_id" in str(exc)
     else:
         raise AssertionError("conversation_id must be required")
-
 
 ###############################################################################
 def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
@@ -94,7 +88,6 @@ def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     assert any(
         error["loc"][-1] == "defer_map_commit" for error in response.json()["detail"]
     )
-
 
 ###############################################################################
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
@@ -113,13 +106,13 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
     assert response.goal is None
     assert "turn_contract" not in response.model_dump(mode="json")
 
-
 ###############################################################################
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     orchestrator_called = False
 
     ###############################################################################
     class _ConversationRepository:
+
         # -------------------------------------------------------------------------
         def get_conversation(self, conversation_id: str) -> None:  # noqa: ARG002
             return None
@@ -144,7 +137,6 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert response.json()["detail"] == "Conversation not found."
     assert orchestrator_called is False
 
-
 ###############################################################################
 @pytest.mark.parametrize("route", [CHAT_TURN_ROUTE, CHAT_STREAM_ROUTE, CHAT_JOBS_ROUTE])
 def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -> None:
@@ -168,9 +160,9 @@ def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -
     assert "message is too long" in response.text
     assert "xxxx" not in response.text
 
-
 ###############################################################################
 class _ChatTurnLifecycleStub(RunLifecycleService):
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -193,6 +185,7 @@ class _ChatTurnLifecycleStub(RunLifecycleService):
         return self._response, self._result, True
 
 
+###############################################################################
 def _chat_turn_runtime() -> SimpleNamespace:
     return SimpleNamespace(
         conversation_repository=SimpleNamespace(
@@ -201,6 +194,7 @@ def _chat_turn_runtime() -> SimpleNamespace:
     )
 
 
+###############################################################################
 def _chat_turn_result(state: AgentRunState) -> AgentRunCreateResult:
     return AgentRunCreateResult(
         conversation_id="conv-1",
@@ -210,6 +204,7 @@ def _chat_turn_result(state: AgentRunState) -> AgentRunCreateResult:
     )
 
 
+###############################################################################
 def _accepted_snapshot() -> AgentRunSnapshot:
     return AgentRunSnapshot(
         conversation_id="conv-1",
@@ -223,6 +218,7 @@ def _accepted_snapshot() -> AgentRunSnapshot:
     )
 
 
+###############################################################################
 def _terminal_response() -> ChatTurnResponse:
     return ChatTurnResponse(
         request_id="request-1",
@@ -236,6 +232,7 @@ def _terminal_response() -> ChatTurnResponse:
     )
 
 
+###############################################################################
 def _post_with_lifecycle(lifecycle: _ChatTurnLifecycleStub):
     application = _app()
     application.state.run_lifecycle_service = lifecycle
@@ -246,6 +243,7 @@ def _post_with_lifecycle(lifecycle: _ChatTurnLifecycleStub):
     )
 
 
+###############################################################################
 def test_chat_turn_returns_terminal_200_response() -> None:
     response = _post_with_lifecycle(
         _ChatTurnLifecycleStub(
@@ -258,6 +256,7 @@ def test_chat_turn_returns_terminal_200_response() -> None:
     assert response.json()["assistant_message"] == "Evidence is ready."
 
 
+###############################################################################
 def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
     terminal = _terminal_response().model_copy(
         update={
@@ -275,6 +274,7 @@ def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
 
     ###############################################################################
     class _PersistedTerminalLifecycleStub(_ChatTurnLifecycleStub):
+
         # -------------------------------------------------------------------------
         async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
             response = self.read_completed_response("conv-1", "run-1")
@@ -302,6 +302,7 @@ def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
     assert response.json()["assistant_message"] == "Evidence is ready."
 
 
+###############################################################################
 def test_chat_turn_returns_accepted_202_snapshot_contract() -> None:
     response = _post_with_lifecycle(
         _ChatTurnLifecycleStub(
@@ -324,6 +325,7 @@ def test_chat_turn_returns_accepted_202_snapshot_contract() -> None:
     }
 
 
+###############################################################################
 def test_chat_turn_returns_409_only_for_real_run_conflict() -> None:
     response = _post_with_lifecycle(
         _ChatTurnLifecycleStub(
@@ -337,6 +339,7 @@ def test_chat_turn_returns_409_only_for_real_run_conflict() -> None:
     assert response.json()["detail"] == "An active run already exists."
 
 
+###############################################################################
 def test_chat_turn_returns_503_for_unusable_provider() -> None:
     snapshot = _accepted_snapshot().model_copy(
         update={

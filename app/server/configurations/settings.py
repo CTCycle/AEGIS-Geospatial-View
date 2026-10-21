@@ -13,7 +13,6 @@ from server.common.constants import (
     NASA_ATTRIBUTION,
 )
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
@@ -21,14 +20,12 @@ class DatabaseSettings:
     sqlite_lock_timeout_seconds: int = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
     backend: Literal["sqlite"] = "sqlite"
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class NominatimSettings:
     base_url: str
     user_agent: str
     timeout: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -40,7 +37,6 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class MapSettings:
@@ -48,19 +44,16 @@ class MapSettings:
     render_delay_s: float
     tiles: str
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
     application_timezone: str = "UTC"
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -99,7 +92,6 @@ class AgentExecutionSettings:
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class OpenMeteoSettings:
@@ -109,7 +101,6 @@ class OpenMeteoSettings:
     timeout: float
     cache_ttl_s: float
     min_call_interval_s: float
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -122,7 +113,6 @@ class OverpassSettings:
     default_radius_m: float
     default_limit: int
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RainViewerSettings:
@@ -134,7 +124,6 @@ class RainViewerSettings:
     tile_color_scheme: int
     tile_smooth: int
     tile_snow: int
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -156,7 +145,6 @@ class GIBSSettings:
     layer_sync_user_agent: str
     layer_sync_timeout: float
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ServerSettings:
@@ -172,18 +160,15 @@ class ServerSettings:
     gibs: GIBSSettings
     agent_execution: AgentExecutionSettings = AgentExecutionSettings()
 
-
 ###############################################################################
 class StrictJsonSettings(BaseModel):
     model_config = SettingsConfigDict(extra="forbid")
-
 
 ###############################################################################
 class JsonNominatimSettings(StrictJsonSettings):
     base_url: str = "https://nominatim.openstreetmap.org/search"
     user_agent: str = "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)"
     timeout: float = Field(default=10.0, ge=1.0)
-
 
 ###############################################################################
 class JsonGeospatialSettings(StrictJsonSettings):
@@ -194,6 +179,7 @@ class JsonGeospatialSettings(StrictJsonSettings):
     min_lon: float = Field(default=-180.0, ge=-180.0, le=180.0)
     max_mercator_extent: float = Field(default=20037508.3427892, gt=0.0)
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_ranges(self) -> "JsonGeospatialSettings":
         if self.min_lat > self.max_lat:
@@ -202,24 +188,20 @@ class JsonGeospatialSettings(StrictJsonSettings):
             raise ValueError("min_lon must not exceed max_lon")
         return self
 
-
 ###############################################################################
 class JsonMapSettings(StrictJsonSettings):
     default_size_m: float = Field(default=500.0, ge=1.0)
     render_delay_s: float = Field(default=1.0, ge=0.0)
     tiles: str = "OpenStreetMap"
 
-
 ###############################################################################
 class JsonJobsSettings(StrictJsonSettings):
     polling_interval: float = Field(default=1.0, ge=0.1)
-
 
 ###############################################################################
 class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(default=12, ge=1, le=100)
     application_timezone: str = "UTC"
-
 
 ###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):
@@ -259,7 +241,6 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
     )
     vision_max_calls: int = Field(default=2, ge=1, le=8)
 
-
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
     weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
@@ -268,7 +249,6 @@ class JsonOpenMeteoSettings(StrictJsonSettings):
     timeout: float = Field(default=15.0, ge=1.0)
     cache_ttl_s: float = Field(default=600.0, ge=30.0)
     min_call_interval_s: float = Field(default=0.15, ge=0.05)
-
 
 ###############################################################################
 class JsonOverpassSettings(StrictJsonSettings):
@@ -280,7 +260,6 @@ class JsonOverpassSettings(StrictJsonSettings):
     default_radius_m: float = Field(default=2500.0, ge=100.0)
     default_limit: int = Field(default=30, ge=1, le=200)
 
-
 ###############################################################################
 class JsonRainViewerSettings(StrictJsonSettings):
     metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
@@ -291,7 +270,6 @@ class JsonRainViewerSettings(StrictJsonSettings):
     tile_color_scheme: int = Field(default=2, ge=0, le=6)
     tile_smooth: int = Field(default=1, ge=0, le=1)
     tile_snow: int = Field(default=1, ge=0, le=1)
-
 
 ###############################################################################
 class JsonGIBSSettings(StrictJsonSettings):
@@ -350,8 +328,6 @@ RUNTIME_SETTING_BLOCKS = (
     "agent_execution",
 )
 
-
-###############################################################################
 ###############################################################################
 def build_database_settings() -> DatabaseSettings:
     from server.configurations.database_configuration import (
@@ -364,7 +340,6 @@ def build_database_settings() -> DatabaseSettings:
         sqlite_lock_timeout_seconds=configuration.sqlite_lock_timeout_seconds,
         backend=configuration.backend,
     )
-
 
 ###############################################################################
 class AppSettings(BaseSettings):
@@ -522,12 +497,12 @@ class AppSettings(BaseSettings):
             ),
         )
 
+    # -------------------------------------------------------------------------
     def runtime_payload(self) -> dict[str, Any]:
         """Return only application-editable settings, excluding bootstrap values."""
 
         dumped = self.model_dump(mode="json")
         return {block: dumped[block] for block in RUNTIME_SETTING_BLOCKS}
-
 
 ###############################################################################
 def _normalize_upper_key_mapping(
@@ -540,7 +515,6 @@ def _normalize_upper_key_mapping(
         if k and v:
             normalized[k] = v
     return normalized
-
 
 ###############################################################################
 def _normalize_key_mapping(

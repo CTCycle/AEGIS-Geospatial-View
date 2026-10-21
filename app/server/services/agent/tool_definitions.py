@@ -67,7 +67,6 @@ class CapabilityDiscoveryInput(StrictToolInput):
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=12, ge=1, le=50)
 
-
 ###############################################################################
 class ProviderLayerDiscoveryInput(StrictToolInput):
     provider_id: str = Field(min_length=1, max_length=100)
@@ -75,7 +74,6 @@ class ProviderLayerDiscoveryInput(StrictToolInput):
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=50)
     refresh: bool = False
-
 
 ###############################################################################
 class DescribeCapabilityInput(StrictToolInput):
@@ -101,7 +99,6 @@ class ExecuteCapabilityInput(StrictToolInput):
     end_time_iso: str | None = Field(default=None, max_length=80)
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
-
 
 ###############################################################################
 class ExecuteCapabilityToolInput(StrictToolInput):
@@ -129,14 +126,12 @@ class AttributeFilterOperation(StrictToolInput):
     operator: Literal["eq", "neq", "in", "contains", "gte", "lte"] = "eq"
     value: Any
 
-
 ###############################################################################
 class TemporalFilterOperation(StrictToolInput):
     op: Literal["temporal_filter"]
     field: str = Field(default="timestamp", min_length=1, max_length=200)
     start: str | None = Field(default=None, max_length=80)
     end: str | None = Field(default=None, max_length=80)
-
 
 ###############################################################################
 class SpatialFilterOperation(StrictToolInput):
@@ -145,25 +140,21 @@ class SpatialFilterOperation(StrictToolInput):
     center: list[float] = Field(min_length=2, max_length=2)
     radius_km: float = Field(gt=0, le=20_000)
 
-
 ###############################################################################
 class SortOperation(StrictToolInput):
     op: Literal["sort"]
     field: str = Field(min_length=1, max_length=200)
     descending: bool = False
 
-
 ###############################################################################
 class LimitOperation(StrictToolInput):
     op: Literal["limit"]
     value: int = Field(ge=1, le=10_000)
 
-
 ###############################################################################
 class FieldProjectionOperation(StrictToolInput):
     op: Literal["field_projection"]
     fields: list[str] = Field(min_length=1, max_length=64)
-
 
 ###############################################################################
 class AggregateOperation(StrictToolInput):
@@ -173,6 +164,7 @@ class AggregateOperation(StrictToolInput):
     metric: Literal["sum", "count", "mean", "max", "min"] = "sum"
 
 
+###############################################################################
 class GridAggregateOperation(StrictToolInput):
     op: Literal["grid_aggregate"]
     cell_size_deg: float = Field(ge=0.1, le=10)
@@ -192,7 +184,6 @@ EvidenceOperation = Annotated[
     Field(discriminator="op"),
 ]
 
-
 ###############################################################################
 class TransformEvidenceInput(StrictToolInput):
     evidence_refs: list[str] = Field(min_length=1, max_length=8)
@@ -211,7 +202,6 @@ class SearchConversationHistoryInput(StrictToolInput):
 # Keep the shorter spelling available to composition code while retaining a
 # descriptive schema/class name in generated tool definitions.
 HistorySearchInput = SearchConversationHistoryInput
-
 
 ###############################################################################
 class ApplyMapPlanInput(StrictToolInput):

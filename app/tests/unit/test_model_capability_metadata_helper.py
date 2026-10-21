@@ -10,15 +10,20 @@ from tests.e2e.helpers.model_capability_metadata import (
 )
 
 
+###############################################################################
 class _Response:
+
+    # -------------------------------------------------------------------------
     def __init__(self, status: int, payload: dict[str, Any]) -> None:
         self.status = status
         self._payload = payload
 
+    # -------------------------------------------------------------------------
     def json(self) -> dict[str, Any]:
         return self._payload
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("supports_tools", "expected_ready", "expected_reason"),
     [
