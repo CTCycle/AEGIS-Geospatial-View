@@ -40,6 +40,7 @@ def _number_param(params: dict[str, Any], *keys: str) -> float | None:
     return None
 
 
+###############################################################################
 def grid_points(
     bbox: tuple[float, float, float, float],
     max_points: int = 100,
@@ -82,6 +83,7 @@ def grid_points(
     return best
 
 
+###############################################################################
 def _regular_grid(bbox: tuple[float, float, float, float], cells: int) -> tuple[list[tuple[float, float]], float]:
     west, south, east, north = bbox
     width, height = east - west, north - south

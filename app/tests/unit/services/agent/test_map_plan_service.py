@@ -185,7 +185,6 @@ class FakeEvidenceRepository:
             }
         ).encode()
 
-
 ###############################################################################
 class _AdmissionEvidenceRepository(FakeEvidenceRepository):
 
@@ -325,7 +324,6 @@ def _service() -> MapPlanService:
         evidence_repository=FakeEvidenceRepository(),
     )
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     "descriptor",
@@ -361,7 +359,6 @@ def test_render_descriptor_admission_rejects_unsafe_geojson_sources(
 ) -> None:
     with pytest.raises(MapPlanBuildError):
         MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
-
 
 ###############################################################################
 def test_render_descriptor_admission_accepts_relative_geojson_source() -> None:
@@ -625,7 +622,6 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     assert result.error.code == "stale_map_revision"
     assert state.prepared_map_session is None
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_active_map_move_uses_the_validated_new_route_target() -> None:
@@ -665,7 +661,6 @@ async def test_active_map_move_uses_the_validated_new_route_target() -> None:
         "longitude": salta.longitude,
     }
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
@@ -697,7 +692,6 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     assert result.error is not None
     assert result.error.code == "missing_location"
     assert state.prepared_map_session is None
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -766,7 +760,6 @@ async def test_missing_evidence_is_rejected() -> None:
     assert result.error is not None
     assert result.error.code == "unknown_evidence"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> None:
@@ -791,7 +784,6 @@ async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> N
     assert result.error is not None
     assert result.error.code == "evidence_not_renderable"
     assert state.prepared_map_session is None
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -832,7 +824,6 @@ async def test_non_usable_evidence_cannot_satisfy_a_requested_layer(
     assert result.error is not None
     assert result.error.code == "evidence_not_renderable"
     assert state.prepared_map_session is None
-
 
 ###############################################################################
 @pytest.mark.asyncio

@@ -8,7 +8,10 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers import http as provider_http
 
 
+###############################################################################
 class _FakeResponse:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -22,12 +25,15 @@ class _FakeResponse:
         self._chunks = chunks
         self._body_error = body_error
 
+    # -------------------------------------------------------------------------
     async def __aenter__(self) -> _FakeResponse:
         return self
 
+    # -------------------------------------------------------------------------
     async def __aexit__(self, *args: object) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     async def aiter_bytes(self):  # noqa: ANN201
         if self._body_error is not None:
             raise self._body_error
@@ -35,20 +41,26 @@ class _FakeResponse:
             yield chunk
 
 
+###############################################################################
 class _FakeClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self, response: _FakeResponse | Exception) -> None:
         self.response = response
 
+    # -------------------------------------------------------------------------
     def stream(self, *args: object, **kwargs: object):  # noqa: ANN201
         if isinstance(self.response, Exception):
             raise self.response
         return self.response
 
 
+###############################################################################
 def _request_error(message: str) -> httpx.RequestError:
     return httpx.ConnectError(message, request=httpx.Request("GET", "https://example.test/tile"))
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("status_code", "category"),
     [
@@ -102,6 +114,7 @@ def test_raster_http_classifies_upstream_statuses(
     assert "secret-token" not in diagnostic.upstream
 
 
+###############################################################################
 def test_raster_http_classifies_transport_failure_categories(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -129,6 +142,7 @@ def test_raster_http_classifies_transport_failure_categories(
         assert "secret" not in str(error.value).lower()
 
 
+###############################################################################
 def test_raster_http_classifies_body_read_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         provider_http,
@@ -154,6 +168,7 @@ def test_raster_http_classifies_body_read_failure(monkeypatch: pytest.MonkeyPatc
     assert "secret body failure" not in str(error.value)
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("body", "content_type", "category"),
     [
@@ -191,6 +206,7 @@ def test_raster_http_classifies_empty_and_non_image_bodies(
     assert error.value.diagnostic.content_length == len(body)
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "body",
     [b"\x89PNG\r\n\x1a\npng", b"\xff\xd8\xffjpeg"],
@@ -213,6 +229,7 @@ def test_raster_http_accepts_png_and_jpeg(
     ) == body
 
 
+###############################################################################
 def test_raster_http_classifies_oversized_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         provider_http,

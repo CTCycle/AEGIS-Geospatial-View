@@ -85,7 +85,6 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "answer and stop."
 )
 
-
 ###############################################################################
 def build_native_agent_system_prompt() -> str:
     return "\n\n".join(
@@ -97,7 +96,6 @@ def build_native_agent_system_prompt() -> str:
             INTERNAL_INFORMATION_RESTRICTIONS,
         ]
     )
-
 
 ###############################################################################
 def build_native_context_messages(

@@ -18,17 +18,19 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
-
 ###############################################################################
 class _StubProvider(LLMProvider):
     provider_name = "stub"
 
+    # -------------------------------------------------------------------------
     def __init__(self, vision: bool | None) -> None:
         self._vision = vision
 
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         return []
 
+    # -------------------------------------------------------------------------
     def chat(
         self,
         request: LLMRequest,
@@ -39,14 +41,17 @@ class _StubProvider(LLMProvider):
     ) -> LLMResult:
         return LLMResult(content="")
 
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         return iter(())
 
+    # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
         return {}
 
+    # -------------------------------------------------------------------------
     async def achat(
         self,
         request: LLMRequest,
@@ -57,20 +62,23 @@ class _StubProvider(LLMProvider):
     ) -> LLMResult:
         return LLMResult(content="")
 
+    # -------------------------------------------------------------------------
     async def astructured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
         return {}
 
+    # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
         return []
 
+    # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         return {"ok": True}
 
+    # -------------------------------------------------------------------------
     def supports_vision(self, model: str) -> bool | None:
         return self._vision
-
 
 ###############################################################################
 def _request(*, requires_vision: bool) -> LLMRequest:
@@ -79,7 +87,6 @@ def _request(*, requires_vision: bool) -> LLMRequest:
         messages=[{"role": "user", "content": "hello"}],
         metadata={"requires_vision": True} if requires_vision else {},
     )
-
 
 ###############################################################################
 def test_validate_request_capabilities_fails_closed_without_vision() -> None:
@@ -91,14 +98,12 @@ def test_validate_request_capabilities_fails_closed_without_vision() -> None:
             )
         assert exc_info.value.code == "model_vision_unsupported"
 
-
 ###############################################################################
 def test_validate_request_capabilities_allows_vision_when_supported() -> None:
     provider = _StubProvider(vision=True)
     provider._validate_request_capabilities(  # pyright: ignore[reportPrivateUsage]
         _request(requires_vision=True)
     )
-
 
 ###############################################################################
 def test_validate_request_capabilities_ignores_requires_vision_when_unset() -> None:
@@ -108,14 +113,12 @@ def test_validate_request_capabilities_ignores_requires_vision_when_unset() -> N
         _request(requires_vision=False)
     )
 
-
 ###############################################################################
 def test_openai_provider_vision_follows_catalog() -> None:
     provider = OpenAIProvider(api_key="test")
     assert provider.supports_vision("gpt-4.1") is True
     assert provider.supports_vision("gpt-4.1-mini") is True
     assert provider.supports_vision("unknown-model") is None
-
 
 ###############################################################################
 def test_google_provider_vision_follows_catalog() -> None:
@@ -124,13 +127,11 @@ def test_google_provider_vision_follows_catalog() -> None:
     assert provider.supports_vision("gemini-2.5-pro") is True
     assert provider.supports_vision("unknown-model") is None
 
-
 ###############################################################################
 def test_deepseek_provider_is_text_only() -> None:
     provider = DeepSeekProvider(api_key="test", base_url="https://example.invalid")
     assert provider.supports_vision("deepseek-chat") is False
     assert provider.supports_vision("deepseek-v4-flash") is False
-
 
 ###############################################################################
 def test_opencode_provider_vision_only_for_explicit_vision_models() -> None:
@@ -138,15 +139,19 @@ def test_opencode_provider_vision_only_for_explicit_vision_models() -> None:
     assert provider.supports_vision("deepseek-v4-flash-vision-exp") is True
     assert provider.supports_vision("deepseek-v4-flash") is False
 
-
 ###############################################################################
 def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
+    ###############################################################################
     class _Response:
+
+        # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None
 
+        # -------------------------------------------------------------------------
         def json(self) -> dict[str, Any]:
             return {
                 "data": [

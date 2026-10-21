@@ -18,6 +18,7 @@ from tests.e2e.test_live_raster_diagnostics import (
 from tests.e2e.test_route_matrix_live import _scenario_result
 
 
+###############################################################################
 def _send(page: Page, prompt: str) -> None:
     previous = page.locator(".chat-message--assistant").count()
     page.get_by_label("Chat message").fill(prompt)
@@ -31,6 +32,7 @@ def _send(page: Page, prompt: str) -> None:
     page.wait_for_timeout(4000)
 
 
+###############################################################################
 def _session(page: Page, api_base_url: str) -> dict[str, Any]:
     conversation_id = _read_conversation_id(page)
     response = page.request.get(f"{api_base_url}/api/conversations/{conversation_id}")
@@ -38,6 +40,7 @@ def _session(page: Page, api_base_url: str) -> dict[str, Any]:
     return response.json()["map_session"]
 
 
+###############################################################################
 def _capabilities(session: dict[str, Any]) -> set[str]:
     return {
         str(overlay.get("capability_id") or overlay.get("capabilityId"))
@@ -45,6 +48,7 @@ def _capabilities(session: dict[str, Any]) -> set[str]:
     }
 
 
+###############################################################################
 def test_eea_coverage_and_gbif_lifecycle(
     browser: Browser, base_url: str, api_base_url: str, artifact_root: Path
 ) -> None:

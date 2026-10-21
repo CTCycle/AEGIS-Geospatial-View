@@ -22,7 +22,6 @@ SUPPORTED_LLM_PROVIDERS: Final[frozenset[str]] = frozenset(
     }
 )
 
-
 ###############################################################################
 def require_canonical_provider(provider: object) -> str:
     """Return an exact registered provider ID or reject the configuration."""

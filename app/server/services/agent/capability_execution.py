@@ -762,6 +762,7 @@ def _response_summary(
     return summary
 
 
+###############################################################################
 def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
     """Expose a small, allowlisted feature sample for bounded answer synthesis."""
 
@@ -891,7 +892,6 @@ def _feature_bbox(value: object) -> list[float] | None:
     longitudes = [item[0] for item in coordinates]
     latitudes = [item[1] for item in coordinates]
     return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
-
 
 ###############################################################################
 def _geometry_positions(value: object) -> list[tuple[float, float]]:

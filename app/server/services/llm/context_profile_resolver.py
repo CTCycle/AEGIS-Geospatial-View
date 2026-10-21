@@ -21,13 +21,11 @@ from server.services.llm.deepseek_provider import DEFAULT_DEEPSEEK_BASE_URL
 from server.services.llm.google_provider import DEFAULT_GOOGLE_BASE_URL
 from server.services.llm.types import ModelContextProfile
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class _CachedProfile:
     expires_at: float
     profile: ModelContextProfile | None
-
 
 ###############################################################################
 class ModelContextProfileResolver:

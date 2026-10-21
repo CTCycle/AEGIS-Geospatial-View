@@ -177,7 +177,6 @@ FAULT_SCENARIOS = (
     "retry_exhausted",
 )
 
-
 ###############################################################################
 def _tested_commit() -> str:
     configured = os.environ.get("APP_TEST_COMMIT")
@@ -196,7 +195,6 @@ def _tested_commit() -> str:
         raise RuntimeError("Could not determine the exact tested commit.")
     return commit
 
-
 ###############################################################################
 def _sanitize_evidence(value: Any) -> Any:
     if isinstance(value, dict):
@@ -214,11 +212,9 @@ def _sanitize_evidence(value: Any) -> Any:
         return [_sanitize_evidence(item) for item in value[:MAX_EVIDENCE_ITEMS]]
     return value
 
-
 ###############################################################################
 def _bounded_text(value: str) -> str:
     return " ".join(value.split())[:MAX_EVIDENCE_TEXT]
-
 
 ###############################################################################
 def _capture_console_output(page: Page) -> list[dict[str, str]]:
@@ -230,7 +226,6 @@ def _capture_console_output(page: Page) -> list[dict[str, str]]:
 
     page.on("console", capture_console)
     return console_output
-
 
 ###############################################################################
 def _candidate_refs(
@@ -276,7 +271,6 @@ def _candidate_refs(
         )
     return candidates
 
-
 ###############################################################################
 def _final_run_version(
     acknowledgments: list[dict[str, Any]],
@@ -289,7 +283,6 @@ def _final_run_version(
         if isinstance(item.get("run_version"), int):
             return item["run_version"]
     return None
-
 
 ###############################################################################
 def _scenario_evidence(
@@ -327,7 +320,6 @@ def _scenario_evidence(
             fixture_state.get("rejected_acknowledgments", [])
         ),
     }
-
 
 ###############################################################################
 def _controlled_socket(
@@ -1000,7 +992,6 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
         if entry["type"] == "error"
         and any(token in entry["text"].casefold() for token in ("typeerror", "webgl", "map source"))
     ]
-
 
 ###############################################################################
 @pytest.mark.parametrize("scenario", FAULT_SCENARIOS)

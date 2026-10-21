@@ -12,7 +12,6 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPOSITORY_ROOT / "app"
 
-
 ###############################################################################
 def test_launcher_has_one_canonical_backend_entrypoint() -> None:
     launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
@@ -29,7 +28,6 @@ def test_launcher_has_one_canonical_backend_entrypoint() -> None:
     assert "app.server.app:app" not in launcher
     assert "Start-Process -FilePath 'cmd.exe'" not in launcher
     assert "/k" not in launcher
-
 
 ###############################################################################
 def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
@@ -63,7 +61,6 @@ def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
     assert "[System.Diagnostics.Process]$Process" in health_wait
     assert "HasExited" in health_wait
 
-
 ###############################################################################
 def test_launcher_separates_dependency_sync_from_build_state() -> None:
     launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
@@ -91,7 +88,6 @@ def test_launcher_separates_dependency_sync_from_build_state() -> None:
     assert "postbuild" in package_json["scripts"]
     assert "test:frontend-state" in package_json["scripts"]
 
-
 ###############################################################################
 def test_old_import_root_is_rejected_when_only_app_is_on_pythonpath() -> None:
     environment = os.environ.copy()
@@ -110,7 +106,6 @@ def test_old_import_root_is_rejected_when_only_app_is_on_pythonpath() -> None:
     )
 
     assert result.returncode != 0
-
 
 ###############################################################################
 def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> None:
@@ -135,7 +130,6 @@ def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> N
     assert "nativeagentorchestrator" in composition
     assert "shadow" not in composition
     assert "legacy" not in composition
-
 
 ###############################################################################
 def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> None:

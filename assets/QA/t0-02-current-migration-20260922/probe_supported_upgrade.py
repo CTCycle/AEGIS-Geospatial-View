@@ -57,6 +57,7 @@ CONVERSATION_STATE = {
 }
 
 
+###############################################################################
 def _database() -> tuple[SQLiteRepository, Path]:
     data_dir_value = os.environ.get("AEGIS_DATA_DIR", "").strip()
     if not data_dir_value:
@@ -71,6 +72,7 @@ def _database() -> tuple[SQLiteRepository, Path]:
     )
 
 
+###############################################################################
 def _current_revision(database: SQLiteRepository) -> str:
     with database.engine.connect() as connection:
         return str(
@@ -80,6 +82,7 @@ def _current_revision(database: SQLiteRepository) -> str:
         )
 
 
+###############################################################################
 def _downgrade(database: SQLiteRepository) -> None:
     config = Config(str(ALEMBIC_CONFIG_PATH))
     with database.engine.connect() as connection:
@@ -88,6 +91,7 @@ def _downgrade(database: SQLiteRepository) -> None:
         connection.commit()
 
 
+###############################################################################
 def _model_settings_snapshot(database: SQLiteRepository) -> tuple[object, ...]:
     with database.session() as session:
         row = session.execute(
@@ -109,6 +113,7 @@ def _model_settings_snapshot(database: SQLiteRepository) -> tuple[object, ...]:
         )
 
 
+###############################################################################
 def _encryption_snapshot(database: SQLiteRepository) -> tuple[object, ...]:
     material = CredentialEncryptionMaterialRepository(database).get_active_material()
     if material is None:
@@ -116,6 +121,7 @@ def _encryption_snapshot(database: SQLiteRepository) -> tuple[object, ...]:
     return (material.id, material.key_purpose, material.key_version, material.key_material)
 
 
+###############################################################################
 def _seed_counts(database: SQLiteRepository) -> dict[str, object]:
     return {
         "credential_encryption_materials": database.count_records(
@@ -129,6 +135,7 @@ def _seed_counts(database: SQLiteRepository) -> dict[str, object]:
     }
 
 
+###############################################################################
 def _run_fresh_seed_check() -> None:
     database, _ = _database()
     first = initialize_database(
@@ -177,6 +184,7 @@ def _run_fresh_seed_check() -> None:
     print("second_start_seed_counts=unchanged; already_current_idempotency=PASS")
 
 
+###############################################################################
 def _prepare_supported_previous_revision(
     database: SQLiteRepository,
 ) -> tuple[tuple[object, ...], tuple[object, ...]]:
@@ -208,6 +216,7 @@ def _prepare_supported_previous_revision(
     return model_before, encryption_before
 
 
+###############################################################################
 def _run_supported_upgrade() -> None:
     database, database_path = _database()
     model_before, encryption_before = _prepare_supported_previous_revision(database)
@@ -256,6 +265,7 @@ def _run_supported_upgrade() -> None:
     print(f"reference_countries={reference_count}; runtime_settings_rows=1; migration_backups=0")
 
 
+###############################################################################
 def _logical_snapshot(path: Path) -> bytes:
     def quote_identifier(value: str) -> str:
         return '"' + value.replace('"', '""') + '"'
@@ -292,6 +302,7 @@ def _logical_snapshot(path: Path) -> bytes:
     ).encode("utf-8")
 
 
+###############################################################################
 def _run_failed_migration_recovery() -> None:
     database, database_path = _database()
     _prepare_supported_previous_revision(database)
@@ -346,6 +357,7 @@ def _run_failed_migration_recovery() -> None:
     print("schema_and_all_rows=PASS; conflict_marker=preserved; migration_backups=0")
 
 
+###############################################################################
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(

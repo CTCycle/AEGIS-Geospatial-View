@@ -57,7 +57,6 @@ def _positive_int(value: object) -> int | None:
         return number if number > 0 else None
     return None
 
-
 ###############################################################################
 def _normalized_alias_value(
     metadata: dict[str, Any], aliases: tuple[str, ...], *, field_name: str
@@ -84,7 +83,6 @@ def _normalized_alias_value(
         )
         return None
     return next(iter(values))
-
 
 ###############################################################################
 def normalize_model_context_profile(
@@ -143,7 +141,6 @@ def normalize_model_context_profile(
         metadata_source=str(source),
         metadata_authority=authority,
     )
-
 
 ###############################################################################
 def profile_to_request_metadata(profile: ModelContextProfile) -> dict[str, Any]:

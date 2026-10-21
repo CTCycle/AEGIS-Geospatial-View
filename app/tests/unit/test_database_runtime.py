@@ -26,6 +26,7 @@ from server.services.database_runtime import (
 )
 
 
+###############################################################################
 def _manager(
     monkeypatch,
     tmp_path: Path,
@@ -75,6 +76,7 @@ def _manager(
     return manager, previous_configuration, published, shutdown
 
 
+###############################################################################
 def test_database_target_test_reports_empty_and_rejects_corrupt_files(
     tmp_path: Path,
 ) -> None:
@@ -93,6 +95,7 @@ def test_database_target_test_reports_empty_and_rejects_corrupt_files(
         )
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_database_switch_persists_target_and_shuts_down_previous_runtime(
     monkeypatch,
@@ -109,6 +112,7 @@ async def test_database_switch_persists_target_and_shuts_down_previous_runtime(
     assert shutdown[0].name == "previous"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_failed_activation_rolls_runtime_and_file_configuration_back(
     monkeypatch,
@@ -129,6 +133,7 @@ async def test_failed_activation_rolls_runtime_and_file_configuration_back(
     assert shutdown[0].name == "candidate"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_database_switch_is_rejected_while_requests_or_jobs_are_active(
     monkeypatch,
@@ -149,6 +154,7 @@ async def test_database_switch_is_rejected_while_requests_or_jobs_are_active(
     assert shutdown[0].name == "candidate"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_database_switch_is_rejected_when_current_database_state_cannot_be_checked(
     monkeypatch,
@@ -172,6 +178,7 @@ async def test_database_switch_is_rejected_when_current_database_state_cannot_be
     assert shutdown[0].name == "candidate"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_database_switch_is_rejected_during_an_inflight_request(
     monkeypatch,
@@ -192,6 +199,7 @@ async def test_database_switch_is_rejected_during_an_inflight_request(
     assert shutdown[0].name == "candidate"
 
 
+###############################################################################
 def test_database_settings_api_reports_connection_and_busy_switch(
     monkeypatch,
     tmp_path: Path,
@@ -227,6 +235,7 @@ def test_database_settings_api_reports_connection_and_busy_switch(
     assert current.json()["database_path"] == previous.database_path
 
 
+###############################################################################
 def test_unversioned_populated_database_is_not_adopted(tmp_path: Path) -> None:
     database_path = tmp_path / "unversioned.sqlite"
     with sqlite3.connect(database_path) as connection:
@@ -238,6 +247,7 @@ def test_unversioned_populated_database_is_not_adopted(tmp_path: Path) -> None:
         )
 
 
+###############################################################################
 def test_current_revision_with_missing_application_tables_is_rejected(
     tmp_path: Path,
 ) -> None:

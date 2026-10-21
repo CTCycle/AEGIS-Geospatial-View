@@ -108,6 +108,7 @@ class OpenMeteoProvider(GeospatialProvider):
             partial=partial,
         )
 
+    # -------------------------------------------------------------------------
     async def _weather_grid(self, request: ProviderRequest) -> ProviderResponse:
         assert request.bbox is not None
         bbox = request.bbox
@@ -345,7 +346,6 @@ class OpenMeteoProvider(GeospatialProvider):
                 )
         return datetime.now(UTC)
 
-
 ###############################################################################
 def _grid_feature(
     feature_id: str, point: tuple[float, float], payload: dict[str, Any], past_days: int, stage: str
@@ -381,6 +381,7 @@ def _grid_feature(
     }
 
 
+###############################################################################
 def _refinement_points(
     features: list[dict[str, Any]], spacing: float, mask: LandMask, existing: set[tuple[float, float]]
 ) -> list[tuple[float, float]]:

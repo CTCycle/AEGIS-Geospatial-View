@@ -88,10 +88,12 @@ TARGET_LABEL_HINTS: dict[str, tuple[str, ...]] = {
 }
 
 
+###############################################################################
 def _bounded_text(value: str) -> str:
     return " ".join(value.split())[:MAX_TEXT]
 
 
+###############################################################################
 def _sanitize_url(raw_url: str) -> str:
     parsed = urlsplit(raw_url)
     query: list[tuple[str, str]] = []
@@ -104,6 +106,7 @@ def _sanitize_url(raw_url: str) -> str:
     )
 
 
+###############################################################################
 def _raster_transport(url: str) -> str | None:
     parsed = urlsplit(url)
     if (parsed.hostname or "").casefold() in RASTER_HOSTS:
@@ -113,6 +116,7 @@ def _raster_transport(url: str) -> str | None:
     return None
 
 
+###############################################################################
 def _proxy_capability_id(url: str) -> str | None:
     path_parts = [unquote(part) for part in urlsplit(url).path.split("/")]
     try:
@@ -125,6 +129,7 @@ def _proxy_capability_id(url: str) -> str | None:
     return capability_id or None
 
 
+###############################################################################
 def _request_failure(request: Any) -> str | None:
     failure = getattr(request, "failure", None)
     if callable(failure):
@@ -136,6 +141,7 @@ def _request_failure(request: Any) -> str | None:
     return None
 
 
+###############################################################################
 def _safe_trace_int(value: Any) -> int:
     if isinstance(value, bool):
         return 0
@@ -145,9 +151,11 @@ def _safe_trace_int(value: Any) -> int:
         return 0
 
 
+###############################################################################
 class _RasterCapture(NetworkCapture):
     upstream_hosts = frozenset(RASTER_HOSTS)
 
+    # -------------------------------------------------------------------------
     def attach(self, page: Page) -> None:
         def on_request(request: Any) -> None:
             transport = _raster_transport(request.url)
@@ -210,6 +218,7 @@ class _RasterCapture(NetworkCapture):
         page.on("pageerror", on_page_error)
 
 
+###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
     raw = page.evaluate(
         "() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')"
@@ -230,6 +239,7 @@ def _read_conversation_id(page: Page) -> str | None:
     )
 
 
+###############################################################################
 def _read_latest_run_trace(
     page: Page, api_base_url: str, conversation_id: str | None
 ) -> dict[str, Any]:
@@ -292,6 +302,7 @@ def _read_latest_run_trace(
     )
 
 
+###############################################################################
 def _summarize_run_trace(
     *,
     conversation_id: str,
@@ -585,6 +596,7 @@ def _summarize_run_trace(
     }
 
 
+###############################################################################
 def _expand_overlay_controls(page: Page) -> None:
     toggle = page.locator(".overlay-controls__toggle")
     if not toggle.count():
@@ -594,6 +606,7 @@ def _expand_overlay_controls(page: Page) -> None:
         page.wait_for_timeout(500)
 
 
+###############################################################################
 def _map_evidence(page: Page, expected_capability_id: str | None) -> dict[str, Any]:
     if not expected_capability_id:
         return {
@@ -649,6 +662,7 @@ def _map_evidence(page: Page, expected_capability_id: str | None) -> dict[str, A
     }
 
 
+###############################################################################
 def _scenario_result(
     page: Page,
     capture: _RasterCapture,
@@ -787,6 +801,7 @@ def _scenario_result(
     }
 
 
+###############################################################################
 def test_live_public_raster_request_diagnostics(
     browser: Browser,
     base_url: str,

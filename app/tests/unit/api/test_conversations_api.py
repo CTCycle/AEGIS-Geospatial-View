@@ -143,7 +143,6 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
         for item in history.list_messages(conversation_id=conversation.id)
     ] == ["First response"]
 
-
 ###############################################################################
 def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     backend = _InMemoryBackend()
@@ -185,7 +184,6 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
         item["content"]
         for item in history.list_messages(conversation_id=conversation.id)
     ] == ["The map is ready."]
-
 
 ###############################################################################
 def test_assistant_state_write_migrates_legacy_clarification() -> None:

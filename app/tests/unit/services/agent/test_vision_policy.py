@@ -9,7 +9,6 @@ from server.services.agent.vision_policy import (
     VisionPolicyEngine,
 )
 
-
 ###############################################################################
 def _state(
     *,
@@ -56,7 +55,6 @@ def _state(
         vision_state=vision_state,
     )
 
-
 ###############################################################################
 def _engine(
     policy: str,
@@ -69,7 +67,6 @@ def _engine(
         vision_supported=vision_supported,
         max_vision_calls=max_vision_calls,
     )
-
 
 ###############################################################################
 def test_disabled_policy_never_captures_or_attaches() -> None:
@@ -90,7 +87,6 @@ def test_disabled_policy_never_captures_or_attaches() -> None:
     ) is False
     assert engine.should_capture(state) is True
 
-
 ###############################################################################
 def test_always_policy_captures_and_attaches_once_per_render() -> None:
     state = _state()
@@ -110,7 +106,6 @@ def test_always_policy_captures_and_attaches_once_per_render() -> None:
     assert engine.should_attach(
         state, capture_ref="map-1:3", capture_present=True, call_kind=ITERATION_CALL_KIND
     ) is True
-
 
 ###############################################################################
 def test_on_failure_policy_stays_inactive_until_a_relevant_failure() -> None:
@@ -137,7 +132,6 @@ def test_on_failure_policy_stays_inactive_until_a_relevant_failure() -> None:
     assert engine.relevant_failures(failed_tool) == 1
     assert engine.should_capture(failed_tool) is True
 
-
 ###############################################################################
 def test_final_check_policy_attaches_only_on_terminal_calls() -> None:
     state = _state()
@@ -151,7 +145,6 @@ def test_final_check_policy_attaches_only_on_terminal_calls() -> None:
         state, capture_ref="map-1:2", capture_present=True, call_kind=TERMINAL_CALL_KIND
     ) is True
 
-
 ###############################################################################
 def test_attach_requires_an_existing_capture_and_a_capture_ref() -> None:
     state = _state()
@@ -163,7 +156,6 @@ def test_attach_requires_an_existing_capture_and_a_capture_ref() -> None:
     assert engine.should_attach(
         state, capture_ref="map-1:2", capture_present=False, call_kind=ITERATION_CALL_KIND
     ) is False
-
 
 ###############################################################################
 def test_capture_ref_falls_back_to_prepared_map_session() -> None:
@@ -179,7 +171,6 @@ def test_capture_ref_falls_back_to_prepared_map_session() -> None:
     )
     engine = _engine(VisionPolicy.ALWAYS.value)
     assert engine.current_capture_ref(state) == "session-9:4"
-
 
 ###############################################################################
 def test_capture_is_requested_when_the_loop_suspends_for_a_new_render() -> None:
@@ -209,7 +200,6 @@ def test_capture_is_requested_when_the_loop_suspends_for_a_new_render() -> None:
     assert _engine(VisionPolicy.ON_FAILURE.value).should_capture(retry_after_failure) is True
     assert _engine(VisionPolicy.ALWAYS.value).should_capture(nothing_prepared) is False
 
-
 ###############################################################################
 def test_vision_calls_cap_limits_further_attachments() -> None:
     state = _state(vision_state=VisionState(attached_capture_ref="map-1:1", vision_calls=2))
@@ -219,7 +209,6 @@ def test_vision_calls_cap_limits_further_attachments() -> None:
     assert engine.should_attach(
         state, capture_ref="map-1:2", capture_present=True, call_kind=ITERATION_CALL_KIND
     ) is False
-
 
 ###############################################################################
 def test_mark_attached_persists_capture_ref_and_increments_vision_calls() -> None:

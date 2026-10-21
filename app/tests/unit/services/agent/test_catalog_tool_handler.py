@@ -13,6 +13,7 @@ from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 ###############################################################################
 class _CapabilityRegistry:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.last_shortlist_kwargs: dict[str, Any] = {}
         self.items = [
@@ -81,7 +82,6 @@ def test_discovery_cursor_returns_a_stable_bounded_page() -> None:
         "total": 2,
     }
 
-
 ###############################################################################
 def test_catalog_inventory_does_not_apply_execution_operation_or_point_scope() -> None:
     registry = _CapabilityRegistry()
@@ -123,7 +123,6 @@ def test_catalog_inventory_does_not_apply_execution_operation_or_point_scope() -
     assert registry.last_shortlist_kwargs["scope_kind"] is None
     assert registry.last_shortlist_kwargs["domains"] == {CapabilityDomain.MIXED}
 
-
 ###############################################################################
 def test_catalog_inventory_page_matches_model_observation_limit() -> None:
     registry = _CapabilityRegistry()
@@ -157,7 +156,6 @@ def test_catalog_inventory_page_matches_model_observation_limit() -> None:
     assert len(result.data["capabilities"]) == 12  # type: ignore[index]
     assert result.data["next_cursor"] == "12"  # type: ignore[index]
     assert result.data["total"] == 15  # type: ignore[index]
-
 
 ###############################################################################
 def test_point_location_is_lowered_to_provider_bbox_for_execution_discovery() -> None:

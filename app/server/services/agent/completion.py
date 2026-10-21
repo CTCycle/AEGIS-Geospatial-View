@@ -30,6 +30,7 @@ def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
 class CompletionEvaluator:
     """Keep render obligations independent of provider or model wording."""
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def assess_evidence(state: AgentRunState, result: ToolResult) -> EvidenceAssessment:
         """Assess normalized evidence against the current server-owned goal."""
@@ -82,6 +83,7 @@ class CompletionEvaluator:
             spatial_scope_satisfied=spatial, temporal_scope_satisfied=temporal, reasons=reasons,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def data_checks(state: AgentRunState) -> dict[str, bool]:
         results = [result for result in state.tool_results if result.tool_name in {
@@ -263,7 +265,6 @@ class CompletionEvaluator:
                 return True
         return False
 
-
 ###############################################################################
 def _native_flag(name: str) -> str:
     return {
@@ -275,7 +276,6 @@ def _native_flag(name: str) -> str:
         "spatial_scope_applied": "spatial_scope",
         "map_candidate_prepared": "map_preparation",
     }.get(name, name)
-
 
 ###############################################################################
 def _native_temporal_scope_applied(
@@ -319,7 +319,6 @@ def _native_temporal_scope_applied(
         == expected_mode
         for instance in temporal_instances
     )
-
 
 ###############################################################################
 def _native_spatial_scope_applied(

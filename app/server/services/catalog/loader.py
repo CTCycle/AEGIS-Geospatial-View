@@ -256,6 +256,7 @@ def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
     return tuple(normalized)
 
 
+###############################################################################
 @lru_cache(maxsize=8)
 def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEntry, ...]:
     payload = _load_json_file((catalog_root or get_catalog_root()) / "reference" / "macro_regions.json")
@@ -290,6 +291,7 @@ def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEnt
     return tuple(regions)
 
 
+###############################################################################
 def find_macro_region_entry(text: str) -> MacroRegionEntry | None:
     key = text.strip().casefold()
     for region in load_macro_regions():

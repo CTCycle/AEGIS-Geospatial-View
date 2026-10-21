@@ -5,6 +5,7 @@ from typing import Any
 from playwright.sync_api import Page
 
 
+###############################################################################
 def selected_model_tool_support_metadata(
     page: Page, api_base_url: str
 ) -> tuple[bool, str, dict[str, Any]]:
@@ -78,6 +79,7 @@ def selected_model_tool_support_metadata(
     return True, "", evidence
 
 
+###############################################################################
 def exact_lane_tool_support_metadata(
     page: Page, api_base_url: str
 ) -> tuple[bool, str, dict[str, Any]]:

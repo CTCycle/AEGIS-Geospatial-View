@@ -24,6 +24,7 @@ from server.services.settings.runtime_settings import RuntimeSettingsService
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
+###############################################################################
 def get_database_runtime_manager(request: Request) -> DatabaseRuntimeManager:
     manager = getattr(request.app.state, "database_runtime_manager", None)
     if not isinstance(manager, DatabaseRuntimeManager):
@@ -34,6 +35,7 @@ def get_database_runtime_manager(request: Request) -> DatabaseRuntimeManager:
     return manager
 
 
+###############################################################################
 def get_runtime_settings_service(request: Request) -> RuntimeSettingsService:
     service = getattr(request.app.state, "runtime_settings_service", None)
     if not isinstance(service, RuntimeSettingsService):
@@ -44,6 +46,7 @@ def get_runtime_settings_service(request: Request) -> RuntimeSettingsService:
     return service
 
 
+###############################################################################
 @router.get(
     "/runtime",
     response_model=RuntimeSettingsResponse,
@@ -61,6 +64,7 @@ def get_runtime_settings(
         ) from exc
 
 
+###############################################################################
 @router.patch(
     "/runtime",
     response_model=RuntimeSettingsResponse,
@@ -79,6 +83,7 @@ def update_runtime_settings(
         ) from exc
 
 
+###############################################################################
 @router.get(
     "/database",
     response_model=DatabaseSettingsResponse,
@@ -90,6 +95,7 @@ def get_database_settings(
     return database_settings_response(manager.configuration)
 
 
+###############################################################################
 @router.post(
     "/database/test",
     response_model=DatabaseConnectionTestResponse,
@@ -108,6 +114,7 @@ async def test_database_connection(
         ) from exc
 
 
+###############################################################################
 @router.put(
     "/database",
     response_model=DatabaseSettingsResponse,

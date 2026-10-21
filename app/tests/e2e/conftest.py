@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def browser_type_launch_args(
     browser_type_launch_args: dict[str, Any],

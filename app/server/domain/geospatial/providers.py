@@ -52,10 +52,12 @@ class ProviderExecutionPolicy:
 _RUN_PROVIDER_POLICY: ContextVar[ProviderExecutionPolicy | None] = ContextVar("run_provider_policy", default=None)
 
 
+###############################################################################
 def current_provider_policy(default: ProviderExecutionPolicy) -> ProviderExecutionPolicy:
     return _RUN_PROVIDER_POLICY.get() or default
 
 
+###############################################################################
 @contextmanager
 def provider_execution_scope(policy: ProviderExecutionPolicy | None) -> Generator[None]:
     token = _RUN_PROVIDER_POLICY.set(policy)

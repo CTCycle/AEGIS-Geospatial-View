@@ -644,7 +644,6 @@ class NativeAgentOrchestrator:
         with budget.observe(stage):
             yield
 
-
 ###############################################################################
 def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
@@ -676,7 +675,6 @@ def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
         ),
         "execution_trace": response.execution_trace,
     }
-
 
 ###############################################################################
 def _native_constraints(response: AgentTurnResponse) -> dict[str, Any]:

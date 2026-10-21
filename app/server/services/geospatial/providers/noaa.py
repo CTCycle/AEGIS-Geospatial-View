@@ -518,7 +518,6 @@ def _normalize_noaa_alerts(
         )
     return features
 
-
 ###############################################################################
 def _noaa_alert_zone_urls(properties: dict[str, object]) -> list[str]:
     """Return only canonical NWS forecast-zone URLs from an alert."""
@@ -553,19 +552,16 @@ def _noaa_alert_zone_urls(properties: dict[str, object]) -> list[str]:
         urls.append(f"https://api.weather.gov/zones/forecast/{zone_id}")
     return list(dict.fromkeys(urls))
 
-
 ###############################################################################
 def _normalize_noaa_zone_geometry(payload: object) -> dict[str, object] | None:
     if not is_json_object(payload):
         return None
     return _normalize_noaa_geometry(payload.get("geometry"))
 
-
 ###############################################################################
 def _normalize_noaa_geometry(value: object) -> dict[str, object] | None:
     geometry = json_object(value)
     return geometry if _valid_noaa_geometry(geometry) else None
-
 
 ###############################################################################
 def _combine_noaa_geometries(
@@ -577,7 +573,6 @@ def _combine_noaa_geometries(
     if len(usable) == 1:
         return usable[0]
     return {"type": "GeometryCollection", "geometries": usable}
-
 
 ###############################################################################
 def _valid_noaa_geometry(value: object) -> bool:

@@ -23,6 +23,8 @@ from server.services.geospatial.providers.base import (
     ProviderInvalidQueryError,
     ProviderTimeoutError,
 )
+
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("coordinates, expected", [([8.5, 47.3], True), ([100, 0], False), ([8.5], False)])
 async def test_provider_geometry_is_checked_against_requested_bbox(coordinates, expected) -> None:
@@ -361,7 +363,6 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     assert request.params["filters"] == {"category": "hospital"}  # type: ignore[attr-defined]
     assert request.params["radius_m"] == 5000  # type: ignore[attr-defined]
 
-
 ###############################################################################
 def test_feature_summary_exposes_bounded_preview_to_model() -> None:
     features = [
@@ -535,7 +536,6 @@ async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     assert request.params["latitude"] == 47.3769  # type: ignore[attr-defined]
     assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_manifest_metadata_is_forwarded_to_descriptor_provider() -> None:
@@ -569,7 +569,6 @@ async def test_manifest_metadata_is_forwarded_to_descriptor_provider() -> None:
         "layer_id": "WORLDCOVER_2021_MAP",
     }
 
-
 ###############################################################################
 def test_weather_summary_exposes_bounded_current_observations() -> None:
     summary = _response_summary(
@@ -596,7 +595,6 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
     }
     assert summary["timezone"] == "Europe/Rome"
 
-
 ###############################################################################
 def test_solar_summary_exposes_bounded_pvgis_estimate() -> None:
     summary = _response_summary(
@@ -615,7 +613,6 @@ def test_solar_summary_exposes_bounded_pvgis_estimate() -> None:
         "yearly_kwh_per_kwp": 1267.38,
         "unit": "kWh/kWp/year",
     }
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -701,7 +698,6 @@ def test_forecast_summary_exposes_at_most_24_allowlisted_hourly_rows(
     assert series["fields"][0] == "time"
     assert len(json.dumps(projected, separators=(",", ":"))) <= 2048
 
-
 ###############################################################################
 def test_raster_summary_is_renderable_only_with_a_source() -> None:
     renderable = _response_summary(
@@ -723,7 +719,6 @@ def test_raster_summary_is_renderable_only_with_a_source() -> None:
 
     assert renderable["map_eligibility"] == "renderable"
     assert unavailable["map_eligibility"] == "unknown"
-
 
 ###############################################################################
 def test_normalized_polygon_feature_is_renderable_and_has_bounds() -> None:

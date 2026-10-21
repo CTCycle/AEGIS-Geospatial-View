@@ -10,7 +10,6 @@ from server.services.chat.model_library import (
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.types import ModelDescriptor
 
-
 ###############################################################################
 @dataclass
 class _DeepSeekProviderStub:
@@ -19,7 +18,6 @@ class _DeepSeekProviderStub:
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         return self.models
-
 
 ###############################################################################
 @dataclass
@@ -35,9 +33,9 @@ class _FlakyDynamicProvider:
             raise response
         return response
 
-
 ###############################################################################
 class _ProviderFactoryStub:
+
     # -------------------------------------------------------------------------
     def __init__(self, provider: _DeepSeekProviderStub | Exception) -> None:
         self.provider = provider
@@ -48,7 +46,6 @@ class _ProviderFactoryStub:
         if isinstance(self.provider, Exception):
             raise self.provider
         return self.provider
-
 
 ###############################################################################
 class _OllamaProviderUnavailableStub:
@@ -72,14 +69,12 @@ class _OllamaProviderUnavailableStub:
         type(self).calls += 1
         return []
 
-
 ###############################################################################
 def _build_service() -> ChatModelLibraryService:
     return ChatModelLibraryService(
         provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
         ollama_unavailable_ttl_s=30.0,
     )
-
 
 ###############################################################################
 def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
@@ -99,7 +94,6 @@ def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
     assert response["sources"]["ollama"]["reachable"] is False
     assert response["sources"]["ollama"]["ok"] is False
 
-
 ###############################################################################
 def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     _OllamaProviderUnavailableStub.calls = 0
@@ -116,7 +110,6 @@ def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     assert first["sources"]["ollama"]["reachable"] is False
     assert second["sources"]["ollama"]["reachable"] is False
     assert _OllamaProviderUnavailableStub.calls == 1
-
 
 ###############################################################################
 def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
@@ -139,7 +132,6 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert response["cloud"]
     assert response["sources"]["deepseek"]["ok"] is False
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
-
 
 ###############################################################################
 def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
@@ -194,7 +186,6 @@ def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
     assert fourth["sources"]["deepseek"]["ok"] is True
     assert dynamic_provider.calls == 3
 
-
 ###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -221,7 +212,6 @@ def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -
         raise AssertionError(
             "Expected ModelLibrarySourceError for unavailable DeepSeek catalog."
         )
-
 
 ###############################################################################
 def test_find_model_loads_dynamic_metadata_for_context_profile_lookup(
@@ -254,12 +244,12 @@ def test_find_model_loads_dynamic_metadata_for_context_profile_lookup(
     assert result is not None
     assert result["name"] == "runtime-model"
 
-
 ###############################################################################
 def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None:
 
     ###############################################################################
     class _ProviderThatMustNotBeCalled:
+
         # -------------------------------------------------------------------------
         def list_models(self):  # noqa: ANN201
             raise AssertionError("context lookup must not refresh a provider catalog")
@@ -291,7 +281,6 @@ def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None
     assert result is not None
     assert result["name"] == "cached-model"
 
-
 ###############################################################################
 def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
     service = _build_service()
@@ -304,7 +293,6 @@ def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
         )
         is None
     )
-
 
 ###############################################################################
 def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
@@ -335,7 +323,6 @@ def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
     assert all(item["id"] != "stale-model" for item in response["cloud"])
     assert response["sources"]["deepseek"]["ok"] is False
 
-
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:
     assert (
@@ -343,17 +330,19 @@ def test_normalize_ollama_url_rewrites_localhost() -> None:
         == "http://127.0.0.1:11434"
     )
 
-
 ###############################################################################
 def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
     monkeypatch,
 ) -> None:
+
+    ###############################################################################
     class _OllamaProviderWithContext:
-        # ---------------------------------------------------------------------
+
+        # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:  # noqa: ANN003
             self.last_list_models_error = None
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         def list_models(self) -> list[ModelDescriptor]:
             return [
                 ModelDescriptor(
@@ -363,7 +352,7 @@ def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
                 )
             ]
 
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         def get_model_context_metadata(self, model: str) -> dict[str, object]:
             assert model == "local-alias"
             return {

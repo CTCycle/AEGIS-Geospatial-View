@@ -102,7 +102,6 @@ _PLACE_SEARCH_DATA_TERMS = frozenset(
     }
 )
 
-
 ###############################################################################
 def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | None:
     """Build a bounded map route when route bootstrap misses a plain place request."""
@@ -121,7 +120,6 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
         capability_queries=["place search", "map viewport"],
         operation="show_location_on_map",
     )
-
 
 ###############################################################################
 class CapabilityRouter:
@@ -444,7 +442,6 @@ def _is_executable_candidate(capability: dict[str, object]) -> bool:
         and capability.get("runtime_render_ready") is not False
     )
 
-
 ###############################################################################
 def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
     """Enforce the route contract before any capability discovery or execution."""
@@ -487,7 +484,6 @@ def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
         reasons.append("answer_route_disallows_clarification_question")
     return reasons
 
-
 ###############################################################################
 def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if len(state.location_refs) == 1:
@@ -508,7 +504,6 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
         "reset_view",
     }
 )
-
 
 ###############################################################################
 def _is_active_map_update(route: CapabilityRoute, state: AgentRunState) -> bool:
@@ -532,7 +527,6 @@ def _route_terms(route: CapabilityRoute) -> set[str]:
         for token in re.findall(r"[a-z0-9]+", str(value).casefold())
         if len(token) > 1
     }
-
 
 ###############################################################################
 def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
@@ -569,7 +563,6 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     )
     return not specific_terms
 
-
 ###############################################################################
 def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
     """Guard raw generic infrastructure wording before model subtype guesses."""
@@ -597,7 +590,6 @@ def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
         "utilities",
     }
     return not terms.intersection(subtype_terms)
-
 
 ###############################################################################
 def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
@@ -654,7 +646,6 @@ def _normalize_route_semantics(
         ),
         "route_semantics_normalized",
     )
-
 
 ###############################################################################
 def _normalize_capability_inventory_route(
@@ -767,7 +758,6 @@ def _normalize_capability_inventory_route(
         )
     return normalized, "capability_inventory_route_normalized"
 
-
 ###############################################################################
 def _normalize_text_only_coordinate_route(
     route: CapabilityRoute,
@@ -826,7 +816,6 @@ def _normalize_text_only_coordinate_route(
         "text_only_coordinate_lookup_route_normalized",
     )
 
-
 ###############################################################################
 def _normalize_text_evidence_inspection_route(
     route: CapabilityRoute,
@@ -872,7 +861,6 @@ def _normalize_text_evidence_inspection_route(
         ),
         "text_evidence_inspection_route_normalized",
     )
-
 
 ###############################################################################
 def _normalize_data_bearing_map_route(
@@ -988,7 +976,6 @@ def _normalize_recent_scope(
             "recent_scope_normalized_to_current",
         )
     return route, None
-
 
 ###############################################################################
 def _normalize_metadata_only_analysis_route(
@@ -1107,7 +1094,6 @@ def _normalize_location_map_route(
         ),
         "location_map_route_normalized",
     )
-
 
 ###############################################################################
 def _concrete_scope_kind(

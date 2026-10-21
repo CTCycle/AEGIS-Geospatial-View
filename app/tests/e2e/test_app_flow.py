@@ -14,6 +14,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
 )
 
 
+###############################################################################
 def _fulfill_json(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(
         status=200,

@@ -14,6 +14,7 @@ from server.repositories.schemas import Base
 from server.services.settings.runtime_settings import RuntimeSettingsService
 
 
+###############################################################################
 def _client(tmp_path: Path) -> tuple[TestClient, RuntimeSettingsRepository]:
     database = SQLiteRepository(DatabaseSettings(str(tmp_path / "runtime.db")))
     Base.metadata.create_all(database.engine)
@@ -25,6 +26,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, RuntimeSettingsRepository]:
     return TestClient(application), repository
 
 
+###############################################################################
 def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
 
@@ -46,6 +48,7 @@ def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path
     assert repository.get_required().chat.max_history_messages == 12
 
 
+###############################################################################
 def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
 
@@ -60,6 +63,7 @@ def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -
     assert repository.get_required().chat.max_history_messages == 24
 
 
+###############################################################################
 def test_restart_requirement_survives_get_and_clears_when_values_return_to_startup(
     tmp_path: Path,
 ) -> None:
@@ -86,6 +90,7 @@ def test_restart_requirement_survives_get_and_clears_when_values_return_to_start
     assert client.get("/api/settings/runtime").json()["restart_required"] is False
 
 
+###############################################################################
 def test_runtime_settings_survive_database_reopen_after_patch(tmp_path: Path) -> None:
     database_path = tmp_path / "runtime-restart.db"
     database = SQLiteRepository(DatabaseSettings(str(database_path)))
@@ -117,6 +122,7 @@ def test_runtime_settings_survive_database_reopen_after_patch(tmp_path: Path) ->
     restarted_database.engine.dispose()
 
 
+###############################################################################
 def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
     response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}})
@@ -128,6 +134,7 @@ def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomi
     assert repository.get_required().agent_execution.max_iterations == 7
 
 
+###############################################################################
 def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
 
@@ -141,6 +148,7 @@ def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> N
     assert repository.get_required().map.tiles == "OpenStreetMap"
 
 
+###############################################################################
 def test_runtime_settings_api_rejects_unknown_blocks(tmp_path: Path) -> None:
     client, repository = _client(tmp_path)
 

@@ -23,6 +23,8 @@ _SENSITIVE_QUERY_KEY = re.compile(
 _MAX_TRACE_DEPTH = 5
 _MAX_TRACE_ITEMS = 48
 _MAX_TRACE_STRING = 4_096
+
+###############################################################################
 def public_protocol_projection(value: Any) -> Any:
     """Omit private SDK continuation from transport output without mutating checkpoints."""
     if isinstance(value, dict):
@@ -98,7 +100,6 @@ class AgentCheckpoint(BaseModel):
     completed_call_fingerprints: list[str] = Field(default_factory=list)
     completion_reason: str | None = None
 
-
 ###############################################################################
 def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[str]]:
     """Return a bounded trace-safe value and the fields redacted from it.
@@ -156,7 +157,6 @@ def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[
 
     result = visit(value, path, 0)
     return result, list(dict.fromkeys(redacted))
-
 
 ###############################################################################
 def redact_trace_url(value: str, *, path: str = "$") -> tuple[str, list[str]]:

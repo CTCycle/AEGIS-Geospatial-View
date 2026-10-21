@@ -116,11 +116,9 @@ def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> No
 
     assert candidates[0]["id"] == "traffic"
 
-
 ###############################################################################
 def test_basemap_switch_operations_include_the_manifest_render_primitive() -> None:
     assert "show" in _operation_candidates("switch_basemap_to_satellite")
-
 
 ###############################################################################
 def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() -> None:
@@ -157,11 +155,9 @@ def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() 
     assert runtime.supports_mode("pvgis_solar", "map") is False
     assert runtime.supports_mode("pvgis_solar", "text") is True
 
-
 ###############################################################################
 def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
     assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
-
 
 ###############################################################################
 def test_comparing_places_matches_the_same_capabilities_as_retrieving_them() -> None:
@@ -309,7 +305,6 @@ def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None
 
     assert candidates == []
 
-
 ###############################################################################
 def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     snapshot = GeospatialManifestSnapshot(
@@ -377,7 +372,6 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
     )
     assert [item["id"] for item in candidate] == ["us-parcels"]
 
-
 ###############################################################################
 def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() -> None:
     snapshot = GeospatialManifestSnapshot(
@@ -443,7 +437,6 @@ def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() 
         runtime_registry=_RuntimeEligibility(),
     )
     assert context_only == []
-
 
 ###############################################################################
 def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> None:
@@ -589,7 +582,6 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     )
     assert water_gauges[0]["id"] == "usgs_water_gauges"
 
-
 ###############################################################################
 def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:
     registry = CapabilityRegistry()
@@ -674,7 +666,6 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
     charging = shortlist("EV charging stations", "retrieve_infrastructure", rome)
     assert charging == []
 
-
 ###############################################################################
 def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() -> None:
     registry = CapabilityRegistry()
@@ -720,7 +711,6 @@ def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() 
         location=locations[0],
     )
     assert nowcast == []
-
 
 ###############################################################################
 def test_real_catalog_keyless_vector_point_capabilities_route_for_tier3() -> None:

@@ -14,9 +14,11 @@ from urllib.parse import urlsplit
 from playwright.sync_api import Browser, Page
 
 
+###############################################################################
 class NetworkCapture:
     upstream_hosts: frozenset[str] = frozenset()
 
+    # -------------------------------------------------------------------------
     def __init__(self, max_events: int = 512) -> None:
         self.max_events = max_events
         self.events: list[dict[str, Any]] = []
@@ -29,6 +31,7 @@ class NetworkCapture:
         self.started_at: str | None = None
         self.ended_at: str | None = None
 
+    # -------------------------------------------------------------------------
     def _append(self, event: dict[str, Any]) -> None:
         if event.get("kind") == "request":
             host = (urlsplit(str(event.get("url", ""))).hostname or "").casefold()
@@ -41,6 +44,7 @@ class NetworkCapture:
         else:
             self.dropped_events += 1
 
+    # -------------------------------------------------------------------------
     def summary(self) -> dict[str, Any]:
         return {
             "started_at": self.started_at,
@@ -56,10 +60,12 @@ class NetworkCapture:
             "counters_independent_of_event_limit": True,
         }
 
+    # -------------------------------------------------------------------------
     def attach(self, page: Page) -> None:
         raise NotImplementedError
 
 
+###############################################################################
 @contextmanager
 def observed_page(
     browser: Browser, capture: NetworkCapture, output: Path

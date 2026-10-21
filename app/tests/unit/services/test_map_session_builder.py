@@ -6,7 +6,6 @@ from server.services.geospatial.map_session_builder import (
     _viewport_for_location,
 )
 
-
 ###############################################################################
 def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     location = ResolvedLocation(
@@ -23,7 +22,6 @@ def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     assert viewport.center_longitude == location.longitude
     assert viewport.bbox is None
 
-
 ###############################################################################
 def test_point_like_feature_bbox_keeps_a_usable_context_viewport() -> None:
     location = ResolvedLocation(
@@ -39,7 +37,6 @@ def test_point_like_feature_bbox_keeps_a_usable_context_viewport() -> None:
     assert viewport.center_latitude == location.latitude
     assert viewport.center_longitude == location.longitude
     assert viewport.bbox is None
-
 
 ###############################################################################
 def test_normalized_polygon_feature_is_converted_to_renderable_geojson() -> None:

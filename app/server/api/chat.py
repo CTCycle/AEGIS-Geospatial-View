@@ -62,31 +62,25 @@ from server.services.llm.errors import (
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
-
 
 ###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
-
 ###############################################################################
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
-
 
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService | None:
     return getattr(request.app.state, "run_lifecycle_service", None)
 
-
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(public_protocol_projection(event.model_dump(mode="json"))) + "\n"
-
 
 ###############################################################################
 async def _serialize_chat_event_stream(
@@ -99,7 +93,6 @@ async def _serialize_chat_event_stream(
         owner_user_id=owner_user_id,
     ):
         yield _stream_event(event)
-
 
 ###############################################################################
 def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
@@ -120,7 +113,6 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
             ),
         ) from exc
 
-
 ###############################################################################
 @router.post(
     CHAT_JOBS_ROUTE,
@@ -133,7 +125,6 @@ async def create_chat_job(
 ) -> BackgroundJobCreateResponse:
     _build_run_request(payload)
     return job_service.create_chat_job(payload)
-
 
 ###############################################################################
 @router.post(
@@ -244,7 +235,6 @@ async def chat_turn(
             detail=str(exc),
         ) from exc
 
-
 ###############################################################################
 @router.post(
     CHAT_ATTACHMENTS_ROUTE,
@@ -281,7 +271,6 @@ async def create_chat_attachment(
         expires_in_seconds=int(store.ttl_seconds),
     )
 
-
 ###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
@@ -302,7 +291,6 @@ async def chat_stream(
         ),
         media_type="application/x-ndjson",
     )
-
 
 ###############################################################################
 @router.get(
@@ -350,7 +338,6 @@ def get_models(
             ),
         ) from exc
 
-
 ###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
@@ -367,7 +354,6 @@ def get_settings(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
-
 
 ###############################################################################
 @router.patch(
@@ -389,7 +375,6 @@ def update_settings(
             detail=str(exc),
         ) from exc
 
-
 ###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -406,7 +391,6 @@ def refresh_ollama_models(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
-
 
 ###############################################################################
 @router.post(
@@ -438,7 +422,6 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Ollama pull failed.",
         ) from exc
-
 
 ###############################################################################
 @router.get(

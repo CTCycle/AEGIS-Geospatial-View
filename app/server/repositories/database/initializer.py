@@ -17,7 +17,6 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
 
-
 ###############################################################################
 def required_seed_data_missing(database: SQLiteRepository) -> bool:
     return (

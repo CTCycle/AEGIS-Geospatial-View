@@ -1404,6 +1404,7 @@ class GeospatialApiService:
                 await asyncio.sleep(_RELAY_RETRY_BACKOFF_SECONDS * attempt)
         raise AssertionError("unreachable")
 
+    # -------------------------------------------------------------------------
     async def _fetch_binary_url(
         self,
         url: str,

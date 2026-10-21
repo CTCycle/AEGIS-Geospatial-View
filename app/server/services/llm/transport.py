@@ -5,7 +5,6 @@ import math
 from dataclasses import dataclass
 from typing import Any, cast
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMTransportPolicy:
@@ -113,7 +112,6 @@ class LLMTransportPolicy:
             self.retry_backoff_base_seconds * (2**exponent),
         )
 
-
 ###############################################################################
 def close_sync_client(client: object) -> None:
     close = getattr(client, "close", None)
@@ -123,7 +121,6 @@ def close_sync_client(client: object) -> None:
         close()
     except Exception:
         return
-
 
 ###############################################################################
 def _positive_float(value: object, *, default: float) -> float:
@@ -135,7 +132,6 @@ def _positive_float(value: object, *, default: float) -> float:
         return default
     return parsed if math.isfinite(parsed) and parsed > 0 else default
 
-
 ###############################################################################
 def _non_negative_float(value: object, *, default: float) -> float:
     if isinstance(value, bool):
@@ -145,7 +141,6 @@ def _non_negative_float(value: object, *, default: float) -> float:
     except TypeError, ValueError:
         return default
     return parsed if math.isfinite(parsed) and parsed >= 0 else default
-
 
 ###############################################################################
 def _positive_int(value: object, *, default: int) -> int:

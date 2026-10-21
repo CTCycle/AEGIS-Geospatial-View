@@ -21,13 +21,11 @@ from server.services.llm.provider_contract import require_canonical_provider
 from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.types import ModelDescriptor
 
-
 ###############################################################################
 @dataclass
 class _CachedOllamaFailure:
     expires_at: float
     message: str
-
 
 ###############################################################################
 @dataclass
@@ -36,7 +34,6 @@ class _CachedModelDescriptors:
     models: list[ModelDescriptor]
     source: dict[str, object]
 
-
 ###############################################################################
 class ModelLibrarySourceError(RuntimeError):
     pass
@@ -44,9 +41,9 @@ class ModelLibrarySourceError(RuntimeError):
 
 DYNAMIC_CLOUD_PROVIDERS = ("deepseek", OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER)
 
-
 ###############################################################################
 class ChatModelLibraryService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,

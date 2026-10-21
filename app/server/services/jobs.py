@@ -34,14 +34,13 @@ from server.services.llm.errors import safe_failure_detail
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
-
 ###############################################################################
 class BackgroundJobService:
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -62,6 +61,7 @@ class BackgroundJobService:
     def poll_interval(self) -> float:
         return self._polling_interval
 
+    # -------------------------------------------------------------------------
     @property
     def has_nonterminal_jobs(self) -> bool:
         terminal = {JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED, JOB_STATUS_CANCELLED}

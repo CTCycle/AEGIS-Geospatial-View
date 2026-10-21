@@ -67,7 +67,6 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert repository.count_records(ReferenceCountryRecord) > 0
     assert repository.count_records(ApplicationRuntimeSettingsRecord) == 1
 
-
 ###############################################################################
 def test_existing_sqlite_database_is_idempotent(
     monkeypatch, tmp_path: Path

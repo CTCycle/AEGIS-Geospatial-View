@@ -10,13 +10,16 @@ from server.repositories.runtime_settings import (
 )
 
 
+###############################################################################
 class RuntimeSettingsService:
     """Application-facing service for typed runtime settings updates."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, repository: RuntimeSettingsRepository) -> None:
         self.repository = repository
         self._startup_payload = repository.get_required().runtime_payload()
 
+    # -------------------------------------------------------------------------
     def get_settings(self) -> RuntimeSettingsResponse:
         settings = self.repository.get_required()
         restart_required = self._restart_required(settings)
@@ -30,6 +33,7 @@ class RuntimeSettingsService:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def update_settings(
         self, patch: Mapping[str, Any]
     ) -> RuntimeSettingsResponse:
@@ -47,6 +51,7 @@ class RuntimeSettingsService:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def _restart_required(self, settings: AppSettings) -> bool:
         current_payload = settings.runtime_payload()
         return any(
@@ -54,6 +59,7 @@ class RuntimeSettingsService:
             for block, startup_value in self._startup_payload.items()
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _response(
         settings: AppSettings,

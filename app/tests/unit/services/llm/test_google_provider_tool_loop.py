@@ -31,7 +31,6 @@ def test_google_converts_aegis_tools_into_declarations() -> None:
         },
     }
 
-
 ###############################################################################
 def test_google_reads_selected_model_limits_from_models_api(monkeypatch) -> None:
     client = SimpleNamespace(
@@ -117,7 +116,6 @@ def test_google_classifies_tools_plus_response_schema_at_provider_boundary() -> 
         GoogleProvider(api_key="test")._validate_request_capabilities(request)
     assert error.value.category == "schema_definition"
 
-
 ###############################################################################
 def test_native_parts_survive_sequential_parallel_checkpoint_continuation() -> None:
     import json
@@ -165,7 +163,6 @@ def test_native_parts_survive_sequential_parallel_checkpoint_continuation() -> N
         assert model_content.parts[1].thought_signature == f"signature-{step}".encode()
         assert [part.function_call.id for part in model_content.parts[1:]] == [f"{step}-a", f"{step}-b"]
         assert [part["function_response"]["id"] for part in contents[step * 2 + 1]["parts"]] == [f"{step}-a", f"{step}-b"]
-
 
 ###############################################################################
 def test_only_first_google_candidate_is_executed() -> None:

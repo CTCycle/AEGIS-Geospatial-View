@@ -21,7 +21,6 @@ from tests.e2e.helpers.model_capability_metadata import (
     selected_model_tool_support_metadata,
 )
 
-
 ###############################################################################
 def _check_selected_model_capability(
     page: Page, api_base_url: str
@@ -29,7 +28,6 @@ def _check_selected_model_capability(
     ready, reason, evidence = selected_model_tool_support_metadata(page, api_base_url)
     evidence["tested_commit"] = os.environ.get("APP_TEST_COMMIT") or "unknown"
     return ready, reason, evidence
-
 
 ###############################################################################
 def _record_capability_metadata(
@@ -45,13 +43,11 @@ def _record_capability_metadata(
         evidence,
     )
 
-
 ###############################################################################
 def _assert_clean_backend_tail(tail: str) -> None:
     normalized = tail.lower()
     assert "traceback" not in normalized
     assert "unhandled exception" not in normalized
-
 
 ###############################################################################
 def _read_conversation_id(page: Page) -> str | None:
@@ -69,7 +65,6 @@ def _read_conversation_id(page: Page) -> str | None:
         if isinstance(conversation_id, str) and conversation_id
         else None
     )
-
 
 ###############################################################################
 def test_live_chat_happy_path(
@@ -122,7 +117,6 @@ def test_live_chat_happy_path(
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
-
 ###############################################################################
 def test_live_follow_up_same_conversation(
     page: Page,
@@ -174,7 +168,6 @@ def test_live_follow_up_same_conversation(
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
-
 ###############################################################################
 def test_live_new_chat_reset(
     page: Page,
@@ -208,7 +201,6 @@ def test_live_new_chat_reset(
         ],
         backend_log_status="not collected for reset-only flow",
     )
-
 
 ###############################################################################
 def test_live_degraded_path_shows_user_failure_without_crash(

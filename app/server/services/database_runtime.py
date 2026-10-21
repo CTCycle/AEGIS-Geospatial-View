@@ -30,18 +30,22 @@ from server.repositories.schemas import Base
 LOGGER = logging.getLogger(__name__)
 
 
+###############################################################################
 class DatabaseConnectionError(RuntimeError):
     """Raised when a SQLite target cannot be safely opened or initialized."""
 
 
+###############################################################################
 class DatabaseRuntimeBusyError(RuntimeError):
     """Raised when a runtime switch would interrupt active application work."""
 
 
+###############################################################################
 class DatabaseRuntimeSwitchError(RuntimeError):
     """Raised when preparing or activating a replacement runtime fails."""
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SQLiteTargetInspection:
     configuration: DatabaseConfiguration
@@ -49,6 +53,7 @@ class SQLiteTargetInspection:
     message: str
 
 
+###############################################################################
 def inspect_database_configuration(
     configuration: DatabaseConfiguration,
 ) -> SQLiteTargetInspection:
@@ -150,6 +155,7 @@ def inspect_database_configuration(
     )
 
 
+###############################################################################
 def database_test_response(
     configuration: DatabaseConfiguration,
 ) -> DatabaseConnectionTestResponse:
@@ -163,6 +169,7 @@ def database_test_response(
     )
 
 
+###############################################################################
 def database_settings_response(
     configuration: DatabaseConfiguration,
 ) -> DatabaseSettingsResponse:
@@ -174,9 +181,11 @@ def database_settings_response(
     )
 
 
+###############################################################################
 class DatabaseRuntimeManager:
     """Coordinates connection admission and safe, process-local runtime swaps."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -199,11 +208,13 @@ class DatabaseRuntimeManager:
         self._active_requests = 0
         self._switching = False
 
+    # -------------------------------------------------------------------------
     @property
     def configuration(self) -> DatabaseConfiguration:
         with self._lock:
             return self._configuration
 
+    # -------------------------------------------------------------------------
     def enter_request(self) -> bool:
         with self._lock:
             if self._switching:
@@ -211,15 +222,18 @@ class DatabaseRuntimeManager:
             self._active_requests += 1
             return True
 
+    # -------------------------------------------------------------------------
     def leave_request(self) -> None:
         with self._lock:
             self._active_requests = max(0, self._active_requests - 1)
 
+    # -------------------------------------------------------------------------
     async def test_connection(
         self, configuration: DatabaseConfiguration
     ) -> DatabaseConnectionTestResponse:
         return await asyncio.to_thread(database_test_response, configuration)
 
+    # -------------------------------------------------------------------------
     async def switch_database(
         self, configuration: DatabaseConfiguration
     ) -> DatabaseSettingsResponse:
@@ -318,6 +332,7 @@ class DatabaseRuntimeManager:
             if owns_switch_gate:
                 self._finish_switch()
 
+    # -------------------------------------------------------------------------
     def _begin_switch(self) -> None:
         with self._lock:
             if self._switching:
@@ -330,18 +345,22 @@ class DatabaseRuntimeManager:
                 )
             self._switching = True
 
+    # -------------------------------------------------------------------------
     def _finish_switch(self) -> None:
         with self._lock:
             self._switching = False
 
 
+###############################################################################
 class DatabaseRuntimeGateMiddleware:
     """Counts complete HTTP/WebSocket lifetimes and pauses new work during swaps."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, app: Any, *, state: Any) -> None:
         self.app = app
         self.state = state
 
+    # -------------------------------------------------------------------------
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         kind = scope.get("type")
         path = str(scope.get("path", ""))

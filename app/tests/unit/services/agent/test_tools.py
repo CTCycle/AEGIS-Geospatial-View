@@ -146,7 +146,6 @@ def _state() -> AgentRunState:
         user_message="show hospitals",
     )
 
-
 ###############################################################################
 @pytest.mark.parametrize("task_mode", ["answer", "clarify"])
 def test_answer_and_clarify_routes_expose_no_execution_tools(task_mode: str) -> None:
@@ -162,7 +161,6 @@ def test_answer_and_clarify_routes_expose_no_execution_tools(task_mode: str) -> 
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
 
     assert registry.expose(state) == []
-
 
 ###############################################################################
 def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
@@ -180,7 +178,6 @@ def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
         "osm_default",
     ]
 
-
 ###############################################################################
 def test_route_request_schema_inlines_enums_and_nested_scopes() -> None:
     tool = _registry().get("route_request")
@@ -192,7 +189,6 @@ def test_route_request_schema_inlines_enums_and_nested_scopes() -> None:
     assert schema["properties"]["primary_domain"]["enum"] == [
         domain.value for domain in CapabilityDomain
     ]
-
 
 ###############################################################################
 def test_map_only_routes_expose_map_preparation_without_data_execution() -> None:
@@ -218,7 +214,6 @@ def test_map_only_routes_expose_map_preparation_without_data_execution() -> None
     assert "apply_map_plan" in exposed
     assert "execute_geospatial_capability" not in exposed
 
-
 ###############################################################################
 def test_new_route_target_location_mode_resolution_even_with_active_map() -> None:
     registry = _registry()
@@ -241,7 +236,6 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
     exposed = {tool.name for tool in registry.expose(state)}
 
     assert "resolve_geospatial_location" in exposed
-
 
 ###############################################################################
 def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() -> None:
@@ -271,7 +265,6 @@ def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() ->
     assert "resolve_geospatial_location" not in exposed
     assert "execute_geospatial_capability" in exposed
 
-
 ###############################################################################
 def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None:
     registry = _registry()
@@ -293,7 +286,6 @@ def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None
     assert "transform_evidence" not in exposed
     assert "inspect_evidence" not in exposed
     assert "discover_geospatial_capabilities" not in exposed
-
 
 ###############################################################################
 def test_capability_discovery_route_does_not_expose_data_execution() -> None:
@@ -323,7 +315,6 @@ def test_capability_discovery_route_does_not_expose_data_execution() -> None:
     assert "describe_geospatial_capability" in exposed
     assert "execute_geospatial_capability" not in exposed
 
-
 ###############################################################################
 def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> None:
     registry = _registry()
@@ -352,7 +343,6 @@ def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> N
 
     assert "discover_geospatial_capabilities" in exposed
     assert "execute_geospatial_capability" not in exposed
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -384,7 +374,6 @@ async def test_compatibility_state_has_no_foreign_run_id() -> None:
 
     assert service.context is not None
     assert service.context.run_id is None
-
 
 ###############################################################################
 def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() -> None:
@@ -442,7 +431,6 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
     assert bound.arguments == {"category": "hospital", "live": True}
     assert bound.filters == {"amenity": "hospital", "emergency": True}
 
-
 ###############################################################################
 def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
     state = _state()
@@ -472,7 +460,6 @@ def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
     )
 
     assert bound.bbox == [11.4, 36.6, 15.7, 38.4]
-
 
 ###############################################################################
 def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None:
@@ -509,7 +496,6 @@ def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None
 
     assert bound.radius_m is None
     assert bound.bbox == [-97.9367663, 30.0985133, -97.5605288, 30.5166255]
-
 
 ###############################################################################
 def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> None:
@@ -561,7 +547,6 @@ def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> Non
 
     assert _map_plan_semantic_validator(plan, state) == []
 
-
 ###############################################################################
 def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
     state = _state()
@@ -586,7 +571,6 @@ def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
         "location_ref must match an exact target in the validated goal; "
         "another geography will not be substituted."
     ]
-
 
 ###############################################################################
 def test_manifest_argument_schema_is_checked_before_execution() -> None:
@@ -664,7 +648,6 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
         "apply_map_plan",
     }
 
-
 ###############################################################################
 def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
     registry = _registry()
@@ -693,7 +676,6 @@ def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
     assert "inspect_evidence" not in exposed
     assert "transform_evidence" not in exposed
 
-
 ###############################################################################
 def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
     registry = _registry()
@@ -721,7 +703,6 @@ def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
     assert "apply_map_plan" in exposed
     assert "inspect_evidence" not in exposed
     assert "transform_evidence" not in exposed
-
 
 ###############################################################################
 def test_map_add_route_ignores_capability_target_for_location_prerequisite() -> None:
@@ -829,7 +810,6 @@ def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "capability_not_shortlisted"
 
-
 ###############################################################################
 def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
     registry = _registry()
@@ -858,7 +838,6 @@ def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
 
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "route_domain_mismatch"
-
 
 ###############################################################################
 def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None:
@@ -913,7 +892,6 @@ def test_location_reference_never_falls_back_to_another_resolved_location() -> N
     assert _location_for_request(
         ExecuteCapabilityInput(capability_id="places:hospitals"), state
     ) is None
-
 
 ###############################################################################
 def test_location_reference_also_matches_the_resolved_label() -> None:
@@ -982,7 +960,6 @@ class _FakeProviderLayerService:
             ],
         )
 
-
 ###############################################################################
 class _FakeEvidenceStore:
 
@@ -994,7 +971,6 @@ class _FakeEvidenceStore:
     def create(self, **kwargs: Any) -> Any:
         self.payload = kwargs
         return type("Evidence", (), {"evidence_id": "evidence-provider-layers"})()
-
 
 ###############################################################################
 def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
@@ -1026,7 +1002,6 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
     assert "discover_geospatial_provider_layers" not in {
         tool.name for tool in registry.expose(state)
     }
-
 
 ###############################################################################
 @pytest.mark.asyncio

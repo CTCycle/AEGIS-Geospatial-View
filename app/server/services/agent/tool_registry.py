@@ -192,7 +192,6 @@ class ToolRegistry:
                     return False
         return True
 
-
 ###############################################################################
 def _catalog_discovery_can_continue(state: "AgentRunState") -> bool:
     """Expose discovery again only while a catalog page remains or a retry is needed."""
@@ -227,7 +226,6 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
     }
 )
 
-
 ###############################################################################
 def route_target_location_available(state: "AgentRunState") -> bool:
     """Check the validated route targets, not merely any prior map state."""
@@ -254,7 +252,6 @@ def route_target_location_available(state: "AgentRunState") -> bool:
         for target in target_refs
     )
 
-
 ###############################################################################
 def _is_active_map_update(state: "AgentRunState") -> bool:
     route = state.route
@@ -267,7 +264,6 @@ def _is_active_map_update(state: "AgentRunState") -> bool:
         in _ACTIVE_MAP_UPDATE_OPERATIONS
         and route.spatial_scope is None
     )
-
 
 ###############################################################################
 def _evidence_available_for_route(state: "AgentRunState") -> bool:
@@ -296,7 +292,6 @@ def _evidence_available_for_route(state: "AgentRunState") -> bool:
         )
     return bool(state.evidence_refs)
 
-
 ###############################################################################
 def _task_mode_allows_tool(
     registered: RegisteredTool, state: "AgentRunState"
@@ -309,14 +304,12 @@ def _task_mode_allows_tool(
         return True
     return state.route is not None and state.route.task_mode == "execute"
 
-
 ###############################################################################
 def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
     route = state.route
     if route is None:
         return set()
     return {route.primary_domain, *route.secondary_domains}
-
 
 ###############################################################################
 def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
@@ -349,7 +342,6 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
         return True
     return bool(registered.domains.intersection(route_domains))
 
-
 ###############################################################################
 def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
@@ -357,7 +349,6 @@ def _evidence_analysis_required(state: "AgentRunState") -> bool:
         return False
     return (route.analysis is not None or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
             or route.operation == "inspect_evidence")
-
 
 ###############################################################################
 def _history_recall_required(state: "AgentRunState") -> bool:
@@ -371,7 +362,6 @@ def _history_recall_required(state: "AgentRunState") -> bool:
         marker in terms
         for marker in ("history", "conversation", "earlier", "previous", "remember")
     )
-
 
 ###############################################################################
 def _data_obligation_unmet(state: "AgentRunState") -> bool:
@@ -406,6 +396,7 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
 __all__ = ["ToolRegistry"]
 
 
+###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:
     if state.route is None or state.route.analysis is None:
         return True

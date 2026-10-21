@@ -57,7 +57,6 @@ def test_hierarchical_normalized_location_does_not_duplicate_parent_query() -> N
     assert result.longitude == -95.5555
     assert calls == ["Paris, Texas, USA"]
 
-
 ###############################################################################
 @pytest.mark.parametrize(
     ("display_name", "address", "expected_longitude"),
@@ -89,7 +88,11 @@ def test_explicit_country_qualifier_rejects_unrelated_geocoder_candidate(
     address: dict[str, str],
     expected_longitude: float | None,
 ) -> None:
+
+    ###############################################################################
     class Geocoder:
+
+        # -------------------------------------------------------------------------
         async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
             return {
                 "display_name": display_name,
@@ -1142,6 +1145,7 @@ def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> N
     run_async_in_thread(_run())
 
 
+###############################################################################
 def test_location_resolver_matches_local_ordinals_from_signage_to_english_display() -> None:
 
     ###############################################################################

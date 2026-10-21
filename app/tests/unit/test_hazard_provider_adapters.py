@@ -351,7 +351,6 @@ def test_noaa_provider_resolves_missing_alert_geometry_from_affected_zones() -> 
     assert response.partial is False
     assert response.warnings == []
 
-
 ###############################################################################
 def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavailable() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
@@ -453,6 +452,7 @@ def test_nasa_firms_normalizes_live_csv() -> None:
     assert response.payload["features"][0]["timestamp"] == "2026-05-11T09:30:00Z"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_usgs_magnitude_filter_feed_and_dated_query():
     urls = []
@@ -470,6 +470,7 @@ async def test_usgs_magnitude_filter_feed_and_dated_query():
     assert "minmagnitude=2.5" in urls[-1]
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_emsc_queries_seismicportal_and_normalizes_events():
     urls = []
@@ -489,6 +490,7 @@ async def test_emsc_queries_seismicportal_and_normalizes_events():
     assert "M2.5-3" in response.coverage["completeness_note"]
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_emsc_empty_204_body_is_valid_empty(monkeypatch):
     async def empty_body(url, headers=None):
@@ -499,6 +501,7 @@ async def test_emsc_empty_204_body_is_valid_empty(monkeypatch):
     assert response.result_status == "valid_empty"
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_macro_region_keeps_member_and_nearby_offshore_events_only():
     events = {"anatolia": (39.5, 28.5), "aegean_off_greece": (38.6, 24.3), "athens": (37.98, 23.73)}

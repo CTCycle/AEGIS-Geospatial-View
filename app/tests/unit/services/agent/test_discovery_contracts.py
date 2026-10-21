@@ -23,6 +23,7 @@ from server.services.catalog.loader import load_macro_regions
 from tests.unit.services.agent.test_native_discovery_trajectories import MemoryEvidence
 
 
+###############################################################################
 def state(area: str = "Europe") -> AgentRunState:
     value = AgentRunState(request_id="test", conversation_id="test", phase=AgentPhase.BUILD_TOOL_CONTEXT,
                           user_message="Where is it hottest?")
@@ -32,6 +33,7 @@ def state(area: str = "Europe") -> AgentRunState:
     return value
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_macro_region_never_geocodes() -> None:
     geocoder = AsyncMock()
@@ -44,6 +46,7 @@ async def test_macro_region_never_geocodes() -> None:
     assert all(find_macro_region(name) is None for name in ["Georgia", "Springfield", "Florence", "America"])
 
 
+###############################################################################
 def test_duplicate_macro_alias_is_rejected(tmp_path: Path) -> None:
     (tmp_path / "reference").mkdir()
     region = {"id": "a", "name": "A", "aliases": ["shared"], "bbox": [-10, 0, 10, 10], "kind": "subregion"}
@@ -52,6 +55,7 @@ def test_duplicate_macro_alias_is_rejected(tmp_path: Path) -> None:
         load_macro_regions(tmp_path)
 
 
+###############################################################################
 @pytest.mark.parametrize("area", ["Europe", "World"])
 def test_binding_owns_sampling_extent_and_recent_window(area: str) -> None:
     value = state(area)
@@ -69,6 +73,7 @@ def test_binding_owns_sampling_extent_and_recent_window(area: str) -> None:
     assert "sampling" not in _bind_execute_request(ExecuteCapabilityInput(capability_id="weather", arguments={"sampling": "area"}), value).arguments
 
 
+###############################################################################
 def test_stale_location_and_analysis_map_gate() -> None:
     value = state("Italy")
     value.location_refs["lyon"] = find_macro_region("Europe").model_copy(update={"label": "Lyon"})
@@ -83,6 +88,7 @@ def test_stale_location_and_analysis_map_gate() -> None:
     assert ToolRegistry._prerequisites_satisfied(frozenset({"analysis_complete_if_required"}), value)
 
 
+###############################################################################
 def test_text_stop_is_no_progress_while_derived_locations_are_pending() -> None:
     value = state()
     value.context_hydrated = True
@@ -92,6 +98,7 @@ def test_text_stop_is_no_progress_while_derived_locations_are_pending() -> None:
     assert AgentLoop._evaluate_text_stop(value, value.route, "Done", available_tools=["transform_evidence"])[0] == "no_progress"
 
 
+###############################################################################
 def test_analysis_requires_distinct_executes() -> None:
     value = state()
     value.route.capability_queries = ["weather", "earthquakes"]
@@ -106,6 +113,7 @@ def test_analysis_requires_distinct_executes() -> None:
     assert not _data_obligation_unmet(value)
 
 
+###############################################################################
 def test_raster_descriptor_does_not_close_numeric_retrieval() -> None:
     value = state()
     value.tool_results.append(ToolResult(call_id="raster", tool_name="execute_geospatial_capability", status="success", summary="descriptor",
@@ -113,6 +121,7 @@ def test_raster_descriptor_does_not_close_numeric_retrieval() -> None:
     assert _data_obligation_unmet(value)
 
 
+###############################################################################
 def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -> None:
     from server.repositories.agent_runs import redact_trace_payload
     intent = {"kind": "rank", "metric": "rain", "order": "descending", "top_k": 5}
@@ -124,6 +133,7 @@ def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -
     assert "analysis" not in redact_trace_payload({"location_mode": "target", "analysis": {**intent, "thoughts": "private"}})
 
 
+###############################################################################
 def test_numeric_sort_spatial_epoch_statistics_and_grid() -> None:
     records = [{"latitude": 45, "longitude": 8, "value": 9, "time": 1767225600000},
                {"latitude": 45.1, "longitude": 8.1, "value": 100, "time": 1767229200000},
@@ -140,6 +150,7 @@ def test_numeric_sort_spatial_epoch_statistics_and_grid() -> None:
     assert statistics["mean"] == 54.5 and statistics["argmax"]["value"] == 100
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_derived_bbox_preview_and_provenance() -> None:
     repo = MemoryEvidence()
@@ -158,6 +169,7 @@ async def test_derived_bbox_preview_and_provenance() -> None:
     assert result.data["preview"][0]["value"] == 100
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_transform_labels_leading_coordinate_points_with_nearest_place() -> None:
     repo = MemoryEvidence()
@@ -183,6 +195,7 @@ async def test_transform_labels_leading_coordinate_points_with_nearest_place() -
     assert result.data["place_labelled_count"] == 9
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder():
     from server.domain.agent.evidence import AgentEvidenceEnvelope
@@ -202,6 +215,7 @@ async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder()
     assert error.value.code == "invalid_value_field"
 
 
+###############################################################################
 def test_discovery_prompt_requires_disclosure_and_forbids_overclaiming():
     from server.prompts.agent import build_native_agent_system_prompt
     prompt = build_native_agent_system_prompt()

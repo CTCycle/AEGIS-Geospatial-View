@@ -55,7 +55,6 @@ _GEOJSON_GEOMETRY_TYPES = frozenset(
 _RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"})
 _RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
 
-
 ###############################################################################
 class MapPlanBuildError(ValueError):
 
@@ -567,7 +566,6 @@ def _usable_render_url(value: object) -> bool:
         return bool(parsed.netloc)
     return candidate.startswith("/")
 
-
 ###############################################################################
 def _first_non_proxy_url(*values: object) -> str | None:
     for value in values:
@@ -577,7 +575,6 @@ def _first_non_proxy_url(*values: object) -> str | None:
         if candidate and not candidate.startswith("/api/geospatial/tiles/"):
             return candidate
     return None
-
 
 ###############################################################################
 def _valid_geojson_feature_collection(value: object) -> bool:
@@ -590,14 +587,12 @@ def _valid_geojson_feature_collection(value: object) -> bool:
         _valid_geojson_feature(feature) for feature in feature_items
     )
 
-
 ###############################################################################
 def _valid_geojson_feature(value: object) -> bool:
     feature = json_object(value)
     return feature.get("type") == "Feature" and _valid_geojson_geometry(
         feature.get("geometry")
     )
-
 
 ###############################################################################
 def _valid_geojson_geometry(value: object) -> bool:
@@ -647,14 +642,12 @@ def _valid_geojson_geometry(value: object) -> bool:
         ),
     )
 
-
 ###############################################################################
 def _valid_geojson_position(value: object) -> bool:
     if not isinstance(value, list):
         return False
     position = cast(list[object], value)
     return len(position) >= 2 and all(_finite_number(item) for item in position)
-
 
 ###############################################################################
 def _finite_number(value: object) -> bool:
@@ -664,7 +657,6 @@ def _finite_number(value: object) -> bool:
         return isfinite(float(value))
     except (OverflowError, ValueError):
         return False
-
 
 ###############################################################################
 def _valid_geojson_sequence(
@@ -700,7 +692,6 @@ def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
         center_longitude=location.longitude,
         bbox=bbox,
     )
-
 
 ###############################################################################
 def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
@@ -806,7 +797,6 @@ def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:
             if bbox is not None:
                 return bbox
     return None
-
 
 ###############################################################################
 def _geojson_render_data(value: object) -> dict[str, Any] | None:

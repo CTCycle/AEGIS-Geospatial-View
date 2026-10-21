@@ -24,7 +24,6 @@ class AgentAnalysisIntent(BaseModel):
     order: str = Field(default="descending", max_length=40)
     top_k: int = Field(default=5, ge=1, le=25)
 
-
 ###############################################################################
 class CapabilityRoute(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -53,7 +52,6 @@ class CapabilityRoute(BaseModel):
     spatial_scope: "AgentSpatialScope | None" = None
     filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
-
 ###############################################################################
 class AgentTemporalScope(BaseModel):
     """Provider-neutral temporal intent selected during route bootstrap."""
@@ -66,7 +64,6 @@ class AgentTemporalScope(BaseModel):
     end_time_iso: str | None = Field(default=None, max_length=80)
     granularity: str = Field(default="none", max_length=40)
     aggregation: str = Field(default="none", max_length=40)
-
 
 ###############################################################################
 class AgentSpatialScope(BaseModel):
@@ -121,7 +118,6 @@ class AgentGoal(BaseModel):
         default_factory=lambda: dict[str, object]()
     )
 
-
 ###############################################################################
 class CompletionContract(BaseModel):
     """Deterministic obligations the native loop must satisfy."""
@@ -155,7 +151,6 @@ CompletionRequirementKind = Literal[
     "render_ack",
     "final_text",
 ]
-
 
 ###############################################################################
 class CompletionRequirement(BaseModel):
@@ -208,7 +203,6 @@ TaskStatus = Literal[
     "superseded",
 ]
 
-
 ###############################################################################
 class AgentTask(BaseModel):
     """One lightweight, run-scoped obligation.
@@ -236,7 +230,6 @@ class AgentTask(BaseModel):
         """Compatibility/readability alias for consumers that call it ``id``."""
 
         return self.task_id
-
 
 ###############################################################################
 class AgentTaskState(BaseModel):
@@ -347,7 +340,6 @@ class AgentTaskState(BaseModel):
     def to_payload(self) -> dict[str, object]:
         return self.model_dump(mode="json", exclude_none=True)
 
-
 ###############################################################################
 def _safe_task_id(value: str) -> str:
     normalized = "-".join(str(value).strip().casefold().split())
@@ -391,7 +383,6 @@ class AgentPhase(StrEnum):
     AWAIT_RENDER = "await_render"
     FINALIZE = "finalize"
     FAILED = "failed"
-
 
 ###############################################################################
 class LoopDecision(StrEnum):
@@ -594,7 +585,6 @@ class AgentRunState(BaseModel):
         state.current_iteration = cumulative
         state.iteration = cumulative
         return state
-
 
 ###############################################################################
 def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:

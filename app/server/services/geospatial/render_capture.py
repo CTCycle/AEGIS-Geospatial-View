@@ -27,7 +27,6 @@ DEFAULT_CAPTURE_TTL_SECONDS = 900.0
 # User-uploaded images share the capture bounds and TTL under this session key.
 USER_ATTACHMENT_SESSION = "user_attachment"
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RenderCapture:
@@ -45,7 +44,6 @@ class RenderCapture:
     def image_bytes(self) -> bytes:
         return base64.b64decode(self.image_base64)
 
-
 ###############################################################################
 def _is_valid_base64(value: str) -> bool:
     if not value:
@@ -56,11 +54,11 @@ def _is_valid_base64(value: str) -> bool:
     except (ValueError, TypeError):
         return False
 
-
 ###############################################################################
 class RenderCaptureStore:
     """Bounded in-memory capture registry keyed by the run identity tuple."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, ttl_seconds: float = DEFAULT_CAPTURE_TTL_SECONDS) -> None:
         self.ttl_seconds = float(ttl_seconds)
         self._captures: dict[tuple[str, str, int], RenderCapture] = {}

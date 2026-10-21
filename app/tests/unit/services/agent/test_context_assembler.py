@@ -128,7 +128,6 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert package.map_memory == location
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
 
-
 ###############################################################################
 def test_active_overlay_identity_survives_context_bounding() -> None:
     package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(

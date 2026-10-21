@@ -233,6 +233,7 @@ _OUTSIDE_POINT = (
     '"geometry":{"type":"Point","coordinates":[7.0,45.0]}}'
 )
 
+###############################################################################
 def _snapshot(tmp_path: Path) -> dict[str, bytes]:
     return {
         str(path.relative_to(tmp_path)): path.read_bytes()

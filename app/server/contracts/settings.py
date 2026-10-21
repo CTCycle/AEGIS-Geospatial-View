@@ -18,6 +18,7 @@ from server.configurations.settings import (
 )
 
 
+###############################################################################
 class RuntimeSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -36,6 +37,7 @@ class RuntimeSettingsResponse(BaseModel):
     message: str | None = None
 
 
+###############################################################################
 class RuntimeSettingsUpdateRequest(BaseModel):
     """A strict top-level partial update; nested values are validated atomically."""
 
@@ -52,6 +54,7 @@ class RuntimeSettingsUpdateRequest(BaseModel):
     gibs: dict[str, Any] | None = None
     agent_execution: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     def as_patch(self) -> dict[str, dict[str, Any]]:
         return {
             key: value

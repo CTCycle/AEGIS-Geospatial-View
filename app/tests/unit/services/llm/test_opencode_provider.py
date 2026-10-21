@@ -183,7 +183,6 @@ def test_go_catalog_leaves_tool_support_unknown_when_model_omits_capabilities(
     assert "tools" not in models[1].capabilities
     assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
 
-
 ###############################################################################
 def test_go_catalog_uses_explicit_model_tool_capabilities(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -200,7 +199,6 @@ def test_go_catalog_uses_explicit_model_tool_capabilities(monkeypatch) -> None:
     assert model.metadata["supports_tools"] is True
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" in model.capabilities
-
 
 ###############################################################################
 def test_go_catalog_uses_explicit_support_flag_when_present(monkeypatch) -> None:
@@ -219,7 +217,6 @@ def test_go_catalog_uses_explicit_support_flag_when_present(monkeypatch) -> None
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" in model.capabilities
 
-
 ###############################################################################
 def test_go_catalog_preserves_explicitly_unsupported_tool_support(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -236,7 +233,6 @@ def test_go_catalog_preserves_explicitly_unsupported_tool_support(monkeypatch) -
     assert model.metadata["supports_tools"] is False
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" not in model.capabilities
-
 
 ###############################################################################
 def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(

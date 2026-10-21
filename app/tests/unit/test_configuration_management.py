@@ -12,12 +12,14 @@ from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.schemas import Base
 
 
+###############################################################################
 def _runtime_repository(tmp_path: Path) -> RuntimeSettingsRepository:
     database = SQLiteRepository(DatabaseSettings(str(tmp_path / "runtime.db")))
     Base.metadata.create_all(database.engine)
     return RuntimeSettingsRepository(database)
 
 
+###############################################################################
 def _runtime_row_count(tmp_path: Path) -> int:
     with sqlite3.connect(tmp_path / "runtime.db") as connection:
         row = connection.execute(
@@ -27,6 +29,7 @@ def _runtime_row_count(tmp_path: Path) -> int:
     return int(row[0])
 
 
+###############################################################################
 def test_runtime_repository_seeds_database_defaults_once(tmp_path: Path) -> None:
     repository = _runtime_repository(tmp_path)
 
@@ -38,6 +41,7 @@ def test_runtime_repository_seeds_database_defaults_once(tmp_path: Path) -> None
     assert _runtime_row_count(tmp_path) == 1
 
 
+###############################################################################
 def test_runtime_repository_rolls_back_failed_settings_commit(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -55,6 +59,7 @@ def test_runtime_repository_rolls_back_failed_settings_commit(
     assert _runtime_row_count(tmp_path) == 0
 
 
+###############################################################################
 def test_existing_runtime_row_remains_authoritative(tmp_path: Path) -> None:
     repository = _runtime_repository(tmp_path)
     repository.initialize_defaults()
@@ -67,6 +72,7 @@ def test_existing_runtime_row_remains_authoritative(tmp_path: Path) -> None:
     assert _runtime_row_count(tmp_path) == 1
 
 
+###############################################################################
 def test_runtime_repository_updates_one_block_atomically(tmp_path: Path) -> None:
     repository = _runtime_repository(tmp_path)
     repository.initialize_defaults()
@@ -80,6 +86,7 @@ def test_runtime_repository_updates_one_block_atomically(tmp_path: Path) -> None
     assert repository.get_required().map.tiles == "CartoDB Positron"
 
 
+###############################################################################
 def test_agent_execution_vision_policy_defaults_and_round_trip() -> None:
     defaults = AppSettings().agent_execution
     assert defaults.vision_policy == "disabled"
@@ -97,6 +104,7 @@ def test_agent_execution_vision_policy_defaults_and_round_trip() -> None:
     assert server_settings.agent_execution.vision_max_calls == 4
 
 
+###############################################################################
 def test_agent_execution_rejects_unknown_vision_policy() -> None:
     payload = AppSettings().runtime_payload()
     payload["agent_execution"]["vision_policy"] = "sometimes"

@@ -10,7 +10,6 @@ import server.app as app_module
 from server.configurations import environment
 from server.repositories.model_settings import ModelSettingsRepository
 
-
 ###############################################################################
 def test_application_starts_against_isolated_sqlite_database(
     monkeypatch,
@@ -57,6 +56,7 @@ def test_application_starts_against_isolated_sqlite_database(
     assert reference_count is not None and reference_count[0] > 0
 
 
+###############################################################################
 def test_dynamic_provider_outage_does_not_block_isolated_application_startup(
     monkeypatch,
     tmp_path: Path,
@@ -117,6 +117,7 @@ def test_dynamic_provider_outage_does_not_block_isolated_application_startup(
     assert (data_dir / "database.db").is_file()
 
 
+###############################################################################
 def test_database_switch_keeps_each_database_settings_independent_and_survives_restart(
     monkeypatch,
     tmp_path: Path,

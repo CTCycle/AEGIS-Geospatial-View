@@ -635,7 +635,6 @@ class CapabilityRegistry:
         )
         return candidates[:bounded_limit]
 
-
 ###############################################################################
 def _preferred_area_bonus(
     contract: dict[str, Any], location: ResolvedLocation | None
@@ -721,7 +720,6 @@ def _contract_supports(
         return False
     return True
 
-
 ###############################################################################
 def _operation_candidates(operation: str) -> set[str]:
     """Map compound user-semantic operations to manifest primitives."""
@@ -777,7 +775,6 @@ def _operation_candidates(operation: str) -> set[str]:
         candidates.add("show")
     return candidates
 
-
 ###############################################################################
 def _runtime_supports_render(
     runtime_registry: RuntimeEligibility, capability_id: str
@@ -791,7 +788,6 @@ def _runtime_supports_render(
         return True
     return bool(supports_mode(capability_id, "map"))
 
-
 ###############################################################################
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
     if is_json_object(capability.get("executionContract")):
@@ -800,7 +796,6 @@ def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
         return True
     metadata = json_object(capability.get("metadata"))
     return is_json_object(metadata.get("execution_contract"))
-
 
 ###############################################################################
 def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
@@ -865,7 +860,6 @@ def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
             )
         )
     return True
-
 
 ###############################################################################
 def _avoid_when_conflicts(
@@ -966,7 +960,6 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         for token in _query_tokens(value if is_json_array(value) else [value])
     }
 
-
 ###############################################################################
 def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
     """Return high-signal identity terms used only for deterministic ranking."""
@@ -982,7 +975,6 @@ def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
         for value in values
         for token in _raw_query_tokens(value if is_json_array(value) else [value])
     }
-
 
 ###############################################################################
 def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
@@ -1011,7 +1003,6 @@ def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
                 terms.add(token)
     return terms, recognized
 
-
 ###############################################################################
 def _routing_variant_matches(
     capability: dict[str, Any],
@@ -1037,7 +1028,6 @@ def _routing_variant_matches(
         ):
             return True
     return False
-
 
 ###############################################################################
 def _routing_searchable_text(
@@ -1110,7 +1100,6 @@ def _query_tokens(values: Sequence[object]) -> set[str]:
                 tokens.add(token[:-1])
             tokens.update(_QUERY_ALIASES.get(token, set()))
     return tokens
-
 
 ###############################################################################
 def _raw_query_tokens(values: Sequence[object]) -> set[str]:

@@ -89,7 +89,9 @@ async def test_catalog_pages_continue_without_additional_model_calls() -> None:
     assert provider.requests == []
     assert messages == []
 
+###############################################################################
 class FakeProvider:
+
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
@@ -100,9 +102,9 @@ class FakeProvider:
         self.requests.append({"request": request, "kwargs": kwargs})
         return self.results.popleft()
 
-
 ###############################################################################
 class VisionFakeProvider(FakeProvider):
+
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult], *, vision: bool | None = True) -> None:
         super().__init__(results)
@@ -384,7 +386,6 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
     assert simple_budget.total_seconds == 150
     assert complex_budget.total_seconds == 300
 
-
 ###############################################################################
 def test_verified_render_closes_map_completion_contract() -> None:
     state = _state()
@@ -423,7 +424,6 @@ def test_verified_render_closes_map_completion_contract() -> None:
     )
 
     assert stop == ("goal_satisfied", "The map is ready.")
-
 
 ###############################################################################
 def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
@@ -470,7 +470,6 @@ def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     assert "missing_source" in outcome.final_text
     assert "The selected source was not registered." in outcome.final_text
     assert "generic_validation" not in outcome.final_text
-
 
 ###############################################################################
 def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
@@ -531,7 +530,6 @@ def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
         max_validation_corrections=2,
         max_discovery_attempts=2,
     ) == expected
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -594,7 +592,6 @@ async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correctio
     ] == ["failed_render_recovery"]
     assert provider.requests[1]["kwargs"]["tool_choice"] == "auto"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
@@ -653,7 +650,6 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_verified_render_suppresses_raw_dsml_finalization_content() -> None:
@@ -684,7 +680,6 @@ async def test_verified_render_suppresses_raw_dsml_finalization_content() -> Non
     completed = [event for event in events if event.kind == "finalization_completed"]
     assert len(completed) == 1
     assert completed[0].payload["outcome"] == "protocol_text_suppressed"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -778,7 +773,6 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.temporal_scope_required is True
     assert state.completion_contract.spatial_scope_required is True
 
-
 ###############################################################################
 def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None:
     state = _state()
@@ -826,7 +820,6 @@ def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None
         state
     ) == []
 
-
 ###############################################################################
 def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> None:
     state = _state()
@@ -864,7 +857,6 @@ def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> N
         state
     ) == []
 
-
 ###############################################################################
 def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> None:
     state = _state()
@@ -889,7 +881,6 @@ def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary()
     assert state.completion_contract is not None
     assert state.completion_contract.data_requirement == "provider_data"
     assert "required_data_retrieved" in state.completion_contract.requirements
-
 
 ###############################################################################
 def test_capability_discovery_route_completes_on_catalog_result() -> None:
@@ -955,7 +946,6 @@ def test_capability_discovery_route_completes_on_catalog_result() -> None:
     )
     assert AgentLoop._pending_catalog_discovery_cursor(state) is None  # pyright: ignore[reportPrivateUsage]
 
-
 ###############################################################################
 def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
     state = _state()
@@ -985,7 +975,6 @@ def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
         max_validation_corrections=3,
         max_discovery_attempts=2,
     ) is None
-
 
 ###############################################################################
 def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> None:
@@ -1032,7 +1021,6 @@ def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> N
 
     assert _stop([rejected]) == ("clarification_required", coverage)
     assert _stop([rejected, described]) is None
-
 
 ###############################################################################
 def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None:
@@ -1103,7 +1091,6 @@ def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None
         "No supported capability matched the request after discovery.",
     )
 
-
 ###############################################################################
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
@@ -1153,7 +1140,6 @@ def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None
         state
     ) == []
 
-
 ###############################################################################
 def test_location_only_map_recovery_requires_a_single_resolved_location() -> None:
     state = _state()
@@ -1195,7 +1181,6 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
     )
     assert AgentLoop._completion_checks(state)["required_data_retrieved"] is False  # pyright: ignore[reportPrivateUsage]
 
-
 ###############################################################################
 def test_location_only_map_recovery_accepts_duplicate_same_location_results() -> None:
     state = _state()
@@ -1232,7 +1217,6 @@ def test_location_only_map_recovery_accepts_duplicate_same_location_results() ->
     assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
         state, route
     )
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1293,7 +1277,6 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
 
     assert outcome.stopped_reason == "awaiting_render"
     assert outcome.final_text == "The map is ready."
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1633,7 +1616,6 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
     assert request.state.context_usage_trace[0]["reported_input_tokens"] == 110
     assert request.state.model_trace[0]["status"] == "observed"
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_run_control_stops_before_a_superseded_model_result_is_applied() -> None:
@@ -1663,7 +1645,6 @@ async def test_run_control_stops_before_a_superseded_model_result_is_applied() -
     assert outcome.stopped_reason == "superseded"
     assert outcome.state.tool_calls == 0
     assert outcome.state.termination_reason == "superseded"
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1749,7 +1730,6 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assistant_message = provider.requests[2]["request"].messages[1]
     assert assistant_message["tool_calls"][0]["name"] == "test_tool"
     assert assistant_message["tool_calls"][0]["arguments"] == {}
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2147,6 +2127,7 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
     assert outcome.stopped_reason == "failed"
     assert outcome.failure_category == "model_capability"
 
+###############################################################################
 @pytest.mark.parametrize('coverage,observed,expected', [
     ({'spatial_scope_satisfied': False}, '2026-09-01T00:00:00Z', False),
     ({'spatial_scope_satisfied': True}, '2026-08-01T00:00:00Z', False),
@@ -2178,6 +2159,7 @@ def test_completion_requires_verified_scope_for_every_requested_source(coverage,
     if not expected:
         assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
 
+###############################################################################
 @pytest.mark.parametrize('observed,expected', [
     ('2024-03-27T20:30:45+00:00', True),
     ('2024-03-31T23:00:00+00:00', True),
@@ -2214,7 +2196,6 @@ def _vision_state(render_verified: bool = True) -> AgentRunState:
     ]
     return state
 
-
 ###############################################################################
 def _vision_capture_store(run_id: str = "request-1") -> RenderCaptureStore:
     import base64
@@ -2232,7 +2213,6 @@ def _vision_capture_store(run_id: str = "request-1") -> RenderCaptureStore:
     )
     return store
 
-
 ###############################################################################
 def _image_parts(request: Any) -> list[dict[str, Any]]:
     for message in request.messages:
@@ -2240,7 +2220,6 @@ def _image_parts(request: Any) -> list[dict[str, Any]]:
         if isinstance(content, list):
             return content
     return []
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2267,7 +2246,6 @@ async def test_always_policy_attaches_captured_map_to_next_model_step() -> None:
     assert state.vision_state.vision_calls == 1
     assert provider.requests[0]["request"].metadata.get("requires_vision") is True
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_non_vision_model_never_attaches() -> None:
@@ -2287,7 +2265,6 @@ async def test_non_vision_model_never_attaches() -> None:
 
     assert _image_parts(provider.requests[0]["request"]) == []
     assert state.vision_state is None
-
 
 ###############################################################################
 @pytest.mark.parametrize("vision", [True, False])
@@ -2315,7 +2292,6 @@ async def test_user_attached_image_reaches_every_model_call_or_is_declared_unvie
     else:
         assert _image_parts(sent) == []
         assert any("cannot view images" in str(message.get("content")) for message in sent.messages)
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2354,7 +2330,6 @@ async def test_on_failure_policy_attaches_only_after_a_relevant_failure() -> Non
     assert state.vision_state is not None
     assert state.vision_state.vision_calls == 1
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call() -> None:
@@ -2379,7 +2354,6 @@ async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call(
     assert state.vision_state is not None
     assert state.vision_state.vision_calls == 1
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_missing_capture_degrades_to_non_vision_without_failing() -> None:
@@ -2399,7 +2373,6 @@ async def test_missing_capture_degrades_to_non_vision_without_failing() -> None:
 
     assert _image_parts(provider.requests[0]["request"]) == []
     assert state.vision_state is None
-
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2433,7 +2406,6 @@ async def test_capture_missing_is_traced_only_when_an_image_was_wanted(
 
     assert traced == expected
     assert _image_parts(provider.requests[0]["request"]) == []
-
 
 ###############################################################################
 @pytest.mark.asyncio

@@ -168,6 +168,7 @@ def _metadata(request: ProviderRequest) -> dict[str, Any]:
     return dict(value) if is_json_object(value) else {}
 
 
+###############################################################################
 def _protocol(metadata: dict[str, Any]) -> str:
     value = str(
         metadata.get("source_protocol")

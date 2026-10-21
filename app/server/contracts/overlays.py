@@ -11,7 +11,6 @@ OverlayAction = Literal["add", "remove", "keep_only", "show", "hide", "update"]
 OverlayScopeKind = Literal["global", "current_view", "location"]
 OverlayVisibility = Literal["any", "visible", "hidden"]
 
-
 ###############################################################################
 class OverlaySelector(BaseModel):
     """Independent selectors for capabilities and rendered instances."""
@@ -28,7 +27,6 @@ class OverlaySelector(BaseModel):
     tags: list[str] = Field(default_factory=list)
     visibility: OverlayVisibility = "any"
 
-
 ###############################################################################
 class OverlayScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -36,7 +34,6 @@ class OverlayScope(BaseModel):
     kind: OverlayScopeKind = "global"
     location: dict[str, Any] | None = None
     label: str | None = None
-
 
 ###############################################################################
 class OverlayPatch(BaseModel):
@@ -47,14 +44,12 @@ class OverlayPatch(BaseModel):
     style: str | None = None
     format: str | None = None
 
-
 ###############################################################################
 class OverlayStateReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     collection_id: str = "active-map"
     revision: int = Field(default=0, ge=0)
-
 
 ###############################################################################
 class OverlayCommand(BaseModel):

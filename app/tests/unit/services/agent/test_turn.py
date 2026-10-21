@@ -234,7 +234,6 @@ async def test_native_runner_preserves_location_refs_in_response() -> None:
 
     assert response.location_refs["rome"] == location
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_exposes_control_stops_as_failed_operations() -> None:
@@ -293,7 +292,6 @@ async def test_native_runner_resumes_a_valid_checkpoint_without_rerouting() -> N
     assert response.execution_trace["checkpoint"]["request_id"] == "request-resume"
     assert provider.calls == 1
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
@@ -320,6 +318,7 @@ async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
     assert checkpoints[0].route is not None
     assert checkpoints[-1].budget_snapshot["model_calls"] == 2
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_run_policy_snapshot_survives_settings_change_and_checkpoint(monkeypatch) -> None:
     from dataclasses import asdict

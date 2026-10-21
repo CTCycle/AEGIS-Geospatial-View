@@ -8,11 +8,13 @@ from server.configurations import build_database_settings
 from server.configurations import database_configuration as database_config
 
 
+###############################################################################
 def _isolate_configuration(monkeypatch, tmp_path: Path) -> None:
     data_root = tmp_path / "runtime"
     monkeypatch.setenv("AEGIS_DATA_DIR", str(data_root))
 
 
+###############################################################################
 def test_first_run_writes_database_only_configuration_and_uses_its_values(
     monkeypatch,
     tmp_path: Path,
@@ -34,6 +36,7 @@ def test_first_run_writes_database_only_configuration_and_uses_its_values(
     assert not set(stored) & {"FASTAPI_PORT", "UI_PORT", "application_settings"}
 
 
+###############################################################################
 def test_existing_database_configuration_is_the_only_runtime_source(
     monkeypatch,
     tmp_path: Path,
@@ -52,6 +55,7 @@ def test_existing_database_configuration_is_the_only_runtime_source(
     assert settings.sqlite_lock_timeout_seconds == 15
 
 
+###############################################################################
 def test_invalid_primary_recovers_from_valid_backup(
     monkeypatch,
     tmp_path: Path,
@@ -73,6 +77,7 @@ def test_invalid_primary_recovers_from_valid_backup(
     assert database_config._read_configuration(config_path) == recovered
 
 
+###############################################################################
 def test_atomic_save_keeps_last_valid_configuration_as_backup(
     monkeypatch,
     tmp_path: Path,
