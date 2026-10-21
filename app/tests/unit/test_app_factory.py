@@ -51,6 +51,10 @@ class _LifecycleStub:
         self.call_order = call_order
 
     # -------------------------------------------------------------------------
+    def resume_active_runs(self) -> None:
+        self.call_order.append("run_lifecycle.resume_active_runs")
+
+    # -------------------------------------------------------------------------
     async def shutdown(self) -> None:
         self.call_order.append("run_lifecycle.shutdown")
 
@@ -195,7 +199,15 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
-    monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
+    monkeypatch.setattr(
+        app_module,
+        "load_database_configuration",
+        lambda: SimpleNamespace(
+            database_path="test.db",
+            sqlite_lock_timeout_seconds=5,
+            backend="sqlite",
+        ),
+    )
     monkeypatch.setattr(
         app_module,
         "RuntimeSettingsRepository",
@@ -268,6 +280,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "build_chat_runtime",
         "settings_service.validate_persisted_settings",
         "run_startup_validations",
+        "run_lifecycle.resume_active_runs",
         "realtime.close_all",
         "run_lifecycle.shutdown",
         "sqlite.dispose",
@@ -281,7 +294,15 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     geospatial_runtime = _build_geospatial_runtime()
 
     monkeypatch.setattr(app_module, "ensure_environment_loaded", lambda: None)
-    monkeypatch.setattr(app_module, "build_database_settings", lambda: object())
+    monkeypatch.setattr(
+        app_module,
+        "load_database_configuration",
+        lambda: SimpleNamespace(
+            database_path="test.db",
+            sqlite_lock_timeout_seconds=5,
+            backend="sqlite",
+        ),
+    )
     monkeypatch.setattr(
         app_module,
         "RuntimeSettingsRepository",
