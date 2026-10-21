@@ -129,7 +129,7 @@ def text_from_multimodal_content(content: Any) -> str:
     """Return the text projection of a neutral content value.
 
     Plain string content is returned unchanged; list content is joined from
-    its text parts (used by token estimators and legacy stringifiers).
+    its text parts (used by token estimators and context builders).
     """
 
     if isinstance(content, str):

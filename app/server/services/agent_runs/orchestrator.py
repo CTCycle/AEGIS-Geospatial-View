@@ -527,9 +527,6 @@ class AgentRunOrchestrator:
             else None
         )
         if terminal_presentation_status is None:
-            # Keep the legacy repository seam usable for lightweight worker
-            # doubles and non-render transports; ``not_requested`` is already
-            # the repository default and carries no additional state.
             completed, transitioned = self.run_repository.mark_completed_if_current(
                 run_id, snapshot.active_run_version
             )
@@ -711,14 +708,9 @@ class AgentRunOrchestrator:
     def _latest_checkpoint(
         self, run_id: str, run_version: int
     ) -> dict[str, Any] | None:
-        repository = getattr(self.event_publisher, "event_repository", None)
-        loader = getattr(repository, "get_latest_checkpoint_state", None)
-        if not callable(loader):
-            return None
-        try:
-            value = loader(run_id, run_version=run_version)
-        except Exception:
-            return None
+        value = self.event_publisher.event_repository.get_latest_checkpoint_state(
+            run_id, run_version=run_version
+        )
         return value if is_json_object(value) else None
 
     # -------------------------------------------------------------------------

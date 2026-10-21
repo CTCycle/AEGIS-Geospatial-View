@@ -308,14 +308,12 @@ class RenderCompletionService:
                 "action_fingerprint": action_fingerprint,
             }
         )
-        expire_pending = getattr(self.run_repository, "expire_pending_render", None)
-        if callable(expire_pending):
-            expire_pending(
-                conversation_id=conversation_id,
-                run_id=payload.run_id,
-                run_version=payload.run_version,
-                timeout_seconds=render_ack_timeout_seconds,
-            )
+        self.run_repository.expire_pending_render(
+            conversation_id=conversation_id,
+            run_id=payload.run_id,
+            run_version=payload.run_version,
+            timeout_seconds=render_ack_timeout_seconds,
+        )
         try:
             snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
                 conversation_id=conversation_id,
@@ -440,87 +438,27 @@ class RenderCompletionService:
                 observation=observation,
             )
 
-        response = pending_response or {}
         stored_presentation = _json_object(snapshot.presentation)
         durable_event_ids = [
             str(item)
             for item in _json_list(stored_presentation.get("durable_event_ids"))
             if item
         ]
-        fanout_existing = getattr(self.event_publisher, "fanout_existing", None)
-        if durable_event_ids and callable(fanout_existing):
-            # The repository already persisted the terminal events in the
-            # same transaction as the run/conversation promotion. Only fan
-            # those rows out to currently connected clients.
-            fanout_existing_fn = cast(
-                Callable[[str], Awaitable[object]], fanout_existing
+        if not durable_event_ids:
+            raise ValueError(
+                "Render completion requires durable event ids persisted with the "
+                "run presentation; bind the run event repository to the "
+                "repository holder."
             )
-            for event_id in durable_event_ids:
-                await fanout_existing_fn(event_id)
-        else:
-            # Test doubles and older repository compositions have no shared
-            # event transaction. Keep the publishing fallback for them; the
-            # production composition always supplies durable event IDs.
-            if payload.status == "ready":
-                await self.event_publisher.publish(
-                    conversation_id=conversation_id,
-                    run_id=payload.run_id,
-                    run_version=payload.run_version,
-                    type=RunEventType.PROGRESS,
-                    payload={
-                        "stage": RunProgressStage.COMPLETED.value,
-                        "label": "Completed",
-                    },
-                )
-                await self.event_publisher.publish(
-                    conversation_id=conversation_id,
-                    run_id=payload.run_id,
-                    run_version=payload.run_version,
-                    type=RunEventType.ASSISTANT_TEXT_COMPLETED,
-                    payload={"content": response.get("assistant_message", "Map ready.")},
-                )
-                event_type = RunEventType.COMPLETED
-                stored_requirements = _json_list(
-                    stored_presentation.get("completion_requirements")
-                )
-                event_payload = {
-                    **response,
-                    "presentation_status": "ready",
-                    "render_acknowledgment": acknowledgment,
-                    "completion_requirements": CompletionEvaluator.acknowledge_requirements(
-                        [
-                            cast(dict[str, Any], item)
-                            for item in stored_requirements
-                            if isinstance(item, dict)
-                        ],
-                        acknowledgment,
-                    ),
-                }
-            else:
-                await self.event_publisher.publish(
-                    conversation_id=conversation_id,
-                    run_id=payload.run_id,
-                    run_version=payload.run_version,
-                    type=RunEventType.PROGRESS,
-                    payload={
-                        "stage": RunProgressStage.FAILED.value,
-                        "label": "Map rendering failed",
-                    },
-                )
-                event_type = RunEventType.ERROR
-                event_payload = {
-                    "code": payload.failure_code or "render_failed",
-                    "message": "The prepared map could not be rendered; the previous map remains available.",
-                    "presentation_status": "failed",
-                    "render_acknowledgment": acknowledgment,
-                }
-            await self.event_publisher.publish(
-                conversation_id=conversation_id,
-                run_id=payload.run_id,
-                run_version=payload.run_version,
-                type=event_type,
-                payload=event_payload,
-            )
+        # The repository already persisted the terminal events in the
+        # same transaction as the run/conversation promotion. Only fan
+        # those rows out to currently connected clients.
+        fanout_existing_fn = cast(
+            Callable[[str], Awaitable[object]],
+            self.event_publisher.fanout_existing,
+        )
+        for event_id in durable_event_ids:
+            await fanout_existing_fn(event_id)
         return RenderAcknowledgementResult(
             run_id=snapshot.run_id,
             run_version=snapshot.active_run_version,
