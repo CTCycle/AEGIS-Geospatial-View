@@ -83,11 +83,13 @@ activation fails. The active connection settings live in
 `database-settings.json` in the application data directory, independently of
 the selected database. Database shows the active SQLite file, provides the
 SQLite migration-lock timeout, and can test another file's access, integrity,
-and schema before switching. Applying a switch initializes an empty database or migrates a
-recognized older schema. The app refuses to switch while API or WebSocket work,
-queued or running jobs, or active agent runs are present. Each file keeps its
-own settings and records; switching never copies data. After activation the
-browser reloads so all client-side settings come from the selected database.
+and schema before switching. Applying a switch initializes an empty database
+at revision `202608200001`. Existing files must already use that revision;
+other revisions are rejected and require an explicit rebuild or separately
+reviewed migration. The app refuses to switch while API or WebSocket work or
+active agent runs are present. Each file keeps its own settings and records;
+switching never copies data. After activation the browser reloads so all
+client-side settings come from the selected database.
 SQLite is the only database backend currently implemented. Changing the
 application data root or process-level service configuration still requires a
 server restart.

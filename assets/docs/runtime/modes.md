@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-09-15
+Last updated: 2026-10-21
 
 ## Supported Modes
 
@@ -25,8 +25,9 @@ model decisions and bounded observations. Direct map responses remain
 `prepared_unverified` until the realtime browser acknowledgment path is used;
 realtime runs promote only after `map.render_ack` succeeds.
 
-There is no runtime legacy/shadow/native switch. Compatibility code and
-rollout-only preview modes were removed as part of the native consolidation.
+There is no runtime legacy/shadow/native switch. The active architecture uses
+the native run, status, and render-acknowledgment contracts; the retired
+execution paths and rollout-only preview modes have no active runtime route.
 
 ### Browser Validation Tooling
 

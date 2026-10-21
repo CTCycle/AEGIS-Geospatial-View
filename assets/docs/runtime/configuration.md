@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Environment file
 
@@ -49,7 +49,7 @@ or application-editable runtime blocks.
 Application runtime settings are validated typed blocks stored in the SQLite
 `application_runtime_settings` row and exposed through
 `GET/PATCH /api/settings/runtime`. The blocks cover Nominatim, geospatial
-bounds, map defaults, job polling, chat defaults, Open-Meteo, Overpass,
+bounds, map defaults, conversation-run status polling, chat defaults, Open-Meteo, Overpass,
 RainViewer, NASA GIBS request tuning, and the native agent execution policy.
 The PATCH body may contain one or more changed blocks; each block contains only
 the changed fields, and the server merges and validates the patch before one

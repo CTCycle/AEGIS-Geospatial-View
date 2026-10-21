@@ -1140,18 +1140,6 @@ def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) ->
     assert response.json()["status"] == "missing-credential"
 
 ###############################################################################
-def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
-    client = create_started_client()
-
-    response = client.get("/api/geospatial/cameras/windy_webcams%2Fcamera-1")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["id"] == "windy_webcams/camera-1"
-    assert payload["status"] in {"missing-credential", "metadata-unavailable", "ok"}
-    assert payload["provider"] == "windy_webcams"
-
-###############################################################################
 def test_geospatial_credential_status_ignores_environment_variables(
     monkeypatch,
 ) -> None:
@@ -1165,24 +1153,6 @@ def test_geospatial_credential_status_ignores_environment_variables(
     assert payload["required"] is True
     assert payload["configured"] is False
     assert "environmentVariable" not in payload
-
-###############################################################################
-def test_geospatial_provider_account_setup_detail_reports_encrypted_storage(
-    monkeypatch,
-) -> None:
-    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    client = create_started_client()
-
-    response = client.get("/api/geospatial/providers/tomtom/account-setup")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["provider_id"] == "tomtom"
-    assert payload["requires_credentials"] is True
-    assert "environment_variable" not in payload
-    assert payload["configured"] is False
-    assert payload["instructions"]
-    assert any("encrypted Access settings" in item for item in payload["instructions"])
 
 ###############################################################################
 @pytest.mark.parametrize("provider_id", ["opentripmap", "openchargemap"])
@@ -1273,15 +1243,6 @@ def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "secret-tomtom-value" not in str(response.json())
-
-###############################################################################
-def test_geospatial_audit_endpoint_passes() -> None:
-    client = create_started_client()
-
-    response = client.post("/api/geospatial/audit")
-
-    assert response.status_code == 200
-    assert response.json()["error_count"] == 0
 
 ###############################################################################
 @pytest.mark.parametrize(

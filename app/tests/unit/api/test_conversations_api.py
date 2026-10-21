@@ -184,30 +184,3 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
         item["content"]
         for item in history.list_messages(conversation_id=conversation.id)
     ] == ["The map is ready."]
-
-###############################################################################
-def test_assistant_state_write_migrates_legacy_clarification() -> None:
-    backend = _InMemoryBackend()
-    Base.metadata.create_all(backend.engine)
-    conversations = ConversationRepository(backend)
-    history = ChatHistoryRepository(backend)
-    conversation = conversations.create_conversation("Legacy assistant state")
-
-    _message, revision = history.append_assistant_message_with_state(
-        conversation_id=conversation.id,
-        expected_revision=1,
-        conversation_state={
-            "schema_version": 1,
-            "conversation_id": conversation.id,
-            "unresolved_questions": ["Which country contains Lake Bracciano?"],
-        },
-        content="Which country contains Lake Bracciano?",
-        request_id="legacy-state-request",
-    )
-
-    assert revision == 2
-    persisted = conversations.read_state(conversation.id)["conversation_state"]
-    assert persisted["schema_version"] == 2
-    assert persisted["revision"] == 2
-    assert "unresolved_questions" not in persisted
-    assert persisted["pending_clarification"]["status"] == "active"

@@ -1,6 +1,6 @@
 # Native AEGIS harness status and completion plan
 
-Last updated: 2026-09-17
+Last updated: 2026-10-21
 
 ## Purpose
 
@@ -178,8 +178,8 @@ summaries, context usage, trace, conversation state, and optional map
 candidate. Removed parser/planner/task/migration projections are not accepted
 by the response models or client parsers.
 
-HTTP turns, NDJSON streams, background jobs, and realtime runs all create or
-observe the same persisted `AgentRun` lifecycle. Conversation listing/search,
+`POST /api/chat/turn`, run-status polling, and realtime WebSocket commands all
+create or observe the same persisted `AgentRun` lifecycle. Conversation listing/search,
 recent-run summaries, and the access-checked redacted run-trace endpoint reuse
 the existing conversation, run-event, and evidence tables.
 
@@ -213,7 +213,7 @@ the durable event stream for reconnect and replay.
 | P2 tool registry and manifest contracts | Covered | one registry/executor and strict runtime catalog validation |
 | P2 durable traces and bounded task state | Covered | typed task ledger, iteration exhaustion category, paired context, redacted run trace |
 | P2 conversation history and run inspection | Covered | conversation page/search, scoped history tool, recent runs, trace endpoint |
-| P2 transport lifecycle consolidation | Covered | HTTP/NDJSON/jobs use `RunLifecycleService`; realtime already used it |
+| P2 transport lifecycle consolidation | Covered | Current turn HTTP and realtime commands use `RunLifecycleService`; retired stream and job adapters have been removed |
 | P2 live provider discovery transfer | Covered locally | canonical provider-layer handler; live upstream coverage remains environment-dependent |
 | P3 legacy/shadow runtime deletion | Covered | old execution files, parser/planner chain, shadow path, mode switch, and migration response fields deleted |
 | P4 trajectory/evaluation suite | Covered locally | core native trajectories and focused contracts pass, including discovery, replan, valid-empty, malformed-call correction, 10-turn bounded context, in-flight cancellation, durable checkpoint retrieval/resume, duplicate suppression, and MapLibre acknowledgement; live/provider coverage remains an external validation gate |

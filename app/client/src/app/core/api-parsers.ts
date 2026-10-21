@@ -2240,7 +2240,7 @@ export const parseRunTraceResponse = (value: unknown): RunTraceResponse => {
   if (!conversationId || !runId) {
     return apiContract(endpoint, 'conversation_id and run_id are required', value);
   }
-  const rawEntries = record.entries ?? record.events ?? record.trace;
+  const rawEntries = record.events;
   const entries = requireApiArray(rawEntries, endpoint, 'entries')
     .map((item, index) => parseRunTraceEntry(item, endpoint, index, runId));
   const cursor = record.next_cursor ?? record.nextCursor;

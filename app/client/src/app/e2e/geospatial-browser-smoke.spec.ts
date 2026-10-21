@@ -39,6 +39,7 @@ describe('e2e/geospatial browser smoke', () => {
     addSource: jasmine.Spy;
     addLayer: jasmine.Spy;
     on: jasmine.Spy;
+    off: jasmine.Spy;
     fitBounds: jasmine.Spy;
     getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
@@ -49,6 +50,29 @@ describe('e2e/geospatial browser smoke', () => {
     resize: jasmine.Spy;
     remove: jasmine.Spy;
   };
+
+  const makeOverlayCollection = (descriptors: Record<string, unknown>[]) => ({
+    collection_id: 'active-map',
+    revision: 0,
+    instances: descriptors.map((descriptor) => {
+      const id = String(descriptor.id ?? 'overlay');
+      return {
+        instance_id: id,
+        capability_id: id,
+        label: String(descriptor.label ?? id),
+        provider: String(descriptor.provider ?? 'fixture'),
+        overlay_type: String(descriptor.type ?? 'overlay'),
+        rendering_mode: String(descriptor.rendering_mode ?? descriptor.type ?? 'metadata-only'),
+        scope_key: 'global',
+        scope: { kind: 'global' },
+        visible: descriptor.visible !== false,
+        opacity: typeof descriptor.default_opacity === 'number' ? descriptor.default_opacity : 1,
+        render_variant: {},
+        descriptor: descriptor as unknown as Record<string, JsonValue>,
+        inspections: [],
+      };
+    }),
+  });
 
   const mockedMapResponse: ChatTurnResponse = ({
     conversation_id: 'conv-browser-smoke',
@@ -91,21 +115,6 @@ describe('e2e/geospatial browser smoke', () => {
         tile_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution: 'OpenStreetMap contributors',
       },
-      overlay_ids: [
-        'mock_clustered_points',
-        'rainviewer_precipitation_radar_stale',
-        'tomtom_traffic_flow_mocked',
-        'tomtom_traffic_incidents_mocked',
-        'eea_noise_wms',
-        'esa_worldcover_wmts',
-        'eurostat_metadata_only',
-        'eurostat_join_required',
-        'gtfs_stops_routes_alerts_vehicles',
-        'overpass_poi_amenities_1000_clustered',
-        'geospatial_5000_feature_performance',
-        'windy_webcams_missing_key',
-        'metadata_context',
-      ],
       center: { latitude: 41.9, longitude: 12.5 },
       viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 5000 },
       bounds: [12.45, 41.86, 12.55, 41.94],
@@ -113,7 +122,7 @@ describe('e2e/geospatial browser smoke', () => {
         'Windy Webcams credentials are missing; configure access before live camera previews.',
         'RainViewer radar frame is stale; showing cached public radar tiles.',
       ],
-      overlays: [
+      overlay_collection: makeOverlayCollection([
         {
           id: 'mock_clustered_points',
           label: 'Mock GeoJSON clustered points',
@@ -245,67 +254,21 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'metadata-only',
           attribution: 'Metadata source',
         },
-      ],
+      ]),
     },
   } as unknown as ChatTurnResponse);
-
-  const canonicalizeMockedMapSession = (raw: Record<string, unknown>): MapSession => {
-    const descriptors = Array.isArray(raw.overlays)
-      ? raw.overlays.filter((item): item is Record<string, unknown> => (
-        item !== null && typeof item === 'object'
-      ))
-      : [];
-    const instances = descriptors.map((descriptor) => {
-      const id = String(descriptor.id ?? 'overlay');
-      return {
-        instance_id: id,
-        capability_id: id,
-        label: String(descriptor.label ?? id),
-        provider: String(descriptor.provider ?? 'fixture'),
-        overlay_type: String(descriptor.type ?? 'overlay'),
-        rendering_mode: String(descriptor.rendering_mode ?? descriptor.type ?? 'metadata-only'),
-        scope_key: 'global',
-        scope: { kind: 'global' },
-        visible: descriptor.visible !== false,
-        opacity: typeof descriptor.default_opacity === 'number' ? descriptor.default_opacity : 1,
-        render_variant: {},
-        descriptor: descriptor as unknown as Record<string, JsonValue>,
-        inspections: [],
-      };
-    });
-    return {
-      session_id: String(raw.session_id),
-      resolved_location: raw.resolved_location as MapSession['resolved_location'],
-      basemap_id: String(raw.basemap_id),
-      viewport: raw.viewport as MapSession['viewport'],
-      center: raw.center as MapSession['center'],
-      bounds: raw.bounds as MapSession['bounds'],
-      basemap: raw.basemap as MapSession['basemap'],
-      compliance_warnings: Array.isArray(raw.compliance_warnings)
-        ? raw.compliance_warnings.filter((item): item is string => typeof item === 'string')
-        : [],
-      overlay_collection: {
-        collection_id: 'active-map',
-        revision: 0,
-        instances,
-      },
-    };
-  };
-
-  const canonicalMockedMapResponse: ChatTurnResponse = {
-    ...mockedMapResponse,
-    map_session: mockedMapResponse.map_session
-      ? canonicalizeMockedMapSession(
-        mockedMapResponse.map_session as unknown as Record<string, unknown>,
-      )
-      : null,
-  };
 
   beforeEach(async () => {
     fakeMap = {
       addSource: jasmine.createSpy('addSource'),
       addLayer: jasmine.createSpy('addLayer'),
-      on: jasmine.createSpy('on').and.callFake((_: string, callback: () => void) => callback()),
+      on: jasmine.createSpy('on').and.callFake((event: string, layerOrListener: string | (() => void), listener?: () => void) => {
+        if (event === 'load' || event === 'idle') {
+          const callback = typeof layerOrListener === 'function' ? layerOrListener : listener;
+          callback?.();
+        }
+      }),
+      off: jasmine.createSpy('off'),
       fitBounds: jasmine.createSpy('fitBounds'),
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
@@ -325,7 +288,7 @@ describe('e2e/geospatial browser smoke', () => {
       'fetchCatalog',
     ]);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-browser-smoke', title: 'show mocked map' });
-    apiClient.sendChatTurn.and.resolveTo(canonicalMockedMapResponse);
+    apiClient.sendChatTurn.and.resolveTo(mockedMapResponse);
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
     realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
 
@@ -446,7 +409,7 @@ describe('e2e/geospatial browser smoke', () => {
   it('renders a bounded valid-empty layer as an explicit no-results state', async () => {
     const emptyOverlayId = 'empty_flood_zones';
     const emptyMapSession: MapSession = {
-      ...canonicalMockedMapResponse.map_session!,
+      ...mockedMapResponse.map_session!,
       session_id: 'empty-map-session',
       bounds: [12.45, 41.86, 12.55, 41.94],
       overlay_collection: {
@@ -480,7 +443,7 @@ describe('e2e/geospatial browser smoke', () => {
       },
     };
     apiClient.sendChatTurn.and.resolveTo({
-      ...canonicalMockedMapResponse,
+      ...mockedMapResponse,
       assistant_message: 'Map ready. No results for the Flood Zones overlay.',
       map_session: emptyMapSession,
     });

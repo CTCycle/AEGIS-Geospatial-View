@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 from playwright.sync_api import APIRequestContext, Error as PlaywrightError
 
@@ -101,7 +99,7 @@ def test_chat_models_with_prefix_parity(
     assert set(base_body.keys()) == set(prefixed_body.keys())
 
 ###############################################################################
-def test_chat_turn_stream_event_order_and_contract_parity(
+def test_chat_turn_response_contract(
     api_context: APIRequestContext,
 ) -> None:
     conversation_id = _create_conversation(api_context, "chat API contract")
@@ -118,47 +116,6 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     assert "operation" in turn_body
     assert "route" in turn_body
     assert "completion_contract" in turn_body
-
-    prefixed_turn = _post(api_context, "/api/chat/turn", turn_payload)
-    _require_provider_or_skip(prefixed_turn)
-    assert prefixed_turn.ok
-    assert set(turn_body.keys()) == set(prefixed_turn.json().keys())
-
-    stream_response = _post(
-        api_context,
-        "/api/chat/stream",
-        {
-            "conversation_id": conversation_id,
-            "message": "show map at 41.9028, 12.4964",
-        },
-    )
-    _require_provider_or_skip(stream_response)
-    assert stream_response.ok
-    events = [
-        json.loads(line) for line in stream_response.text().splitlines() if line.strip()
-    ]
-    event_names = [entry.get("event") for entry in events]
-    assert event_names[0] == "status"
-    assert event_names[-1] in {"final", "error"}
-    if event_names[-1] == "final":
-        if "tool_call_started" in event_names:
-            assert "tool_call_completed" in event_names
-            assert event_names.index("tool_call_started") < event_names.index(
-                "tool_call_completed"
-            )
-        if "map_session_created" in event_names:
-            assert event_names.index("map_session_created") < event_names.index("final")
-
-    prefixed_stream = _post(
-        api_context,
-        "/api/chat/stream",
-        {
-            "conversation_id": conversation_id,
-            "message": "show map at 41.9028, 12.4964",
-        },
-    )
-    _require_provider_or_skip(prefixed_stream)
-    assert prefixed_stream.ok
 
 ###############################################################################
 def test_chat_turn_coordinate_lookup_and_follow_up(

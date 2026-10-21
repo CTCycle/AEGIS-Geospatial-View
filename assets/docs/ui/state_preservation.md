@@ -1,12 +1,14 @@
 # State Preservation
 
-Last updated: 2026-09-21
+Last updated: 2026-10-21
 
 ## Overview
 
-The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v5` with a 6-hour TTL.
+The web app stores per-tab view preferences in `sessionStorage` under
+`aegis:webapp-ui-state:v1` with a 6-hour TTL.
 
-Older schema payloads are invalidated and discarded.
+Malformed, expired, and unsupported-version payloads are discarded. The
+current state contract has no migration from older keys or versions.
 
 ## Persisted Root Contract
 
@@ -14,7 +16,6 @@ Older schema payloads are invalidated and discarded.
 
 - `version`
 - `savedAt`
-- `tabId`
 - `chatPage`
 - `settingsPage`
 
@@ -22,32 +23,19 @@ Older schema payloads are invalidated and discarded.
 
 Persisted chat state includes:
 
-- `conversationId`, `contextRevision`, `taskSnapshot`, `activeRunId`, and `activeRunVersion`
-- `conversationNonce`
-- `messages`
-- `lastDecision`
-- `memorySnapshot`
-- `mapSession`
-- candidate presentation identity and status (`runVersion`, `mapSessionId`,
-  `collectionRevision`, and pending render requirements)
-- status and composer/transcript UI state
-- bounded run event duplicate-protection state
-
-Persisted map UI state includes:
-
-- `overlayVisibility`
-- `overlayOpacity`
-- stable overlay instance IDs and the active collection revision carried by the
-  current `mapSession`
+- toolbar width and collapsed state
+- chat-panel conversation ID, last run sequence, composer draft, and transcript
+  scroll position
+- map overlay visibility, opacity, and order
+- chat-page scroll position
+- settings search text and scroll positions
 
 The basemap selector is a live session preference: a manual choice is retained
 when subsequent location requests prepare a new map candidate, while a new
 chat or browser reload starts from the catalog default basemap.
 
-The v5 boundary invalidates pre-collection active-map/task snapshots. A small
-one-time migration retains conversation ID and messages, while old map/task
-state is discarded; messages are never removed solely because the map schema
-changed.
+Conversation history, active runs, and map sessions are loaded from their
+current API contracts; they are not copied into this view-preference cache.
 
 Prepared map state is a candidate, not committed visualization memory. The
 client validates it locally and acknowledges the exact run/version/session/

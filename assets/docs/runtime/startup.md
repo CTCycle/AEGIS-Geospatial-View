@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Local Development Via Launcher
 
@@ -46,16 +46,15 @@ preserving application source files. The final option exits the launcher.
 Startup loads and validates `<AEGIS_DATA_DIR or data/runtime>/database-settings.json`
 before opening a database, so selecting the database never depends on database
 contents. A first-run file defaults to `database.db`; database synchronization
-runs before repositories and background jobs are constructed. A missing SQLite
-file is created, migrated, and seeded.
-Versioned SQLite files receive pending migrations and menu option 4 invokes the
-same idempotent workflow. A populated database without an Alembic revision,
-unknown revisions, and structurally invalid files fail with an actionable
-error and are never silently stamped or replaced. The migration lock protects
-read-only schema and required-seed checks. SQLite creates a temporary backup
-only when an existing database needs a migration or required seed mutation; a
-current, fully seeded database takes a no-copy path. Mutating operations restore
-the backup if they fail.
+runs before repositories and run-lifecycle services are constructed. A missing
+SQLite file is initialized at the current revision, `202608200001`, and seeded.
+Existing files must already use that revision; unknown and retired revisions
+fail with an actionable error and are never stamped or replaced. Menu option 4
+invokes the same guarded workflow. A populated database without an Alembic
+revision and structurally invalid files are also rejected. The migration lock
+protects read-only schema and required-seed checks. SQLite creates a temporary
+backup before an existing database is mutated and restores it if migration or
+seeding fails.
 
 New databases seed the typed `application_runtime_settings` row with built-in
 defaults. Existing rows remain authoritative, and startup does not read runtime
@@ -63,8 +62,8 @@ settings from JSON files.
 
 The Settings Database section can test and switch the active SQLite file while
 the server is running. A switch validates and prepares the target first, then
-is rejected if requests or WebSockets, queued or running jobs, or agent runs
-are active. A failed activation rolls back to the prior database and config.
+is rejected if requests or WebSockets or active agent runs are in flight. A
+failed activation rolls back to the prior database and config.
 The browser reloads its client state after success so the selected database's
 settings are visible immediately. A switch never copies records between
 databases. Changing `AEGIS_DATA_DIR` or process-level hosts, ports, and reload

@@ -1,21 +1,15 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from filelock import Timeout
 from sqlalchemy import inspect
 
 from server.configurations import DatabaseSettings
 from server.repositories.database import migration_runner
 from server.repositories.database.initializer import initialize_database
-from server.repositories.database.migration_runner import (
-    ALEMBIC_CONFIG_PATH,
-    DatabaseMigrationError,
-)
+from server.repositories.database.migration_runner import DatabaseMigrationError
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import (
     Base,
@@ -43,14 +37,6 @@ def _initialize(repository: SQLiteRepository):
         repository,
         on_ready=lambda: seed_reference_catalog(repository),
     )
-
-###############################################################################
-def _downgrade(repository: SQLiteRepository, revision: str) -> None:
-    config = Config(str(ALEMBIC_CONFIG_PATH))
-    with repository.engine.connect() as connection:
-        config.attributes["connection"] = connection
-        command.downgrade(config, revision)
-        connection.commit()
 
 ###############################################################################
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
@@ -125,85 +111,6 @@ def test_at_head_missing_required_seed_creates_backup_before_reseeding(
     assert backups[0] is not None
     assert ModelSettingsRepository(repaired).has_required()
     assert repaired.count_records(ModelProviderSettingsRecord) == 1
-
-###############################################################################
-def test_native_state_migration_preserves_legacy_context_and_settings(
-    tmp_path: Path,
-) -> None:
-    database_path = tmp_path / "database.db"
-    settings = _settings(database_path)
-    repository = SQLiteRepository(settings)
-    _initialize(repository)
-    with repository.engine.connect() as connection:
-        model_settings_before = connection.exec_driver_sql(
-            "SELECT agent_model_provider, agent_model_name FROM model_provider_settings"
-        ).one()
-    encryption_material_count = repository.count_records(CredentialEncryptionMaterial)
-    _downgrade(repository, "202609090002")
-
-    legacy_location = {
-        "label": "Zurich",
-        "latitude": 47.3769,
-        "longitude": 8.5417,
-        "source": "test",
-        "confidence": 1.0,
-    }
-    with repository.engine.begin() as connection:
-        connection.exec_driver_sql(
-            """
-            INSERT INTO conversations (
-                id, title, context_revision, next_message_sequence,
-                active_instructions, task_snapshot, memory_snapshot,
-                conversation_summary, summary_through_turn_index
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "legacy-conversation",
-                "Migrated conversation",
-                7,
-                0,
-                json.dumps(
-                    [{"text": "Always use metric units", "created_turn_index": 2}]
-                ),
-                json.dumps({}),
-                json.dumps({"active_location": legacy_location}),
-                json.dumps({"summary": "Earlier wildfire analysis"}),
-                6,
-            ),
-        )
-    repository.engine.dispose()
-
-    migrated = SQLiteRepository(settings)
-    result = _initialize(migrated)
-
-    assert result.current_revisions == ("202609090002",)
-    assert result.final_revisions == ("202610200001",)
-    with migrated.engine.connect() as connection:
-        columns = {
-            item["name"]
-            for item in inspect(migrated.engine).get_columns("conversations")
-        }
-        row = connection.exec_driver_sql(
-            "SELECT context_revision, conversation_state FROM conversations "
-            "WHERE id = 'legacy-conversation'"
-        ).one()
-        model_settings_after = connection.exec_driver_sql(
-            "SELECT agent_model_provider, agent_model_name FROM model_provider_settings"
-        ).one()
-    state = json.loads(row[1]) if isinstance(row[1], str) else row[1]
-
-    assert row[0] == 7
-    assert state["active_directives"][0]["text"] == "Always use metric units"
-    assert state["summary"] == {"summary": "Earlier wildfire analysis"}
-    assert state["summary_through_turn_index"] == 6
-    assert state["resolved_locations"]["active_location"]["label"] == "Zurich"
-    assert "conversation_state" in columns
-    assert "active_instructions" not in columns
-    assert model_settings_after == model_settings_before
-    assert (
-        migrated.count_records(CredentialEncryptionMaterial)
-        == encryption_material_count
-    )
 
 ###############################################################################
 def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(

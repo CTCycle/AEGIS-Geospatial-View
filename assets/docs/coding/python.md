@@ -1,6 +1,6 @@
 # Python
 
-Last updated: 2026-09-21
+Last updated: 2026-10-21
 
 ## Baseline
 
@@ -24,7 +24,7 @@ Last updated: 2026-09-21
 - Prefer schema-driven validation over ad-hoc validation blocks.
 - Use explicit HTTP status codes and consistent response models.
 - Never leak secrets or credentials in errors.
-- Preserve job and request traceability.
+- Preserve run and request traceability.
 - Normalize external provider responses into JSON-object contracts and classify
   provider failures without leaking response bodies, credentials, or raw XML.
 
@@ -32,9 +32,8 @@ Last updated: 2026-09-21
 
 - Use async only when dependencies are non-blocking.
 - Keep CPU-heavy work out of async handlers.
-- Use the shared `BackgroundJobService` for long-running chat or map operations.
-- Long-running APIs must support start, poll, and cancel flows.
-- Conversation runs additionally support versioned WebSocket replay,
+- Use the native conversation-run lifecycle for long-running chat or map work.
+  Accepted runs expose durable status polling and versioned WebSocket replay,
   cooperative cancellation, idempotent commands, and steering against the same
   conversation/run identity.
 

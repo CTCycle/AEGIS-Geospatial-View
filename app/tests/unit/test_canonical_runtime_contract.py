@@ -117,7 +117,20 @@ def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> N
     }
 
     assert "/api/chat/turn" in paths
-    assert "/api/chat/stream" in paths
+    assert "/api/chat/stream" not in paths
+    assert "/api/chat/jobs" not in paths
+    assert not any(path.startswith("/api/jobs/") for path in paths)
+    assert not any(
+        path in paths
+        for path in (
+            "/api/geospatial/layers/{layer_id}/health",
+            "/api/geospatial/providers/{provider_id}/layers",
+            "/api/geospatial/providers/{provider_id}/layers/{layer_id}",
+            "/api/geospatial/cameras/{camera_id}",
+            "/api/geospatial/providers/{provider_id}/account-setup",
+            "/api/geospatial/audit",
+        )
+    )
     assert not any(
         marker in path.casefold()
         for path in paths

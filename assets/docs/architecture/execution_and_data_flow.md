@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 ## Layering
 
@@ -28,8 +28,8 @@ AEGIS uses these backend layers:
   map, and response boundaries. It does not define free-form model prompts.
 - `services/llm/` owns provider invocation and protocol translation.
 - `app/server/prompts/` is the sole source of free-form model instructions.
-- Runtime job state is owned by `app/server/services/jobs.py`; durable run and
-  conversation state remain repository-owned.
+- Conversation run state, checkpoints, and events are owned by the run and
+  conversation repositories.
 
 The composition boundary is intentionally explicit:
 
@@ -258,10 +258,10 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
 ### Async
 
 - FastAPI handlers are predominantly async.
-- `POST /api/chat/stream` emits lifecycle NDJSON.
-- Chat jobs run through `/api/chat/jobs` and are observed through
-  `/api/jobs/{job_id}`.
-- The realtime WebSocket supports session resume, run commands, steering,
+- `POST /api/chat/turn` starts or executes a conversation run. Accepted runs
+  are observed through `GET /api/conversations/{conversation_id}/runs/{run_id}`.
+- The `/api/conversations/{conversation_id}/realtime` WebSocket supports
+  session resume, run commands, steering,
   render acknowledgments, heartbeats, and ordered durable events.
 - Render continuation publishes bounded `run_suspended`, `render_observed`,
   `run_resumed`, `completion_decision`, and (when needed)
@@ -272,20 +272,20 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
 
 ### Threaded
 
-- Long-running chat jobs use one in-memory `BackgroundJobService` worker.
-- The selected deployment is a single backend replica; persisted event replay
-  is the reconnect source of truth.
+- Native run lifecycle tasks are tracked by the application and their status,
+  checkpoints, and ordered event history are persisted in SQLite. Realtime
+  event replay is the reconnect source of truth.
 - Distributed workers, shared fanout, and external metrics are not part of the
   current local Windows runtime.
 
 ## Runtime constraints
 
-- Job state is process-local and memory-backed.
+- Active work executes in the current backend process; durable run state and
+  event history survive process restarts in SQLite.
 - The Windows launcher/manual-start workflow is the supported local deployment.
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.
 - Each native run persists bounded iteration checkpoints in the internal run
   event log and reloads the latest checkpoint when an active run is resumed.
-  The in-memory background-job state itself remains process-local.
 
 ## Regional discovery within the native harness
 

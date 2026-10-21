@@ -163,13 +163,6 @@ class RunTraceResponse(BaseModel):
         default_factory=lambda: dict[str, Any]()
     )
 
-    # -------------------------------------------------------------------------
-    @property
-    def entries(self) -> list[RunTraceEntry]:
-        """Alias for clients that call trace rows entries."""
-
-        return self.events
-
 ###############################################################################
 class ConversationSnapshotResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
