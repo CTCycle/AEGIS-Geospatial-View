@@ -6,17 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
 from server.contracts.geospatial import (
-    GeospatialCameraDetailResponse,
     GeospatialCatalogResponse,
     GeospatialCredentialStatusResponse,
-    GeospatialLayerHealthResponse,
     GeospatialLayersResponse,
     GeospatialProviderAccountSetupListResponse,
-    GeospatialProviderAccountSetupResponse,
-    GeospatialProviderLayerResponse,
-    GeospatialProviderLayersResponse,
     GeospatialProviderPayloadResponse,
-    LayerAuditReport,
 )
 from server.contracts.render_capture import (
     RenderCaptureCreateRequest,
@@ -115,67 +109,6 @@ async def get_geospatial_layers(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayersResponse:
     return GeospatialLayersResponse.model_validate(service.list_layers())
-
-###############################################################################
-@router.get(
-    "/providers/{provider_id}/layers",
-    response_model=GeospatialProviderLayersResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def list_provider_layers(
-    provider_id: str,
-    query: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=250),
-    refresh: bool = Query(default=False),
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> GeospatialProviderLayersResponse:
-    try:
-        return await service.list_provider_layers(
-            provider_id,
-            query=query,
-            limit=limit,
-            refresh=refresh,
-        )
-    except GeospatialApiServiceError as exc:
-        raise_service_http_error(exc)
-
-###############################################################################
-@router.get(
-    "/providers/{provider_id}/layers/{layer_id:path}",
-    response_model=GeospatialProviderLayerResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_provider_layer(
-    provider_id: str,
-    layer_id: str,
-    refresh: bool = Query(default=False),
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> GeospatialProviderLayerResponse:
-    try:
-        return await service.get_provider_layer(
-            provider_id,
-            layer_id,
-            refresh=refresh,
-        )
-    except GeospatialApiServiceError as exc:
-        raise_service_http_error(exc)
-
-###############################################################################
-@router.get(
-    "/layers/{layer_id}/health",
-    response_model=GeospatialLayerHealthResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_layer_health(
-    layer_id: str,
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> GeospatialLayerHealthResponse:
-    try:
-        return GeospatialLayerHealthResponse.model_validate(
-            service.get_layer_health(layer_id)
-        )
-    except GeospatialApiServiceError as exc:
-        raise_service_http_error(exc)
 
 ###############################################################################
 @router.get(
@@ -361,23 +294,6 @@ async def get_geospatial_cameras_geojson(
 
 ###############################################################################
 @router.get(
-    "/cameras/{camera_id:path}",
-    response_model=GeospatialCameraDetailResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_geospatial_camera(
-    camera_id: str,
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> GeospatialCameraDetailResponse:
-    try:
-        return GeospatialCameraDetailResponse.model_validate(
-            await service.get_camera(camera_id)
-        )
-    except GeospatialApiServiceError as exc:
-        raise_service_http_error(exc)
-
-###############################################################################
-@router.get(
     "/sources/{provider_id}/credential-status",
     response_model=GeospatialCredentialStatusResponse,
     status_code=status.HTTP_200_OK,
@@ -402,31 +318,3 @@ async def get_provider_account_setups(
     return GeospatialProviderAccountSetupListResponse.model_validate(
         service.list_provider_account_setup()
     )
-
-###############################################################################
-@router.get(
-    "/providers/{provider_id}/account-setup",
-    response_model=GeospatialProviderAccountSetupResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_provider_account_setup(
-    provider_id: str,
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> GeospatialProviderAccountSetupResponse:
-    try:
-        return GeospatialProviderAccountSetupResponse.model_validate(
-            service.get_provider_account_setup(provider_id)
-        )
-    except GeospatialApiServiceError as exc:
-        raise_service_http_error(exc)
-
-###############################################################################
-@router.post(
-    "/audit",
-    response_model=LayerAuditReport,
-    status_code=status.HTTP_200_OK,
-)
-async def audit_geospatial_sources(
-    service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> LayerAuditReport:
-    return service.audit_sources()

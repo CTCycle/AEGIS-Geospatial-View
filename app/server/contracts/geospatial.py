@@ -185,17 +185,6 @@ class GeospatialLayersResponse(BaseModel):
     )
 
 ###############################################################################
-class GeospatialLayerHealthResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    provider: str | None = None
-    reliability: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
-    runtime: Any = None
-    available: bool = False
-    availability_reason: str | None = None
-
-###############################################################################
 class GeospatialProviderPayloadResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -270,27 +259,6 @@ class GeospatialProviderLayersResponse(BaseModel):
     provider: str
     layers: list[GeospatialProviderLayerDescriptor]
     warnings: list[str] = Field(default_factory=lambda: list[str]())
-
-###############################################################################
-class GeospatialProviderLayerResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider: str
-    layer: GeospatialProviderLayerDescriptor
-    warnings: list[str] = Field(default_factory=lambda: list[str]())
-
-###############################################################################
-class GeospatialCameraDetailResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    status: str
-    provider: str
-    message: str | None = None
-    camera: dict[str, Any] | None = None
-    attribution: list[str] = Field(default_factory=lambda: list[str]())
-    warnings: list[str] = Field(default_factory=lambda: list[str]())
-    stale: bool = False
 
 ###############################################################################
 class GeospatialCredentialStatusResponse(BaseModel):

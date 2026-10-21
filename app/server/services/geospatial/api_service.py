@@ -11,9 +11,7 @@ from typing import Any, TypeGuard
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from server.contracts.geospatial import (
-    GeospatialProviderLayerResponse,
     GeospatialProviderLayersResponse,
-    LayerAuditReport,
 )
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -21,7 +19,6 @@ from server.services.geospatial.credential_resolver import (
     GeospatialCredentialResolutionError,
     GeospatialCredentialResolver,
 )
-from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import (
     ProviderNotRegisteredError,
@@ -309,22 +306,6 @@ class GeospatialApiService:
         }
 
     # -------------------------------------------------------------------------
-    def get_layer_health(self, layer_id: str) -> dict[str, Any]:
-        manifest = self._manifest_by_id(layer_id)
-        reliability = manifest.get("reliability")
-        available = self.runtime_registry.is_enabled(
-            layer_id
-        ) and self.runtime_registry.access_available(layer_id)
-        return {
-            "id": layer_id,
-            "provider": manifest.get("provider"),
-            "reliability": json_object(reliability),
-            "runtime": self.runtime_registry.provider_health(layer_id),
-            "available": available,
-            "availability_reason": self.runtime_registry.availability_reason(layer_id),
-        }
-
-    # -------------------------------------------------------------------------
     async def list_provider_layers(
         self,
         provider_id: str,
@@ -350,31 +331,6 @@ class GeospatialApiService:
         ) as exc:
             raise GeospatialTileRequestError(str(exc)) from exc
         return GeospatialProviderLayersResponse(provider=provider_id, layers=layers)
-
-    # -------------------------------------------------------------------------
-    async def get_provider_layer(
-        self,
-        provider_id: str,
-        layer_id: str,
-        *,
-        refresh: bool,
-    ) -> GeospatialProviderLayerResponse:
-        try:
-            layer = await self.provider_registry.describe_layer(
-                provider_id,
-                layer_id,
-                refresh=refresh,
-            )
-        except ProviderNotRegisteredError as exc:
-            raise GeospatialCapabilityNotFoundError(str(exc)) from exc
-        except (
-            ProviderUnavailableError,
-            ProviderTimeoutError,
-            ProviderCircuitOpenError,
-            ProviderError,
-        ) as exc:
-            raise GeospatialTileRequestError(str(exc)) from exc
-        return GeospatialProviderLayerResponse(provider=provider_id, layer=layer)
 
     # -------------------------------------------------------------------------
     async def get_layer_features(
@@ -572,47 +528,6 @@ class GeospatialApiService:
         return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
-    async def get_camera(self, camera_id: str) -> dict[str, Any]:
-        provider_id, provider_camera_id = self._parse_camera_identifier(camera_id)
-        if provider_id:
-            request = ProviderRequest(
-                capability_id=provider_id,
-                params={"live": True, "camera_id": provider_camera_id},
-            )
-            listing = await self._fetch_provider_payload(provider_id, request)
-            if listing.get("status") != "ok":
-                return {
-                    "id": camera_id,
-                    "status": listing.get("status", "metadata-unavailable"),
-                    "provider": provider_id,
-                    "message": listing.get("message")
-                    or "Camera detail lookup is not available.",
-                }
-            payload = listing.get("payload")
-            features = payload.get("features") if is_json_object(payload) else None
-            if is_json_array(features):
-                for feature in features:
-                    if not is_json_object(feature):
-                        continue
-                    feature_id = str(feature.get("id") or "")
-                    if feature_id in {camera_id, provider_camera_id}:
-                        return {
-                            "id": camera_id,
-                            "status": "ok",
-                            "provider": provider_id,
-                            "camera": feature,
-                            "attribution": listing.get("attribution", []),
-                            "warnings": listing.get("warnings", []),
-                            "stale": listing.get("stale", False),
-                        }
-        return {
-            "id": camera_id,
-            "status": "metadata-unavailable",
-            "provider": provider_id or "unknown",
-            "message": "Camera detail lookup requires a configured camera provider response.",
-        }
-
-    # -------------------------------------------------------------------------
     def get_credential_status(self, provider_id: str) -> dict[str, Any]:
         configured = self.credential_resolver.is_configured(provider_id)
         return {
@@ -633,20 +548,6 @@ class GeospatialApiService:
             key=lambda item: str(item.get("name") or item.get("provider_id"))
         )
         return {"providers": providers}
-
-    # -------------------------------------------------------------------------
-    def get_provider_account_setup(self, provider_id: str) -> dict[str, Any]:
-        normalized = provider_id.strip()
-        for record in self.list_provider_account_setup()["providers"]:
-            if str(record.get("provider_id") or "") == normalized:
-                return record
-        raise GeospatialCapabilityNotFoundError(
-            f"Geospatial provider '{provider_id}' was not found."
-        )
-
-    # -------------------------------------------------------------------------
-    def audit_sources(self) -> LayerAuditReport:
-        return audit_all_manifests(strict=True)
 
     # -------------------------------------------------------------------------
     def _manifest_by_id(self, capability_id: str) -> dict[str, Any]:
@@ -1042,18 +943,6 @@ class GeospatialApiService:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
             raise GeospatialInvalidRequestError("time must be ISO-8601.") from exc
-
-    # -------------------------------------------------------------------------
-    def _parse_camera_identifier(self, camera_id: str) -> tuple[str | None, str]:
-        normalized = camera_id.strip()
-        for separator in ("/", ":"):
-            if separator in normalized:
-                provider_id, provider_camera_id = normalized.split(separator, 1)
-                provider_id = provider_id.strip()
-                provider_camera_id = provider_camera_id.strip()
-                if provider_id and provider_camera_id:
-                    return provider_id, provider_camera_id
-        return None, normalized
 
     # -------------------------------------------------------------------------
     def _provider_requires_credentials(self, provider_id: str) -> bool:
