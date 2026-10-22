@@ -218,6 +218,22 @@ def test_websocket_route_rejects_wrong_origin(
             pass
 
 ###############################################################################
+def test_websocket_route_accepts_backend_served_origin(
+    realtime_client: tuple[TestClient, FastAPI],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FASTAPI_PORT", "5002")
+    client, _app = realtime_client
+    conversation = client.post("/api/conversations", json={"title": "Same origin"})
+    conversation_id = conversation.json()["conversation_id"]
+    with client.websocket_connect(
+        f"/api/conversations/{conversation_id}/realtime",
+        subprotocols=[REALTIME_SUBPROTOCOL],
+        headers={"origin": "http://127.0.0.1:5002"},
+    ) as socket:
+        assert socket.receive_json()["type"] == "connection.ready"
+
+###############################################################################
 def test_websocket_reconnect_replays_only_events_after_sequence(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:

@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Local Development Via Launcher
 
@@ -69,18 +69,26 @@ settings are visible immediately. A switch never copies records between
 databases. Changing `AEGIS_DATA_DIR` or process-level hosts, ports, and reload
 configuration still requires an application restart.
 
-Launch option 1 checks both configured ports before dependency work and again
-before starting services. If a port is occupied, it shows the grouped PID,
-process name, and occupied ports, then accepts only an explicit `y` or `yes`
-before terminating each confirmed process tree once. Declining cancels the
-launch; non-interactive launch fails without terminating existing processes.
-It starts the backend and Angular preview together, checks each process while
-waiting for `/api/health` and UI readiness, and cleans up only process trees
-created by that launch if readiness fails. It launches the venv Python directly
+Launch option 1 checks the configured backend port (`FASTAPI_PORT`) before
+dependency work and again before starting the service. If the port is occupied,
+it shows the grouped PID, process name, and occupied ports, then accepts only an
+explicit `y` or `yes` before terminating each confirmed process tree once.
+Declining cancels the launch; non-interactive launch fails without terminating
+existing processes. It starts only the backend, which serves the built frontend
+and the API from one origin, waits for `/api/health` and for `/` to return the
+SPA index, opens `http://<FASTAPI_HOST>:<FASTAPI_PORT>/`, and then stays in the
+foreground as the lifecycle owner. If readiness fails, only the process tree
+created by that launch is cleaned up. It launches the venv Python directly
 with `server.app:app` from the `app` directory and does not support an
 alternate import root, stale launcher arguments, or compatibility fallback.
 The native route rejects provider aliases and never substitutes a different
 provider or model after a configured provider failure.
+
+Press Ctrl+C in the launcher to stop. The backend shares the launcher console,
+receives the interrupt, and runs its normal shutdown; the launcher waits up to
+10 seconds and then terminates only the process tree it started. A backend that
+exits on its own is reported with its exit code. `UI_HOST` and `UI_PORT` apply
+only to the Angular dev server.
 
 Option 1 validates Python runtime dependencies and a content fingerprint for
 frontend dependencies. It synchronizes dependencies only when that state is
@@ -94,11 +102,11 @@ directories. Use menu option 2 to install or update dependencies and build the
 frontend, or menu option 3 to rebuild the frontend without synchronizing
 backend dependencies.
 
-`BACKEND_LOGS_VISIBLE=true` (the default when absent) starts backend logs in a
-separate visible terminal. Set it to `false` to start the backend detached and
-hidden. After menu option 1 reports successful startup, the original launcher
-terminal closes while the backend and frontend continue running.
-
+`BACKEND_LOGS_VISIBLE=true` (the default when absent) shows backend logs in the
+launcher console. Set it to `false` to write backend output to
+`data/logs/backend-console.log` and `backend-console.err.log` instead; Ctrl+C
+still stops the backend gracefully. The launcher requires PowerShell 7+ (`pwsh`)
+and refuses to run under Windows PowerShell 5.1.
 
 An existing `app\server\.venv` is reused. The launcher recreates it only when
 `pyvenv.cfg` references a different portable Python location, such as after the
@@ -115,7 +123,9 @@ reinstalling. Persistent application data under `data/runtime`, `data/geospatial
 
 ## Local Development Manual
 
-Run the backend and frontend commands in separate PowerShell terminals.
+Production-style run: build the frontend (`npm run build` in `app/client`) and run
+the backend command below; it serves the UI at the backend port. For frontend
+development, also run the Angular dev server in a second PowerShell terminal.
 
 ```powershell
 Set-Location <repository-root>
@@ -132,6 +142,7 @@ $env:PYTEST_ADDOPTS = '--basetemp="' + (Join-Path $runtimeCacheRoot 'pytest-tmp'
 Set-Location app/server
 uv sync
 uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002 --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10
+# Development only: Angular dev server with /api proxy
 Set-Location ../client
 npm install
 npm run start -- --host 127.0.0.1 --port 5000

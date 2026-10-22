@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Environment file
 
@@ -14,8 +14,8 @@ Common keys include:
   values are resolved from the repository root)
 - `FASTAPI_HOST`
 - `FASTAPI_PORT`
-- `UI_HOST`
-- `UI_PORT`
+- `UI_HOST` (Angular dev server only)
+- `UI_PORT` (Angular dev server only)
 - `RELOAD`
 - `BACKEND_LOGS_VISIBLE`
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for

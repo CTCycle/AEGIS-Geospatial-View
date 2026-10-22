@@ -640,9 +640,13 @@ def is_realtime_origin_allowed(websocket: WebSocket) -> bool:
         }
     ui_host = os.getenv("UI_HOST", "127.0.0.1").strip()
     ui_port = os.getenv("UI_PORT", "8001").strip()
+    api_port = os.getenv("FASTAPI_PORT", "5002").strip()
     allowed = {
         f"http://{ui_host}:{ui_port}",
         f"http://localhost:{ui_port}",
         f"http://127.0.0.1:{ui_port}",
+        f"http://{configured_host}:{api_port}",
+        f"http://localhost:{api_port}",
+        f"http://127.0.0.1:{api_port}",
     }
     return origin.rstrip("/") in allowed

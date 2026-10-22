@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Backend persistence
 
@@ -22,10 +22,14 @@ data directory only after the original has been safely copied.
 
 ## Interoperability
 
-- the frontend communicates with the backend through `/api`;
-- development proxying is configured by `app/client/proxy.conf.cjs`;
-- the Windows launcher runs the backend and frontend as local processes using
-  the portable runtimes under `runtimes/`.
+- in the launcher and any production-style run, the backend serves the built
+  frontend (`app/client/dist/browser`) and `/api` from one origin, so no
+  proxy or second server is involved; unknown `/api/*` paths return 404 and
+  other unknown paths fall back to `index.html`;
+- the Angular dev server and `app/client/proxy.conf.cjs` are for development
+  only;
+- the Windows launcher supervises the single backend process using the
+  portable runtimes under `runtimes/` and stops it on Ctrl+C.
 
 ## Operational constraints
 
