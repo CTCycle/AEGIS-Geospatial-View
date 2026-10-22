@@ -355,6 +355,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private modelSettingsWriteQueue: Promise<void> = Promise.resolve();
   private modelSettingsWriteRevision = 0;
   private activeCredentialWrites = 0;
+  // Drafts whose save just failed; blur must not resend them (e.g. when Clear is pressed).
+  private readonly failedCredentialDrafts = new Map<string, string>();
   private activeGeospatialCredentialWrites = 0;
   private routerEventsSubscription?: Subscription;
   private readonly onWindowPopState = (): void => {
@@ -857,7 +859,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   commitGeoCredential(provider: string): void {
     this.cancelAutosave(`geo:${provider}`);
-    if (this.geoCredentialDrafts[provider]?.trim()) {
+    const draft = this.geoCredentialDrafts[provider]?.trim();
+    if (draft && this.failedCredentialDrafts.get(`geo:${provider}`) !== draft) {
       void this.saveGeoProvider(provider);
     }
   }
@@ -1016,7 +1019,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   commitCloudCredential(provider: CloudCredentialProvider): void {
     this.cancelAutosave(`cloud:${provider}`);
-    if (this.cloudCredentialValue(provider).trim()) {
+    const draft = this.cloudCredentialValue(provider).trim();
+    if (draft && this.failedCredentialDrafts.get(`cloud:${provider}`) !== draft) {
       void this.saveCloudProvider(provider);
     }
   }
@@ -1047,6 +1051,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       if (this.isDestroyed) return;
       this.settings = updated;
+      this.failedCredentialDrafts.delete(key);
       if (revisionAtSend === (this.autosaveRevisions.get(key) ?? 0)
         && this.cloudCredentialValue(provider).trim() === value) {
         this.setCloudCredentialValue(provider, '');
@@ -1060,6 +1065,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) return;
+      this.failedCredentialDrafts.set(key, value);
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not save the ${providerDisplayLabel(provider)} key right now.`,
@@ -1194,6 +1200,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       if (this.isDestroyed) return true;
       this.settings = updated;
+      if (draftKey) this.failedCredentialDrafts.delete(draftKey);
       const isCurrentDraft = !draftKey
         || (revisionAtSend === (this.autosaveRevisions.get(draftKey) ?? 0)
           && (draftKey.startsWith('signup:')
@@ -1216,6 +1223,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return true;
     } catch (error: unknown) {
       if (this.isDestroyed) return false;
+      if (draftKey) this.failedCredentialDrafts.set(draftKey, apiKey);
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not update ${setup?.name ?? provider} access.`,

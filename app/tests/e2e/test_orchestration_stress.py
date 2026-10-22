@@ -182,7 +182,7 @@ def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> N
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 ###############################################################################
-def test_backend_overlay_state_wins_after_refresh(
+def test_tab_overlay_preferences_are_restored_after_refresh(
     page: Page, base_url: str
 ) -> None:
     _stub_ui_api(page)
@@ -190,7 +190,9 @@ def test_backend_overlay_state_wins_after_refresh(
     page.get_by_label("Chat message").fill("show map with overlays")
     page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+    page.get_by_role("button", name="Map tools", exact=True).click()
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
+    page.get_by_role("button", name="Expand", exact=True).click()
 
     first_checkbox = page.locator(".overlay-control-row input[type='checkbox']").first
     first_checkbox.uncheck()
@@ -200,13 +202,15 @@ def test_backend_overlay_state_wins_after_refresh(
     )
     assert int(first_range.input_value()) == 25
     page.reload()
+    page.get_by_role("button", name="Map tools", exact=True).click()
     expect(page.locator(".overlay-controls")).to_be_visible()
-    # The canonical backend collection owns explicit visibility values. Local
-    # preferences remain a fallback for payloads without that field.
+    page.get_by_role("button", name="Expand", exact=True).click()
+    # Tab-local overlay preferences override the snapshot values only while
+    # the page is restoring after a refresh.
     expect(
         page.locator(".overlay-control-row input[type='checkbox']").first
-    ).to_be_checked()
+    ).not_to_be_checked()
     restored = page.locator(
         ".overlay-control-row input[type='range']"
     ).first.input_value()
-    assert int(restored) == 65
+    assert int(restored) == 25

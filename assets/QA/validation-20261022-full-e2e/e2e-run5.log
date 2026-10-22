@@ -1,0 +1,83 @@
+...F..................F..sss.sss........s.................s.s.s.s.s.s.s. [ 82%]
+s..ss.sssssssss                                                          [100%]
+================================== FAILURES ===================================
+______ TestChatFlow.test_chat_composer_visible_and_send_prompt[chromium] ______
+tests\e2e\test_app_flow.py:47: in test_chat_composer_visible_and_send_prompt
+    expect(page.locator(".chat-message--assistant").last).to_be_visible(
+E   AssertionError: Locator expected to be visible
+E   Actual value: None
+E   Error: element(s) not found 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 45000ms
+E     - waiting for locator(".chat-message--assistant").last
+E   
+E   Aria snapshot:
+E   - banner "Primary navigation":
+E     - link "AEGIS workspace":
+E       - /url: /
+E       - text: AEGIS
+E     - navigation "Application sections":
+E       - link "Search":
+E         - /url: /
+E       - link "Geodata":
+E         - /url: /geodata
+E       - link "Settings":
+E         - /url: /settings
+E   - main:
+E     - heading "Search workspace" [level=1]
+E     - complementary "Chat toolbar":
+E       - region "Agent Chat":
+E         - button "Start new chat"
+E         - button "Show conversation history"
+E         - log "Conversation transcript":
+E           - article:
+E             - paragraph: show map at 41.9028, 12.4964
+E         - button "Attach an image"
+E         - textbox "Chat message":
+E           - /placeholder: Ask for a location, map data, or coordinates for a place.
+E         - button "Send message" [disabled]
+E         - group "Context window usage": Context Unavailable
+E     - separator "Resize chat and map panels"
+E     - region "Map canvas":
+E       - status: Ready for a location or data request
+E       - button "Hide chat panel" [pressed]: Hide chat
+E       - button "Alerts"
+E       - paragraph: Map Workspace
+E       - paragraph: Ask for a location or map data to load the workspace.
+E     - group "Workspace status":
+E       - list:
+E         - listitem:
+E           - 'link "Agent model: Needs attention. Open agent settings"':
+E             - /url: /settings
+E             - text: Agent model
+E             - strong: Needs attention
+E         - listitem:
+E           - 'group "Satellite: Available"':
+E             - text: Satellite
+E             - strong: Available
+E         - listitem:
+E           - 'link "Optional Keys: Optional. Open geospatial access settings"':
+E             - /url: /settings?tab=geospatial-access
+E             - text: Optional Keys
+E             - strong: Optional
+E       - button "Tool activity and execution details": Tool activity Needs attention
+_______________ test_eea_coverage_and_gbif_lifecycle[chromium] ________________
+tests\e2e\test_eea_raster_lifecycle.py:61: in test_eea_coverage_and_gbif_lifecycle
+    assert settings["agent_model_provider"] == "opencode-go"
+E   AssertionError: assert '' == 'opencode-go'
+E     
+E     - opencode-go
+=========================== short test summary info ===========================
+FAILED server\test_app_flow.py::TestChatFlow::test_chat_composer_visible_and_send_prompt[chromium]
+FAILED server\test_eea_raster_lifecycle.py::test_eea_coverage_and_gbif_lifecycle[chromium]
+SKIPPED [1] tests\e2e\test_live_chat_smoke.py:82: Selected model is missing from the current catalog.
+SKIPPED [1] tests\e2e\test_live_chat_smoke.py:133: Selected model is missing from the current catalog.
+SKIPPED [1] tests\e2e\test_live_chat_smoke.py:183: Selected model is missing from the current catalog.
+SKIPPED [12] tests\e2e\test_live_gibs_raster_matrix.py:125: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] tests\e2e\test_live_raster_diagnostics.py:830: Selected model capability is not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] tests\e2e\test_live_vector_point_matrix.py:420: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] tests\e2e\test_route_matrix_live.py:375: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] tests\e2e\test_chat_api.py:64: Requested local agent model is unavailable for this check.
+SKIPPED [2] tests\e2e\test_chat_api.py:29: Providers unavailable for this check (503).
+SKIPPED [5] tests\e2e\test_orchestration_ambiguity.py:16: Provider unavailable for orchestration check (503).
+2 failed, 59 passed, 26 skipped in 150.25s (0:02:30)

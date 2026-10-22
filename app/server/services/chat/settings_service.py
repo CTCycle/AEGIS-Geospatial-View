@@ -251,7 +251,10 @@ class ChatSettingsService:
         has_agent_assignment = bool(
             next_agent_model_provider.strip() and next_agent_model_name.strip()
         )
-        if has_agent_assignment or should_validate_model_selection:
+        if has_agent_assignment or (
+            payload.agent_model_provider is not None
+            or payload.agent_model_name is not None
+        ):
             self._validate_agent_assignment(
                 agent_model_provider=next_agent_model_provider,
                 agent_model_name=next_agent_model_name,

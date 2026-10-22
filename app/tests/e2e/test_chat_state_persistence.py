@@ -15,6 +15,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     geospatial_catalog_payload,
     model_settings_payload,
 )
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 
 STORAGE_KEY = "aegis:webapp-ui-state:v1"
@@ -72,6 +73,7 @@ def _stub_settings_api(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),
     )
+    register_realtime_stub(page, lambda _message, _run_number: {})
     if include_conversation_snapshot:
         page.route(
             re.compile(r".*/api/conversations/conversation-e2e$"),
@@ -129,6 +131,11 @@ def _base_state(saved_at: int | None = None) -> dict[str, Any]:
     }
 
 ###############################################################################
+def _open_layer_list(page: Page) -> None:
+    page.get_by_role("button", name="Map tools", exact=True).click()
+    page.get_by_role("button", name="Expand", exact=True).click()
+
+###############################################################################
 def test_refresh_same_tab_restores_chat_and_map_state(
     page: Page, base_url: str, save_snapshot: Callable[[Page, str], Path]
 ) -> None:
@@ -139,7 +146,7 @@ def test_refresh_same_tab_restores_chat_and_map_state(
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
     expect(page.locator(".maplibregl-canvas")).to_be_visible()
 
-    page.get_by_role("button", name="Expand", exact=True).click()
+    _open_layer_list(page)
     layer_visibility = page.get_by_label("Show OpenAQ Air Quality layer", exact=True)
     layer_opacity = page.get_by_label("Opacity for OpenAQ Air Quality", exact=True)
     expect(layer_visibility).to_be_checked()
@@ -156,6 +163,7 @@ def test_refresh_same_tab_restores_chat_and_map_state(
     assert persisted_state["chatPage"]["mapState"] == {
         "overlayVisibility": {"openaq_air_quality": False},
         "overlayOpacity": {"openaq_air_quality": 0.34},
+        "overlayOrder": ["openaq_air_quality"],
     }
 
     page.reload()
@@ -169,9 +177,10 @@ def test_refresh_same_tab_restores_chat_and_map_state(
     assert restored_state["chatPage"]["mapState"] == {
         "overlayVisibility": {"openaq_air_quality": False},
         "overlayOpacity": {"openaq_air_quality": 0.34},
+        "overlayOrder": ["openaq_air_quality"],
     }
     expect(page.locator(".maplibregl-canvas")).to_be_visible()
-    page.get_by_role("button", name="Expand", exact=True).click()
+    _open_layer_list(page)
     expect(page.get_by_label("Show OpenAQ Air Quality layer", exact=True)).not_to_be_checked()
     expect(page.get_by_label("Opacity for OpenAQ Air Quality", exact=True)).to_have_value("34")
     save_snapshot(page, "t1-02-restored-map-state")
