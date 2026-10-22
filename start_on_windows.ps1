@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [ValidateSet('Launch', 'ClearCache')]
@@ -643,18 +644,12 @@ function Stop-PortListeners {
 
 function Get-ConfiguredApplicationPorts {
     $configuredPorts = [ordered]@{}
-    foreach ($name in @('FASTAPI_PORT', 'UI_PORT')) {
-        $rawValue = [Environment]::GetEnvironmentVariable($name, 'Process')
-        $port = 0
-        if (-not [int]::TryParse($rawValue, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
-            throw "$name must be a TCP port from 1 through 65535; received '$rawValue'."
-        }
-        $configuredPorts[$name] = $port
+    $rawValue = [Environment]::GetEnvironmentVariable('FASTAPI_PORT', 'Process')
+    $port = 0
+    if (-not [int]::TryParse($rawValue, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+        throw "FASTAPI_PORT must be a TCP port from 1 through 65535; received '$rawValue'."
     }
-    if ($configuredPorts.FASTAPI_PORT -eq $configuredPorts.UI_PORT) {
-        throw "FASTAPI_PORT and UI_PORT must differ; both are configured as $($configuredPorts.FASTAPI_PORT)."
-    }
-    return [int[]]@($configuredPorts.FASTAPI_PORT, $configuredPorts.UI_PORT)
+    return [int[]]@($port)
 }
 
 function Get-PortConflicts {
@@ -892,11 +887,9 @@ function Invoke-LaunchApplication {
     Ensure-FrontendBuildCurrent
 
     $fastApiPort = [int]$env:FASTAPI_PORT
-    $uiPort = [int]$env:UI_PORT
     $browserBackendHost = Get-BrowserHost -HostName $env:FASTAPI_HOST
-    $browserUiHost = Get-BrowserHost -HostName $env:UI_HOST
-    $backendHealthUri = "http://${browserBackendHost}:$fastApiPort/api/health"
-    $uiUri = "http://${browserUiHost}:$uiPort"
+    $appUri = "http://${browserBackendHost}:$fastApiPort/"
+    $backendHealthUri = "${appUri}api/health"
 
     Resolve-LaunchPortConflicts -Ports $applicationPorts
 
@@ -914,51 +907,64 @@ function Invoke-LaunchApplication {
         $backendArguments += '--reload'
     }
 
+    # The backend serves the built SPA and the API from one origin; this launcher
+    # owns its lifecycle until Ctrl+C or backend exit.
     $backendProcess = $null
-    $frontendProcess = $null
+    $started = $false
     try {
         Write-Status RUN "Launching backend ($backendModule)"
         if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
-            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
+            # Sharing the launcher console lets Ctrl+C reach uvicorn for a graceful shutdown,
+            # with or without output redirection.
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -PassThru
         }
         else {
-            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
+            New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
+            $stdoutLog = Join-Path $LogsDir 'backend-console.log'
+            $stderrLog = Join-Path $LogsDir 'backend-console.err.log'
+            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
+            Write-Status INFO "Backend output is written to $stdoutLog and $stderrLog."
         }
-
-        Write-Status RUN 'Launching frontend preview'
-        $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort") -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
 
         Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
         if (-not (Wait-HttpHealth -Uri $backendHealthUri -Process $backendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
             throw "Backend did not become ready within 60 seconds at $backendHealthUri."
         }
         Write-Status OK 'Backend health check passed.'
-
-        Write-Status WAIT "Waiting for frontend readiness at $uiUri"
-        if (-not (Wait-HttpHealth -Uri $uiUri -Process $frontendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
-            throw "Frontend preview did not become ready within 60 seconds at $uiUri."
+        if (-not (Wait-HttpHealth -Uri $appUri -Process $backendProcess -TimeoutSeconds 15 -IntervalSeconds 1)) {
+            throw "The backend did not serve the built frontend at $appUri."
         }
-    }
-    catch {
-        Stop-StartedProcessTree -Processes @($frontendProcess, $backendProcess)
-        throw
-    }
+        $started = $true
 
-    try {
-        Start-Process -FilePath $uiUri -ErrorAction Stop | Out-Null
+        try {
+            Start-Process -FilePath $appUri -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-Status WARN "The browser could not be opened automatically. Open $appUri manually."
+        }
+        Clear-LauncherProgress
+        Write-Host ''
+        Write-Status SUCCESS "AEGIS is running at $appUri (backend PID $($backendProcess.Id))."
+        Write-Host '  Press Ctrl+C to stop.'
+        while (-not $backendProcess.HasExited) {
+            Start-Sleep -Milliseconds 500
+            $backendProcess.Refresh()
+        }
+        $backendProcess.WaitForExit()
+        if ($backendProcess.ExitCode -ne 0) {
+            throw "Backend exited unexpectedly with code $($backendProcess.ExitCode)."
+        }
+        Write-Status INFO 'Backend stopped.'
     }
-    catch {
-        Write-Status WARN "The browser could not be opened automatically. Open $uiUri manually."
+    finally {
+        if ($started -and $null -ne $backendProcess -and -not $backendProcess.HasExited) {
+            Write-Status INFO 'Stopping AEGIS; waiting for the backend to shut down.'
+            if (-not $backendProcess.WaitForExit(10000)) {
+                Write-Status WARN 'Backend did not exit within 10 seconds; terminating its process tree.'
+            }
+        }
+        Stop-StartedProcessTree -Processes @($backendProcess)
     }
-    $backendPid = @(Get-PortListenerPids -Port $fastApiPort) | Select-Object -First 1
-    $frontendPid = @(Get-PortListenerPids -Port $uiPort) | Select-Object -First 1
-    if (-not $backendPid -and $backendProcess) { $backendPid = $backendProcess.Id }
-    if (-not $frontendPid) { $frontendPid = $frontendProcess.Id }
-
-    Write-Host ''
-    Write-Status SUCCESS 'AEGIS started successfully.'
-    Write-Host "  Backend: $backendHealthUri (PID $backendPid)"
-    Write-Host "  Frontend: $uiUri (PID $frontendPid)"
 }
 
 function Invoke-InstallOrUpdate {
@@ -1191,10 +1197,7 @@ function Invoke-RemoveAllData {
     ) | ForEach-Object { Get-NormalizedPath -Path $_ } | Select-Object -Unique
 
     Write-Status INFO 'Stopping configured local application services before removing data.'
-    $applicationPorts = @([int]$env:FASTAPI_PORT, [int]$env:UI_PORT) | Select-Object -Unique
-    foreach ($port in $applicationPorts) {
-        Stop-PortListeners -Port $port
-    }
+    Stop-PortListeners -Port ([int]$env:FASTAPI_PORT)
 
     $removed = 0
     $skipped = 0

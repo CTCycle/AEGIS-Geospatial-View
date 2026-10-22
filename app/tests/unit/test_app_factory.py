@@ -139,7 +139,9 @@ def test_create_app_mounts_client_root_assets_and_spa_fallback(
         root = client.get("/")
         asset = client.get("/assets/main.js")
         fallback = client.get("/map/rome")
+        unknown_api = client.get(f"{FASTAPI_API_PREFIX}/missing")
 
+    assert unknown_api.status_code == 404
     assert root.status_code == 200
     assert root.text == "<html>client</html>"
     assert asset.status_code == 200

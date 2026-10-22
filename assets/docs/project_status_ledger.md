@@ -1,6 +1,8 @@
 # Project Status Ledger
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
+
+The [2026-10-22 full validation pass](../QA/validation-20261022-full-e2e/report.md) on `develop@1a864a99` plus the working tree: Ruff, strict Pyright, 1,163 backend tests (after repairing seven test doubles left stale by `ee3ff178`), Angular build and 302/302 Karma pass; single-origin serving and the same-origin WebSocket pass in a real browser. Playwright E2E is 51 pass / 10 fail / 26 skip: no agent model is configured here, so live-lane scenarios are blocked, and the Settings model-card tests plus one visual baseline are stale after the rows refactor (unfixed). Campaign counts are unchanged.
 
 The [2026-10-19 Tier 5 accessibility and performance slice](../QA/validation-20261019-tier5-perf-a11y/report.md) authors the missing `T5-09`/`T5-10` contracts and passes both: axe-core found nine accessibility defects across nine views (headings, nested `main`, unsupported `aria-label`, dangling `aria-describedby`, link underline, transcript focus), all fixed and re-audited to zero violations; API p95 is under 30 ms and initial transfer is 368 kB. Screen-reader and over-map contrast review remain manual gaps. `T5-11`/`T5-13` stay `UNRUN`.
 

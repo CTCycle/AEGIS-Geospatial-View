@@ -1,14 +1,16 @@
 # Runtime Modes
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Supported Modes
 
 ### Local Development
 
 - Backend: FastAPI
-- Frontend: Angular dev or preview server
-- Primary launcher: `start_on_windows.ps1`
+- Frontend: built Angular SPA served by the FastAPI backend on the same origin
+  (Angular dev server only for frontend development)
+- Primary launcher: `start_on_windows.ps1`, which supervises the backend until
+  Ctrl+C
 - Portable runtimes are expected under `runtimes/`
 
 ### Automated Test Runtime

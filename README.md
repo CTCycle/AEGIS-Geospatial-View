@@ -69,7 +69,7 @@ cd ../client
 npm install
 ```
 
-Then start the backend and client following [Runtime startup](assets/docs/runtime/startup.md).
+Then launch the application (the backend serves the built UI and API at `http://<FASTAPI_HOST>:<FASTAPI_PORT>/`; press Ctrl+C in the launcher to stop) following [Runtime startup](assets/docs/runtime/startup.md).
 
 ## Configuration
 
@@ -77,8 +77,8 @@ Then start the backend and client following [Runtime startup](assets/docs/runtim
 |---|---|---|
 | `FASTAPI_HOST` | `127.0.0.1` | Backend host |
 | `FASTAPI_PORT` | `5002` | Backend port |
-| `UI_HOST` | `127.0.0.1` | Frontend host |
-| `UI_PORT` | `5000` | Frontend port |
+| `UI_HOST` | `127.0.0.1` | Angular dev-server host (development only) |
+| `UI_PORT` | `5000` | Angular dev-server port (development only) |
 | `RELOAD` | `false` | Enable backend reload |
 | `BACKEND_LOGS_VISIBLE` | `true` | Show backend logs |
 | `REALTIME_ALLOW_MISSING_ORIGIN` | `false` | Allow missing-origin WebSocket connections |

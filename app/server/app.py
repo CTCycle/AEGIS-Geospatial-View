@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -285,6 +285,9 @@ def serve_client_root() -> FileResponse:
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
+    api_segment = FASTAPI_API_PREFIX.strip("/")
+    if full_path == api_segment or full_path.startswith(f"{api_segment}/"):
+        raise HTTPException(status_code=404, detail="Not Found")
     client_file = _resolve_client_file(full_path)
     if client_file is not None:
         return FileResponse(client_file)

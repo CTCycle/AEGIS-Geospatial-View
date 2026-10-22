@@ -308,7 +308,7 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
     expect(page.get_by_role("button", name="Test selected model")).to_have_count(0)
     model_card = (
         page.locator("article.model-row")
-        .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
+        .filter(has_text="gpt-5-mini")
         .first
     )
     model_card.get_by_role("button", name="Select as agent model: gpt-5-mini").click()
@@ -473,7 +473,7 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
 
     model_card = (
         page.locator("article.model-row")
-        .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
+        .filter(has_text="gpt-5-mini")
         .first
     )
     expect(model_card).to_be_visible(timeout=15000)

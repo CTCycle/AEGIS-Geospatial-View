@@ -71,7 +71,7 @@ def test_history_search_is_scoped_bounded_and_deterministic() -> None:
     second_page = history.search_conversation_history(
         first.id,
         "rome",
-        cursor=page["next_cursor"],
+        cursor=page["pagination"]["next_cursor"],
         limit=10,
     )
     assert [item["turn_index"] for item in second_page["messages"]] == [2, 3]

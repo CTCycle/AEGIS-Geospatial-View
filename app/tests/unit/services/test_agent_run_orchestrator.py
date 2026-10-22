@@ -147,11 +147,22 @@ class _FakeRunRepository:
         return self.request_cancel(run_id), True
 
 ###############################################################################
+class _FakeEventRepository:
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def get_latest_checkpoint_state(
+        _run_id: str, *, run_version: int
+    ) -> dict[str, object] | None:
+        return None
+
+###############################################################################
 class _FakeEventPublisher:
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, object]] = []
+        self.event_repository = _FakeEventRepository()
 
     # -------------------------------------------------------------------------
     async def publish(self, **kwargs):  # noqa: ANN003

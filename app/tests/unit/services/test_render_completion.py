@@ -71,21 +71,10 @@ def test_presentation_carries_vision_capture_requested_from_execution_trace(rend
     assert enabled["vision_capture_requested"] is True
 
 ###############################################################################
-class _EventPublisher:
-
-    # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self.events: list[tuple[str, dict[str, object]]] = []
-
-    # -------------------------------------------------------------------------
-    async def publish(
-        self,
-        *,
-        type: object,
-        payload: dict[str, object],
-        **_kwargs: object,
-    ) -> None:
-        self.events.append((str(type), dict(payload)))
+def _event_types(publisher: RunEventPublisher, run_id: str) -> list[str]:
+    return [
+        str(event.type.value) for event in publisher.event_repository.list_events(run_id)
+    ]
 
 ###############################################################################
 class _InMemoryBackend:
@@ -102,21 +91,22 @@ class _InMemoryBackend:
 
 ###############################################################################
 @pytest.fixture()
-def render_context() -> tuple[AgentRunRepository, _EventPublisher, str, str]:
+def render_context() -> tuple[AgentRunRepository, RunEventPublisher, str, str]:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
     conversation_id = "conversation-render"
     with backend.session() as session:
         session.add(ConversationRecord(id=conversation_id, title="Render"))
         session.commit()
-    repository = AgentRunRepository(backend)
+    event_repository = AgentRunEventRepository(backend)
+    repository = AgentRunRepository(backend, event_repository=event_repository)
     run = repository.create_run(
         conversation_id,
         "Show Rome",
         "Show Rome",
         client_request_id="render-request-1",
     )
-    publisher = _EventPublisher()
+    publisher = RunEventPublisher(event_repository)
     return repository, publisher, conversation_id, run.run_id
 
 ###############################################################################
@@ -554,11 +544,11 @@ def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
     assert first.duplicate is False
     assert first.state == "completed"
     assert first.presentation_status == "ready"
-    assert [event[0] for event in publisher.events].count("completed") == 1
+    assert _event_types(publisher, run_id).count("completed") == 1
 
     second = run_async_in_thread(service.acknowledge(conversation_id, acknowledgment))
     assert second.duplicate is True
-    assert [event[0] for event in publisher.events].count("completed") == 1
+    assert _event_types(publisher, run_id).count("completed") == 1
 
     with pytest.raises(ValueError, match="different render acknowledgment"):
         run_async_in_thread(
@@ -859,7 +849,7 @@ def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     assert ready.presentation_status == "ready"
     assert ready.observation is not None
     assert ready.observation.attempt == 2
-    assert any(str(event[0]) == "render_observed" for event in publisher.events)
+    assert "render_observed" in _event_types(publisher, run_id)
 
     duplicate = run_async_in_thread(service.acknowledge(conversation_id, ready_ack))
     assert duplicate.duplicate is True
@@ -945,7 +935,7 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     assert result.observation.failure_code == "render_validation_failed"
     assert result.observation.failure_stage == "backend_validation"
     assert result.observation.recovery == "revise_map"
-    assert any(str(event[0]) == "render_observed" for event in publisher.events)
+    assert "render_observed" in _event_types(publisher, run_id)
 
 ###############################################################################
 @pytest.mark.parametrize('rendering_mode', ['raster-tile', 'tile', 'xyz', 'wms', 'wmts'])
