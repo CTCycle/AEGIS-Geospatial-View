@@ -19,17 +19,18 @@
 
 ## Overview
 
-AEGIS turns location questions into map-focused results. Describe a place, coordinates, or a geospatial task in plain language, review the map and available overlays, and refine the result with follow-up requests. The local web application includes a Workspace, a Geodata catalog, and Settings.
-
-The default workflow can use public geospatial sources without a provider key. Optional cloud models and provider services require their own access and availability.
+AEGIS Geospatial View is a chat-driven local geospatial workspace for exploring places, layers, and map context. Users describe a location, coordinates, or geospatial task in plain language and receive map-focused results with overlays and session context. The application can refine results through follow-up requests while preserving conversation context and supports direct coordinate lookups. It can discover conditions across an area and locate photos from visual clues using a vision-capable model. The default workflow uses public geospatial sources without a provider key, while optional cloud models and provider services require their own access. Local state persists in SQLite, and the interface requires a desktop browser window at least 1024 pixels wide.
 
 ## Key Features
 
-- Search by address or coordinates and review the location in its map context.
-- Explore base maps, overlays, and other geospatial capabilities in the Geodata catalog.
+- Search by address or coordinates and review locations in their map context.
+- Explore base maps, overlays, and geospatial capabilities in the Geodata catalog.
 - Refine a map session with follow-up requests while preserving conversation context.
-- Configure model selection, local Ollama access, provider credentials, and geospatial settings from the application.
-- Keep local application state in SQLite, with schema changes managed through Alembic.
+- Discover conditions across an area with ranked samples, grid bins, and named places.
+- Locate a photo from visual cues as a hypothesis with confirmation.
+- Configure model selection, local Ollama access, provider credentials, and geospatial settings.
+- Keep local application state in SQLite with schema migrations via Alembic.
+- Use public sources by default, with optional provider keys for services such as TomTom and OpenAQ.
 
 ## Screenshots
 
