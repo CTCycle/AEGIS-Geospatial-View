@@ -195,11 +195,6 @@ def backend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "backend.log"
 
 ###############################################################################
-@pytest.fixture(scope="session")
-def frontend_log_path(artifact_root: Path) -> Path:
-    return artifact_root / "logs" / "frontend.log"
-
-###############################################################################
 @pytest.fixture
 def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
     test_file = request.node.nodeid.split("::", 1)[0].replace("\\", "/").split("/")[-1]

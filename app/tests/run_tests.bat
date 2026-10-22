@@ -28,9 +28,6 @@ set "UI_PORT=8001"
 set "TEST_RESULT=0"
 set "LIVE_SERVER_PHASE=SKIPPED"
 set "PYTEST_PHASE=SKIPPED"
-set "FRONTEND_BOOTSTRAP_PHASE=SKIPPED"
-set "FRONTEND_UNIT_PHASE=SKIPPED"
-set "FRONTEND_E2E_PHASE=SKIPPED"
 set "STARTED_BACKEND=0"
 set "STARTED_FRONTEND=0"
 set "SKIP_LIVE_SERVERS=0"
@@ -186,9 +183,6 @@ echo  Test Summary
 echo ============================================================
 echo  Live server phase   : %LIVE_SERVER_PHASE%
 echo  Python tests        : %PYTEST_PHASE%
-echo  Frontend bootstrap  : %FRONTEND_BOOTSTRAP_PHASE%
-echo  Frontend unit tests : %FRONTEND_UNIT_PHASE%
-echo  Frontend E2E tests  : %FRONTEND_E2E_PHASE%
 echo ============================================================
 echo.
 

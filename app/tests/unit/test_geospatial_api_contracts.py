@@ -1,47 +1,35 @@
 from __future__ import annotations
-
 import logging
-from urllib.parse import parse_qs, urlsplit
-
 import pytest
+import json
+from urllib.parse import parse_qs, urlsplit
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-
 from server.api import geospatial
 from server.api.geospatial import raise_service_http_error
-from server.app import create_app
-from server.contracts.geospatial import (
-    GeospatialLayerRenderDescriptor,
-    GeospatialProviderLayerDescriptor,
-)
+from server.app import create_app, app
+from server.contracts.geospatial import GeospatialLayerRenderDescriptor, GeospatialProviderLayerDescriptor
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial import api_service as api_service_module
-from server.services.geospatial.api_service import (
-    GeospatialApiService,
-    GeospatialApiServiceError,
-    GeospatialCapabilityNotFoundError,
-    GeospatialInvalidRequestError,
-    GeospatialTileCredentialError,
-    GeospatialTileRequestError,
-    GeospatialUnsupportedTileError,
-)
+from server.services.geospatial.api_service import GeospatialApiService, GeospatialApiServiceError, GeospatialCapabilityNotFoundError, GeospatialInvalidRequestError, GeospatialTileCredentialError, GeospatialTileRequestError, GeospatialUnsupportedTileError
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
-from server.services.geospatial.providers.base import (
-    ProviderRateLimitError,
-    ProviderTimeoutError,
-    ProviderUnavailableError,
-)
-from server.services.geospatial.providers.http import (
-    RasterHttpDiagnostic,
-    RasterHttpError,
-)
+from server.services.geospatial.providers.base import ProviderRateLimitError, ProviderTimeoutError, ProviderUnavailableError, ProviderRequest
+from server.services.geospatial.providers.http import RasterHttpDiagnostic, RasterHttpError
 from server.services.geospatial.raster_tiles import web_mercator_tile_bbox
+from tests.conftest import run_async_in_thread
+from server.services.geospatial.tiler import build_vector_tile_manifest
+from pathlib import Path
+
+# --- test_geospatial_api_contracts.py ---
+
+
+
 
 ###############################################################################
 def create_started_client() -> TestClient:
@@ -1293,3 +1281,97 @@ def test_raise_service_http_error_uses_generic_fallback_for_unknown_error() -> N
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "Geospatial service request failed."
+
+# --- test_geospatial_plan_completion_surface.py ---
+
+
+
+###############################################################################
+def test_ingestion_only_providers_return_graceful_state() -> None:
+    registry = ProviderRegistry()
+    registry.build_from_manifests()
+
+    response = run_async_in_thread(
+        registry.fetch(
+            "natural_earth",
+            ProviderRequest(capability_id="natural_earth_admin_boundaries"),
+        )
+    )
+
+    assert response.payload["status"] == "source-ready"
+    assert response.payload["downloadUrl"].startswith("https://")
+
+###############################################################################
+def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
+    catalog = tmp_path / "feeds.csv"
+    catalog.write_text(
+        "mdb_source_id,provider,name,location.country_code,urls.latest,urls.license\n"
+        "mdb-1,Example Transit,Example City,IT,https://agency.example/gtfs.zip,https://agency.example/license\n",
+        encoding="utf-8",
+    )
+    from server.services.geospatial.providers.mobility_database import (
+        MobilityDatabaseProvider,
+    )
+
+    registry = ProviderRegistry(
+        providers=[MobilityDatabaseProvider(catalog_path=catalog)]
+    )
+
+    response = run_async_in_thread(
+        registry.fetch(
+            "mobility_database",
+            ProviderRequest(
+                capability_id="mobility_database_feeds", params={"query": "Example"}
+            ),
+        )
+    )
+
+    assert response.payload["feedCount"] == 1
+    assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
+    assert response.payload["feeds"][0]["license"].endswith("license")
+
+###############################################################################
+def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:
+    geojson = tmp_path / "features.geojson"
+    geojson.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "A"},
+                        "geometry": {"type": "Point", "coordinates": [1.0, 2.0]},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = build_vector_tile_manifest(
+        capability_id="sample",
+        normalized_geojson=geojson,
+        tile_dir=tmp_path / "tiles",
+    )
+
+    assert result.feature_count == 1
+    assert (
+        json.loads((tmp_path / "tiles" / "tile_manifest.json").read_text())[
+            "featureCount"
+        ]
+        == 1
+    )
+
+# --- test_openapi_schema.py ---
+
+
+
+
+SHARED_OPENAPI_PATH = Path(__file__).resolve().parents[2] / "shared" / "openapi.json"
+
+###############################################################################
+def test_shared_openapi_schema_matches_runtime() -> None:
+    shared_schema = json.loads(SHARED_OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    assert shared_schema == app.openapi()

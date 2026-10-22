@@ -1,0 +1,331 @@
+from __future__ import annotations
+from collections.abc import Iterable, Sequence
+from typing import Any
+import pytest
+from server.services.llm.base import LLMProvider
+from server.services.llm.deepseek_provider import DeepSeekProvider
+from server.services.llm.errors import LLMStructuredOutputError
+from server.services.llm.google_provider import GoogleProvider
+from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.opencode_provider import OpenCodeProvider
+from server.services.llm.types import LLMRequest, LLMResult, LLMToolDefinition, ModelDescriptor
+from types import SimpleNamespace
+from server.services.llm.context_profile_resolver import ModelContextProfileResolver
+
+# --- test_capabilities.py ---
+
+
+
+
+###############################################################################
+class _StubProvider(LLMProvider):
+    provider_name = "stub"
+
+    # -------------------------------------------------------------------------
+    def __init__(self, vision: bool | None) -> None:
+        self._vision = vision
+
+    # -------------------------------------------------------------------------
+    def list_models(self) -> list[ModelDescriptor]:
+        return []
+
+    # -------------------------------------------------------------------------
+    def chat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return LLMResult(content="")
+
+    # -------------------------------------------------------------------------
+    def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        return iter(())
+
+    # -------------------------------------------------------------------------
+    def structured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        return {}
+
+    # -------------------------------------------------------------------------
+    async def achat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        return LLMResult(content="")
+
+    # -------------------------------------------------------------------------
+    async def astructured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        return {}
+
+    # -------------------------------------------------------------------------
+    def embeddings(self, *, model: str, input_text: str) -> list[float]:
+        return []
+
+    # -------------------------------------------------------------------------
+    def health_check(self) -> dict[str, Any]:
+        return {"ok": True}
+
+    # -------------------------------------------------------------------------
+    def supports_vision(self, model: str) -> bool | None:
+        return self._vision
+
+###############################################################################
+def _request(*, requires_vision: bool) -> LLMRequest:
+    return LLMRequest(
+        model="model-x",
+        messages=[{"role": "user", "content": "hello"}],
+        metadata={"requires_vision": True} if requires_vision else {},
+    )
+
+###############################################################################
+def test_validate_request_capabilities_fails_closed_without_vision() -> None:
+    for unsupported in (False, None):
+        provider = _StubProvider(vision=unsupported)
+        with pytest.raises(LLMStructuredOutputError) as exc_info:
+            provider._validate_request_capabilities(  # pyright: ignore[reportPrivateUsage]
+                _request(requires_vision=True)
+            )
+        assert exc_info.value.code == "model_vision_unsupported"
+
+###############################################################################
+def test_validate_request_capabilities_allows_vision_when_supported() -> None:
+    provider = _StubProvider(vision=True)
+    provider._validate_request_capabilities(  # pyright: ignore[reportPrivateUsage]
+        _request(requires_vision=True)
+    )
+
+###############################################################################
+def test_validate_request_capabilities_ignores_requires_vision_when_unset() -> None:
+    provider = _StubProvider(vision=False)
+    # Without the flag, no image is present and the text request must pass.
+    provider._validate_request_capabilities(  # pyright: ignore[reportPrivateUsage]
+        _request(requires_vision=False)
+    )
+
+###############################################################################
+def test_openai_provider_vision_follows_catalog() -> None:
+    provider = OpenAIProvider(api_key="test")
+    assert provider.supports_vision("gpt-4.1") is True
+    assert provider.supports_vision("gpt-4.1-mini") is True
+    assert provider.supports_vision("unknown-model") is None
+
+###############################################################################
+def test_google_provider_vision_follows_catalog() -> None:
+    provider = GoogleProvider(api_key="test")
+    assert provider.supports_vision("gemini-2.5-flash") is True
+    assert provider.supports_vision("gemini-2.5-pro") is True
+    assert provider.supports_vision("unknown-model") is None
+
+###############################################################################
+def test_deepseek_provider_is_text_only() -> None:
+    provider = DeepSeekProvider(api_key="test", base_url="https://example.invalid")
+    assert provider.supports_vision("deepseek-chat") is False
+    assert provider.supports_vision("deepseek-v4-flash") is False
+
+###############################################################################
+def test_opencode_provider_vision_only_for_explicit_vision_models() -> None:
+    provider = OpenCodeProvider(api_key="test", provider_name="opencode")
+    assert provider.supports_vision("deepseek-v4-flash-vision-exp") is True
+    assert provider.supports_vision("deepseek-v4-flash") is False
+
+###############################################################################
+def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+
+    ###############################################################################
+    class _Response:
+
+        # -------------------------------------------------------------------------
+        def raise_for_status(self) -> None:
+            return None
+
+        # -------------------------------------------------------------------------
+        def json(self) -> dict[str, Any]:
+            return {
+                "data": [
+                    {"id": "deepseek-v4.1-flash", "owned_by": "opencode"},
+                    {"id": "deepseek-v4-pro", "owned_by": "opencode"},
+                ]
+            }
+
+    monkeypatch.setattr(
+        "server.services.llm.opencode_provider.httpx.get",
+        lambda *_args, **_kwargs: _Response(),
+    )
+    provider = OpenCodeProvider(api_key="test", provider_name="opencode-go")
+
+    assert provider.supports_vision("deepseek-v4.1-flash") is True
+    assert provider.supports_vision("deepseek-v4-pro") is False
+    assert [model.metadata["supports_vision"] for model in provider.list_models()] == [
+        True,
+        False,
+    ]
+    # The verification is per endpoint: the Zen catalog does not inherit it.
+    zen = OpenCodeProvider(api_key="test", provider_name="opencode")
+    assert zen.supports_vision("deepseek-v4.1-flash") is False
+
+# --- test_context_profile_resolver.py ---
+
+
+
+###############################################################################
+class _SettingsRepository:
+
+    # -------------------------------------------------------------------------
+    def get_required(self):  # noqa: ANN201
+        return SimpleNamespace(ollama_url="http://ollama.test")
+
+###############################################################################
+class _ModelLibrary:
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        descriptor: dict[str, object] | None,
+        selected_descriptor: dict[str, object] | Exception | None = None,
+    ) -> None:
+        self.descriptor = descriptor
+        self.selected_descriptor = selected_descriptor
+        self.find_calls = 0
+        self.selected_calls = 0
+        self.last_find_kwargs = {}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_ollama_url(value: str) -> str:
+        return value
+
+    # -------------------------------------------------------------------------
+    def find_cached_model(self, **kwargs):  # noqa: ANN003, ANN201
+        self.find_calls += 1
+        self.last_find_kwargs = kwargs
+        assert kwargs["ollama_url"] == "http://ollama.test"
+        return self.descriptor
+
+    # -------------------------------------------------------------------------
+    def find_model(self, **kwargs):  # noqa: ANN003, ANN201
+        self.selected_calls += 1
+        if isinstance(self.selected_descriptor, Exception):
+            raise self.selected_descriptor
+        return self.selected_descriptor
+
+###############################################################################
+def test_resolver_prefers_exact_static_catalog_without_dynamic_lookup() -> None:
+    library = _ModelLibrary(None)
+    resolver = ModelContextProfileResolver(
+        model_library_service=library,
+        settings_repo=_SettingsRepository(),
+    )
+
+    profile = resolver.resolve("openai", "gpt-4.1")
+
+    assert profile is not None
+    assert profile.context_window_tokens == 1_047_576
+    assert profile.metadata_source == "openai_model_catalog"
+    assert library.find_calls == 0
+
+###############################################################################
+def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
+    library = _ModelLibrary(
+        {
+            "provider": "opencode-go",
+            "name": "runtime-model",
+            "metadata": {
+                "context_window_tokens": 8192,
+                "max_output_tokens": 512,
+                "context_profile_source": "provider_models_api",
+            },
+        }
+    )
+    resolver = ModelContextProfileResolver(
+        model_library_service=library,
+        settings_repo=_SettingsRepository(),
+    )
+
+    first = resolver.resolve("opencode-go", "runtime-model")
+    second = resolver.resolve("opencode-go", "runtime-model")
+
+    assert first == second
+    assert first is not None
+    assert first.context_window_tokens == 8192
+    assert first.maximum_output_tokens == 512
+    assert first.metadata_source == "provider_models_api"
+    assert library.find_calls == 1
+    assert library.last_find_kwargs["provider"] == "opencode-go"
+
+###############################################################################
+def test_resolver_keeps_missing_dynamic_context_unknown() -> None:
+    library = _ModelLibrary({"provider": "opencode-go", "name": "custom-4k"})
+    resolver = ModelContextProfileResolver(
+        model_library_service=library,
+        settings_repo=_SettingsRepository(),
+    )
+
+    profile = resolver.resolve("opencode-go", "custom-4k")
+
+    assert profile is None
+    assert library.find_calls == 1
+
+###############################################################################
+def test_resolver_selected_lookup_hydrates_once_and_caches_the_profile() -> None:
+    library = _ModelLibrary(
+        None,
+        {
+            "provider": "opencode-go",
+            "name": "runtime-model",
+            "metadata": {
+                "context_window_tokens": 32_768,
+                "context_profile_source": "provider_models_api",
+                "context_metadata_authority": "provider",
+            },
+        },
+    )
+    resolver = ModelContextProfileResolver(
+        model_library_service=library,
+        settings_repo=_SettingsRepository(),
+    )
+
+    first = resolver.resolve_selected("opencode-go", "runtime-model")
+    second = resolver.resolve_selected("opencode-go", "runtime-model")
+
+    assert first is not None
+    assert first.context_window_tokens == 32_768
+    assert second == first
+    assert library.selected_calls == 1
+
+###############################################################################
+def test_resolver_preserves_previous_profile_when_refresh_fails() -> None:
+    library = _ModelLibrary(
+        None,
+        {
+            "provider": "opencode-go",
+            "name": "runtime-model",
+            "metadata": {
+                "context_window_tokens": 16_384,
+                "context_metadata_authority": "provider",
+            },
+        },
+    )
+    resolver = ModelContextProfileResolver(
+        model_library_service=library,
+        settings_repo=_SettingsRepository(),
+        cache_ttl_seconds=0.0,
+    )
+
+    initial = resolver.resolve_selected("opencode-go", "runtime-model")
+    library.selected_descriptor = RuntimeError("provider unavailable")
+    stale = resolver.resolve_selected("opencode-go", "runtime-model")
+
+    assert initial is not None
+    assert stale == initial
