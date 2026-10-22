@@ -338,6 +338,22 @@ describe('components/map-preview.component', () => {
     expect(style.sources.basemap.tiles[0]).toContain('World_Imagery/MapServer/tile/{z}/{y}/{x}');
   });
 
+  it('skips resize when the canvas already matches its container', () => {
+    Object.assign(fakeMap, {
+      getContainer: () => ({ clientWidth: 640, clientHeight: 480 }),
+      getCanvas: () => ({ width: 640, height: 480, clientWidth: 640, clientHeight: 480 }),
+    });
+    component.payload = {
+      map_session: makeMapSession({
+        center: { latitude: 41.9028, longitude: 12.4964 },
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.resize).not.toHaveBeenCalled();
+  });
+
   it('fits bounds with a capped max zoom and resizes after load', () => {
     component.payload = {
       map_session: makeMapSession({

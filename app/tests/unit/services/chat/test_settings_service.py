@@ -338,6 +338,21 @@ def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> 
     assert settings_repo.last_update["agent_model_name"] == ""
 
 ###############################################################################
+def test_updating_only_ollama_url_is_allowed_before_first_agent_selection() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(agent_model_provider="", agent_model_name="")
+    )
+    service = build_service(settings_repo=settings_repo)
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(ollama_url="http://127.0.0.1:11500")
+    )
+
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["ollama_url"] == "http://127.0.0.1:11500"
+    assert settings_repo.last_update["agent_model_provider"] == ""
+
+###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()

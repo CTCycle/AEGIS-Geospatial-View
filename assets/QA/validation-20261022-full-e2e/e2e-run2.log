@@ -1,0 +1,435 @@
+...F.....F.......F...FFF.sssFsss.......Fs.F.F.............s.s.s.s.s.s.s. [ 82%]
+s..ss.sssssssss                                                          [100%]
+================================== FAILURES ===================================
+E   AssertionError: Locator expected to be visible
+    Actual value: None
+    Error: element(s) not found 
+    Call log:
+      - Expect "to_be_visible" with timeout 45000ms
+      - waiting for locator(".chat-message--assistant").last
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Search workspace" [level=1]
+      - complementary "Chat toolbar":
+        - region "Agent Chat":
+          - button "Start new chat"
+          - button "Show conversation history"
+          - log "Conversation transcript":
+            - article:
+              - paragraph: show map at 41.9028, 12.4964
+          - button "Attach an image"
+          - textbox "Chat message":
+            - /placeholder: Ask for a location, map data, or coordinates for a place.
+          - button "Send message" [disabled]
+          - group "Context window usage": Context Unavailable
+      - separator "Resize chat and map panels"
+      - region "Map canvas":
+        - status: Ready for a location or data request
+        - button "Hide chat panel" [pressed]: Hide chat
+        - button "Alerts"
+        - paragraph: Map Workspace
+        - paragraph: Ask for a location or map data to load the workspace.
+      - group "Workspace status":
+        - list:
+          - listitem:
+            - 'link "Agent model: Needs attention. Open agent settings"':
+              - /url: /settings
+              - text: Agent model
+              - strong: Needs attention
+          - listitem:
+            - 'group "Satellite: Available"':
+              - text: Satellite
+              - strong: Available
+          - listitem:
+            - 'link "Optional Keys: Optional. Open geospatial access settings"':
+              - /url: /settings?tab=geospatial-access
+              - text: Optional Keys
+              - strong: Optional
+        - button "Tool activity and execution details": Tool activity Needs attention
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_app_flow.py:47: AssertionError: Locator expected to be visible
+E   playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+    Call log:
+      - waiting for get_by_role("button", name="Expand", exact=True)
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Lib\site-packages\playwright\_impl\_connection.py:563: playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+E   AssertionError: Locator expected to be visible
+    Actual value: None
+    Error: element(s) not found 
+    Call log:
+      - Expect "to_be_visible" with timeout 5000ms
+      - waiting for locator(".overlay-controls")
+        5 × locator resolved to <div class="overlay-controls" _ngcontent-ng-c2505629778="">…</div>
+          - unexpected value "hidden"
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Search workspace" [level=1]
+      - complementary "Chat toolbar":
+        - region "Agent Chat":
+          - button "Start new chat"
+          - button "Show conversation history"
+          - log "Conversation transcript":
+            - article:
+              - paragraph: Show me a map of Rome with air quality
+            - article:
+              - paragraph: Search executed successfully. Showing Rome with air quality overlay.
+          - button "Attach an image"
+          - textbox "Chat message":
+            - /placeholder: Ask for a location, map data, or coordinates for a place.
+          - button "Send message" [disabled]
+          - group "Context window usage": Context Unavailable
+      - separator "Resize chat and map panels"
+      - region "Map canvas":
+        - status: Ready for a location or data request
+        - button "Hide chat panel" [pressed]: Hide chat
+        - button "Alerts"
+        - paragraph: Map Workspace
+        - paragraph: Ask for a location or map data to load the workspace.
+      - group "Workspace status":
+        - list:
+          - listitem:
+            - 'link "Agent model: Needs attention. Open agent settings"':
+              - /url: /settings
+              - text: Agent model
+              - strong: Needs attention
+          - listitem:
+            - 'group "Satellite: Available"':
+              - text: Satellite
+              - strong: Available
+          - listitem:
+            - 'link "Optional Keys: Optional. Open geospatial access settings"':
+              - /url: /settings?tab=geospatial-access
+              - text: Optional Keys
+              - strong: Optional
+        - button "Tool activity and execution details": Tool activity Needs attention
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_documented_conversations.py:162: AssertionError: Locator expected to be visible
+E   AssertionError: Locator expected to be visible
+    Actual value: None
+    Error: element(s) not found 
+    Call log:
+      - Expect "to_be_visible" with timeout 15000ms
+      - waiting for locator(".overlay-controls")
+        5 × locator resolved to <div class="overlay-controls" _ngcontent-ng-c2505629778="">…</div>
+          - unexpected value "hidden"
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Search workspace" [level=1]
+      - complementary "Chat toolbar":
+        - region "Agent Chat":
+          - button "Start new chat"
+          - button "Show conversation history"
+          - log "Conversation transcript":
+            - article:
+              - paragraph: Show me a map of Rome with air quality
+            - article:
+              - paragraph: Search executed successfully. Showing Rome with air quality overlay.
+          - button "Attach an image"
+          - textbox "Chat message":
+            - /placeholder: Ask for a location, map data, or coordinates for a place.
+          - button "Send message" [disabled]
+          - group "Context window usage": Context Unavailable
+      - separator "Resize chat and map panels"
+      - region "Map canvas":
+        - status: Ready for a location or data request
+        - button "Hide chat panel" [pressed]: Hide chat
+        - button "Alerts"
+        - paragraph: Map Workspace
+        - paragraph: Ask for a location or map data to load the workspace.
+      - group "Workspace status":
+        - list:
+          - listitem:
+            - 'link "Agent model: Needs attention. Open agent settings"':
+              - /url: /settings
+              - text: Agent model
+              - strong: Needs attention
+          - listitem:
+            - 'group "Satellite: Available"':
+              - text: Satellite
+              - strong: Available
+          - listitem:
+            - 'link "Optional Keys: Optional. Open geospatial access settings"':
+              - /url: /settings?tab=geospatial-access
+              - text: Optional Keys
+              - strong: Optional
+        - button "Tool activity and execution details": Tool activity Needs attention
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_documented_conversations.py:318: AssertionError: Locator expected to be visible
+E   AssertionError: assert '' == 'opencode-go'
+      
+      - opencode-go
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_eea_raster_lifecycle.py:61: AssertionError: assert '' == 'opencode-go'
+E   AssertionError: Visual size mismatch for map-canvas.png: expected (889, 594), got (886, 594).
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_geospatial_visual_regressions.py:224: AssertionError: Visual size mismatch for map-canvas.png: expected (889, 594), got (886, 594).
+E   AssertionError: Locator expected to be visible
+    Actual value: None
+    Error: element(s) not found 
+    Call log:
+      - Expect "to_be_visible" with timeout 15000ms
+      - waiting for locator(".chat-message--assistant").last
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Search workspace" [level=1]
+      - complementary "Chat toolbar":
+        - region "Agent Chat":
+          - button "Start new chat"
+          - button "Show conversation history"
+          - log "Conversation transcript":
+            - article:
+              - paragraph: Show me Rome
+          - button "Attach an image"
+          - textbox "Chat message":
+            - /placeholder: Ask for a location, map data, or coordinates for a place.
+          - button "Send message" [disabled]
+          - group "Context window usage": Context Unavailable
+      - separator "Resize chat and map panels"
+      - region "Map canvas":
+        - status: Ready for a location or data request
+        - button "Hide chat panel" [pressed]: Hide chat
+        - button "Alerts"
+        - paragraph: Map Workspace
+        - paragraph: Ask for a location or map data to load the workspace.
+      - group "Workspace status":
+        - list:
+          - listitem:
+            - 'link "Agent model: Needs attention. Open agent settings"':
+              - /url: /settings
+              - text: Agent model
+              - strong: Needs attention
+          - listitem:
+            - 'group "Satellite: Available"':
+              - text: Satellite
+              - strong: Available
+          - listitem:
+            - 'link "Optional Keys: Optional. Open geospatial access settings"':
+              - /url: /settings?tab=geospatial-access
+              - text: Optional Keys
+              - strong: Optional
+        - button "Tool activity and execution details": Tool activity Needs attention
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_live_chat_smoke.py:217: AssertionError: Locator expected to be visible
+E   AssertionError: Locator expected to be visible
+    Actual value: hidden 
+    Call log:
+      - Expect "to_be_visible" with timeout 15000ms
+      - waiting for locator(".overlay-controls")
+        33 × locator resolved to <div class="overlay-controls" _ngcontent-ng-c2505629778="">…</div>
+           - unexpected value "hidden"
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Search workspace" [level=1]
+      - complementary "Chat toolbar":
+        - region "Agent Chat":
+          - button "Start new chat"
+          - button "Show conversation history"
+          - log "Conversation transcript":
+            - article:
+              - paragraph: show map with overlays
+            - article:
+              - paragraph: Search executed successfully.
+          - button "Attach an image"
+          - textbox "Chat message":
+            - /placeholder: Ask for a location, map data, or coordinates for a place.
+          - button "Send message" [disabled]
+          - group "Context window usage": Context Unavailable
+      - separator "Resize chat and map panels"
+      - region "Map canvas":
+        - status: Rome, Italy
+        - button "Hide chat panel" [pressed]: Hide chat
+        - button "Alerts"
+        - region "Interactive map":
+          - region "Map"
+          - group:
+            - text: OpenStreetMap contributors |
+            - link "MapLibre":
+              - /url: https://maplibre.org/
+        - button "Map tools"
+        - status:
+          - paragraph: Demo alert summary for documented session.
+        - text: openaq
+      - group "Workspace status":
+        - list:
+          - listitem:
+            - 'link "Agent model: Needs attention. Open agent settings"':
+              - /url: /settings
+              - text: Agent model
+              - strong: Needs attention
+          - listitem:
+            - 'group "Satellite: Available"':
+              - text: Satellite
+              - strong: Available
+          - listitem:
+            - 'link "Optional Keys: Optional. Open geospatial access settings"':
+              - /url: /settings?tab=geospatial-access
+              - text: Optional Keys
+              - strong: Optional
+        - button "Tool activity and execution details": Tool activity Complete
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_orchestration_stress.py:193: AssertionError: Locator expected to be visible
+E   playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+    Call log:
+      - waiting for locator("article.model-row").filter(has=get_by_role("heading", name="gpt-5-mini")).first.get_by_role("button", name="Select as agent model: gpt-5-mini")
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Lib\site-packages\playwright\_impl\_connection.py:563: playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+E   AssertionError: Locator expected to be visible
+    Actual value: None
+    Error: element(s) not found 
+    Call log:
+      - Expect "to_be_visible" with timeout 15000ms
+      - waiting for locator("article.model-row").filter(has=get_by_role("heading", name="gpt-5-mini")).first
+    
+    Aria snapshot:
+    - banner "Primary navigation":
+      - link "AEGIS workspace":
+        - /url: /
+        - text: AEGIS
+      - navigation "Application sections":
+        - link "Search":
+          - /url: /
+        - link "Geodata":
+          - /url: /geodata
+        - link "Settings":
+          - /url: /settings
+    - main:
+      - heading "Settings" [level=1]
+      - navigation "Settings sections":
+        - button "Models"
+        - button "Model Providers"
+        - button "Geospatial Access"
+        - button "Application"
+        - button "Map & Search"
+        - button "Data Sources"
+        - button "Agent Runtime"
+        - button "Database"
+      - heading "Models" [level=2]
+      - region "Model catalog controls":
+        - searchbox "Search models"
+        - text: 4 models
+        - button "Refresh from Ollama API"
+        - group "Model provider filter":
+          - button "All" [pressed]
+          - button "Ollama"
+          - button "OpenAI"
+          - button "Google"
+          - button "DeepSeek"
+          - button "OpenCode Zen"
+          - button "OpenCode Go"
+        - group "Capability filter":
+          - button "Tools"
+          - button "Structured"
+          - button "Vision"
+          - button "Embeddings"
+        - text: Sort
+        - combobox "Sort models":
+          - option "Name" [selected]
+          - option "Context window"
+      - paragraph: ollama · installed
+      - article:
+        - 'button "Select as agent model: llama3.2"': llama3.2 Optimized for llama. Tools? — Select
+      - paragraph: OpenAI
+      - article:
+        - 'button "Select as agent model: gpt-5-mini"': gpt-5-mini Low-latency OpenAI cloud model. Tools Structured — Select
+      - article:
+        - 'button "Selected agent model: gpt-4.1-mini" [pressed]':
+          - text: gpt-4.1-mini General purpose OpenAI cloud model. Tools? —
+          - strong: Selected
+      - paragraph: Google
+      - article:
+        - 'button "Select as agent model: gemini-2.5-flash"': gemini-2.5-flash Fast Google cloud model. Tools? — Select
+      - complementary "Selected agent model":
+        - region "Selected agent model":
+          - paragraph: Selected agent model
+          - heading "gpt-4.1-mini" [level=2]
+          - text: openai · cloud
+          - term: Installed locally
+          - definition: "No"
+          - term: Tool calling
+          - definition: Unknown
+          - term: Structured output
+          - definition: Unknown
+          - term: Vision
+          - definition: "No"
+          - term: Embeddings
+          - definition: "No"
+          - term: Tool support source
+          - definition: fixture
+          - term: Capabilities
+          - definition: chat
+          - paragraph: This model is used for native routing, orchestration, tool calls, and final responses.
+      - status: Model settings loaded
+G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\tests\e2e\test_settings_regressions.py:479: AssertionError: Locator expected to be visible
+=========================== short test summary info ===========================
+FAILED test_app_flow.py::TestChatFlow::test_chat_composer_visible_and_send_prompt[chromium]
+FAILED test_chat_state_persistence.py::test_refresh_same_tab_restores_chat_and_map_state[chromium]
+FAILED test_documented_conversations.py::test_documented_conversation_map_search_happy_path[chromium]
+FAILED test_documented_conversations.py::test_documented_conversation_settings_roundtrip_and_restore[chromium]
+FAILED test_eea_raster_lifecycle.py::test_eea_coverage_and_gbif_lifecycle[chromium]
+FAILED test_geospatial_visual_regressions.py::test_map_canvas_matches_visual_baseline[chromium]
+FAILED test_live_chat_smoke.py::test_live_degraded_path_shows_user_failure_without_crash[chromium]
+FAILED test_orchestration_stress.py::test_backend_overlay_state_wins_after_refresh[chromium]
+FAILED test_settings_regressions.py::test_settings_destinations_render_and_runtime_disclosures_are_keyboard_accessible[chromium]
+FAILED test_settings_regressions.py::test_model_card_selects_the_single_agent_model[chromium]
+SKIPPED [1] ..\tests\e2e\test_live_chat_smoke.py:82: Selected model is missing from the current catalog.
+SKIPPED [1] ..\tests\e2e\test_live_chat_smoke.py:133: Selected model is missing from the current catalog.
+SKIPPED [1] ..\tests\e2e\test_live_chat_smoke.py:183: Selected model is missing from the current catalog.
+SKIPPED [12] ..\tests\e2e\test_live_gibs_raster_matrix.py:125: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] ..\tests\e2e\test_live_raster_diagnostics.py:830: Selected model capability is not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] ..\tests\e2e\test_live_vector_point_matrix.py:420: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] ..\tests\e2e\test_route_matrix_live.py:375: Exact live provider lane was not ready: Selected model is missing from the current catalog.; {'settings_http_status': 200, 'catalog_http_status': 200, 'provider': '', 'model': '', 'supports_tools': None, 'tool_support_source': None, 'protocol': None}
+SKIPPED [1] ..\tests\e2e\test_chat_api.py:64: Requested local agent model is unavailable for this check.
+SKIPPED [2] ..\tests\e2e\test_chat_api.py:29: Providers unavailable for this check (503).
+SKIPPED [5] ..\tests\e2e\test_orchestration_ambiguity.py:16: Provider unavailable for orchestration check (503).
+10 failed, 51 passed, 26 skipped in 279.61s (0:04:39)

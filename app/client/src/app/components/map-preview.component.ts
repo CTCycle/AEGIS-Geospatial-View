@@ -720,7 +720,7 @@ candidate.on('load', () => {
       if (!isCurrentCandidate()) {
         return;
       }
-      candidate.resize();
+      this.resizeMapToContainer(candidate);
       this.overlayRenderStatuses = addOverlayLayers(candidate, this.mapSession);
       this.bindInspectionListeners(candidate);
       const bounds = normalizeBounds(this.mapSession?.bounds);
@@ -864,8 +864,25 @@ candidate.on('load', () => {
       if (this.pendingCandidate?.map) {
         maps.add(this.pendingCandidate.map);
       }
-      maps.forEach((map) => map.resize());
+      maps.forEach((map) => this.resizeMapToContainer(map));
     });
+  }
+
+  // MapLibre can permanently clamp its canvas to 0x0 when resize() runs before
+  // the WebGL drawing buffer has caught up, so only resize when the size changed.
+  private resizeMapToContainer(map: Map): void {
+    const container = map.getContainer?.();
+    const canvas = map.getCanvas?.();
+    if (
+      container
+      && canvas
+      && canvas.width > 0
+      && canvas.clientWidth === container.clientWidth
+      && canvas.clientHeight === container.clientHeight
+    ) {
+      return;
+    }
+    map.resize();
   }
 
   private createCandidateContainer(original: HTMLDivElement): HTMLDivElement {

@@ -24,6 +24,12 @@ from tests.e2e.helpers.chat_stub_payloads import (
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 ###############################################################################
+def _open_map_tools(page: Page) -> None:
+    toggle = page.get_by_role("button", name="Map tools", exact=True)
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+
+###############################################################################
 def _json_ok(route: Route, payload: dict) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
@@ -159,6 +165,7 @@ def test_documented_conversation_map_search_happy_path(
             "Search executed successfully. Showing Rome with air quality overlay."
         )
     ).to_be_visible()
+    _open_map_tools(page)
     expect(page.locator(".overlay-controls")).to_be_visible()
     write_snapshot(page, dirs["screenshots"], "02-assistant-map")
     write_snapshot(page, dirs["screenshots"], "03-overlay-panel")
@@ -315,6 +322,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     page.get_by_label("Chat message").fill("Show me a map of Rome with air quality")
     page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+    _open_map_tools(page)
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 
     page.get_by_role("link", name="Settings", exact=True).click()
@@ -329,6 +337,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     page.get_by_role("link", name="Search").click()
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
     expect(page.get_by_text("Show me a map of Rome with air quality")).to_be_visible()
+    _open_map_tools(page)
     expect(page.locator(".overlay-controls")).to_be_visible()
     write_snapshot(page, dirs["screenshots"], "02-back-to-chat")
 

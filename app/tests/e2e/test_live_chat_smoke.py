@@ -214,11 +214,12 @@ def test_live_degraded_path_shows_user_failure_without_crash(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
     page.get_by_role("button", name="Send message").click()
-    expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
-    assistant_text = page.locator(
-        ".chat-message--assistant .chat-message__content"
-    ).last
-    expect(assistant_text).to_contain_text(
-        re.compile(r"provider unavailable|request failed|503", re.IGNORECASE)
-    )
+    # Execution failures are reported in Tool activity, not as chat messages.
+    activity = page.get_by_role("button", name="Tool activity and execution details")
+    expect(activity).to_contain_text("Needs attention", timeout=15000)
+    expect(page.locator(".chat-message--assistant")).to_have_count(0)
+    activity.click()
+    expect(
+        page.get_by_text("The request could not be completed.", exact=False)
+    ).to_be_visible()
     expect(page.get_by_label("Chat message")).to_be_visible()
