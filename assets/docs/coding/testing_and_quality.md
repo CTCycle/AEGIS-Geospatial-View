@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-10-19
+Last updated: 2026-10-22
 
 ## Python Quality Gates
 
@@ -17,6 +17,12 @@ Last updated: 2026-10-19
   only in isolated tests that explicitly exercise ORM fixture construction.
 - Keep one migration head and run `alembic current --check-heads` and
   `alembic check` before release.
+
+The backend unit suite is organized by behavior rather than one file per
+contract. CI runs all of `app/tests/unit` once, including SQLite persistence,
+agent, provider, and manifest contracts. The strict production manifest audit
+runs once as a separate gate. Deterministic provider contracts are not repeated
+in the optional live-provider workflow.
 
 The bounded backend validation sequence is:
 
@@ -86,6 +92,10 @@ does not promote a completion-path gate.
   not send inference requests to determine readiness.
 - Browser smoke coverage lives in `app/client/src/app/e2e`; backend/API E2E
   coverage lives in `app/tests/e2e`.
+
+The frontend test command runs every Angular spec, including the geospatial
+browser smoke spec, once. `npm run test:frontend-state` remains a separate Node
+suite for the build-state script.
 
 Map-oriented E2E tests must prove the complete controlled path, including
 canonical interpretation, location/scope validation, capability execution,

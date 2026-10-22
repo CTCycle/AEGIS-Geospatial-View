@@ -11,7 +11,6 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:frontend-state": "node --test scripts/frontend-state.test.cjs",
-    "test:e2e:geospatial": "ng test --watch=false --browsers=ChromeHeadlessNoGpu --include src/app/e2e/geospatial-browser-smoke.spec.ts",
     "preview": "ng serve --proxy-config proxy.conf.cjs"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 # Dataset Ingestion
 
-Last updated: 2026-10-19
+Last updated: 2026-10-22
 
 ## Scope
 
@@ -41,7 +41,7 @@ They should also define checksum and bbox constraints when the source publishes 
 9. Write a tile manifest for downstream vector-tile generation.
 10. Write source health with feature count, status, warnings, and ingest timestamp.
 
-Failure contract: any failure (checksum mismatch, `minFeatureCount`, bbox, download or write error) rolls the run back. Files and directories the failed run created are removed and files it overwrote are restored, so a failed re-ingestion never replaces a previous good materialization. Verified by `tests/unit/test_geospatial_ingestion.py`.
+Failure contract: any failure (checksum mismatch, `minFeatureCount`, bbox, download or write error) rolls the run back. Files and directories the failed run created are removed and files it overwrote are restored, so a failed re-ingestion never replaces a previous good materialization. Verified by `tests/unit/test_geospatial_ingestion_transit.py`.
 
 ## Current Dataset Manifests
 

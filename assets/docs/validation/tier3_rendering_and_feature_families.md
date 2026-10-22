@@ -1,6 +1,6 @@
 # Tier 3 rendering and geospatial feature families
 
-Last updated: 2026-10-19
+Last updated: 2026-10-22
 
 The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and `T4-04` configured live GTFS. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT had not yet run. Later EEA and vision follow-ups supersede those statuses; Census, elevation, imagery, and narration limitations remain.
 
@@ -106,7 +106,7 @@ All Tier 3 slices share the standing campaign rules:
 - **Provider/model lane:** `opencode-go / deepseek-v4.1-flash`, no fallback.
 - **Credentials/datasets:** none (public feed).
 - **Automated tests:** routing/manifest contract tests
-  (`app/tests/unit/services/geospatial/test_agentic_manifest_contract.py`),
+  (`app/tests/unit/services/geospatial/test_manifest_runtime_contracts.py`),
   USGS adapter tests, valid-empty unit coverage; a new E2E browser test modeled
   on `app/tests/e2e/test_live_gibs_raster_matrix.py`.
 - **Browser/manual:** live Playwright run per scenario with screenshot/network/
