@@ -5,6 +5,10 @@ from __future__ import annotations
 import time
 import re
 
+from pydantic import ValidationError
+
+from server.common.typing import json_object
+from server.contracts.geospatial import ClientMapView
 from server.contracts.location import LocationSignal
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.domain.agent.capability_route import AgentRunState
@@ -42,6 +46,11 @@ _LOCATION_TYPES = frozenset(
         "state",
     }
 )
+
+# Reserved target for "this area" requests: the viewport the user sees.
+_CURRENT_VIEW_NAMES = frozenset({"current map view", "current view"})
+CURRENT_VIEW_LABEL = "Current map view"
+CURRENT_VIEW_SOURCE = "client_map_view"
 
 _COORDINATE_PAIR_RE = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
@@ -96,6 +105,20 @@ class LocationToolHandler:
                 recovery="request_user_input",
                 started=started,
             )
+        if " ".join(query.casefold().replace("_", " ").split()) in _CURRENT_VIEW_NAMES:
+            location = _current_view_location(state)
+            if location is None:
+                return _failure(
+                    code="current_view_unavailable",
+                    message=(
+                        "The current map view is not available; name the area "
+                        "to search instead."
+                    ),
+                    recovery="request_user_input",
+                    started=started,
+                )
+            state.location_refs[target_key] = location
+            return _success(location=location, target_key=target_key, started=started)
         query = _retain_user_stated_location_components(query, state.user_message)
 
         expected_type = str(request.expected_location_type or "city").casefold()
@@ -183,6 +206,30 @@ class LocationToolHandler:
             )
         state.location_refs[target_key] = result
         return _success(location=result, target_key=target_key, started=started)
+
+###############################################################################
+def _current_view_location(state: AgentRunState) -> ResolvedLocation | None:
+    """The client-reported viewport as a bbox location, when one was sent."""
+
+    view = json_object(state.map_memory.get("current_view"))
+    if not view:
+        return None
+    try:
+        current = ClientMapView.model_validate(
+            {key: value for key, value in view.items() if key != "source"}
+        )
+    except ValidationError:
+        return None
+    return ResolvedLocation(
+        label=CURRENT_VIEW_LABEL,
+        latitude=current.center[1],
+        longitude=current.center[0],
+        source=CURRENT_VIEW_SOURCE,
+        confidence=1.0,
+        location_type="viewport",
+        bbox=list(current.bounds),
+        bbox_source=CURRENT_VIEW_SOURCE,
+    )
 
 ###############################################################################
 def _target_key(request: ResolveLocationInput) -> str:

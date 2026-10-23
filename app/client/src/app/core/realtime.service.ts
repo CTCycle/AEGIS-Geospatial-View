@@ -8,6 +8,7 @@ import {
 } from './constants';
 import { parseRealtimeServerMessage } from './realtime-parsers';
 import {
+  ClientMapView,
   JsonObject,
   MapRenderAcknowledgement,
   RealtimeConnectionState,
@@ -105,12 +106,19 @@ export class RealtimeService {
     this.resumeSequence = Math.max(0, sequence);
   }
 
-  sendRunStart(message: string, clientRequestId: string, timezone?: string, attachmentId?: string): string {
+  sendRunStart(
+    message: string,
+    clientRequestId: string,
+    timezone?: string,
+    attachmentId?: string,
+    mapView?: ClientMapView | null,
+  ): string {
     return this.queueCommand('run.start', {
       message,
       client_request_id: clientRequestId,
       ...(timezone ? { timezone } : {}),
       ...(attachmentId ? { attachment_id: attachmentId } : {}),
+      ...(mapView ? { map_view: mapView } : {}),
     });
   }
 

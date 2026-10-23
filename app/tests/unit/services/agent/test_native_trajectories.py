@@ -699,6 +699,61 @@ async def test_derived_bbox_preview_and_provenance() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_transform_answers_nearest_and_country_questions_deterministically() -> None:
+    repo = MemoryEvidence()
+    features = [
+        {"latitude": 48.8566, "longitude": 2.3522, "name": "Paris"},
+        {"latitude": 45.4642, "longitude": 9.19, "name": "Milan"},
+        {"latitude": 41.8902, "longitude": 12.4922, "name": "Colosseum"},
+    ]
+    parent = repo.create(kind="vector", media_type="application/json", status="available",
+                         payload={"features": features}, summary={}, provenance={"provider_id": "test"})
+    value = state()
+    value.evidence_refs = [parent.evidence_id]
+    value.location_refs["rome"] = ResolvedLocation(label="Rome, Italy", latitude=41.9028, longitude=12.4964)
+
+    result = await EvidenceToolHandler(repository=repo).transform(TransformEvidenceInput(
+        evidence_refs=value.evidence_refs,
+        operations=[{"op": "distance_from", "location_ref": "rome"}, {"op": "country_tag"},
+                    {"op": "sort", "field": "distance_km"}, {"op": "limit", "value": 2}]), value)
+
+    nearest = result.data["preview"]
+    assert [item["name"] for item in nearest] == ["Colosseum", "Milan"]
+    assert nearest[0]["distance_km"] < 2
+    assert 470 < nearest[1]["distance_km"] < 485
+    assert [item["country_iso2"] for item in nearest] == ["IT", "IT"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_measurement_tool_computes_geodesic_distance_and_country() -> None:
+    from server.services.agent.tool_definitions import MeasureGeospatialInput
+    from server.services.agent.tool_handlers.measure import MeasureToolHandler
+
+    value = state()
+    value.location_refs.update({
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.8566, longitude=2.3522),
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.405),
+        "atlantic": ResolvedLocation(label="40, -40", latitude=40.0, longitude=-40.0),
+    })
+    handler = MeasureToolHandler()
+
+    distance = await handler.measure(
+        MeasureGeospatialInput(operation="distance", location_refs=["paris", "berlin"]), value)
+    pair = distance.data["measurements"][0]
+    assert 875 < pair["distance_km"] < 881
+    assert pair["bearing_compass"] == "NE"
+    assert "Paris, France to Berlin, Germany" in distance.summary
+
+    countries = await handler.measure(
+        MeasureGeospatialInput(operation="country_of", location_refs=["paris", "atlantic"]), value)
+    assert [item["country_iso2"] for item in countries.data["measurements"]] == ["FR", None]
+
+    unknown = await handler.measure(
+        MeasureGeospatialInput(operation="distance", location_refs=["paris", "madrid"]), value)
+    assert unknown.status == "failed" and unknown.error.recovery == "correct_arguments"
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_transform_labels_leading_coordinate_points_with_nearest_place() -> None:
     repo = MemoryEvidence()
     features = [{"latitude": 40 + index, "longitude": 8, "name": f"{40 + index}, 8", "label_kind": "coordinates",
@@ -747,7 +802,7 @@ async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder()
 def test_discovery_prompt_requires_disclosure_and_forbids_overclaiming():
     from server.prompts.agent import build_native_agent_system_prompt
     prompt = build_native_agent_system_prompt()
-    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "sample count", "model estimates", "partial or excluded", "verified maximum", "evidence does not contain", "near <place_label>", "emsc_earthquakes"]:
+    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "sample count", "model estimates", "partial or excluded", "verified maximum", "evidence does not contain", "near <place_label>", "completeness_note"]:
         assert term in prompt
 
 # --- test_native_harness_trajectories.py ---
@@ -1275,7 +1330,8 @@ async def test_malformed_tool_call_is_corrected_in_the_same_native_run() -> None
 
     assert outcome.stopped_reason == "goal_satisfied"
     assert calls == ["primary-source"]
-    assert outcome.state.validation_corrections == 1
+    # The successful corrected call resets the consecutive-invalid guard.
+    assert outcome.state.validation_corrections == 0
     assert [result.status for result in outcome.tool_results] == [
         "failed",
         "success",

@@ -320,9 +320,12 @@ def _project_result_data(
                     for key in (
                         "id",
                         "name",
+                        "summary",
                         "description",
                         "provider",
                         "kind",
+                        "operations",
+                        "render_support",
                         "supports_map",
                         "execution_contract",
                     )

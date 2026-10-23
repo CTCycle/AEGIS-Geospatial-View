@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from datetime import UTC, datetime, time, timedelta
 
+from server.common.identifiers import location_ref_matches
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import (
@@ -104,8 +105,9 @@ class CompletionEvaluator:
             # One numeric source may cover several queried metrics; the
             # registry still permits further distinct sources for analysis.
             return bool(matched) and (not required or required <= matched)
+        all_targets_covered = not uncovered_route_targets(state)
         return {
-            "required_data_retrieved": covered("data_valid"),
+            "required_data_retrieved": covered("data_valid") and all_targets_covered,
             "spatial_scope_applied": covered("spatial_scope_satisfied"),
             "temporal_scope_applied": covered("temporal_scope_satisfied"),
         }
@@ -175,6 +177,9 @@ class CompletionEvaluator:
             "location_resolved": True,
             "search_area_bound": True,
             "result_locations_derived": True,
+            # A map is prepared only after the loop's own checks; measurement
+            # is not re-evaluated by the browser.
+            "measurement_computed": True,
             "required_data_retrieved": not data_failure
             and bool(
                 map_session.overlay_collection.instances
@@ -344,4 +349,77 @@ def _native_spatial_scope_applied(
     return not expected_kinds or bool(expected_kinds.intersection(declared))
 
 
-__all__ = ["CompletionEvaluator"]
+###############################################################################
+def uncovered_route_targets(state: AgentRunState) -> list[str]:
+    """Return resolved route targets that no data execution has covered yet.
+
+    A comparison such as "Paris and Berlin" needs data for each place; one
+    successful execution must not satisfy the whole route. Single-target and
+    analysis routes keep their own coverage rules.
+    """
+
+    route = state.route
+    if (
+        route is None
+        or route.analysis is not None
+        or route.location_mode != "target"
+        or len(route.target_refs) < 2
+    ):
+        return []
+    covered_keys = {
+        str(json_object(json_object(result.data).get("query")).get("location_ref") or "").strip()
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status in {"success", "partial", "valid_empty"}
+    }
+    uncovered: list[str] = []
+    for target in route.target_refs:
+        matches = [
+            key
+            for key, location in state.location_refs.items()
+            if location_ref_matches(str(target), str(key), location.label)
+        ]
+        if matches and not covered_keys.intersection(matches):
+            uncovered.append(str(target))
+    return uncovered
+
+
+###############################################################################
+def follow_up_location_keys(state: AgentRunState) -> set[str]:
+    """Return points this run resolved inside a goal target's area.
+
+    An investigation may find a place first (the strongest earthquake in
+    Europe) and then query another source there.  Such a point is not a goal
+    target, but it stays within the requested geography, so later steps may
+    use it; any other location is still never substituted for the target.
+    """
+
+    goal = state.goal
+    if goal is None or not goal.target_ids:
+        return set()
+
+    def is_goal_target(key: str, label: str) -> bool:
+        return any(location_ref_matches(str(target), key, label) for target in goal.target_ids)
+
+    areas = [
+        location.bbox
+        for key, location in state.location_refs.items()
+        if location.bbox and len(location.bbox) == 4 and is_goal_target(str(key), location.label)
+    ]
+    keys: set[str] = set()
+    for result in state.tool_results:
+        if result.tool_name != "resolve_geospatial_location" or result.status != "success":
+            continue
+        key = str(json_object(result.data).get("target_id") or "")
+        location = state.location_refs.get(key)
+        if location is None or is_goal_target(key, location.label):
+            continue
+        if any(
+            area[0] <= location.longitude <= area[2] and area[1] <= location.latitude <= area[3]
+            for area in areas
+        ):
+            keys.add(key)
+    return keys
+
+
+__all__ = ["CompletionEvaluator", "follow_up_location_keys", "uncovered_route_targets"]

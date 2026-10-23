@@ -1733,33 +1733,42 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exhausted() -> None:
-    provider = FakeProvider([])
+async def test_model_cap_exhaustion_summarizes_gathered_evidence() -> None:
+    provider = FakeProvider(
+        [
+            _route_call(),
+            LLMResult(
+                content="",
+                tool_calls=[LLMToolCall(id="call-1", name="test_tool", arguments={})],
+            ),
+            LLMResult(content="Grounded answer from the tool result."),
+        ]
+    )
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_model_calls=2,
+        )
+    )
+
+    assert outcome.stopped_reason == "model_budget_exhausted"
+    assert outcome.final_text.startswith("Grounded answer from the tool result.")
+    assert "model-call limit was reached" in outcome.final_text
+    assert len(provider.requests) == 3
+
+###############################################################################
+def _exhausted_weather_request(provider: FakeProvider) -> AgentLoopRequest:
     state = _state()
     state.tool_results.append(
         ToolResult(
             call_id="weather-1",
             tool_name="execute_geospatial_capability",
             status="success",
-            summary="weather fetched",
-            data={
-                "capability_id": "get_weather_forecast",
-                "observations": {
-                    "temperature_2m": 27.3,
-                    "relative_humidity_2m": 62,
-                    "precipitation": 0.0,
-                    "wind_speed_10m": 9.5,
-                    "surface_pressure": 1010.0,
-                    "weather_code": 3,
-                },
-                "observation_time": "2026-09-18T14:00",
-                "timezone": "Europe/Rome",
-                "query": {
-                    "location_ref": "rome",
-                    "resolved_location": "Rome, Italy",
-                },
-            },
-            metadata=ToolExecutionMetadata(duration_ms=0),
+            summary="Rome, Italy: 27.3 °C, humidity 62%.",
+            metadata=ToolExecutionMetadata(duration_ms=0, provider_id="open_meteo"),
         )
     )
     request = AgentLoopRequest(
@@ -1770,7 +1779,15 @@ async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exha
         max_model_calls=1,
     )
     request.budget.configure_limits(max_model_calls=1)
+    request.budget.record_model_call()
     state.model_calls = 1
+    return request
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_completed_request_uses_the_reserved_terminal_call_at_the_model_cap() -> None:
+    provider = FakeProvider([LLMResult(content="Rome is 27.3 °C right now.")])
+    request = _exhausted_weather_request(provider)
 
     answer = await _loop(provider)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
         request,
@@ -1778,10 +1795,25 @@ async def test_weather_completion_has_bounded_fallback_when_model_budget_is_exha
         [],
     )
 
-    assert "Current weather for Rome, Italy" in answer
-    assert "temperature 27.3°C" in answer
-    assert "humidity 62%" in answer
-    assert "Observation time: 2026-09-18T14:00 (Europe/Rome)" in answer
+    assert answer == "Rome is 27.3 °C right now."
+    assert len(provider.requests) == 1
+    assert request.budget.terminal_reserve_used
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_completed_request_lists_gathered_evidence_when_synthesis_fails() -> None:
+    provider = FakeProvider([])
+    request = _exhausted_weather_request(provider)
+
+    answer = await _loop(provider)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,
+        [],
+    )
+
+    assert answer.startswith("Results gathered so far:")
+    assert "Rome, Italy: 27.3 °C" in answer
+    assert "(source: open_meteo)" in answer
 
 ###############################################################################
 @pytest.mark.asyncio

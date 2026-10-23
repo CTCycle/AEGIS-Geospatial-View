@@ -41,6 +41,7 @@
             <span>Basemap</span>
             <select
               [value]="mapSession?.basemap_id || ''"
+              [disabled]="basemapLocked"
               aria-label="Select map basemap"
               (change)="onBasemapSelection($any($event.target).value)"
             >

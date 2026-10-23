@@ -44,7 +44,10 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition
-from server.prompts.agent import build_native_context_messages
+from server.prompts.agent import (
+    build_native_agent_system_prompt,
+    build_native_context_messages,
+)
 from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import (
     CapabilityRouter,
@@ -53,6 +56,7 @@ from server.services.agent.capability_router import (
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.completion import CompletionEvaluator
+from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.agent.tool_registry import analysis_complete, route_target_location_available, ToolRegistry
 from server.services.agent.vision_policy import (
     ITERATION_CALL_KIND,
@@ -81,6 +85,23 @@ USER_IMAGE_UNSUPPORTED_NOTE = (
 _PROVIDER_FAILURE_TYPES = frozenset(
     {"timeout", "rate_limit", "provider_unavailable", "provider_malformed_response"}
 )
+
+# Tools whose successful results are evidence worth listing in a fallback.
+_EVIDENCE_TOOLS = frozenset(
+    {
+        "resolve_geospatial_location",
+        "execute_geospatial_capability",
+        "transform_evidence",
+        "measure_geospatial",
+    }
+)
+
+_LIMIT_LABELS = {
+    "iteration_budget_exhausted": "iteration limit",
+    "model_budget_exhausted": "model-call limit",
+    "tool_budget_exhausted": "tool-call limit",
+    "transition_budget_exhausted": "state-transition limit",
+}
 
 ###############################################################################
 class AgentProvider(Protocol):
@@ -214,6 +235,7 @@ class AgentLoop:
         final_text = ""
         state.max_iterations = max(1, min(100, int(request.max_iterations)))
         self._ensure_task_state(state, request.max_iterations)
+        self._attach_client_map_view(state)
         request.budget.configure_limits(
             max_model_calls=request.max_model_calls,
             max_tool_calls=request.max_tool_calls,
@@ -351,7 +373,7 @@ class AgentLoop:
             state.termination_reason = "cancelled"
             return self._outcome(state, final_text, "cancelled", request)
         except ExecutionBudgetExceeded as exc:
-            return self._budget_outcome(state, request, exc.reason)
+            return await self._exhausted_outcome(request, provider, messages, exc.reason)
         except LLMProviderRequestError as exc:
             if exc.timeout_origin == "application_deadline":
                 state.termination_reason = "run_deadline_exhausted"
@@ -374,6 +396,25 @@ class AgentLoop:
             return self._failed(state, request, "The selected model could not complete this request.", category=exc.category)
         except Exception:
             return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="provider_error")
+
+    # -------------------------------------------------------------------------
+    def _attach_client_map_view(self, state: AgentRunState) -> None:
+        """Expose the view the user saw when sending the request.
+
+        It is client-reported: it tells the model where the user is looking
+        and which layers they hid, while committed map state stays the
+        server's record. A checkpoint keeps it across resumes.
+        """
+
+        capture_store = getattr(self, "capture_store", None)
+        if capture_store is None:
+            return
+        view = capture_store.map_view_for_run(state.run_id or state.request_id)
+        if view is not None:
+            state.map_memory = {
+                **state.map_memory,
+                "current_view": {**view, "source": "client_reported"},
+            }
 
     # -------------------------------------------------------------------------
     async def _run_iterations(
@@ -446,7 +487,9 @@ class AgentLoop:
         model_limit = request.budget.max_model_calls or request.max_model_calls
         catalog_cursor = self._pending_catalog_discovery_cursor(state)
         if state.model_calls >= model_limit and catalog_cursor is None:
-            return self._budget_outcome(state, request, "model_budget_exhausted")
+            return await self._exhausted_outcome(
+                request, provider, messages, "model_budget_exhausted"
+            )
         self._transition(state, AgentPhase.BUILD_TOOL_CONTEXT, request.budget)
         tools = self.tool_registry.expose(state)
         await self._emit_trace(request, AgentTraceEvent(
@@ -750,6 +793,8 @@ class AgentLoop:
         request: AgentLoopRequest,
         provider: AgentProvider,
         messages: list[dict[str, Any]],
+        *,
+        stop_reason: str = "iteration_budget_exhausted",
     ) -> str:
         """Make one bounded, tools-disabled finalization attempt.
 
@@ -761,73 +806,12 @@ class AgentLoop:
         """
 
         state = request.state
-        candidate = ""
-        model_limit = request.budget.max_model_calls or request.max_model_calls
-        can_finalize = (
-            not state.finalization_attempted
-            and state.model_calls < model_limit
-            and request.budget.remaining_seconds() > 0.001
+        candidate = await self._terminal_synthesis(
+            request, provider, messages, reason="iteration_exhaustion"
         )
-        finalization_reason = "iteration_exhaustion"
-        if can_finalize:
-            state.finalization_attempted = True
-            await self._emit_finalization_trace(
-                request,
-                reason=finalization_reason,
-                kind="finalization_started",
-            )
-            outcome = "empty"
-            try:
-                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
-                # A provider violating ``tools=[]`` is treated as an empty
-                # finalization result; the deterministic explanation remains
-                # the safe terminal response.
-                if not result.tool_calls:
-                    candidate, protocol_text_suppressed = (
-                        self._sanitize_finalization_candidate(result.content)
-                    )
-                    outcome = (
-                        "protocol_text_suppressed"
-                        if protocol_text_suppressed
-                        else "text"
-                        if candidate
-                        else "empty"
-                    )
-                else:
-                    outcome = "tool_calls_suppressed"
-            except (AgentRunControlSignal, asyncio.CancelledError):
-                outcome = "cancelled"
-                raise
-            except (
-                ExecutionBudgetExceeded,
-                LLMProviderRequestError,
-                LLMStructuredOutputError,
-                TimeoutError,
-            ):
-                outcome = "provider_error"
-                candidate = ""
-            except Exception:
-                outcome = "error"
-                candidate = ""
-            finally:
-                await self._emit_finalization_trace(
-                    request,
-                    reason=finalization_reason,
-                    kind="finalization_completed",
-                    outcome=outcome,
-                )
-        else:
-            await self._emit_finalization_trace(
-                request,
-                reason=finalization_reason,
-                kind="finalization_completed",
-                outcome=(
-                    "already_attempted"
-                    if state.finalization_attempted
-                    else "budget_unavailable"
-                ),
-            )
-
+        if not candidate:
+            candidate = self._evidence_summary(state)
+        limit_label = _LIMIT_LABELS.get(stop_reason, "execution limit")
         pending = self._pending_requirements_for_task_state(state)
         if state.render_retry_exhausted:
             suffix = (
@@ -837,14 +821,14 @@ class AgentLoop:
             )
         elif pending:
             suffix = (
-                "The iteration limit was reached before these requirements were "
+                f"The {limit_label} was reached before these requirements were "
                 "satisfied: "
                 + ", ".join(item.replace("_", " ") for item in pending)
                 + "."
             )
         else:
             suffix = (
-                "The iteration limit was reached before completion could be "
+                f"The {limit_label} was reached before completion could be "
                 "verified."
             )
         final = candidate.rstrip()
@@ -865,68 +849,9 @@ class AgentLoop:
         """Synthesize the final answer after a verified browser render."""
 
         state = request.state
-        candidate = ""
-        model_limit = request.budget.max_model_calls or request.max_model_calls
-        if (
-            not state.finalization_attempted
-            and state.model_calls < model_limit
-            and request.budget.remaining_seconds() > 0.001
-        ):
-            state.finalization_attempted = True
-            finalization_reason = "verified_render"
-            await self._emit_finalization_trace(
-                request,
-                reason=finalization_reason,
-                kind="finalization_started",
-            )
-            outcome = "empty"
-            try:
-                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
-                if not result.tool_calls:
-                    candidate, protocol_text_suppressed = (
-                        self._sanitize_finalization_candidate(result.content)
-                    )
-                    outcome = (
-                        "protocol_text_suppressed"
-                        if protocol_text_suppressed
-                        else "text"
-                        if candidate
-                        else "empty"
-                    )
-                else:
-                    outcome = "tool_calls_suppressed"
-            except (AgentRunControlSignal, asyncio.CancelledError):
-                outcome = "cancelled"
-                raise
-            except (
-                ExecutionBudgetExceeded,
-                LLMProviderRequestError,
-                LLMStructuredOutputError,
-                TimeoutError,
-            ):
-                outcome = "provider_error"
-                candidate = ""
-            except Exception:
-                outcome = "error"
-                candidate = ""
-            finally:
-                await self._emit_finalization_trace(
-                    request,
-                    reason=finalization_reason,
-                    kind="finalization_completed",
-                    outcome=outcome,
-                )
-        else:
-            await self._emit_finalization_trace(
-                request,
-                reason="verified_render",
-                kind="finalization_completed",
-                outcome=(
-                    "already_attempted"
-                    if state.finalization_attempted
-                    else "budget_unavailable"
-                ),
-            )
+        candidate = await self._terminal_synthesis(
+            request, provider, messages, reason="verified_render"
+        )
         verified_map_state = self._verified_map_state_summary(state)
         if verified_map_state is not None:
             return verified_map_state
@@ -980,114 +905,108 @@ class AgentLoop:
     ) -> str:
         """Synthesize a completed non-render request with tools disabled."""
 
-        state = request.state
-        candidate = ""
-        model_limit = request.budget.max_model_calls or request.max_model_calls
-        reason = "goal_satisfied"
-        if (
-            not state.finalization_attempted
-            and state.model_calls < model_limit
-            and request.budget.remaining_seconds() > 0.001
-        ):
-            state.finalization_attempted = True
-            await self._emit_finalization_trace(
-                request, reason=reason, kind="finalization_started"
-            )
-            outcome = "empty"
-            try:
-                result = await self._model_step(request, provider, messages, [], call_kind=TERMINAL_CALL_KIND)
-                if not result.tool_calls:
-                    candidate, protocol_text_suppressed = (
-                        self._sanitize_finalization_candidate(result.content)
-                    )
-                    outcome = (
-                        "protocol_text_suppressed"
-                        if protocol_text_suppressed
-                        else "text"
-                        if candidate
-                        else "empty"
-                    )
-                else:
-                    outcome = "tool_calls_suppressed"
-            except (AgentRunControlSignal, asyncio.CancelledError):
-                outcome = "cancelled"
-                raise
-            except (
-                ExecutionBudgetExceeded,
-                LLMProviderRequestError,
-                LLMStructuredOutputError,
-                TimeoutError,
-            ):
-                outcome = "provider_error"
-            except Exception:
-                outcome = "error"
-            finally:
-                await self._emit_finalization_trace(
-                    request,
-                    reason=reason,
-                    kind="finalization_completed",
-                    outcome=outcome,
-                )
+        candidate = await self._terminal_synthesis(
+            request, provider, messages, reason="goal_satisfied"
+        )
         return (
             candidate
-            or self._completed_request_fallback(state)
+            or self._evidence_summary(request.state)
             or "The requested information is ready."
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _completed_request_fallback(state: AgentRunState) -> str:
-        """Render a bounded direct answer when no final model slot remains."""
+    async def _terminal_synthesis(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+        *,
+        reason: str,
+    ) -> str:
+        """Make the run's single tools-disabled synthesis call.
 
-        for result in reversed(state.tool_results):
-            if result.status not in {"success", "partial"}:
-                continue
-            data = result.data if is_json_object(result.data) else None
-            if data is None or data.get("capability_id") != "get_weather_forecast":
-                continue
-            observations = data.get("observations")
-            if not is_json_object(observations) or not observations:
-                continue
-            query = data.get("query")
-            resolved_location = (
-                query.get("resolved_location")
-                if is_json_object(query)
-                else None
+        It may use the budget's one reserved model slot, so a run that spent
+        its ordinary calls gathering evidence still gets a grounded answer.
+        A provider violating ``tools=[]`` counts as an empty result.
+        """
+
+        state = request.state
+        if state.finalization_attempted or request.budget.remaining_seconds() <= 0.001:
+            await self._emit_finalization_trace(
+                request,
+                reason=reason,
+                kind="finalization_completed",
+                outcome=(
+                    "already_attempted"
+                    if state.finalization_attempted
+                    else "budget_unavailable"
+                ),
             )
-            location = str(
-                resolved_location
-                or (query.get("location_ref") if is_json_object(query) else None)
-                or "the requested location"
+            return ""
+        state.finalization_attempted = True
+        await self._emit_finalization_trace(
+            request, reason=reason, kind="finalization_started"
+        )
+        candidate = ""
+        outcome = "empty"
+        try:
+            result = await self._model_step(
+                request, provider, messages, [], call_kind=TERMINAL_CALL_KIND
             )
-            fields = (
-                ("temperature_2m", "temperature", "°C"),
-                ("relative_humidity_2m", "humidity", "%"),
-                ("precipitation", "precipitation", "mm"),
-                ("wind_speed_10m", "wind", "km/h"),
-                ("surface_pressure", "pressure", "hPa"),
+            if not result.tool_calls:
+                candidate, protocol_text_suppressed = (
+                    self._sanitize_finalization_candidate(result.content)
+                )
+                outcome = (
+                    "protocol_text_suppressed"
+                    if protocol_text_suppressed
+                    else "text"
+                    if candidate
+                    else "empty"
+                )
+            else:
+                outcome = "tool_calls_suppressed"
+        except (AgentRunControlSignal, asyncio.CancelledError):
+            outcome = "cancelled"
+            raise
+        except (
+            ExecutionBudgetExceeded,
+            LLMProviderRequestError,
+            LLMStructuredOutputError,
+            TimeoutError,
+        ):
+            outcome = "provider_error"
+        except Exception:
+            outcome = "error"
+        finally:
+            await self._emit_finalization_trace(
+                request,
+                reason=reason,
+                kind="finalization_completed",
+                outcome=outcome,
             )
-            values = [
-                f"{label} {observations[key]}{unit}"
-                for key, label, unit in fields
-                if observations.get(key) is not None
-            ]
-            weather_code = observations.get("weather_code")
-            if weather_code is not None:
-                values.append(f"WMO weather code {weather_code}")
-            if not values:
-                continue
-            answer = f"Current weather for {location}: " + "; ".join(values) + "."
-            observation_time = data.get("observation_time")
-            timezone = data.get("timezone")
-            if observation_time:
-                suffix = f"Observation time: {observation_time}"
-                if timezone:
-                    suffix += f" ({timezone})"
-                answer += f" {suffix}."
-            if result.status == "partial" or data.get("partial"):
-                answer += " The provider marked this result as partial."
-            return answer
-        return ""
+        return candidate
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _evidence_summary(state: AgentRunState) -> str:
+        """List what the run established when no model synthesis is available."""
+
+        lines = [
+            f"- {result.summary.strip()}"
+            + (
+                f" (source: {result.metadata.provider_id})"
+                if result.metadata.provider_id
+                else ""
+            )
+            for result in state.tool_results
+            if result.status in {"success", "partial", "valid_empty"}
+            and result.tool_name in _EVIDENCE_TOOLS
+            and result.summary.strip()
+        ]
+        if not lines:
+            return ""
+        return "Results gathered so far:\n" + "\n".join(lines[-8:])
 
     # -------------------------------------------------------------------------
     async def _emit_finalization_trace(
@@ -1263,6 +1182,10 @@ class AgentLoop:
             or state.active_map_session is not None,
             "search_area_bound": route_target_location_available(state),
             "result_locations_derived": analysis_complete(state),
+            "measurement_computed": any(
+                result.tool_name == "measure_geospatial" and result.status == "success"
+                for result in state.tool_results
+            ),
             "required_data_retrieved": data_completed,
             "evidence_inspected": evidence_inspected,
             "capabilities_discovered": capabilities_discovered,
@@ -1324,6 +1247,7 @@ class AgentLoop:
             "location_resolved": "location",
             "search_area_bound": "location",
             "result_locations_derived": "evidence_analysis",
+            "measurement_computed": "evidence_analysis",
             "capabilities_discovered": "capability_discovery",
             "required_data_retrieved": "provider_data",
             "evidence_inspected": "evidence_inspection",
@@ -1500,9 +1424,12 @@ class AgentLoop:
         if registered_route_tool is None:
             return "Routing is unavailable for this request.", "provider_error", None
         route_tool = registered_route_tool.definition
+        # The route call has its own instructions; the native tool-loop prompt
+        # describes tools this call cannot use and would contradict them.
+        native_prompt = build_native_agent_system_prompt()
         correction_messages = [
             {"role": "system", "content": build_capability_route_prompt()},
-            *messages,
+            *(message for message in messages if message.get("content") != native_prompt),
         ]
         for attempt in range(request.max_route_corrections + 1):
             result = await self._model_call(
@@ -1659,6 +1586,7 @@ class AgentLoop:
             model_messages,
             tools,
             tool_choice="auto" if tools else "none",
+            terminal=call_kind == TERMINAL_CALL_KIND,
         )
 
     # -------------------------------------------------------------------------
@@ -1756,17 +1684,14 @@ class AgentLoop:
     def _vision_caption(state: AgentRunState, capture_ref: str) -> str:
         """Concise caption telling the model what the image represents."""
 
-        session = state.prepared_map_session
+        # The candidate is cleared at acknowledgement, so the capture shows the
+        # session that was just committed.
+        session = state.prepared_map_session or state.active_map_session
         basemap_id = ""
         overlay_count = 0
         if session is not None:
-            basemap_id = str(getattr(session, "basemap_id", "") or "")
-            collection = getattr(session, "overlay_collection", None)
-            overlay_count = (
-                len(getattr(collection, "items", []))
-                if collection is not None
-                else 0
-            )
+            basemap_id = str(session.basemap_id or "")
+            overlay_count = len(session.overlay_collection.instances)
         return (
             "This is a capture of the map rendered by the agent for this request "
             f"(render {capture_ref}). "
@@ -1929,6 +1854,7 @@ class AgentLoop:
         *,
         tool_choice: str,
         budget_stage: str = "model_step",
+        terminal: bool = False,
     ) -> LLMResult:
         self._ensure_run_control(request)
         request.budget.ensure_available(budget_stage)
@@ -1979,7 +1905,7 @@ class AgentLoop:
                 budget_stage,
                 requested_seconds=request.max_model_call_seconds,
             )
-            request.budget.record_model_call()
+            request.budget.record_model_call(terminal=terminal)
             request.state.model_calls += 1
             try:
                 with request.budget.observe(
@@ -2332,6 +2258,10 @@ class AgentLoop:
         for call, result in zip(bounded_calls, results, strict=False):
             self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
+            if result.status != "failed":
+                # Progress resets the guard: it bounds consecutive invalid
+                # calls, not unrelated corrections spread across a long run.
+                state.validation_corrections = 0
             if result.status == "failed":
                 state.failed_fingerprints[fingerprint] = (
                     state.failed_fingerprints.get(fingerprint, 0) + 1
@@ -2567,7 +2497,9 @@ class AgentLoop:
     ) -> tuple[str, str] | None:
         if state.prepared_map_session is not None:
             return "awaiting_render", "The map candidate is awaiting render acknowledgment."
-        if state.validation_corrections >= max_validation_corrections:
+        # Each invalid call returns a correction; stop only once the model has
+        # used every allowed correction and is still calling tools invalidly.
+        if state.validation_corrections > max_validation_corrections:
             return "failed", "The agent stopped after repeated invalid tool calls."
         actionable_recovery = any(
             result.error is not None
@@ -2899,6 +2831,7 @@ class AgentLoop:
             or route.presentation in {"map", "both"}
             or route.secondary_domains
             or len(route.capability_queries) > 1
+            or len(route.target_refs) > 1
             or route.primary_domain is CapabilityDomain.SPATIAL_ANALYSIS
         ):
             return "complex"
@@ -2953,20 +2886,31 @@ class AgentLoop:
             and route.presentation == "text"
             and operation == "inspect_evidence"
         )
-        data_route = (
-            CapabilityDomain.DATA_RETRIEVAL in route_domains
-            or route.primary_domain
-            not in {CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE}
-        )
+        # Provider data is only an obligation where the route may execute
+        # capabilities; otherwise the contract could never be satisfied.
+        data_route = route_allows_capability_execution(route)
         capability_discovery_only = operation == "discover_available_map_data"
+        # Distance, bearing, extent or country-of questions about places are
+        # answered by deterministic measurement, never by a model estimate.
+        measurement_route = (
+            route.task_mode == "execute"
+            and route.analysis is None
+            and route.location_mode != "none"
+            and route.primary_domain
+            in {CapabilityDomain.SPATIAL_ANALYSIS, CapabilityDomain.ROUTING}
+            and CapabilityDomain.DATA_RETRIEVAL not in route_domains
+        )
         requires_provider_data = (
             route.task_mode == "execute"
             and data_route
+            and not measurement_route
             and not text_location_resolution_only
             and not text_evidence_inspection_only
             and not capability_discovery_only
             and not _is_location_only_map_request(state.user_message, route)
         )
+        if measurement_route:
+            requirements.append("measurement_computed")
         if requires_provider_data:
             requirements.append("required_data_retrieved")
         elif route.task_mode == "execute" and capability_discovery_only:
@@ -3407,11 +3351,31 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    async def _exhausted_outcome(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+        reason: str,
+    ) -> AgentLoopOutcome:
+        """Stop on an exhausted budget, summarizing any evidence gathered."""
+
+        state = request.state
+        text: str | None = None
+        if any(result.status != "failed" for result in state.tool_results):
+            text = await self._finalize_iteration_exhaustion(
+                request, provider, messages, stop_reason=reason
+            )
+        return self._budget_outcome(state, request, reason, final_text=text)
+
+    # -------------------------------------------------------------------------
     def _budget_outcome(
         self,
         state: AgentRunState,
         request: AgentLoopRequest,
         reason: str,
+        *,
+        final_text: str | None = None,
     ) -> AgentLoopOutcome:
         state.termination_reason = reason
         request.budget.terminal_reason = reason
@@ -3422,7 +3386,7 @@ class AgentLoop:
         self._transition(state, AgentPhase.FAILED, count=False)
         final_text = self._preserve_render_failure_cause(
             state,
-            "The agent reached its configured execution limit.",
+            final_text or "The agent reached its configured execution limit.",
             reason,
         )
         return AgentLoopOutcome(

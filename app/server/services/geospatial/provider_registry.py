@@ -58,6 +58,7 @@ from server.services.geospatial.providers.mobility_database import (
 )
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.emsc import EMSCProvider
+from server.services.geospatial.providers.wikidata import WikidataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
 ProviderFactory = Callable[[str | None], Any]
@@ -95,6 +96,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "local_open_data": lambda _credential: LocalOpenDataProvider(),
     "mobility_database": lambda _credential: MobilityDatabaseProvider(),
     "nominatim": lambda _credential: NominatimProvider(),
+    "wikidata": lambda _credential: WikidataProvider(),
 }
 
 LOGGER = logging.getLogger(__name__)

@@ -13,6 +13,7 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -191,7 +192,7 @@ class CapabilityRouter:
                 rejected_capability_ids=[],
                 reason_codes=list(dict.fromkeys([*reasons, *contract_reasons])),
             )
-        active_map_update = _is_active_map_update(proposed, active_state)
+        active_map_update = is_active_map_update(proposed, active_state)
         if active_map_update and proposed.location_mode != "none":
             proposed = proposed.model_copy(update={"location_mode": "none"})
             reasons.append("active_map_update_uses_current_map")
@@ -491,32 +492,6 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
-
-
-_ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
-    {
-        "remove_layer",
-        "set_layer_visibility",
-        "set_layer_opacity",
-        "set_basemap",
-        "keep_only_layers",
-        "fit_layer",
-        "reset_view",
-    }
-)
-
-###############################################################################
-def _is_active_map_update(route: CapabilityRoute, state: AgentRunState) -> bool:
-    """Return whether the route mutates the already-rendered map session."""
-
-    return (
-        route.task_mode == "execute"
-        and route.primary_domain is CapabilityDomain.MAP_STATE
-        and state.active_map_session is not None
-        and str(route.operation or "").strip().casefold()
-        in _ACTIVE_MAP_UPDATE_OPERATIONS
-        and route.spatial_scope is None
-    )
 
 ###############################################################################
 def _route_terms(route: CapabilityRoute) -> set[str]:

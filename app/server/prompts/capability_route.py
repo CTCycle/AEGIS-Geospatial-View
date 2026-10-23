@@ -41,7 +41,17 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "Analysis is separate from provider operations: use operation show for maps or inspect for text, "
     "and choose bbox spatial scope for a macro-region. For active-map updates use none.\n"
     "7. Use secondary_domains for at most three genuinely related domains.\n"
-    "8. Return the tool call immediately without explanations or deliberation."
+    "8. Distance, bearing, size/area, or which-country questions about named "
+    "places are measurements: task_mode execute, primary_domain spatial_analysis, "
+    "location_mode target with each place in target_refs, no capability_queries. "
+    "Add data_retrieval only when provider data is also requested.\n"
+    "9. Hiding, showing, removing, restyling or recolouring a layer already on "
+    "the map, or changing the basemap, is primary_domain map_state; name the layer "
+    "in target_refs, never as a place.\n"
+    "10. Data requested for the area the user is looking at ('here', 'in this "
+    "view', 'the visible map') uses location_mode target with target_refs "
+    "['current map view'].\n"
+    "11. Return the tool call immediately without explanations or deliberation."
 )
 
 ###############################################################################

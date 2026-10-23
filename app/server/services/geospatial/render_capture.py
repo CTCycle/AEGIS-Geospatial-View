@@ -4,6 +4,7 @@ import base64
 import time
 import uuid
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 from server.common.typing import is_json_array
 
@@ -63,6 +64,8 @@ class RenderCaptureStore:
         self.ttl_seconds = float(ttl_seconds)
         self._captures: dict[tuple[str, str, int], RenderCapture] = {}
         self._attachment_conversations: dict[str, str] = {}
+        # The map view the user saw when starting a run, with its bind time.
+        self._map_views: dict[str, tuple[float, dict[str, Any]]] = {}
 
     # -------------------------------------------------------------------------
     def _key(self, run_id: str, map_session_id: str, collection_revision: int) -> tuple[str, str, int]:
@@ -193,6 +196,19 @@ class RenderCaptureStore:
         return self.get(run_id, USER_ATTACHMENT_SESSION, 0)
 
     # -------------------------------------------------------------------------
+    def bind_map_view(self, run_id: str, view: dict[str, Any]) -> None:
+        """Hold the client-reported map view for the run that will read it."""
+        self._map_views[run_id] = (time.time(), dict(view))
+
+    # -------------------------------------------------------------------------
+    def map_view_for_run(self, run_id: str) -> dict[str, Any] | None:
+        entry = self._map_views.get(run_id)
+        if entry is None or time.time() - entry[0] > self.ttl_seconds:
+            self._map_views.pop(run_id, None)
+            return None
+        return dict(entry[1])
+
+    # -------------------------------------------------------------------------
     def delete_for_run(self, run_id: str) -> int:
         removed = [
             key
@@ -201,6 +217,7 @@ class RenderCaptureStore:
         ]
         for key in removed:
             self._captures.pop(key, None)
+        self._map_views.pop(run_id, None)
         return len(removed)
 
     # -------------------------------------------------------------------------

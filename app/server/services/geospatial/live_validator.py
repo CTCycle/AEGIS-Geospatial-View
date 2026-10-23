@@ -348,6 +348,15 @@ PROVIDER_SMOKE_CHECKS = (
         required_payload_keys=("results", "resultCount"),
         numeric_payload_keys=("resultCount",),
     ),
+    LiveCheck(
+        provider_id="wikidata",
+        request=ProviderRequest(
+            capability_id="wikidata_place_facts",
+            params={"wikidata_id": "Q220", "latitude": 41.9, "longitude": 12.5},
+        ),
+        response_contract="metadata",
+        required_payload_keys=("facts", "features"),
+    ),
 )
 
 PUBLIC_LIVE_CHECKS = tuple(

@@ -67,5 +67,7 @@ class ResolvedLocation(BaseModel):
     location_class: str | None = None
     bbox: list[float] | None = None
     bbox_source: str | None = None
+    # Wikidata entity of the geocoded place, used for place-fact lookups.
+    wikidata_id: str | None = Field(default=None, pattern=r"^Q\d+$")
     provenance: LocationResolutionProvenance | None = None
     hierarchy: LocationHierarchy | None = None

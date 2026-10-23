@@ -109,6 +109,7 @@ class OverpassService:
     )
     MAX_RADIUS_M = 250_000.0
     MAX_LIMIT = 500
+    MAX_FETCH_LIMIT = 2000
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -192,13 +193,16 @@ class OverpassService:
             raise OverpassInvalidQueryError(
                 "No supported OpenStreetMap POI category was requested."
             )
+        # Overpass returns elements in its own order, not by distance; fetch
+        # more than requested so the nearest ones survive the trim below.
+        fetch_limit = min(self.MAX_FETCH_LIMIT, resolved_limit * 4)
         payload = await asyncio.to_thread(
             self._query_overpass,
             latitude=latitude,
             longitude=longitude,
             radius_m=resolved_radius_m,
             selectors=selectors,
-            limit=resolved_limit,
+            limit=fetch_limit,
         )
         elements = json_array(payload.get("elements"))
         points: list[dict[str, Any]] = []
@@ -244,7 +248,9 @@ class OverpassService:
         points.sort(key=lambda item: float(item.get("distance_m") or 0.0))
         trimmed = points[:resolved_limit]
         fetched_at = datetime.now(UTC).isoformat()
-        truncated = len(points) > len(trimmed)
+        # Only a server-side cut can hide nearer results; trimming the sorted
+        # list to the requested limit is the intended answer.
+        truncated = len(elements) >= fetch_limit
         return {
             "provider": "overpass",
             "kind": "poi_amenities",

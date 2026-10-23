@@ -203,11 +203,11 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     )
 
     assert report["counts"] == {
-        "manifests": 87,
-        "providers": 39,
-        "direct_tools": 4,
-        "llm_native_tools": 10,
-        "runtime_profiles": 69,
+        "manifests": 88,
+        "providers": 40,
+        "direct_tools": 5,
+        "llm_native_tools": 11,
+        "runtime_profiles": 70,
     }
     providers = {item["id"]: item for item in report["providers"]}
     assert providers["openmeteo"]["operational_status"] == "active"

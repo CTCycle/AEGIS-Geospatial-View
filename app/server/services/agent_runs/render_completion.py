@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import hashlib
@@ -40,6 +41,22 @@ def _json_object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 ###############################################################################
+def _visible_fraction(viewport: object, bounds: object) -> float | None:
+    """Share of a [west, south, east, north] extent inside the viewport."""
+
+    try:
+        vw, vs, ve, vn = (float(item) for item in cast(list[Any], viewport))
+        west, south, east, north = (float(item) for item in cast(list[Any], bounds))
+    except (TypeError, ValueError):
+        return None
+    area = (east - west) * (north - south)
+    if area <= 0:
+        return None
+    width = max(0.0, min(east, ve) - max(west, vw))
+    height = max(0.0, min(north, vn) - max(south, vs))
+    return round(min(1.0, width * height / area), 3)
+
+###############################################################################
 def _json_list(value: object) -> list[Any]:
     return cast(list[Any], value) if isinstance(value, list) else []
 
@@ -73,6 +90,7 @@ class RenderCompletionService:
         self.render_ack_timeout_seconds = max(0.1, float(render_ack_timeout_seconds))
         self.resume_mode = bool(resume_mode)
         self.max_render_attempts = max(1, min(32, int(max_render_attempts)))
+        self._deadline_tasks: set[asyncio.Task[None]] = set()
 
     # -------------------------------------------------------------------------
     def prepare(
@@ -138,10 +156,11 @@ class RenderCompletionService:
             for instance in candidate_model.overlay_collection.instances
             if not RenderCompletionService._metadata_only(instance)
         ]
+        render_ack_timeout_seconds = float(_json_object(
+            _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
+        ).get("render_ack_seconds") or self.render_ack_timeout_seconds)
         presentation = {
-            "render_ack_timeout_seconds": float(_json_object(
-                _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
-            ).get("render_ack_seconds") or self.render_ack_timeout_seconds),
+            "render_ack_timeout_seconds": render_ack_timeout_seconds,
             "max_render_attempts": int(_json_object(
                 _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
             ).get("max_render_attempts") or self.max_render_attempts),
@@ -180,12 +199,57 @@ class RenderCompletionService:
                 or False
             ),
         }
-        _snapshot, transitioned = self.run_repository.prepare_render(
+        snapshot, transitioned = self.run_repository.prepare_render(
             run_id,
             run_version,
             presentation,
         )
+        self._schedule_render_deadline(
+            conversation_id=snapshot.conversation_id,
+            run_id=run_id,
+            run_version=run_version,
+            timeout_seconds=render_ack_timeout_seconds,
+        )
         return presentation, transitioned
+
+    # -------------------------------------------------------------------------
+    def _schedule_render_deadline(
+        self,
+        *,
+        conversation_id: str,
+        run_id: str,
+        run_version: int,
+        timeout_seconds: float,
+    ) -> None:
+        """Fail a candidate no browser acknowledges, instead of waiting forever.
+
+        Expiry is otherwise only checked when an acknowledgement arrives, so a
+        closed tab left the run awaiting render. A later candidate of the same
+        run moves the prepared time, which makes this timer a no-op.
+        """
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+
+        async def expire() -> None:
+            await asyncio.sleep(timeout_seconds + 1.0)
+            snapshot = self.run_repository.expire_pending_render(
+                conversation_id=conversation_id,
+                run_id=run_id,
+                run_version=run_version,
+                timeout_seconds=timeout_seconds,
+            )
+            if snapshot is None:
+                return
+            event_ids = _json_list(_json_object(snapshot.presentation).get("durable_event_ids"))
+            if event_ids:
+                await self.event_publisher.fanout_existing(str(event_ids[-1]))
+
+        task = loop.create_task(expire())
+        self._deadline_tasks.add(task)
+        task.add_done_callback(self._deadline_tasks.discard)
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -297,6 +361,10 @@ class RenderCompletionService:
             )
         observation = self._observation_from_ack(payload).model_copy(
             update={
+                "results_in_viewport": _visible_fraction(
+                    payload.viewport_bounds,
+                    _json_object(pending_response.get("map_session")).get("bounds"),
+                ),
                 "attempt": prior_attempt + 1,
                 "recovery": (
                     "continue"

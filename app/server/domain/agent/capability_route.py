@@ -177,6 +177,9 @@ class RenderObservation(BaseModel):
     attempt: int = Field(ge=1, le=32)
     status: Literal["ready", "failed"]
     viewport_bounds: list[float] | None = Field(default=None, max_length=4)
+    # Share of the prepared result extent inside the browser viewport; below 1
+    # the user sees only part of the result (for example after a minzoom bump).
+    results_in_viewport: float | None = Field(default=None, ge=0.0, le=1.0)
     checks: dict[str, bool] = Field(default_factory=lambda: dict[str, bool](), max_length=32)
     overlay_results: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]](), max_length=64

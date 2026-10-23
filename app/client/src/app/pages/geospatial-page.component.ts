@@ -1073,6 +1073,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         pendingRun.clientRequestId,
         Intl.DateTimeFormat().resolvedOptions().timeZone,
         attachmentId,
+        this.mapPreview?.currentView(),
       );
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(

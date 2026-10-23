@@ -71,6 +71,37 @@ def test_presentation_carries_vision_capture_requested_from_execution_trace(rend
     assert enabled["vision_capture_requested"] is True
 
 ###############################################################################
+def test_unacknowledged_candidate_fails_at_the_render_deadline(
+    render_context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from server.services.agent_runs import render_completion
+
+    repository, publisher, _, run_id = render_context
+    real_sleep = asyncio.sleep
+    # The watchdog waits the deadline plus a grace second; shorten it.
+    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.2))
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.1
+    )
+    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
+        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+
+    async def prepare_and_wait() -> None:
+        service.prepare(run_id=run_id, run_version=1, response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+        })
+        await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
+
+    run_async_in_thread(prepare_and_wait())
+
+    snapshot = repository.get_run(run_id)
+    assert snapshot is not None and snapshot.state == "failed"
+    assert snapshot.error_code == "render_timeout"
+    assert "error" in _event_types(publisher, run_id)
+
+###############################################################################
 def _event_types(publisher: RunEventPublisher, run_id: str) -> list[str]:
     return [
         str(event.type.value) for event in publisher.event_repository.list_events(run_id)

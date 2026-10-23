@@ -89,6 +89,7 @@ class AgentExecutionBudget:
     max_tool_calls: int | None = None
     max_state_transitions: int | None = None
     retry_count: int = 0
+    terminal_reserve_used: bool = False
     terminal_reason: str | None = None
     terminal_stage: str | None = None
     run_profile: str = "initial"
@@ -191,7 +192,20 @@ class AgentExecutionBudget:
         return min(max(0.0, float(limit)), remaining)
 
     # -------------------------------------------------------------------------
-    def record_model_call(self) -> None:
+    def record_model_call(self, *, terminal: bool = False) -> None:
+        """Count one model call; a run's single terminal synthesis call may
+        use one reserved slot beyond the limit so gathered evidence is always
+        summarized instead of discarded."""
+
+        if (
+            terminal
+            and not self.terminal_reserve_used
+            and self.max_model_calls is not None
+            and self.model_calls >= self.max_model_calls
+        ):
+            self.terminal_reserve_used = True
+            self.model_calls += 1
+            return
         self._ensure_counter_available(
             current=self.model_calls,
             limit=self.max_model_calls,

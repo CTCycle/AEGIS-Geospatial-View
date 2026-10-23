@@ -83,10 +83,33 @@ def geodesic_distance_m(
 ) -> float:
     """Return WGS84 geodesic distance in metres."""
 
+    return geodesic_inverse(
+        first_latitude, first_longitude, second_latitude, second_longitude
+    )[0]
+
+###############################################################################
+def geodesic_inverse(
+    first_latitude: float,
+    first_longitude: float,
+    second_latitude: float,
+    second_longitude: float,
+) -> tuple[float, float]:
+    """Return WGS84 geodesic distance in metres and initial bearing in degrees."""
+
     first = validate_point(first_latitude, first_longitude)
     second = validate_point(second_latitude, second_longitude)
-    _azimuth_a, _azimuth_b, distance = _GEOD.inv(first[1], first[0], second[1], second[0])
-    return float(distance)
+    azimuth, _back_azimuth, distance = _GEOD.inv(first[1], first[0], second[1], second[0])
+    return float(distance), float(azimuth) % 360.0
+
+###############################################################################
+def geodesic_bbox_area_km2(bbox: Iterable[float]) -> float:
+    """Return the WGS84 ellipsoidal area of a [west, south, east, north] box."""
+
+    west, south, east, north = (float(value) for value in bbox)
+    area, _perimeter = _GEOD.polygon_area_perimeter(
+        [west, east, east, west], [south, south, north, north]
+    )
+    return abs(float(area)) / 1_000_000.0
 
 ###############################################################################
 def feature_matches_constraint(

@@ -1268,6 +1268,7 @@ def test_chat_consumes_shared_geospatial_runtime(sqlite_backend) -> None:
         "execute_geospatial_capability",
         "inspect_evidence",
         "transform_evidence",
+        "measure_geospatial",
         "apply_map_plan",
         "search_conversation_history",
     }

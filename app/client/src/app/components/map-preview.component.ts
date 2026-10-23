@@ -23,6 +23,7 @@ import {
 import {
   MapSession,
   CapabilityDescriptor,
+  ClientMapView,
   MapInspection,
   MapOverlayEntry,
   OverlayRenderStatus,
@@ -64,6 +65,8 @@ export interface MapRenderIdentity {
   mapSessionId: string;
   collectionRevision: number;
 }
+
+const OVERLAY_SOURCE_PREFIX = 'overlay-source-';
 
 const stringArrayEqual = (left: readonly string[], right: readonly string[]): boolean => (
   left.length === right.length && left.every((value, index) => value === right[index])
@@ -149,6 +152,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private viewInitialized = false;
   private mapPreparing = false;
   private awaitingBackendAcknowledgment = false;
+
+  /**
+   * A basemap switch rebuilds the map, which would orphan a candidate the
+   * agent is waiting on; lock the selector until that render settles.
+   */
+  get basemapLocked(): boolean {
+    return this.mapPreparing || this.awaitingBackendAcknowledgment;
+  }
   private awaitingCandidateMap: Map | null = null;
   private destroyed = false;
   private candidateGeneration = 0;
@@ -702,8 +713,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       if (!isCurrentCandidate()) {
         return;
       }
-      const error = (event as { error?: unknown } | null)?.error;
-      if (error) {
+      const { error, sourceId } = (event ?? {}) as { error?: unknown; sourceId?: string };
+      // A failed basemap tile leaves the rest of the map usable; only an
+      // overlay source or a style-level failure invalidates the candidate.
+      if (error && (!sourceId || sourceId.startsWith(OVERLAY_SOURCE_PREFIX))) {
         candidateSettled = true;
         this.mapPreparing = false;
         clearCandidate();
@@ -711,7 +724,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
-          this.emitRenderState('failed', this.safeRenderError(error), candidateIdentity);
+          this.emitRenderState('failed', this.safeRenderError(error, sourceId), candidateIdentity);
         }
       }
     });
@@ -948,6 +961,42 @@ candidate.on('load', () => {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * The view the user currently sees, sent with each request so the agent
+   * can answer about "this area" and describe the map as it is displayed.
+   */
+  currentView(): ClientMapView | null {
+    const map = this.mapRef;
+    // Unit-test doubles may not implement the camera API.
+    if (!map || typeof map.getBounds !== 'function' || typeof map.getCenter !== 'function') {
+      return null;
+    }
+    const bounds = map.getBounds();
+    const center = map.getCenter();
+    const clampLongitude = (value: number): number => Math.max(-180, Math.min(180, value));
+    const clampLatitude = (value: number): number => Math.max(-90, Math.min(90, value));
+    const view: [number, number, number, number] = [
+      clampLongitude(bounds.getWest()),
+      clampLatitude(bounds.getSouth()),
+      clampLongitude(bounds.getEast()),
+      clampLatitude(bounds.getNorth()),
+    ];
+    if (!view.every(Number.isFinite) || view[0] >= view[2] || view[1] >= view[3]) {
+      return null;
+    }
+    return {
+      bounds: view,
+      center: [clampLongitude(center.lng), clampLatitude(center.lat)],
+      zoom: Math.max(0, Math.min(24, typeof map.getZoom === 'function' ? map.getZoom() : 0)),
+      basemap_id: this.activeBasemapId,
+      overlays: this.overlays.slice(0, 32).map((overlay) => ({
+        instance_id: overlay.id,
+        visible: this.overlayVisibility[overlay.id] ?? overlay.visible ?? true,
+        opacity: this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY,
+      })),
+    };
   }
 
   private hasRenderableCanvas(map: Map, container: HTMLDivElement): boolean {
@@ -1290,10 +1339,20 @@ private fitMaxZoom(defaultMaxZoom: number): number {
     return true;
   }
 
-  private safeRenderError(error: unknown): string {
+  private safeRenderError(error: unknown, sourceId?: string): string {
     const message = error instanceof Error ? error.message : '';
     if (/\b(401|403)\b/.test(message)) {
       return 'Map layer access was denied. Check the provider credentials in Settings under Geospatial Access.';
+    }
+    // Name the failing layer and status so the agent can revise that layer
+    // instead of guessing which part of the map failed.
+    const overlayId = sourceId?.startsWith(OVERLAY_SOURCE_PREFIX)
+      ? sourceId.slice(OVERLAY_SOURCE_PREFIX.length)
+      : undefined;
+    if (overlayId) {
+      const label = this.overlays.find((overlay) => overlay.id === overlayId)?.label || overlayId;
+      const status = /\b([45]\d{2})\b/.exec(message)?.[1];
+      return `The map layer "${label}" could not be loaded${status ? ` (HTTP ${status})` : ''}. Check provider availability or choose another source.`;
     }
     return 'A map data source could not be loaded. Check provider availability and try again.';
   }

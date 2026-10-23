@@ -546,6 +546,8 @@ def _provider_params(
         # supplied coordinates.
         params["latitude"] = location.latitude
         params["longitude"] = location.longitude
+        if location.wikidata_id:
+            params["wikidata_id"] = location.wikidata_id
         if location.source == "aegis_macro_regions":
             params["macro_region"] = location.label
     if request.operation is not None:
@@ -652,6 +654,9 @@ def _response_summary(
             "yearly_kwh_per_kwp": float(yearly_kwh_per_kwp),
             "unit": "kWh/kWp/year",
         }
+    facts = payload.get("facts")
+    if payload.get("kind") == "place_facts" and is_json_object(facts):
+        summary["facts"] = dict(list(facts.items())[:16])
     if payload.get("kind") == "weather_forecast":
         current = payload.get("current")
         if is_json_object(current):
