@@ -482,7 +482,7 @@ describe('components/map-preview.component', () => {
     expect(component.restoreNotice).toContain('could not be restored');
   });
 
-  it('preserves restored overlay preferences for same-session payload echoes and applies new-session visibility', () => {
+  it('preserves restored preferences for echoes and applies canonical visibility and opacity for a new session', () => {
     fixture.componentRef.setInput('initialOverlayVisibility', { weather: false });
     fixture.componentRef.setInput('initialOverlayOpacity', { weather: 0.12 });
     fixture.componentRef.setInput('payload', {
@@ -515,7 +515,7 @@ describe('components/map-preview.component', () => {
     fixture.detectChanges();
 
     expect(component.overlayVisibility['weather']).toBeTrue();
-    expect(component.overlayOpacity['weather']).toBe(0.12);
+    expect(component.overlayOpacity['weather']).toBe(0.65);
   });
 
   it('keeps a local visibility toggle when the parent echoes map state', () => {

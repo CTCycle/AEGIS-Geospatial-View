@@ -23,6 +23,7 @@ from server.domain.agent.tool_result import (
 )
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.capability_execution import ToolExecutionContext
+from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.map_session_builder import (
     MapPlanBuildError,
@@ -442,17 +443,7 @@ class MapPlanService:
         route = state.route
         if (
             route is not None
-            and route.primary_domain.value == "map_state"
-            and str(route.operation or "").strip().casefold()
-            in {
-                "remove_layer",
-                "set_layer_visibility",
-                "set_layer_opacity",
-                "set_basemap",
-                "keep_only_layers",
-                "fit_layer",
-                "reset_view",
-            }
+            and is_active_map_update(route, state)
             and active_session is not None
         ):
             return active_session.resolved_location

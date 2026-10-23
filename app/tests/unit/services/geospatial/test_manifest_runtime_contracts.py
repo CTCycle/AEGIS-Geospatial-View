@@ -16,6 +16,16 @@ from server.services.geospatial.coverage import CoverageService
 
 # --- test_agentic_manifest_contract.py ---
 
+def test_population_discovery_includes_keyless_place_facts() -> None:
+    registry = CapabilityRegistry()
+    for query in ("population", "population statistics"):
+        candidates = registry.shortlist(
+            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=[query],
+            explicit_ids=[], runtime_registry=RuntimeRegistry(), operation="inspect",
+            location=ResolvedLocation(label="Paris, France", country="France", latitude=48.85, longitude=2.35),
+        )
+        assert "wikidata_place_facts" in {item["id"] for item in candidates}, query
+
 
 ###############################################################################
 class _RuntimeEligibility:

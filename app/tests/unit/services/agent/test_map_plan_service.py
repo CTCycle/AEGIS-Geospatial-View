@@ -851,8 +851,14 @@ async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> N
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_visibility_mutation_increments_candidate_revision() -> None:
+@pytest.mark.parametrize("operation", ["set_layer_visibility", "hide"])
+async def test_visibility_mutation_increments_candidate_revision(operation: str) -> None:
     state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE, task_mode="execute",
+        presentation="map", location_mode="none", operation=operation,
+        target_refs=["Traffic"],
+    )
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
