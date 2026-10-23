@@ -52,4 +52,27 @@ describe('SettingsApiKeyFieldComponent', () => {
     const describedBy = input.getAttribute('aria-describedby') ?? '';
     expect(fixture.nativeElement.querySelector(`#${describedBy}`)).not.toBeNull();
   });
+
+  it('emits commit from Save key and Enter only while the draft is savable', () => {
+    const commits: number[] = [];
+    fixture.componentInstance.commit.subscribe(() => commits.push(1));
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(button.disabled).toBeTrue();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    input.dispatchEvent(new Event('change'));
+    expect(commits.length).toBe(0);
+
+    fixture.componentInstance.value = 'sk-draft-value';
+    fixture.detectChanges();
+    expect(button.disabled).toBeFalse();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    button.click();
+    expect(commits.length).toBe(2);
+
+    fixture.componentInstance.validationError = 'Invalid key.';
+    fixture.detectChanges();
+    expect(button.disabled).toBeTrue();
+  });
 });

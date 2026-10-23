@@ -19,6 +19,7 @@ export class SettingsApiKeyFieldComponent {
   @Input() hint = '';
   @Input() credentialHealth: CredentialHealth = null;
   @Input() validationError: string | undefined;
+  @Input() saving = false;
 
   @Output() valueChange = new EventEmitter<string>();
   @Output() commit = new EventEmitter<void>();
@@ -43,6 +44,17 @@ export class SettingsApiKeyFieldComponent {
       ids.push(`${this.inputId}-error`);
     }
     return ids.length ? ids.join(' ') : null;
+  }
+
+  get canSave(): boolean {
+    return !this.saving && !!this.value.trim() && !this.validationError;
+  }
+
+  onEnter(event: Event): void {
+    event.preventDefault();
+    if (this.canSave) {
+      this.commit.emit();
+    }
   }
 
   onValueChange(value: string): void {
