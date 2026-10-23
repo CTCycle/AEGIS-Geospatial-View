@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
@@ -568,6 +569,13 @@ def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:
     """Keep model-facing result data without embedding raw provider payloads."""
 
     observation = ModelObservation.from_tool_result(value, max_chars=4096)
-    return value.model_copy(update={"data": observation.result}, deep=True).model_dump(
+    data = json_object(observation.result)
+    # Target coverage is durable execution state. Model projections (notably
+    # weather tables) may omit query fields, but render/resume must retain the
+    # binding without retaining provider arguments or raw payloads.
+    location_ref = json_object(json_object(value.data).get("query")).get("location_ref")
+    if value.tool_name == "execute_geospatial_capability" and isinstance(location_ref, str):
+        data = {**data, "query": {"location_ref": location_ref}}
+    return value.model_copy(update={"data": data or observation.result}, deep=True).model_dump(
         mode="json"
     )

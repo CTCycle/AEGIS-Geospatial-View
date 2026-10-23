@@ -74,8 +74,9 @@ class RenderCaptureStore:
     # -------------------------------------------------------------------------
     def _expire(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
-        if not self._captures:
-            return
+        for run_id, (bound_at, _view) in list(self._map_views.items()):
+            if now - bound_at > self.ttl_seconds:
+                self._map_views.pop(run_id, None)
         stale = [
             key
             for key, capture in self._captures.items()
@@ -198,6 +199,7 @@ class RenderCaptureStore:
     # -------------------------------------------------------------------------
     def bind_map_view(self, run_id: str, view: dict[str, Any]) -> None:
         """Hold the client-reported map view for the run that will read it."""
+        self._expire()
         self._map_views[run_id] = (time.time(), dict(view))
 
     # -------------------------------------------------------------------------
@@ -223,6 +225,8 @@ class RenderCaptureStore:
     # -------------------------------------------------------------------------
     def clear(self) -> None:
         self._captures.clear()
+        self._map_views.clear()
+        self._attachment_conversations.clear()
 
     # -------------------------------------------------------------------------
     def __len__(self) -> int:

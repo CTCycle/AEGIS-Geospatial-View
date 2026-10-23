@@ -273,6 +273,8 @@ class RunLifecycleService:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
         self._tasks_by_run.clear()
+        if self.render_completion_service is not None:
+            await self.render_completion_service.shutdown()
 
     # -------------------------------------------------------------------------
     async def cancel_run(

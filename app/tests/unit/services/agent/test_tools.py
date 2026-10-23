@@ -348,7 +348,11 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
             tool_name="execute_geospatial_capability",
             status="success",
             summary="ok",
-            data={"query": {"location_ref": location_ref}},
+            data={
+                "kind": "weather_forecast",
+                "hourly_forecast": [{"time": "2026-10-23T12:00", "temperature_2m": 12}],
+                "query": {"location_ref": location_ref},
+            },
             metadata=ToolExecutionMetadata(duration_ms=0),
         )
 
@@ -359,6 +363,8 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
     }
 
     state.tool_results.append(executed("berlin"))
+    # Render preparation restores the compact checkpoint, not raw results.
+    state = AgentRunState.from_checkpoint(state.checkpoint())
     assert uncovered_route_targets(state) == []
     assert "execute_geospatial_capability" not in {
         tool.name for tool in registry.expose(state)
@@ -438,6 +444,23 @@ def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() ->
         state,
     )
     assert "sampling" not in bound.arguments
+    state.evidence_refs = ["weather-at-result", "raw-earthquakes"]
+    state.tool_results.append(ToolResult(
+        call_id="follow-up-weather", tool_name="execute_geospatial_capability",
+        status="success", summary="Weather at the epicentre.",
+        data={"query": {"location_ref": "38.1, 20.5"}},
+        evidence_refs=["weather-at-result"],
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    ))
+    plan = ApplyMapPlanInput.model_validate({
+        "expected_collection_revision": 0,
+        "actions": [{"action": "add_evidence_layer", "capability_id": "weather",
+                     "evidence_ref": "weather-at-result"}],
+    })
+    assert _map_plan_semantic_validator(plan, state) == []
+    raw_plan = plan.model_copy(update={"actions": [plan.actions[0].model_copy(
+        update={"evidence_ref": "raw-earthquakes"})]})
+    assert any("located derived evidence" in error for error in _map_plan_semantic_validator(raw_plan, state))
 
 ###############################################################################
 @pytest.mark.asyncio

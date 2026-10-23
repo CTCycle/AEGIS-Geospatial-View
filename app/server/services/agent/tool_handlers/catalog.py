@@ -14,6 +14,7 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.services.agent.tool_registry import follow_up_investigation_open
+from server.services.agent.completion import follow_up_location_keys
 from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     DescribeCapabilityInput,
@@ -77,6 +78,13 @@ class CatalogToolHandler:
         # source for a new point: the route's operation and time window
         # describe the first source and must not filter it out.
         follow_up = request.query is not None and follow_up_investigation_open(state)
+        if follow_up:
+            follow_up_keys = follow_up_location_keys(state)
+            location = next(
+                (item for key, item in reversed(list(state.location_refs.items()))
+                 if key in follow_up_keys),
+                location,
+            )
         route_filters = route if route is not None and not follow_up else None
         candidates = self.capability_registry.shortlist(
             domains=route_domains,

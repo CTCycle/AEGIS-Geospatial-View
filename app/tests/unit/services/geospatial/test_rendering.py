@@ -364,8 +364,20 @@ def test_ttl_expiry_reclaims_stale_captures() -> None:
 def test_clear_empties_the_store() -> None:
     store = RenderCaptureStore()
     store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=_png_base64(), width=10, height=10)
+    store.bind_map_view("run-1", {"zoom": 5})
     store.clear()
     assert len(store) == 0
+    assert store.map_view_for_run("run-1") is None
+
+###############################################################################
+def test_viewport_expiry_reclaims_unread_runs(monkeypatch) -> None:
+    store = RenderCaptureStore(ttl_seconds=1.0)
+    monkeypatch.setattr(time, "time", lambda: 100.0)
+    store.bind_map_view("old-run", {"zoom": 5})
+    monkeypatch.setattr(time, "time", lambda: 102.0)
+    store.bind_map_view("new-run", {"zoom": 6})
+    assert "old-run" not in store._map_views
+    assert store.map_view_for_run("new-run") == {"zoom": 6}
 
 ###############################################################################
 def test_user_attachment_binds_once_to_a_run_of_its_conversation() -> None:

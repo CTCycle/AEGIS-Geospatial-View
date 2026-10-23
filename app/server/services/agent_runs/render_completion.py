@@ -252,6 +252,17 @@ class RenderCompletionService:
         task.add_done_callback(self._deadline_tasks.discard)
 
     # -------------------------------------------------------------------------
+    async def shutdown(self) -> None:
+        """Stop render watchdogs before the runtime closes its repositories."""
+
+        tasks = set(self._deadline_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._deadline_tasks.clear()
+
+    # -------------------------------------------------------------------------
     @classmethod
     def requires_browser_ack(cls, map_session: MapSession) -> bool:
         """Whether this candidate contains a browser-visible requirement.
