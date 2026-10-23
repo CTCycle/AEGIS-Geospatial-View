@@ -489,6 +489,10 @@ def _bind_execute_request(
         updates["start_time_iso"] = _optional_string(temporal.get("start_time_iso"))
         updates["end_time_iso"] = _optional_string(temporal.get("end_time_iso"))
         days = {"day": 1, "week": 7, "month": 30}.get(str(temporal.get("granularity")))
+        # "Today" means the current calendar day. A synthesized now-minus-24h
+        # start makes weather sampling include yesterday instead of midnight.
+        if temporal_mode == "current" and temporal.get("granularity") == "day":
+            days = None
         if days and not any(temporal.get(key) for key in ("start_time_iso", "end_time_iso", "reference_time_iso")):
             updates["start_time_iso"] = (datetime.now(UTC) - timedelta(days=days)).isoformat()
         reference_time = _optional_string(temporal.get("reference_time_iso"))

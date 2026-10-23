@@ -536,7 +536,12 @@ async def test_discovery_reaches_derived_map_without_location_turn(area: str | N
     assert state.route is not None and state.route.location_mode == "search_area"
     assert (area or "World") in state.location_refs
     assert providers.requests[0].params["sampling"] == "area" if not seismic else "sampling" not in providers.requests[0].params
-    assert providers.requests[0].time is not None
+    if seismic:
+        assert providers.requests[0].time is not None
+    else:
+        # Current-day weather starts at each point's local midnight, rather
+        # than a synthesized rolling-day timestamp.
+        assert providers.requests[0].time is None
     assert state.prepared_map_session is not None
     descriptor = state.prepared_map_session.overlay_collection.instances[-1].descriptor
     assert descriptor["value_encoding"]["max"] == (1 if seismic else 100)

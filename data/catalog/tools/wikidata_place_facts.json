@@ -6,10 +6,12 @@
   "description": "Fetch population, area, elevation and official website for a resolved city, region or country from its Wikidata entity, each with its reference date.",
   "capabilities": [
     "population",
+    "demographics",
     "place-facts"
   ],
   "coverage": "global",
   "metadata": {
+    "semantic_aliases": ["population statistics", "city population", "regional population"],
     "action_tags": [
       "population",
       "inhabitants",

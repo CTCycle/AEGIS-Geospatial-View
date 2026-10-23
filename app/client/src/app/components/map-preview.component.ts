@@ -554,7 +554,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       const initialOpacity = this.initialOverlayOpacity[overlay.id];
       nextOpacity[overlay.id] = preferInitialState && typeof initialOpacity === 'number'
         ? initialOpacity
-        : this.overlayOpacity[overlay.id] ?? initialOpacity ?? fallback;
+        : fallback;
     });
     this.overlayOpacity = recordNumberEqual(this.overlayOpacity, nextOpacity) ? this.overlayOpacity : nextOpacity;
 

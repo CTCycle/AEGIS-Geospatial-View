@@ -371,6 +371,22 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
     }
 
 ###############################################################################
+def test_current_calendar_day_does_not_become_a_rolling_previous_day() -> None:
+    state = _state()
+    state.goal = AgentGoal(
+        goal="Rainfall today", task_mode="execute", presentation="text",
+        operation="inspect", location_mode="none",
+        temporal_scope={"mode": "current", "granularity": "day"},
+    )
+    bound = _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state)
+    assert bound.start_time_iso is None
+    assert bound.temporal_mode == "current"
+    state.goal = state.goal.model_copy(update={
+        "temporal_scope": {"mode": "historical", "granularity": "day"},
+    })
+    assert _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state).start_time_iso is not None
+
+###############################################################################
 def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() -> None:
     registry = _registry()
     state = _state()
