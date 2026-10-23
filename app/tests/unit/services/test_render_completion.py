@@ -102,6 +102,24 @@ def test_unacknowledged_candidate_fails_at_the_render_deadline(
     assert "error" in _event_types(publisher, run_id)
 
 ###############################################################################
+def test_shutdown_cancels_pending_render_deadline(render_context) -> None:
+    repository, publisher, _, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+
+    async def prepare_and_shutdown() -> None:
+        service.prepare(run_id=run_id, run_version=1, response_payload={
+            "map_session": _session().model_dump(mode="json"),
+        })
+        tasks = set(service._deadline_tasks)
+        assert tasks
+        await service.shutdown()
+        assert all(task.cancelled() for task in tasks)
+        assert not service._deadline_tasks
+
+    run_async_in_thread(prepare_and_shutdown())
+    assert repository.get_run(run_id).state == "awaiting_render"
+
+###############################################################################
 def _event_types(publisher: RunEventPublisher, run_id: str) -> list[str]:
     return [
         str(event.type.value) for event in publisher.event_repository.list_events(run_id)

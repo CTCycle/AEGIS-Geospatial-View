@@ -10,7 +10,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
-from server.common.typing import is_json_array
+from server.common.typing import is_json_array, json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.map_plan import AddEvidenceLayerAction, MapPlan
@@ -27,7 +27,7 @@ from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
 )
-from server.services.agent.completion import follow_up_location_keys
+from server.services.agent.completion import follow_up_location_keys, uncovered_route_targets
 from server.services.agent.map_plan_service import MapPlanService
 from server.services.agent.tool_definitions import (
     ApplyMapPlanInput,
@@ -732,10 +732,31 @@ def _map_plan_semantic_validator(
             derived_refs = {ref for result in state.tool_results
                             if result.tool_name == "transform_evidence"
                             and result.status == "success" for ref in result.evidence_refs}
-            if action.evidence_ref not in derived_refs:
-                errors.append("Analysis maps must use located derived evidence from transform_evidence; for valid_empty use fit_location without an evidence layer.")
+            # A second source queried at a resolved result point (e.g. weather
+            # at a ranked epicentre) is already located; it need not be ranked
+            # by the first source's metric before it can share the map.
+            follow_up_refs = {
+                ref
+                for result in state.tool_results
+                if result.tool_name == "execute_geospatial_capability"
+                and result.status in {"success", "partial"}
+                and _is_follow_up_location(
+                    str(json_object(json_object(result.data).get("query")).get("location_ref") or ""),
+                    state,
+                )
+                for ref in result.evidence_refs
+            }
+            if action.evidence_ref not in derived_refs | follow_up_refs:
+                errors.append("Analysis maps must use located derived evidence or data queried at a resolved result point; for valid_empty use fit_location without an evidence layer.")
 
     contract = state.completion_contract
+    if contract is not None and contract.evidence_required and uncovered_route_targets(state):
+        errors.append(
+            "Retrieve data with execute_geospatial_capability for every requested target "
+            "before preparing the map. Targets still missing data: "
+            + ", ".join(uncovered_route_targets(state))
+            + ". Prior conversation evidence alone does not verify current target coverage."
+        )
     if (
         contract is not None
         and contract.evidence_required
