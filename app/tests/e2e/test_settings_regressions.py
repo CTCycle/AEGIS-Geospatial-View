@@ -597,10 +597,11 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
         card.get_by_text("Saved key cannot be decrypted. Re-enter the key.")
     ).to_be_visible()
 
+    expect(card.get_by_role("button", name="Save key")).to_be_disabled()
     key_input.press("Enter")
     assert patch_payloads == []
     key_input.fill("not-a-valid-key")
-    key_input.press("Enter")
+    card.get_by_role("button", name="Save key").click()
     expect(
         card.get_by_text(
             'OpenAI key must start with "sk-" and include a valid key body.',
@@ -623,6 +624,7 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
         and response.url.endswith("/api/chat/settings")
     ) as failed_key_save:
         key_input.fill(fixture_key)
+        card.get_by_role("button", name="Save key").click()
     assert failed_key_save.value.status == 503
     expect(
         page.get_by_text("Synthetic credential update failure.", exact=True)
@@ -670,7 +672,10 @@ def test_model_provider_credential_safe_save_clear_and_reload(
 
     fixture_key = "sk-fixturekey12345"
     key_input.fill(fixture_key)
-    key_input.press("Enter")
+    key_input.blur()
+    page.wait_for_timeout(800)
+    assert patch_payloads == []
+    card.get_by_role("button", name="Save key").click()
     expect(
         page.get_by_text(
             "OpenAI key saved. Provider access has not been validated.", exact=True
@@ -749,6 +754,10 @@ def test_geospatial_credential_safe_save_clear_and_reload(
 
     fixture_key = "synthetic-tomtom-fixture"
     key_input.fill(fixture_key)
+    key_input.blur()
+    page.wait_for_timeout(800)
+    assert patch_payloads == []
+    card.get_by_role("button", name="Save key").click()
     expect(
         page.get_by_text(
             "TomTom key saved. Provider access has not been validated.", exact=True
@@ -809,6 +818,7 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
 
     fixture_key = "synthetic-tomtom-replacement"
     key_input.fill(fixture_key)
+    card.get_by_role("button", name="Save key").click()
     expect(
         page.get_by_text("Synthetic credential update failure.", exact=True)
     ).to_be_visible()

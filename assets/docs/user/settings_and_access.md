@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-10-21
+Last updated: 2026-10-23
 
 ## Geospatial Access
 
@@ -65,10 +65,12 @@ as a fallback.
 
 The eight Settings destinations are Models, Model Providers, Geospatial Access,
 Application, Map & Search, Data Sources, Agent Runtime, and Database. Every
-non-database setting saves automatically. Runtime controls save 400 ms after the
-last edit and flush pending changes when leaving Settings. Provider credentials
-and the Ollama URL use the same short debounce and also save when the field is
-committed. Saving a provider key makes it available to new requests; provider
+non-credential, non-database setting saves automatically. Runtime controls save
+400 ms after the last edit and flush pending changes when leaving Settings; the
+Ollama URL uses the same short debounce. Provider API keys never autosave: typing
+or leaving the field only updates a local draft, and the key is stored only when
+the user clicks **Save key** (or presses Enter in the field). Unsaved key drafts
+are discarded when leaving Settings. Saving a provider key makes it available to new requests; provider
 reachability is reported separately. Clearing a saved credential remains an
 immediate, direct action because saved secret values are never returned to the
 browser. Runtime settings are typed SQLite-backed blocks; each request sends
@@ -128,11 +130,11 @@ AEGIS restarts or the values return to the configuration loaded at startup.
 - Models section: model search, provider and capability filters, sorting, a scrollable model row list, selected-agent
   capability summary, and Ollama model pull actions.
 - Model Providers section: inline masked credentials for OpenAI, Google, DeepSeek,
-  OpenCode Zen, and OpenCode Go that autosave after a short pause, with a direct
+  OpenCode Zen, and OpenCode Go with an explicit Save key button and a direct
   Clear saved key action; Ollama URL autosave, health, and model refresh
   controls. The default local loopback URL is `http://127.0.0.1:11434`.
 - Geospatial Access section: manifest-driven provider setup notes, documentation
-  links, guided setup, and masked credentials that autosave after a short pause,
-  with a direct Clear saved key action.
+  links, guided setup, and masked credentials with an explicit Save key button
+  (also used in the guided setup dialog), and a direct Clear saved key action.
 - Blank credential drafts do not change saved keys. Clearing a credential acts
   immediately. Saved values are never returned to or repopulated in the browser.

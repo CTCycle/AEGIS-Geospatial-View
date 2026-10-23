@@ -1,13 +1,13 @@
 # Components And Patterns
 
-Last updated: 2026-10-19
+Last updated: 2026-10-23
 
 ## Reusable Components
 
 - `map-preview.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
-- `settings-api-key-field.component.*`
+- `settings-api-key-field.component.*` (masked key input with a **Save key** primary button beside it; credentials persist only on that button or Enter, disabled while the draft is empty, invalid, or saving)
 - `selected-model-summary.component.*`
 - `chat-message.component.*`
 - `execution-status.component.*`

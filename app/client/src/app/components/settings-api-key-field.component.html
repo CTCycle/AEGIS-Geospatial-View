@@ -1,18 +1,21 @@
 <label [attr.for]="inputId">
   {{ labelText }}
+  <span class="settings-api-key-field__row">
   <input
     [id]="inputId"
     type="password"
     autocomplete="off"
     [ngModel]="value"
     (ngModelChange)="onValueChange($event)"
-    (change)="commit.emit()"
+    (keydown.enter)="onEnter($event)"
     [name]="inputName"
     [placeholder]="placeholder"
     [class.input-invalid]="!!validationError"
     [attr.aria-invalid]="validationError ? 'true' : null"
     [attr.aria-describedby]="descriptionIds"
   />
+  <button type="button" class="settings-api-key-field__save" [disabled]="!canSave" (click)="commit.emit()">Save key</button>
+  </span>
   @if (hint) {
     <small [id]="inputId + '-hint'" class="settings-api-key-field__hint">{{ hint }}</small>
   }

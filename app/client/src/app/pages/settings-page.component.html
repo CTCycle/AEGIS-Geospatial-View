@@ -177,7 +177,7 @@
           <header class="settings-section__header">
             <div>
               <h2 id="model-provider-heading">Model providers</h2>
-              <p>Enter a key to discover account-visible models. It saves automatically after a short pause. Saved values stay masked; a readable key does not confirm the endpoint is reachable.</p>
+              <p>Enter a key to discover account-visible models. Click Save key to store it. Saved values stay masked; a readable key does not confirm the endpoint is reachable.</p>
             </div>
           </header>
           <div class="settings-provider-list">
@@ -199,6 +199,7 @@
                   [value]="cloudCredentialValue(provider.id)"
                   [credentialHealth]="credentialHealthForTemplate(provider.id)"
                   [validationError]="cloudCredentialValidationError(provider.id)"
+                  [saving]="isSavingCredential"
                   (valueChange)="onCloudCredentialInput(provider.id, $event)"
                   (commit)="commitCloudCredential(provider.id)"
                 ></app-settings-api-key-field>
@@ -291,6 +292,7 @@
                       [placeholder]="provider.placeholder"
                       [value]="geoCredentialDrafts[provider.id] ?? ''"
                       [credentialHealth]="geoProviderCredentialHealth(provider.id)"
+                      [saving]="isSavingGeospatialCredential"
                       (valueChange)="onGeoCredentialInput(provider.id, $event)"
                       (commit)="commitGeoCredential(provider.id)"
                     ></app-settings-api-key-field>
@@ -794,10 +796,13 @@
               [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
               [ngModel]="signupKeyInput"
               (ngModelChange)="onSignupCredentialChanged($event, setup)"
-              (change)="commitSignupCredential(setup)"
+              (keydown.enter)="commitSignupCredential(setup)"
               name="guided_signup_api_key"
             />
           </label>
+          <div class="settings-actions">
+            <button type="button" class="primary-button" [disabled]="isSavingGeospatialCredential || !signupKeyInput.trim()" (click)="commitSignupCredential(setup)">Save key</button>
+          </div>
         }
 
         @if (signupModalMessage) {

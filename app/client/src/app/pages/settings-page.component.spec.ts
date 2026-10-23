@@ -588,29 +588,40 @@ describe('pages/settings-page.component', () => {
     expect(component.modelProviderHealth('opencode-go')).toContain('readable');
   });
 
-  it('autosaves the latest model-provider key after a short debounce', async () => {
+  it('sends a model-provider key only when Save key is clicked', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    const updated = {
+    component.activeSection = 'model-providers';
+    fixture.detectChanges();
+    updateChatSettingsMock.and.resolveTo({
       ...component.settings,
       credentials: { 'opencode-go': { api_key: true } },
       credential_health: { 'opencode-go': { api_key: 'healthy' } },
-    };
-    updateChatSettingsMock.and.resolveTo(updated);
+    });
+    const root = fixture.nativeElement as HTMLElement;
+    const input = root.querySelector('#settings-key-opencode-go_api_key') as HTMLInputElement;
+    const saveButton = input.parentElement!.querySelector('button') as HTMLButtonElement;
+    expect(saveButton.textContent).toContain('Save key');
+    expect(saveButton.disabled).toBeTrue();
 
     jasmine.clock().install();
     try {
-      component.onCloudCredentialInput('opencode-go', 'first-key-value-12345');
-      jasmine.clock().tick(250);
-      component.onCloudCredentialInput('opencode-go', 'latest-key-value-12345');
-      jasmine.clock().tick(399);
-      expect(updateChatSettingsMock).not.toHaveBeenCalled();
-      jasmine.clock().tick(1);
+      input.value = 'latest-key-value-12345';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      input.dispatchEvent(new Event('blur'));
+      jasmine.clock().tick(5000);
     } finally {
       jasmine.clock().uninstall();
     }
+    fixture.detectChanges();
+    expect(updateChatSettingsMock).not.toHaveBeenCalled();
+    expect(component.opencodeGoKey).toBe('latest-key-value-12345');
+    expect(saveButton.disabled).toBeFalse();
+
+    saveButton.click();
     await fixture.whenStable();
     await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
@@ -622,20 +633,15 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('saved');
   });
 
-  it('keeps a credential draft visible and reports when autosave fails', async () => {
+  it('keeps a credential draft visible and reports when saving the key fails', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
     updateChatSettingsMock.and.rejectWith(new Error('write failed'));
 
-    jasmine.clock().install();
-    try {
-      component.onCloudCredentialInput('opencode-go', 'pending-key-value-12345');
-      jasmine.clock().tick(400);
-    } finally {
-      jasmine.clock().uninstall();
-    }
+    component.onCloudCredentialInput('opencode-go', 'pending-key-value-12345');
+    component.commitCloudCredential('opencode-go');
     await fixture.whenStable();
     await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
@@ -770,7 +776,7 @@ describe('pages/settings-page.component', () => {
       fixture.detectChanges();
       const labels = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
         .map((button) => button.textContent?.trim() ?? '');
-      expect(labels.some((label) => /^(save|apply|cancel)\b/i.test(label))).withContext(section).toBeFalse();
+      expect(labels.some((label) => label !== 'Save key' && /^(save|apply|cancel)\b/i.test(label))).withContext(section).toBeFalse();
     }
     fixture.componentInstance.activeSection = 'database';
     fixture.detectChanges();
@@ -1073,7 +1079,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('TomTom');
-    expect(fixture.nativeElement.textContent).not.toContain('Save key');
+    expect(fixture.nativeElement.textContent).toContain('Save key');
     expect(fixture.nativeElement.querySelector('input[type="password"]')).not.toBeNull();
   });
 

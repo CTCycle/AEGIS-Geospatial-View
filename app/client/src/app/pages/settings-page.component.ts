@@ -355,8 +355,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private modelSettingsWriteQueue: Promise<void> = Promise.resolve();
   private modelSettingsWriteRevision = 0;
   private activeCredentialWrites = 0;
-  // Drafts whose save just failed; blur must not resend them (e.g. when Clear is pressed).
-  private readonly failedCredentialDrafts = new Map<string, string>();
   private activeGeospatialCredentialWrites = 0;
   private routerEventsSubscription?: Subscription;
   private readonly onWindowPopState = (): void => {
@@ -831,11 +829,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   closeProviderSignup(): void {
     const setup = this.selectedProviderAccountSetup;
-    const value = this.signupKeyInput.trim();
-    if (setup && value) {
-      this.cancelAutosave(`signup:${setup.credentialStorageKey}`);
-      void this.persistGeospatialCredential(setup.credentialStorageKey, value);
-    } else if (setup) {
+    if (setup) {
       this.cancelAutosave(`signup:${setup.credentialStorageKey}`);
     }
     this.isSignupModalOpen = false;
@@ -860,21 +854,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   commitGeoCredential(provider: string): void {
     this.cancelAutosave(`geo:${provider}`);
     const draft = this.geoCredentialDrafts[provider]?.trim();
-    if (draft && this.failedCredentialDrafts.get(`geo:${provider}`) !== draft) {
+    if (draft) {
       void this.saveGeoProvider(provider);
     }
   }
 
   onGeoCredentialInput(provider: string, value: string): void {
     this.setGeoCredentialDraft(provider, value);
-    if (!value.trim()) {
-      this.cancelAutosave(`geo:${provider}`);
-      return;
-    }
-    this.scheduleAutosave(`geo:${provider}`, (revision) => this.saveGeoProvider(provider, revision));
   }
 
-  async saveGeoProvider(provider: string, revision?: number): Promise<void> {
+  async saveGeoProvider(provider: string): Promise<void> {
     const setup = this.geoProviderSetup(provider);
     if (!setup || !setup.requiresCredentials) {
       return;
@@ -884,7 +873,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     const currentRevision = this.autosaveRevisions.get(`geo:${provider}`) ?? 0;
-    if (revision !== undefined && revision !== currentRevision) return;
     await this.persistGeospatialCredential(provider, draft, `geo:${provider}`, currentRevision);
   }
 
@@ -908,12 +896,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.signupKeyInput = value;
     this.signupModalError = '';
     this.signupModalMessage = '';
-    const key = `signup:${setup.credentialStorageKey}`;
-    if (!value.trim()) {
-      this.cancelAutosave(key);
-      return;
-    }
-    this.scheduleAutosave(key, (revision) => this.saveSignupCredential(setup, revision));
   }
 
   commitSignupCredential(setup: GeospatialProviderAccountSetup): void {
@@ -934,7 +916,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return labels[setup.automation.support] ?? setup.automation.support;
   }
 
-  private async saveSignupCredential(setup: GeospatialProviderAccountSetup, revision?: number): Promise<void> {
+  private async saveSignupCredential(setup: GeospatialProviderAccountSetup): Promise<void> {
     if (setup.automation.support === 'unsupported') {
       this.signupModalError = 'This provider is documentation-only until automation support is verified.';
       return;
@@ -945,7 +927,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const key = `signup:${setup.credentialStorageKey}`;
     const currentRevision = this.autosaveRevisions.get(key) ?? 0;
-    if (revision !== undefined && revision !== currentRevision) return;
     await this.persistGeospatialCredential(setup.credentialStorageKey, value, key, currentRevision);
   }
 
@@ -992,12 +973,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onCloudCredentialInput(provider: CloudCredentialProvider, value: string): void {
     this.setCloudCredentialValue(provider, value);
-    const key = `cloud:${provider}`;
-    if (!value.trim()) {
-      this.cancelAutosave(key);
-      return;
-    }
-    this.scheduleAutosave(key, (revision) => this.saveCloudProvider(provider, revision));
   }
 
   cloudCredentialValidationError(provider: CloudCredentialProvider): string | undefined {
@@ -1020,12 +995,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   commitCloudCredential(provider: CloudCredentialProvider): void {
     this.cancelAutosave(`cloud:${provider}`);
     const draft = this.cloudCredentialValue(provider).trim();
-    if (draft && this.failedCredentialDrafts.get(`cloud:${provider}`) !== draft) {
+    if (draft) {
       void this.saveCloudProvider(provider);
     }
   }
 
-  async saveCloudProvider(provider: CloudCredentialProvider, revision?: number): Promise<void> {
+  async saveCloudProvider(provider: CloudCredentialProvider): Promise<void> {
     if (!this.settings) {
       return;
     }
@@ -1035,7 +1010,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const key = `cloud:${provider}`;
     const currentRevision = this.autosaveRevisions.get(key) ?? 0;
-    if (revision !== undefined && revision !== currentRevision) return;
     const validation = this.validateCloudCredential(provider, value);
     if (validation) {
       this.keyValidationErrors[provider] = validation;
@@ -1051,7 +1025,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       if (this.isDestroyed) return;
       this.settings = updated;
-      this.failedCredentialDrafts.delete(key);
       if (revisionAtSend === (this.autosaveRevisions.get(key) ?? 0)
         && this.cloudCredentialValue(provider).trim() === value) {
         this.setCloudCredentialValue(provider, '');
@@ -1065,7 +1038,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) return;
-      this.failedCredentialDrafts.set(key, value);
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not save the ${providerDisplayLabel(provider)} key right now.`,
@@ -1200,7 +1172,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       if (this.isDestroyed) return true;
       this.settings = updated;
-      if (draftKey) this.failedCredentialDrafts.delete(draftKey);
       const isCurrentDraft = !draftKey
         || (revisionAtSend === (this.autosaveRevisions.get(draftKey) ?? 0)
           && (draftKey.startsWith('signup:')
@@ -1223,7 +1194,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return true;
     } catch (error: unknown) {
       if (this.isDestroyed) return false;
-      if (draftKey) this.failedCredentialDrafts.set(draftKey, apiKey);
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
         `Could not update ${setup?.name ?? provider} access.`,
