@@ -375,6 +375,7 @@ class RealtimeConnection:
                 client_request_id=payload.client_request_id,
                 timezone=payload.timezone,
                 attachment_id=payload.attachment_id,
+                map_view=payload.map_view,
             ),
         )
         await self._send(

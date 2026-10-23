@@ -167,11 +167,7 @@ class PolicyEngine:
     @staticmethod
     def _route_allows_tool(tool: RegisteredTool, route: Any) -> bool:
         if tool.definition.name == "execute_geospatial_capability":
-            route_domains = {route.primary_domain, *route.secondary_domains}
-            if route.primary_domain is CapabilityDomain.MAP_STATE or not (
-                route_domains
-                & {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
-            ):
+            if not route_allows_capability_execution(route):
                 return False
         if not tool.domains or CapabilityDomain.MIXED in tool.domains:
             return True
@@ -203,4 +199,19 @@ class PolicyEngine:
         return None
 
 
-__all__ = ["PolicyEngine"]
+###############################################################################
+def route_allows_capability_execution(route: Any) -> bool:
+    """Whether a route may execute provider capabilities at all.
+
+    Shared by tool exposure and authorization so a tool is never offered to
+    the model only to be rejected when called.
+    """
+
+    route_domains = {route.primary_domain, *route.secondary_domains}
+    return route.primary_domain is not CapabilityDomain.MAP_STATE and bool(
+        route_domains
+        & {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
+    )
+
+
+__all__ = ["PolicyEngine", "route_allows_capability_execution"]

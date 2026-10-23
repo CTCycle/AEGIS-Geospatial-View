@@ -123,6 +123,10 @@ class RunLifecycleService:
             self.attachment_store.bind_attachment(
                 payload.attachment_id, conversation_id, run.run_id
             )
+        if created and payload.map_view is not None and self.attachment_store is not None:
+            self.attachment_store.bind_map_view(
+                run.run_id, payload.map_view.model_dump(mode="json")
+            )
         if created and schedule:
             self._schedule_run(run.run_id)
         return AgentRunCreateResult(

@@ -27,6 +27,7 @@ from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
 )
+from server.services.agent.completion import follow_up_location_keys
 from server.services.agent.map_plan_service import MapPlanService
 from server.services.agent.tool_definitions import (
     ApplyMapPlanInput,
@@ -35,6 +36,7 @@ from server.services.agent.tool_definitions import (
     ExecuteCapabilityInput,
     ExecuteCapabilityToolInput,
     InspectEvidenceInput,
+    MeasureGeospatialInput,
     ProviderLayerDiscoveryInput,
     ResolveLocationInput,
     RouteRequestInput,
@@ -43,7 +45,11 @@ from server.services.agent.tool_definitions import (
 )
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 from server.services.agent.tool_handlers.evidence import EvidenceToolHandler, PlaceLabeler
-from server.services.agent.tool_handlers.location import LocationToolHandler
+from server.services.agent.tool_handlers.location import (
+    CURRENT_VIEW_SOURCE,
+    LocationToolHandler,
+)
+from server.services.agent.tool_handlers.measure import MeasureToolHandler
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_handlers.history import HistoryToolHandler
 from server.services.agent.tool_registry import ToolRegistry
@@ -330,6 +336,21 @@ def register_agent_tools(
             semantic_validator=_evidence_semantic_validator,
         ),
         _registration(
+            name="measure_geospatial",
+            description=(
+                "Measure resolved locations deterministically: geodesic "
+                "distance and bearing between them, their extent and area, or "
+                "the country containing each. Use it instead of estimating."
+            ),
+            input_model=MeasureGeospatialInput,
+            handler=MeasureToolHandler().measure,
+            domains=_MIXED,
+            phases=_MODEL_PHASE,
+            visibility="model",
+            prerequisites=frozenset({"route", "location", "measurement_relevant"}),
+            idempotent=True,
+        ),
+        _registration(
             name="apply_map_plan",
             description=(
                 "Prepare a typed map candidate from resolved location and valid "
@@ -454,7 +475,11 @@ def _bind_execute_request(
         "filters": {**request.filters, **goal.filters},
         "bbox": None,
     }
-    if goal.location_mode == "search_area":
+    # A derived follow-up point is queried as that point, not as the area.
+    follow_up = _is_follow_up_location(
+        normalize_target_key(str(request.location_ref or "")), state
+    )
+    if goal.location_mode == "search_area" and not follow_up:
         updates["arguments"]["sampling"] = "area"
     temporal = goal.temporal_scope
     if temporal:
@@ -478,7 +503,7 @@ def _bind_execute_request(
 
     bound = request.model_copy(update=updates)
     location = _location_for_request(bound, state)
-    spatial = goal.spatial_scope[0] if goal.spatial_scope else {}
+    spatial = goal.spatial_scope[0] if goal.spatial_scope and not follow_up else {}
     distance_m = _positive_float(spatial.get("distance_m"))
     if distance_m is not None:
         bound = bound.model_copy(update={"radius_m": distance_m})
@@ -586,12 +611,11 @@ def _lower_execution_extent(
             provenance_scope_kind=semantic_kind,
             target_ref=target_ref,
         )
-    if location.bbox and semantic_kind in {
-        "administrative_geometry",
-        "feature_geometry",
-        "bbox",
-        "viewport",
-    }:
+    if location.bbox and (
+        semantic_kind in {"administrative_geometry", "feature_geometry", "bbox", "viewport"}
+        # The visible map is an area by definition, whatever scope was routed.
+        or location.source == CURRENT_VIEW_SOURCE
+    ):
         return ExecutionExtent(
             kind="bbox" if semantic_kind not in {"viewport"} else "viewport",
             latitude=location.latitude,
@@ -618,7 +642,7 @@ def _names_goal_target(
     passes that location's reference key, or the other way round.
     """
 
-    if requested in goal_targets:
+    if requested in goal_targets or _is_follow_up_location(requested, state):
         return True
     return any(
         location_ref_matches(requested, str(key), location.label)
@@ -627,6 +651,17 @@ def _names_goal_target(
             & goal_targets
         )
         for key, location in state.location_refs.items()
+    )
+
+###############################################################################
+def _is_follow_up_location(requested: str, state: AgentRunState) -> bool:
+    """Whether a reference names a point the run derived inside its area."""
+
+    if not requested:
+        return False
+    return any(
+        location_ref_matches(requested, key, state.location_refs[key].label)
+        for key in follow_up_location_keys(state)
     )
 
 ###############################################################################

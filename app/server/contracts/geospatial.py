@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from server.common.time import utc_now
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -502,6 +502,40 @@ class PoiFeature(BaseModel):
     website: str | None = None
     phone: str | None = None
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+###############################################################################
+class ClientMapOverlayState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instance_id: str = Field(min_length=1, max_length=200)
+    visible: bool
+    opacity: float = Field(ge=0.0, le=1.0)
+
+###############################################################################
+class ClientMapView(BaseModel):
+    """The map view the user sees when sending a request (client-reported)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # [west, south, east, north] of the visible viewport.
+    bounds: list[float] = Field(min_length=4, max_length=4)
+    center: list[float] = Field(min_length=2, max_length=2)
+    zoom: float = Field(ge=0.0, le=24.0)
+    basemap_id: str | None = Field(default=None, max_length=120)
+    overlays: list[ClientMapOverlayState] = Field(
+        default_factory=lambda: list[ClientMapOverlayState](), max_length=32
+    )
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def validate_extent(self) -> "ClientMapView":
+        west, south, east, north = self.bounds
+        longitude, latitude = self.center
+        if not (-180.0 <= west < east <= 180.0 and -90.0 <= south < north <= 90.0):
+            raise ValueError("bounds must be an ordered [west, south, east, north] box.")
+        if not (-180.0 <= longitude <= 180.0 and -90.0 <= latitude <= 90.0):
+            raise ValueError("center must be a valid [longitude, latitude] point.")
+        return self
 
 ###############################################################################
 class ViewportPolicy(BaseModel):

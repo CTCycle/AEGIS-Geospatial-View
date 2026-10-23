@@ -3,6 +3,8 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.openmeteo import OpenMeteoService
 from server.services.geospatial.overpass import OverpassService
 import math
+from typing import Any
+
 import pytest
 import httpx
 from server.services.geospatial.api_service import GeospatialApiService, GeospatialInvalidRequestError, GeospatialProviderResponseError, normalize_geojson_feature_collection
@@ -145,42 +147,54 @@ def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
 
 
 ###############################################################################
-def test_overpass_direct_service_marks_limited_results_as_partial() -> None:
+def test_overpass_returns_the_nearest_results_and_flags_only_server_cuts() -> None:
     service = OverpassService(
         base_url="https://overpass.example/api/interpreter",
         default_radius_m=1000,
         default_limit=2,
     )
-    service._query_overpass = lambda **kwargs: {  # type: ignore[method-assign]
-        "elements": [
-            {
-                "type": "node",
-                "id": index,
-                "lat": 41.9 + index / 10000,
-                "lon": 12.5 + index / 10000,
-                "tags": {"amenity": "hospital", "name": f"Hospital {index}"},
-            }
-            for index in range(3)
-        ]
-    }
+    requested_limits: list[int] = []
 
+    def query(*, limit: int, element_count: int = 3, **_kwargs: Any) -> dict[str, Any]:
+        requested_limits.append(limit)
+        # Overpass order is unrelated to distance: farthest first here.
+        return {
+            "elements": [
+                {
+                    "type": "node",
+                    "id": index,
+                    "lat": 41.9 + index / 10000,
+                    "lon": 12.5 + index / 10000,
+                    "tags": {"amenity": "hospital", "name": f"Hospital {index}"},
+                }
+                for index in reversed(range(element_count))
+            ]
+        }
+
+    service._query_overpass = query  # type: ignore[method-assign]
     result = run_async_in_thread(
         service.get_nearby_poi(
-            latitude=41.9,
-            longitude=12.5,
-            categories=["hospitals"],
-            limit=2,
+            latitude=41.9, longitude=12.5, categories=["hospitals"], limit=2
         )
     )
 
-    assert result["source_url"] == "https://overpass.example/api/interpreter"
-    assert result["result_status"] == "partial"
-    assert result["result_type"] == "features"
+    assert requested_limits == [8]
+    assert [item["name"] for item in result["items"]] == ["Hospital 0", "Hospital 1"]
+    assert result["result_status"] == "ok"
     assert result["total_results"] == 3
     assert result["returned_results"] == 2
-    assert result["truncated"] is True
-    assert result["partial"] is True
+    assert result["truncated"] is False
     assert result["coverage"]["radius_m"] == 1000
+
+    service._query_overpass = lambda **kwargs: query(**kwargs, element_count=8)  # type: ignore[method-assign]
+    capped = run_async_in_thread(
+        service.get_nearby_poi(
+            latitude=41.9, longitude=12.5, categories=["hospitals"], limit=2
+        )
+    )
+
+    assert capped["result_status"] == "partial"
+    assert capped["truncated"] is True
 
 # --- test_geospatial_api_validation.py ---
 

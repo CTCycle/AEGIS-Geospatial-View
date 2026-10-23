@@ -172,6 +172,20 @@ class GridAggregateOperation(StrictToolInput):
     order_by: Literal["count", "sum", "mean", "max"] = "count"
 
 
+###############################################################################
+class DistanceFromOperation(StrictToolInput):
+    """Add each located record's geodesic distance_km from a resolved location."""
+
+    op: Literal["distance_from"]
+    location_ref: str = Field(min_length=1, max_length=200)
+
+###############################################################################
+class CountryTagOperation(StrictToolInput):
+    """Add each located record's ISO alpha-2 country code as country_iso2."""
+
+    op: Literal["country_tag"]
+
+
 EvidenceOperation = Annotated[
     AttributeFilterOperation
     | TemporalFilterOperation
@@ -180,7 +194,9 @@ EvidenceOperation = Annotated[
     | LimitOperation
     | FieldProjectionOperation
     | AggregateOperation
-    | GridAggregateOperation,
+    | GridAggregateOperation
+    | DistanceFromOperation
+    | CountryTagOperation,
     Field(discriminator="op"),
 ]
 
@@ -188,6 +204,24 @@ EvidenceOperation = Annotated[
 class TransformEvidenceInput(StrictToolInput):
     evidence_refs: list[str] = Field(min_length=1, max_length=8)
     operations: list[EvidenceOperation] = Field(min_length=1, max_length=8)
+
+###############################################################################
+class MeasureGeospatialInput(StrictToolInput):
+    """Deterministic measurements over resolved location references."""
+
+    operation: Literal["distance", "extent", "country_of"] = Field(
+        description=(
+            "distance: pairwise WGS84 geodesic distance and initial bearing "
+            "(needs two or more locations); extent: bounding box, centre, "
+            "width, height and area; country_of: ISO country containing "
+            "each location's point."
+        )
+    )
+    location_refs: list[str] = Field(
+        min_length=1,
+        max_length=10,
+        description="Exact resolved location references (target_id values).",
+    )
 
 ###############################################################################
 class SearchConversationHistoryInput(StrictToolInput):
@@ -222,6 +256,7 @@ __all__ = [
     "EvidenceOperation",
     "HistorySearchInput",
     "InspectEvidenceInput",
+    "MeasureGeospatialInput",
     "ProviderLayerDiscoveryInput",
     "ResolveLocationInput",
     "RouteRequestInput",

@@ -1,0 +1,147 @@
+{
+  "id": "wikidata_place_facts",
+  "name": "Wikidata Place Facts",
+  "provider": "wikidata",
+  "type": "direct-tool",
+  "description": "Fetch population, area, elevation and official website for a resolved city, region or country from its Wikidata entity, each with its reference date.",
+  "capabilities": [
+    "population",
+    "place-facts"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "action_tags": [
+      "population",
+      "inhabitants",
+      "area",
+      "elevation",
+      "place facts"
+    ],
+    "task_tags": [
+      "direct_query",
+      "demographics"
+    ],
+    "search_examples": [
+      "population of Paris",
+      "compare the population of Paris and Berlin",
+      "how large is Bavaria"
+    ],
+    "handler_name": "place_facts",
+    "requires_location": true,
+    "supports_direct_text": true,
+    "supports_map": false,
+    "requires_key": false,
+    "official_docs_url": "https://www.wikidata.org/wiki/Wikidata:Data_access",
+    "source_protocol": "direct-tool",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Send a descriptive User-Agent and keep request rates low.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-10-23",
+    "keywords": [
+      "wikidata",
+      "direct-tool",
+      "Wikidata Place Facts",
+      "population",
+      "area"
+    ],
+    "location_dependency": "Needs a resolved place linked to a Wikidata entity by the geocoder.",
+    "constraints": "Values are community-maintained; report each value with its reference date."
+  },
+  "version": 1,
+  "last_modified": "2026-10-23T00:00:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.wikidata.org/wiki/Wikidata:Data_access"
+  ],
+  "license": {
+    "name": "CC0 1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "domains": ["data_retrieval"],
+    "plannerHints": [
+      "population",
+      "inhabitants",
+      "people living",
+      "area",
+      "size",
+      "elevation",
+      "demographics",
+      "place facts",
+      "wikidata"
+    ],
+    "requiredUserAction": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context",
+      "statistics below city level"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-10-23",
+    "knownLimitations": [
+      "Only places the geocoder links to Wikidata have facts.",
+      "Population dates differ between places; compare them with their dates."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "inspect",
+      "compare",
+      "retrieve",
+      "query",
+      "lookup"
+    ],
+    "supported_scope_kinds": [
+      "point",
+      "bbox",
+      "administrative_geometry"
+    ],
+    "temporal_modes": [
+      "current"
+    ],
+    "temporal_windows": [],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Point",
+    "render_support": "metadata_only",
+    "coverage": "global",
+    "limitations": [
+      "Community-maintained values with per-value reference dates."
+    ],
+    "fallback_ids": []
+  }
+}

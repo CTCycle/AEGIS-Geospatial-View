@@ -783,6 +783,7 @@ class LocationResolver:
                 ),
                 bbox=bbox,
                 bbox_source=str(geocoded.get("bbox_source") or "") or None,
+                wikidata_id=str(geocoded.get("wikidata_id") or "") or None,
                 provenance=self._provenance_from_geocoded(geocoded),
                 hierarchy=hierarchy,
             )

@@ -16,7 +16,7 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.tool_result import ToolExecutionError
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import ClientMapView, MapSession
 from server.contracts.runs import AgentRunState
 
 ChatRole = Literal["user", "assistant", "system", "tool"]
@@ -41,6 +41,7 @@ class ChatTurnRequest(BaseModel):
     request_id: str | None = None
     conversation_id: str
     attachment_id: str | None = Field(default=None, max_length=64)
+    map_view: ClientMapView | None = None
 
 ###############################################################################
 class ChatAttachmentCreateRequest(BaseModel):

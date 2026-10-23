@@ -68,6 +68,7 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
             client_request_id=payload.request_id,
             timezone=payload.timezone,
             attachment_id=payload.attachment_id,
+            map_view=payload.map_view,
         )
     except ValidationError as exc:
         raise HTTPException(

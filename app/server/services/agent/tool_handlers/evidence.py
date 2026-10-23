@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from server.common.identifiers import location_ref_matches
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
@@ -21,6 +22,8 @@ from server.services.agent.tool_definitions import (
     InspectEvidenceInput,
     TransformEvidenceInput,
 )
+from server.services.geospatial.land_mask import country_at
+from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
 # Coordinate-only result points that receive a reverse-geocoded nearest place
 # name, in result order. Nominatim allows one request per second.
@@ -152,11 +155,35 @@ class EvidenceToolHandler:
             parents.append({"provider": summary.provenance.get("provider_id") or summary.provenance.get("provider"),
                             **summary.provenance,
                             **{key: summary.summary[key] for key in ("coverage", "units", "observation_time", "value_kind") if key in summary.summary}})
-            records.extend(_records_from_payload(_decode_json(raw)))
-        transformed, error = _apply_operations(
-            records,
-            [operation.model_dump(mode="python") for operation in request.operations],
-        )
+            parent_records = _records_from_payload(_decode_json(raw))
+            if len(refs) > 1:
+                # Keep each record's origin so combined sets stay comparable.
+                for record in parent_records:
+                    _properties(record)["source_ref"] = ref
+            records.extend(parent_records)
+        operations = [operation.model_dump(mode="python") for operation in request.operations]
+        for operation in operations:
+            if operation.get("op") != "distance_from":
+                continue
+            reference = str(operation.get("location_ref") or "")
+            location = next(
+                (
+                    item
+                    for key, item in state.location_refs.items()
+                    if location_ref_matches(reference, str(key), item.label)
+                ),
+                None,
+            )
+            if location is None:
+                return _failure(
+                    tool_name="transform_evidence",
+                    code="invalid_transform",
+                    message="distance_from needs the exact target_id of a resolved location.",
+                    recovery="correct_arguments",
+                    started=started,
+                )
+            operation["center"] = [location.longitude, location.latitude]
+        transformed, error = _apply_operations(records, operations)
         if error is not None:
             return _failure(
                 tool_name="transform_evidence",
@@ -260,7 +287,8 @@ def _inspect_payload(
     records = _records_from_payload(payload)
     if fields:
         records = [
-            {key: item.get(key) for key in fields if key in item} for item in records
+            {key: properties[key] for key in fields if key in properties}
+            for properties in (_properties(item) for item in records)
         ]
     if view == "metadata":
         return {
@@ -317,6 +345,8 @@ def _apply_operations(
         "field_projection",
         "aggregate",
         "grid_aggregate",
+        "distance_from",
+        "country_tag",
     }
     result = list(records)
     for operation in operations:
@@ -369,10 +399,7 @@ def _apply_operations(
             fields = operation.get("fields")
             if not is_json_array(fields) or not fields:
                 return result, "field_projection requires a non-empty fields list."
-            result = [
-                {str(key): item.get(str(key)) for key in fields if str(key) in item}
-                for item in result
-            ]
+            result = [_project(item, [str(key) for key in fields]) for item in result]
         elif op == "aggregate":
             metric = str(operation.get("metric") or "sum")
             field = str(operation.get("field") or "")
@@ -395,7 +422,30 @@ def _apply_operations(
             result, error = _spatial_filter(result, operation)
             if error is not None:
                 return result, error
+        elif op == "distance_from":
+            longitude, latitude = operation["center"]
+            for item in result:
+                point = _record_point(item)
+                if point is not None:
+                    _properties(item)["distance_km"] = round(
+                        geodesic_distance_m(latitude, longitude, point[1], point[0]) / 1000.0, 3
+                    )
+        elif op == "country_tag":
+            for item in result:
+                point = _record_point(item)
+                if point is not None:
+                    _properties(item)["country_iso2"] = country_at(point[0], point[1])
     return result, None
+
+###############################################################################
+def _project(item: dict[str, Any], fields: list[str]) -> dict[str, Any]:
+    """Keep the requested attributes and the record's location."""
+
+    properties = _properties(item)
+    projected = {key: properties[key] for key in fields if key in properties}
+    if properties is not item:
+        return {**{key: item[key] for key in ("type", "geometry") if key in item}, "properties": projected}
+    return {**{key: item[key] for key in ("geometry", "latitude", "longitude") if key in item}, **projected}
 
 ###############################################################################
 def _matches(actual: Any, operator: str, expected: Any) -> bool:
@@ -557,10 +607,15 @@ def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) ->
     for (x, y), items in groups.items():
         west, south = x * size - 180, y * size - 90
         east, north = min(180.0, west + size), min(90.0, south + size)
-        values = [value for item in items if (value := _numeric(_properties(item).get(field))) is not None] if field else []
-        representative = max(items, key=lambda item: _numeric(_properties(item).get(field)) or 0) if field else items[0]
+        valued = [(value, item) for item in items if (value := _numeric(_properties(item).get(field))) is not None] if field else []
+        values = [value for value, _item in valued]
+        # The representative is the record with the largest value; negative
+        # values (sub-zero temperatures) must not lose to missing ones.
+        representative = max(valued, key=lambda pair: pair[0])[1] if valued else items[0]
         cells.append({"longitude": (west + east) / 2, "latitude": (south + north) / 2,
                       "cell_bbox": [west, south, east, north], "count": len(items),
                       "sum": sum(values), "mean": sum(values) / len(values) if values else None,
                       "max": max(values) if values else None, "representative": _compact_record(representative)})
-    return sorted(cells, key=lambda item: item.get(str(operation.get("order_by") or "count")) or 0, reverse=True)
+    order_by = str(operation.get("order_by") or "count")
+    # Cells without the ordering value sort last instead of as zero.
+    return sorted(cells, key=lambda item: (item.get(order_by) is not None, item.get(order_by) or 0), reverse=True)

@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING
 from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
+from server.services.agent.completion import uncovered_route_targets
+from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 
 if TYPE_CHECKING:
-    from server.domain.agent.capability_route import AgentRunState
+    from server.domain.agent.capability_route import AgentRunState, CapabilityRoute
 
 ###############################################################################
 class ToolRegistry:
@@ -136,6 +138,7 @@ class ToolRegistry:
                 prerequisite == "capability_shortlist_missing"
                 and state.capability_ids
                 and not _catalog_discovery_can_continue(state)
+                and not follow_up_investigation_open(state)
             ):
                 return False
             if prerequisite == "location" and not has_location:
@@ -144,7 +147,11 @@ class ToolRegistry:
                 state.route is None or state.route.location_mode == "none"
             ):
                 return False
-            if prerequisite == "location_missing" and has_location:
+            if (
+                prerequisite == "location_missing"
+                and has_location
+                and not follow_up_investigation_open(state)
+            ):
                 return False
             if prerequisite == "location_if_required" and (
                 state.route is not None
@@ -163,6 +170,8 @@ class ToolRegistry:
             if prerequisite == "data_obligation_unmet" and not _data_obligation_unmet(state):
                 return False
             if prerequisite == "active_map" and state.active_map_session is None:
+                return False
+            if prerequisite == "measurement_relevant" and not _measurement_relevant(state):
                 return False
             if prerequisite == "provider_discovery_route":
                 if state.route is None:
@@ -254,15 +263,39 @@ def route_target_location_available(state: "AgentRunState") -> bool:
 
 ###############################################################################
 def _is_active_map_update(state: "AgentRunState") -> bool:
-    route = state.route
-    return bool(
-        route is not None
-        and route.task_mode == "execute"
-        and route.primary_domain is CapabilityDomain.MAP_STATE
-        and state.active_map_session is not None
-        and str(route.operation or "").strip().casefold()
-        in _ACTIVE_MAP_UPDATE_OPERATIONS
-        and route.spatial_scope is None
+    return state.route is not None and is_active_map_update(state.route, state)
+
+###############################################################################
+def is_active_map_update(route: "CapabilityRoute", state: "AgentRunState") -> bool:
+    """Return whether the route mutates the already-rendered map session.
+
+    The route operation is free text, so any verb counts when every target
+    names a layer already on the map: those targets are layers, not places.
+    """
+
+    session = state.active_map_session
+    if (
+        route.task_mode != "execute"
+        or route.primary_domain is not CapabilityDomain.MAP_STATE
+        or session is None
+        or route.spatial_scope is not None
+    ):
+        return False
+    if str(route.operation or "").strip().casefold() in _ACTIVE_MAP_UPDATE_OPERATIONS:
+        return True
+    layer_names = [
+        name.casefold()
+        for instance in session.overlay_collection.instances
+        for name in (instance.instance_id, instance.capability_id, instance.label)
+        if name
+    ]
+    return all(
+        any(
+            target.casefold() in name or name in target.casefold()
+            for name in layer_names
+        )
+        for target in (str(ref).strip() for ref in route.target_refs)
+        if target
     )
 
 ###############################################################################
@@ -320,9 +353,17 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
     route = state.route
     route_domains = _route_domains(state)
     if registered.definition.name == "resolve_geospatial_location":
-        return route.location_mode != "none" and not route_target_location_available(state)
+        return route.location_mode != "none" and (
+            not route_target_location_available(state)
+            or follow_up_investigation_open(state)
+        )
     if registered.definition.name == "apply_map_plan":
         return route.presentation in {"map", "both"}
+    if (
+        registered.definition.name == "execute_geospatial_capability"
+        and not route_allows_capability_execution(route)
+    ):
+        return False
     if route.primary_domain is CapabilityDomain.MAP_STATE:
         return registered.definition.name == "apply_map_plan"
     if (
@@ -351,6 +392,18 @@ def _evidence_analysis_required(state: "AgentRunState") -> bool:
             or route.operation == "inspect_evidence")
 
 ###############################################################################
+def _measurement_relevant(state: "AgentRunState") -> bool:
+    """Offer measurement for spatial analysis or when places can be compared."""
+
+    route = state.route
+    if route is None:
+        return False
+    return (
+        CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
+        or len(state.location_refs) >= 2
+    )
+
+###############################################################################
 def _history_recall_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
@@ -375,6 +428,8 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
     contract = state.completion_contract
     if contract is not None and contract.data_requirement != "provider_data":
         return True
+    if uncovered_route_targets(state):
+        return True
     successful_data_tools = {
         "execute_geospatial_capability",
         "inspect_evidence",
@@ -395,6 +450,33 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
 
 __all__ = ["ToolRegistry"]
 
+
+###############################################################################
+def follow_up_investigation_open(state: "AgentRunState") -> bool:
+    """Whether an analysis found its result places but queries remain unserved.
+
+    "The strongest earthquake in Europe and the weather there" first derives
+    the epicentre, then needs another source at that point: resolving the
+    point and discovering that source must be possible again.
+    """
+
+    route = state.route
+    if (
+        route is None
+        or route.task_mode != "execute"
+        or route.analysis is None
+        or not route_allows_capability_execution(route)
+        or not analysis_complete(state)
+    ):
+        return False
+    executed = {
+        result.metadata.capability_id
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status in {"success", "partial", "valid_empty"}
+        and result.metadata.capability_id
+    }
+    return len(executed) < min(3, len(route.capability_queries))
 
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:

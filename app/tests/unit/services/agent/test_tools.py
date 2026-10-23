@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -19,10 +20,13 @@ from server.contracts.geospatial import (
     GeospatialProviderLayerDescriptor,
     GeospatialProviderLayersResponse,
 )
+from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_execution import ToolExecutionContext
+from server.services.agent.completion import uncovered_route_targets
 from server.services.agent.native_tools import register_agent_tools
 from server.services.agent.native_tools import _execute_capability_handler
 from server.services.agent.native_tools import _bind_execute_request
+from server.services.agent.native_tools import _lower_execution_extent
 from server.services.agent.native_tools import _location_for_request
 from server.services.agent.native_tools import _capability_semantic_validator
 from server.services.agent.native_tools import _map_plan_semantic_validator
@@ -226,7 +230,9 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
         target_refs=["Salta, Argentina"],
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
-    state.active_map_session = object()  # type: ignore[assignment]
+    state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
+        overlay_collection=SimpleNamespace(instances=[])
+    )
     state.location_refs = {
         "vermont, united states": ResolvedLocation(
             label="Vermont, United States", latitude=44.0, longitude=-72.7
@@ -286,6 +292,176 @@ def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None
     assert "transform_evidence" not in exposed
     assert "inspect_evidence" not in exposed
     assert "discover_geospatial_capabilities" not in exposed
+
+###############################################################################
+def test_free_text_operation_on_a_named_map_layer_uses_the_current_map() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        operation="hide",
+        target_refs=["EMSC Earthquakes"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
+        overlay_collection=SimpleNamespace(
+            instances=[
+                SimpleNamespace(
+                    instance_id="evidence:ev-1:emsc_earthquakes",
+                    capability_id="emsc_earthquakes",
+                    label="EMSC Earthquakes",
+                )
+            ]
+        )
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert "apply_map_plan" in exposed
+    assert "resolve_geospatial_location" not in exposed
+
+###############################################################################
+def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="target",
+        capability_queries=["current temperature"],
+        target_refs=["Paris", "Berlin"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs = {
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+    }
+
+    def executed(location_ref: str) -> ToolResult:
+        return ToolResult(
+            call_id=f"execute-{location_ref}",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="ok",
+            data={"query": {"location_ref": location_ref}},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+
+    state.tool_results.append(executed("paris"))
+    assert uncovered_route_targets(state) == ["Berlin"]
+    assert "execute_geospatial_capability" in {
+        tool.name for tool in registry.expose(state)
+    }
+
+    state.tool_results.append(executed("berlin"))
+    assert uncovered_route_targets(state) == []
+    assert "execute_geospatial_capability" not in {
+        tool.name for tool in registry.expose(state)
+    }
+
+###############################################################################
+def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() -> None:
+    registry = _registry()
+    state = _state()
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        secondary_domains=[CapabilityDomain.SPATIAL_ANALYSIS],
+        task_mode="execute",
+        presentation="text",
+        location_mode="search_area",
+        analysis={"kind": "rank", "metric": "magnitude", "order": "descending", "top_k": 1},
+        capability_queries=["earthquakes", "current weather"],
+        target_refs=["Europe"],
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs["europe"] = ResolvedLocation(
+        label="Europe", latitude=50.0, longitude=10.0, bbox=[-25.0, 34.0, 45.0, 72.0]
+    )
+    state.tool_results += [
+        ToolResult(
+            call_id="quakes",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="ok",
+            metadata=ToolExecutionMetadata(duration_ms=0, capability_id="places:hospitals"),
+        ),
+        ToolResult(
+            call_id="rank",
+            tool_name="transform_evidence",
+            status="success",
+            summary="ok",
+            data={"located_record_count": 1},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        ),
+    ]
+
+    exposed = {tool.name for tool in registry.expose(state)}
+    assert {"resolve_geospatial_location", "discover_geospatial_capabilities"} <= exposed
+
+    for key, latitude, longitude in (("38.1, 20.5", 38.1, 20.5), ("10.0, -60.0", 10.0, -60.0)):
+        state.location_refs[key] = ResolvedLocation(
+            label=key, latitude=latitude, longitude=longitude
+        )
+        state.tool_results.append(
+            ToolResult(
+                call_id=f"resolve-{key}",
+                tool_name="resolve_geospatial_location",
+                status="success",
+                summary="ok",
+                data={"target_id": key},
+                metadata=ToolExecutionMetadata(duration_ms=0),
+            )
+        )
+
+    def location_errors(location_ref: str) -> list[str]:
+        request = ExecuteCapabilityInput(
+            capability_id="places:hospitals", location_ref=location_ref
+        )
+        return [
+            error
+            for error in _capability_semantic_validator(request, state)
+            if "location_ref" in error
+        ]
+
+    assert location_errors("38.1, 20.5") == []
+    assert location_errors("10.0, -60.0") != []
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="38.1, 20.5"),
+        state,
+    )
+    assert "sampling" not in bound.arguments
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_current_map_view_resolves_to_the_client_reported_viewport() -> None:
+    from server.services.agent.tool_definitions import ResolveLocationInput
+    from server.services.agent.tool_handlers.location import LocationToolHandler
+
+    handler = LocationToolHandler(resolver=FakeResolver())  # type: ignore[arg-type]
+    state = _state()
+
+    missing = await handler.resolve(ResolveLocationInput(query="current map view"), state)
+    assert missing.error is not None and missing.error.recovery == "request_user_input"
+
+    state.map_memory = {"current_view": {
+        "bounds": [19.0, 36.0, 28.0, 41.5], "center": [23.5, 38.75], "zoom": 6.2,
+        "overlays": [], "source": "client_reported",
+    }}
+    resolved = await handler.resolve(ResolveLocationInput(target_id="current_map_view"), state)
+
+    location = state.location_refs["current_map_view"]
+    assert resolved.status == "success"
+    assert location.bbox == [19.0, 36.0, 28.0, 41.5]
+    assert (location.longitude, location.latitude) == (23.5, 38.75)
+    assert _lower_execution_extent({}, location, radius_m=None).kind == "bbox"
 
 ###############################################################################
 def test_capability_discovery_route_does_not_expose_data_execution() -> None:

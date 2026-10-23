@@ -105,6 +105,8 @@ class NominatimService:
                 "format": "jsonv2",
                 "addressdetails": "1",
                 "namedetails": "1",
+                # Carries the place's Wikidata identifier for fact lookups.
+                "extratags": "1",
                 # Prefer a stable validation language while retaining the
                 # provider's alternate names in ``namedetails``.  This lets
                 # the resolver accept user-language names without depending
@@ -810,6 +812,10 @@ class NominatimService:
         namedetails = data.get("namedetails")
         if is_json_object(namedetails):
             result["namedetails"] = dict(namedetails)
+        extratags = data.get("extratags")
+        wikidata_id = extratags.get("wikidata") if is_json_object(extratags) else None
+        if isinstance(wikidata_id, str) and re.fullmatch(r"Q\d+", wikidata_id):
+            result["wikidata_id"] = wikidata_id
         if fetched_at is not None:
             result.update(
                 {

@@ -494,3 +494,65 @@ def test_rainviewer_provider_reports_server_bound_scope_evidence() -> None:
         "temporal_scope_satisfied": True,
     }
     assert response.observation_time == "1970-01-01T00:03:20+00:00"
+
+
+###############################################################################
+def _wikidata_quantity(amount: str, unit: str, *, rank: str = "normal", year: str | None = None) -> dict[str, Any]:
+    statement: dict[str, Any] = {
+        "rank": rank,
+        "mainsnak": {
+            "snaktype": "value",
+            "datavalue": {"value": {"amount": amount, "unit": f"http://www.wikidata.org/entity/{unit}"}},
+        },
+    }
+    if year is not None:
+        statement["qualifiers"] = {
+            "P585": [{"datavalue": {"value": {"time": f"+{year}-01-01T00:00:00Z"}}}]
+        }
+    return statement
+
+
+###############################################################################
+def test_wikidata_provider_reports_current_place_facts_with_their_dates() -> None:
+    from server.services.geospatial.providers.wikidata import WikidataProvider
+
+    requested: list[str] = []
+
+    async def fetcher(url: str, headers: dict[str, str] | None) -> dict[str, Any]:
+        requested.append(url)
+        assert headers is not None and "User-Agent" in headers
+        return {"entities": {"Q64": {
+            "labels": {"en": {"value": "Berlin"}},
+            "descriptions": {"en": {"value": "capital of Germany"}},
+            "claims": {
+                "P1082": [
+                    _wikidata_quantity("+3644826", "Q199", year="2018"),
+                    _wikidata_quantity("+3878100", "Q199", rank="preferred", year="2023"),
+                    _wikidata_quantity("+3000000", "Q199", rank="deprecated", year="2024"),
+                ],
+                "P2046": [_wikidata_quantity("+891.3", "Q712226")],
+                "P2044": [_wikidata_quantity("+34", "Q11573")],
+            },
+        }}}
+
+    provider = WikidataProvider(fetcher=fetcher)
+    response = run_async_in_thread(provider.fetch(ProviderRequest(
+        capability_id="wikidata_place_facts",
+        params={"wikidata_id": "Q64", "latitude": 52.52, "longitude": 13.405},
+    )))
+
+    assert requested == ["https://www.wikidata.org/wiki/Special:EntityData/Q64.json"]
+    facts = response.payload["facts"]
+    assert facts["population"] == 3878100
+    assert facts["population_point_in_time"] == "2023-01-01"
+    assert facts["area_km2"] == 891.3
+    assert facts["elevation_m"] == 34
+    assert facts["label"] == "Berlin"
+    assert response.result_status == "ok"
+    assert response.coverage is not None and response.coverage["spatial_scope_satisfied"] is True
+
+    unlinked = run_async_in_thread(provider.fetch(ProviderRequest(
+        capability_id="wikidata_place_facts", params={"latitude": 1.0, "longitude": 2.0},
+    )))
+    assert unlinked.result_status == "valid_empty"
+    assert len(requested) == 1

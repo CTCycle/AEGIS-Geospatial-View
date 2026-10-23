@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import ClientMapView, MapSession
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.capability_route import AgentTaskState
 
@@ -189,6 +189,7 @@ class AgentRunCreateRequest(BaseModel):
     client_request_id: str | None = None
     timezone: str | None = Field(default=None, max_length=64)
     attachment_id: str | None = Field(default=None, max_length=64)
+    map_view: ClientMapView | None = None
 
     # -------------------------------------------------------------------------
     @field_validator("message")

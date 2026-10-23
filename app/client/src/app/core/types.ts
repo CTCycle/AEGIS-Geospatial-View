@@ -396,6 +396,18 @@ export interface RenderRequirement {
   failure_code?: string | null;
 }
 
+/**
+ * The map view the user sees when sending a request (client-reported). A
+ * type alias, not an interface, so it is assignable to a JSON command payload.
+ */
+export type ClientMapView = {
+  bounds: [number, number, number, number];
+  center: [number, number];
+  zoom: number;
+  basemap_id: string | null;
+  overlays: Array<{ instance_id: string; visible: boolean; opacity: number }>;
+};
+
 export interface MapRenderAcknowledgement {
   run_id: string;
   run_version: number;

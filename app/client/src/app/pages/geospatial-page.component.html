@@ -186,7 +186,9 @@
             <span class="chat-progress-spinner" aria-hidden="true"></span>
           }
           <span>
-            {{ showProgressIndicator
+            {{ showProgressIndicator && streamState === 'reconnecting'
+              ? 'Connection lost; reconnecting to the server…'
+              : showProgressIndicator
               ? (progressLabel || status)
               : (mapSession?.resolved_location?.label || 'Ready for a location or data request') }}
           </span>

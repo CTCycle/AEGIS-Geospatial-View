@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
+from server.contracts.geospatial import ClientMapView
 from server.domain.agent.trace import public_protocol_projection
 
 REALTIME_PROTOCOL_VERSION = 1
@@ -44,6 +45,7 @@ class RealtimeStartPayload(BaseModel):
     client_request_id: str = Field(min_length=1, max_length=160)
     timezone: str | None = Field(default=None, max_length=64)
     attachment_id: str | None = Field(default=None, max_length=64)
+    map_view: ClientMapView | None = None
 
     # -------------------------------------------------------------------------
     @field_validator("message")

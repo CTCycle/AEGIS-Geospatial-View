@@ -13,6 +13,7 @@ from server.domain.agent.tool_result import (
     ToolExecutionMetadata,
     ToolResult,
 )
+from server.services.agent.tool_registry import follow_up_investigation_open
 from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     DescribeCapabilityInput,
@@ -72,6 +73,11 @@ class CatalogToolHandler:
             else []
             )
         )
+        # A follow-up query (the weather at a derived epicentre) is a new
+        # source for a new point: the route's operation and time window
+        # describe the first source and must not filter it out.
+        follow_up = request.query is not None and follow_up_investigation_open(state)
+        route_filters = route if route is not None and not follow_up else None
         candidates = self.capability_registry.shortlist(
             domains=route_domains,
             queries=query_values,
@@ -82,35 +88,35 @@ class CatalogToolHandler:
             limit=None if catalog_discovery else 50,
             operation=(
                 None
-                if catalog_discovery
-                else route.operation if route is not None else None
+                if catalog_discovery or route_filters is None
+                else route_filters.operation
             ),
             scope_kind=(
                 None
-                if catalog_discovery
+                if catalog_discovery or follow_up
                 else _resolved_scope_kind(route, location)
             ),
             temporal_mode=(
-                route.temporal_scope.mode
-                if route is not None and route.temporal_scope.mode != "none"
+                route_filters.temporal_scope.mode
+                if route_filters is not None and route_filters.temporal_scope.mode != "none"
                 else None
             ),
             temporal_granularity=(
-                route.temporal_scope.granularity if route is not None else None
+                route_filters.temporal_scope.granularity if route_filters is not None else None
             ),
             has_explicit_time_range=(
-                route is not None
+                route_filters is not None
                 and any(
                     value is not None
                     for value in (
-                        route.temporal_scope.reference_time_iso,
-                        route.temporal_scope.start_time_iso,
-                        route.temporal_scope.end_time_iso,
+                        route_filters.temporal_scope.reference_time_iso,
+                        route_filters.temporal_scope.start_time_iso,
+                        route_filters.temporal_scope.end_time_iso,
                     )
                 )
             ),
             requires_render=(
-                route is not None and route.presentation in {"map", "both"}
+                route_filters is not None and route_filters.presentation in {"map", "both"}
             ),
             location=location,
         )
