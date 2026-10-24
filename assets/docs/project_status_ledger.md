@@ -1,6 +1,8 @@
 # Project Status Ledger
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
+
+The [October 23–24 agentic-loop audit](../QA/2026-10-23-agent-loop-audit/report.md) continues Opus's F1–F14 work on `loop-dev`. It adds deterministic measurement and keyless Wikidata facts, per-target completion, bounded terminal synthesis, client viewport awareness, render watchdogs, and map-state corrections found in real browser journeys. Follow-up fixes preserve target bindings through checkpoint compaction, admit located cross-source result layers, apply canonical opacity, distinguish today from a rolling day, and keep map mutations renderable. Local gates pass: 1,184 backend tests, strict Pyright, Ruff, 304 Karma tests, production build, and strict production manifest audit. Exact `opencode-go / deepseek-v4.1-flash` browser/provider evidence is recorded per scenario; overall status stays **PARTIAL**, with other model lanes, full vision/render-fault matrices and hosted CI unverified. Panned-view earthquake retrieval remains **PARTIAL**: the correct viewport and resolver exposure did not lead to execution in the long live chat. Nearest-pharmacy results now fit a distinguishable display extent while provider query minimums remain unchanged. Existing campaign roll-ups are unchanged.
 
 The [2026-10-22 full validation pass](../QA/validation-20261022-full-e2e/report.md) on `develop@1a864a99` plus the working tree: Ruff, strict Pyright, 1,164 backend tests, Angular build and 303/303 Karma pass; single-origin serving, the real WebSocket and real-browser journeys pass. Playwright E2E is 59 pass / 2 fail / 26 skip; the two failures and the skips need an agent model that is not configured here (BLOCKED). The pass found and fixed an intermittent blank-map defect (zero-size canvas after a premature resize), a duplicate credential PATCH, and the Ollama URL save on a model-less database; stale E2E tests were updated. Campaign counts are unchanged.
 

@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-10-21
+Last updated: 2026-10-24
 
 ## Layering
 
@@ -156,12 +156,19 @@ bounded to the most recent protocol window.
 
 - `resolve_geospatial_location`
 - `discover_geospatial_capabilities`
-- `discover_geospatial_provider_layers`
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `inspect_evidence`
 - `transform_evidence`
+- `measure_geospatial`
 - `apply_map_plan`
+
+`search_conversation_history` is registered when a history repository is available.
+Provider-layer discovery stays behind the generic capability-discovery tool.
+Multi-target completion retains each execution's location binding through compact
+checkpoints, including the browser render/resume boundary. A single bounded
+terminal synthesis call may use one reserved model slot when the ordinary call
+budget is exhausted; the run deadline and cancellation still apply.
 
 `route_request` is an internal bootstrap definition. `ToolExecutor` is the
 only execution boundary; it validates input, applies policy, counts attempts,

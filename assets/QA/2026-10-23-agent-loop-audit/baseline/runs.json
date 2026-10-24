@@ -1,0 +1,261 @@
+[
+  {
+    "run": "c2a42b80",
+    "conversation": "9a07c55c",
+    "request": "Show me the Colosseum",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 3,
+    "tool_calls": 2,
+    "iterations": 1,
+    "seconds": 8.5,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "apply_map_plan:success"
+    ],
+    "renders": [
+      "ready"
+    ],
+    "final": "The map is ready and centered on the Colosseum.\n\n- **Location:** Colosseum, Celio, Municipio Roma I, Rome, Roma Capitale, Lazio, 00184, Italy\n- **Coordinates:** 12.491903, 41.8909421\n- **Basemap:** OpenStreetMap (standard)\n- **View:** Zoomed to the site's footprint, verified as rendered successfully\n\nNo data layers were added, since you asked only to see the location. Let me know if you'd like nearby points of interest, satellite imagery, or a wider view of the surrounding area."
+  },
+  {
+    "run": "f9843be9",
+    "conversation": "3cd1a718",
+    "request": "Compare the current temperature in Paris and Berlin and show both on the map",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 6,
+    "tool_calls": 6,
+    "iterations": 4,
+    "seconds": 19.7,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "resolve_geospatial_location:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:success",
+      "execute_geospatial_capability:success",
+      "apply_map_plan:success"
+    ],
+    "renders": [
+      "ready"
+    ],
+    "final": "**Current temperature comparison**\n\n| City | Temperature (2 m air) | Local time zone |\n|---|---|---|\n| Paris | **10.3 °C** | Europe/Paris |\n| Berlin | **11.2 °C** | Europe/Berlin |\n\nBerlin is about **0.9 °C warmer** than Paris right now.\n\n**Details**\n- **Source:** Open-Meteo weather forecast (openmeteo_weather_forecast), point queries at each city center — Paris at 48.8535, 2.3484; Berlin at 52.5174, 13.3951.\n- **Sample count:** 1 point per city (2 total).\n- **Units:** °C.\n- **Time window:** observation time 2026-10-23 21:15; the 24-hour forecast window runs 2026-10-23 22:00 to 2026-10-24 21:00 in each city's local time zone (Europe/Paris and Europe/Berlin).\n- **Nature of values:** these are **model estimates** from a forecast model, not direct station observations. The provider's reliability status is marked \"partial.\"\n- **Coverage:** point forecasts only — no area coverage, so these values describe the city-center grid point, not the whole metro area.\n\n**Map:** both cities are shown as graduated temperature markers on a light basemap, with the viewport fitted to span Paris and Berlin. The render was verified — both layers loaded and are visible.\n\nSupporting context from the same readings: Paris has light rain (1.9 mm, WMO code 80) with 68% humidity and 23.8 km/h wind; Berlin is dry (0.0 mm, WMO code 3) with 67% humidity and 15.0 km/h wind."
+  },
+  {
+    "run": "2aec2bf0",
+    "conversation": "030a4de7",
+    "request": "How far is Rome from Milan?",
+    "state": "failed",
+    "stopped_reason": "insufficient_evidence",
+    "operation": "error/failed",
+    "model_calls": 3,
+    "tool_calls": 4,
+    "iterations": 2,
+    "seconds": 6.9,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "resolve_geospatial_location:success",
+      "discover_geospatial_capabilities:valid_empty",
+      "discover_geospatial_capabilities:valid_empty"
+    ],
+    "renders": [],
+    "final": "No supported capability matched the request after discovery."
+  },
+  {
+    "run": "d22b3937",
+    "conversation": "99f78b51",
+    "request": "Show the 5 pharmacies nearest to the Pantheon in Rome",
+    "state": "failed",
+    "stopped_reason": "insufficient_evidence",
+    "operation": "error/failed",
+    "model_calls": 6,
+    "tool_calls": 5,
+    "iterations": 5,
+    "seconds": 32.5,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:failed(provider_timeout)",
+      "discover_geospatial_capabilities:valid_empty",
+      "discover_geospatial_capabilities:valid_empty"
+    ],
+    "renders": [],
+    "final": "The overpass provider did not respond within its execution deadline, and no alternative capability matched the request after discovery."
+  },
+  {
+    "run": "12ee757d",
+    "conversation": "4c2b3afa",
+    "request": "Compare the population of Paris and Berlin",
+    "state": "failed",
+    "stopped_reason": "model_budget_exhausted",
+    "operation": "error/failed",
+    "model_calls": 4,
+    "tool_calls": 4,
+    "iterations": 4,
+    "seconds": 8.9,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "resolve_geospatial_location:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:failed(invalid_arguments)"
+    ],
+    "renders": [],
+    "final": "The agent reached its configured execution limit."
+  },
+  {
+    "run": "91d53eac",
+    "conversation": "08c562fd",
+    "request": "Show Springfield on the map",
+    "state": "completed",
+    "stopped_reason": null,
+    "operation": "None/None",
+    "model_calls": null,
+    "tool_calls": null,
+    "iterations": null,
+    "seconds": 3.8,
+    "tools": [
+      "resolve_geospatial_location:failed(clarification_required)"
+    ],
+    "renders": [],
+    "final": "Which location do you mean: Springfield, Illinois, United States, Springfield, Massachusetts, United States?"
+  },
+  {
+    "run": "a0cf9179",
+    "conversation": "08c562fd",
+    "request": "The one in Illinois",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 3,
+    "tool_calls": 2,
+    "iterations": 1,
+    "seconds": 9.6,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "apply_map_plan:success"
+    ],
+    "renders": [
+      "ready"
+    ],
+    "final": "The map now shows **Springfield, Sangamon County, Illinois, United States** (approximately 39.80°N, 89.64°W), centered on the city with the standard OpenStreetMap basemap. The view is rendered and verified."
+  },
+  {
+    "run": "f06f1f08",
+    "conversation": "fbeb328e",
+    "request": "Which European location received the most rainfall today?",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 6,
+    "tool_calls": 5,
+    "iterations": 4,
+    "seconds": 25.3,
+    "tools": [
+      "describe_geospatial_capability:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:success",
+      "transform_evidence:success",
+      "apply_map_plan:success"
+    ],
+    "renders": [
+      "ready"
+    ],
+    "final": "**Wettest sampled location in Europe today: near Chichester, United Kingdom (51.00000, −0.68468) — about 43.2 mm.**\n\nSource and method\n- **Source:** Open-Meteo forecast grid (model estimates, not station observations).\n- **Sample:** 335 land points across Europe — a 2.0° grid (299 points) plus 36 refined points at ~0.67° spacing around the wettest coarse cells. 404 points outside the region's land mask were excluded; no points were missing.\n- **Time window:** 24-hour accumulation, 2026-10-22 21:00 → 2026-10-23 20:00 Europe/London time (per-point local window; not UTC).\n- **Metric:** daily precipitation sum in millimetres.\n\nTop 5 sampled points\n\n| # | Location | Coordinates | Rainfall | Window (local) |\n|---|---|---|---|---|\n| 1 | near Chichester, United Kingdom | 51.00000, −0.68468 | 43.2 mm | 22 Oct 21:00 → 23 Oct 20:00 (Europe/London) |\n| 2 | near Maizières, France | 50.33333, 2.43243 | 37.2 mm | 22 Oct 22:00 → 23 Oct 21:00 (Europe/Paris) |\n| 3 | near Mid Sussex, United Kingdom | 51.00000, −0.12613 | 34.1 mm | 22 Oct 21:00 → 23 Oct 20:00 (Europe/London) |\n| 4 | near Powys, United Kingdom | 52.33333, −3.24324 | 30.9 mm | 22 Oct 21:00 → 23 Oct 20:00 (Europe/London) |\n| 5 | near Caerphilly County Borough, United Kingdom | 51.66667, −3.24324 | 29.9 mm | 22 Oct 21:00 → 23 Oct 20:00 (Europe/London) |\n\nPlace names are nearest reverse-geocoded labels, not measured sites.\n\nCaveats\n- This is a **sampled** maximum, not the verified maximum for Europe: heavier local totals between sample points can be missed.\n- Values are **model estimates**; the satellite precipitation overlay available here is imagery only and cannot be ranked numerically.\n- The map is prepared and rendered (5 ranked points, graduated by rainfall, zoomed to the wettest cluster over southern Britain and northern France)."
+  },
+  {
+    "run": "16cc2b40",
+    "conversation": "2d4f1dfd",
+    "request": "Find the strongest earthquake in Europe this week and tell me the current weather at its epicentre",
+    "state": "failed",
+    "stopped_reason": "failed",
+    "operation": "error/failed",
+    "model_calls": 7,
+    "tool_calls": 7,
+    "iterations": 6,
+    "seconds": 16.3,
+    "tools": [
+      "describe_geospatial_capability:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:success",
+      "inspect_evidence:success",
+      "transform_evidence:success",
+      "describe_geospatial_capability:failed(semantic_validation_failed)",
+      "apply_map_plan:failed(semantic_validation_failed)"
+    ],
+    "renders": [],
+    "final": "The agent stopped after repeated invalid tool calls."
+  },
+  {
+    "run": "0d1584e5",
+    "conversation": "e6306cc9",
+    "request": "Show earthquakes in Italy this month",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 6,
+    "tool_calls": 5,
+    "iterations": 4,
+    "seconds": 17.6,
+    "tools": [
+      "resolve_geospatial_location:success",
+      "describe_geospatial_capability:success",
+      "describe_geospatial_capability:success",
+      "execute_geospatial_capability:success",
+      "apply_map_plan:success"
+    ],
+    "renders": [
+      "ready"
+    ],
+    "final": "Here's a map of earthquakes in Italy for this month.\n\n**Source:** EMSC-CSEM SeismicPortal (the denser Euro-Mediterranean network, preferred over global catalogs for this region).\n\n**What's shown:** 439 earthquake events, plotted as clustered points over a terrain basemap, fitted to the data extent (roughly 6.6–18.7°E, 36.6–47.0°N).\n\n**Time window:** The provider applied a rolling 30-day window ending at the fetch time (2026-10-23 19:26 UTC), i.e. 2026-09-23 to 2026-10-23 — not a strict calendar month. Note that the requested start/end dates were not honored exactly; the catalog returned its standard trailing 30-day range.\n\n**Data type:** Observations (recorded seismic events), not model estimates.\n\n**Coverage caveat:** Per the source's completeness note, this network is typically complete from about M2.5–3 in Europe and the Mediterranean, so counts are lower bounds — smaller events may be missing. The result was not truncated (well under the 2,000-event cap).\n\n**Spatial caveat:** The query used Italy's bounding box, so a few events near the edges fall just outside Italian territory (e.g. one event labeled Switzerland). The map is a regional view, not a strict administrative boundary clip.\n\nThe map rendered successfully with the earthquake layer visible."
+  },
+  {
+    "run": "2a7eb526",
+    "conversation": "e6306cc9",
+    "request": "Hide the earthquake layer",
+    "state": "failed",
+    "stopped_reason": "no_progress",
+    "operation": "error/failed",
+    "model_calls": 4,
+    "tool_calls": 0,
+    "iterations": 3,
+    "seconds": 10.6,
+    "tools": [],
+    "renders": [],
+    "final": "I don't have a map-editing tool available in this turn, so I can't actually toggle the layer's visibility. Here's the state and what's needed:\n\n**Current map state (authoritative):**\n- Active visualization: Italy, OpenTopoMap Terrain basemap, viewport centered ~41.83°N, 12.65°E\n- Overlay collection revision 1, containing one layer:\n  - **EMSC Earthquakes** — currently `visible: true`, opacity 0.9\n\n**Requested change:** set that layer's visibility to hidden (no data change, no viewport change).\n\n**Blocker:** the map lifecycle action (set layer visibility) isn't exposed to me here, so the layer remains visible. Nothing about the underlying earthquake evidence changed — it's still the same 439-event EMSC dataset from the trailing 30-day window ending 2026-10-23 19:26 UTC.\n\nIf you can re-issue the request in a session where map editing is available, the change is a single visibility toggle on that one layer; alternatively, I can rebuild the map without the earthquake overlay if you'd prefer a clean basemap-only view."
+  },
+  {
+    "run": "ec1fb40a",
+    "conversation": "e6306cc9",
+    "request": "What is on the map right now?",
+    "state": "completed",
+    "stopped_reason": "goal_satisfied",
+    "operation": "direct_answer/success",
+    "model_calls": 3,
+    "tool_calls": 0,
+    "iterations": 1,
+    "seconds": 7.0,
+    "tools": [],
+    "renders": [],
+    "final": "Here's what's on the map right now:\n\n**Basemap:** OpenTopoMap Terrain (© OpenStreetMap contributors, CC-BY-SA)\n\n**Viewport:** Centered ~41.83°N, 12.65°E, covering roughly 6.65–18.66°E and 36.62–47.05°N — a regional view of Italy and surrounding areas.\n\n**Overlay layers (collection revision 1):**\n- **EMSC Earthquakes** — visible, opacity 0.9. This is the 439-event EMSC-CSEM SeismicPortal dataset from the trailing 30-day window ending 2026-10-23 19:26 UTC (observations, not model estimates). Per the source's completeness note, counts are lower bounds (typically complete from ~M2.5–3 in this region).\n\n**Note on your earlier request:** the earthquake layer is still **visible** — the hide action was not applied, so the map is unchanged from the earthquake view. If you'd like it hidden, I can retry the visibility toggle."
+  },
+  {
+    "run": "c049b077",
+    "conversation": "e6306cc9",
+    "request": "Show earthquakes in the area currently visible on the map",
+    "state": "failed",
+    "stopped_reason": "insufficient_evidence",
+    "operation": "error/failed",
+    "model_calls": 3,
+    "tool_calls": 2,
+    "iterations": 2,
+    "seconds": 6.3,
+    "tools": [
+      "discover_geospatial_capabilities:valid_empty",
+      "discover_geospatial_capabilities:valid_empty"
+    ],
+    "renders": [],
+    "final": "No supported capability matched the request after discovery."
+  }
+]
