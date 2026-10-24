@@ -342,7 +342,7 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
         "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
     }
 
-    def executed(location_ref: str) -> ToolResult:
+    def executed(location_ref: str, *, data_valid: bool = True) -> ToolResult:
         return ToolResult(
             call_id=f"execute-{location_ref}",
             tool_name="execute_geospatial_capability",
@@ -353,9 +353,19 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
                 "hourly_forecast": [{"time": "2026-10-23T12:00", "temperature_2m": 12}],
                 "query": {"location_ref": location_ref},
             },
-            metadata=ToolExecutionMetadata(duration_ms=0),
+            metadata=ToolExecutionMetadata(
+                duration_ms=0,
+                capability_id="places:hospitals",
+                result_type="weather_forecast",
+                coverage={"data_valid": data_valid},
+            ),
         )
 
+    state.tool_results.append(executed("paris", data_valid=False))
+    state.tool_results.append(executed("berlin"))
+    assert uncovered_route_targets(state) == ["Paris"]
+
+    state.tool_results.clear()
     state.tool_results.append(executed("paris"))
     assert uncovered_route_targets(state) == ["Berlin"]
     assert "execute_geospatial_capability" in {
