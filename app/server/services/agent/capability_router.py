@@ -193,6 +193,11 @@ class CapabilityRouter:
                 reason_codes=list(dict.fromkeys([*reasons, *contract_reasons])),
             )
         active_map_update = is_active_map_update(proposed, active_state)
+        if active_map_update and proposed.presentation == "text":
+            # Mutating a displayed map requires the browser handshake even
+            # when the route model asks for only a textual confirmation.
+            proposed = proposed.model_copy(update={"presentation": "both"})
+            reasons.append("active_map_update_requires_render")
         if active_map_update and proposed.location_mode != "none":
             proposed = proposed.model_copy(update={"location_mode": "none"})
             reasons.append("active_map_update_uses_current_map")

@@ -1150,7 +1150,9 @@ def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> Non
     assert build_location_map_fallback_route("Show hospitals near Springfield") is None
 
 ###############################################################################
-def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
+@pytest.mark.parametrize("presentation", ["text", "map"])
+@pytest.mark.parametrize("operation", ["remove_layer", "change_basemap"])
+def test_router_uses_active_map_for_layer_lifecycle_updates(presentation: str, operation: str) -> None:
     state = _state(active_map=True)
     state.location_refs["current map"] = ResolvedLocation(
         label="Current map",
@@ -1160,9 +1162,10 @@ def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
     decision = _router().validate_route(
         _route(
             primary_domain=CapabilityDomain.MAP_STATE,
+            presentation=presentation,
             location_mode="target",
             capability_queries=["remove overlay layer", "map layer management"],
-            operation="remove_layer",
+            operation=operation,
             target_refs=["earthquake layer"],
         ),
         user_message="Remove the earthquake layer.",
@@ -1171,6 +1174,7 @@ def test_router_uses_active_map_for_layer_lifecycle_updates() -> None:
 
     assert decision.status in {"accepted", "discovery_required"}
     assert decision.route.location_mode == "none"
+    assert decision.route.presentation in {"map", "both"}
     assert "active_map_update_uses_current_map" in decision.reason_codes
 
 ###############################################################################
