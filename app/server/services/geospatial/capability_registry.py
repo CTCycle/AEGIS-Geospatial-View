@@ -424,6 +424,22 @@ class CapabilityRegistry:
         return list(self._ensure_snapshot().tools)
 
     # -------------------------------------------------------------------------
+    def covered_queries(self, capability_id: str, queries: Sequence[str]) -> list[str]:
+        """Return the requested queries this capability's manifest can serve."""
+
+        capability = self.get_capability(capability_id)
+        if capability is None:
+            return []
+        searchable = _searchable_text(capability)
+        return [
+            query
+            for query in queries
+            if _raw_query_tokens([query])
+            .difference(_ROUTING_CONTEXT_TOKENS)
+            .intersection(searchable)
+        ]
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         normalized = str(capability_id).strip()
         if not normalized:

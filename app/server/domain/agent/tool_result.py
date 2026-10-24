@@ -89,6 +89,7 @@ class ToolExecutionMetadata(BaseModel):
     coverage: dict[str, Any] | None = None
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     source_url: str | None = None
+    covered_queries: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class EvidenceAssessment(BaseModel):

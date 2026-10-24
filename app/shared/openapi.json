@@ -2953,6 +2953,14 @@
             "title": "Evidence Required",
             "default": false
           },
+          "data_obligations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Data Obligations"
+          },
           "map_preparation_required": {
             "type": "boolean",
             "title": "Map Preparation Required",

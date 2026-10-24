@@ -132,6 +132,9 @@ class CompletionContract(BaseModel):
     )
     location_required: bool = False
     evidence_required: bool = False
+    # Requested analytical components; each needs validated evidence from a
+    # capability whose manifest covers it (one source may cover several).
+    data_obligations: list[str] = Field(default_factory=lambda: list[str](), max_length=4)
     map_preparation_required: bool = False
     temporal_scope_required: bool = False
     spatial_scope_required: bool = False

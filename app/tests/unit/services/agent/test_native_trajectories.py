@@ -4,7 +4,7 @@ import json
 import pytest
 import asyncio
 from typing import Any
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, AgentSpatialScope, CapabilityRoute
+from server.domain.agent.capability_route import AgentPhase, AgentRunState, AgentSpatialScope, CapabilityRoute, CompletionContract
 from server.domain.agent.decision import ResolvedLocation, ClarificationRequest
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -12,7 +12,7 @@ from server.domain.geospatial.providers import ProviderResponse
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
-from server.services.agent.native_tools import register_agent_tools, _bind_execute_request, _capability_semantic_validator
+from server.services.agent.native_tools import register_agent_tools, _bind_execute_request
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry, route_target_location_available, _data_obligation_unmet
@@ -632,18 +632,34 @@ def test_text_stop_is_no_progress_while_derived_locations_are_pending() -> None:
 
 
 ###############################################################################
-def test_analysis_requires_distinct_executes() -> None:
+def test_compound_obligations_need_covering_evidence() -> None:
+    def executed(capability_id: str, covered: list[str]) -> ToolResult:
+        return ToolResult(call_id=capability_id, tool_name="execute_geospatial_capability", status="success", summary="ok",
+                          evidence_refs=[f"evidence_{capability_id}"],
+                          metadata=ToolExecutionMetadata(duration_ms=0, capability_id=capability_id, covered_queries=covered))
+
     value = state()
     value.route.capability_queries = ["weather", "earthquakes"]
-    value.tool_results.append(ToolResult(call_id="one", tool_name="execute_geospatial_capability", status="success", summary="ok",
-                                      evidence_refs=["evidence_one"], metadata=ToolExecutionMetadata(duration_ms=0, capability_id="one")))
+    value.completion_contract = CompletionContract(operation="rank", data_requirement="provider_data",
+                                                   data_obligations=["weather", "earthquakes"])
+    value.tool_results.append(executed("quakes", ["earthquakes"]))
+    # Generic retrieval alone must not close a compound request.
     assert _data_obligation_unmet(value)
-    # A further source stays available, but one source covering both metrics completes retrieval.
-    assert CompletionEvaluator.data_checks(value)["required_data_retrieved"]
-    assert _capability_semantic_validator(ExecuteCapabilityInput(capability_id="one"), value)
-    assert not _capability_semantic_validator(ExecuteCapabilityInput(capability_id="two"), value)
-    value.tool_results.append(value.tool_results[0].model_copy(update={"metadata": ToolExecutionMetadata(duration_ms=0, capability_id="two")}))
+    assert not CompletionEvaluator.data_checks(value)["required_data_retrieved"]
+    value.tool_results.append(executed("weather", ["weather"]))
     assert not _data_obligation_unmet(value)
+    assert CompletionEvaluator.data_checks(value)["required_data_retrieved"]
+    # One source whose manifest covers both components also satisfies them.
+    value.tool_results = [executed("combined", ["weather", "earthquakes"])]
+    assert not _data_obligation_unmet(value)
+
+
+###############################################################################
+def test_only_idempotent_tool_results_are_replayable() -> None:
+    loop = make_loop(_ScriptedProvider([]), None)  # type: ignore[arg-type]
+    assert loop._result_cacheable("discover_geospatial_capabilities")
+    assert not loop._result_cacheable("execute_geospatial_capability")
+    assert not loop._result_cacheable("unregistered_tool")
 
 
 ###############################################################################

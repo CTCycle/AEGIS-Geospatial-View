@@ -304,10 +304,14 @@ requires the explicit requested area, rather than a prior map or unrelated ref.
 
 The server binds `sampling=area` and recent day/week/month windows. Provider
 parameters include sampling only for manifests declaring `grid_sample`; other
-sources report `coverage.area_sampling=single_point_center`. Analysis retrieval
-completes with one valid numeric (non-raster) execution; the registry keeps
-`execute` exposed for further distinct sources (up to one per capability query,
-at most three) and blocks duplicates. Raster descriptors and transforms do not
+sources report `coverage.area_sampling=single_point_center`. A route with
+several `capability_queries` compiles them (at most four) into
+`CompletionContract.data_obligations`. Each execution records the queries its
+manifest covers (`metadata.covered_queries`); an obligation is met by validated,
+eligible evidence from any covering source, so one source may satisfy several
+and the model still picks sources and order. The registry keeps `execute`
+exposed while an obligation is uncovered. Analysis retrieval needs at least one
+valid numeric (non-raster) execution; raster descriptors and transforms do not
 count as retrieval.
 Derived evidence stores `features`, spatial bounds, numeric value fields, and
 parent provenance. Completion requires located derived records or valid-empty
