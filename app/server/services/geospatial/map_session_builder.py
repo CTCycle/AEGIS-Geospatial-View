@@ -36,7 +36,7 @@ from server.services.geospatial.raster_tiles import (
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
-# A single point (or tight cluster) fits to about city scale, not street level.
+# A single point fits to about city scale, not street level.
 MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
 _GEOJSON_RENDERING_MODES = frozenset(
     {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points", "circles"}
@@ -325,8 +325,19 @@ class MapSessionBuilder:
         if action.strategy == "fit_evidence":
             bbox = _evidence_bbox(evidence)
             if bbox is not None:
+                distinct_results = (0 < max(bbox[2] - bbox[0], bbox[3] - bbox[1])
+                                    < MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES) and any(
+                    isinstance(count := item.summary.get("located_record_count"), int)
+                    and count > 1
+                    for item in evidence
+                )
+                # A ranked set of nearby results must remain distinguishable.
+                # This changes presentation only; provider query extents and
+                # the broad single-point viewport safeguard remain unchanged.
+                min_span = (MIN_LOCATION_VIEWPORT_SPAN_DEGREES if distinct_results
+                            else MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES)
                 viewport = _viewport_for_bbox(
-                    _with_min_span(bbox, MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES),
+                    _with_min_span(bbox, min_span),
                     session.viewport,
                 )
                 return _with_viewport(session, viewport)

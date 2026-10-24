@@ -18,7 +18,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
 )
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.evidence import AgentEvidenceSummary
+from server.domain.agent.evidence import AgentEvidenceEnvelope, AgentEvidenceSummary
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
@@ -323,6 +323,35 @@ def _service() -> MapPlanService:
         capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
         evidence_repository=FakeEvidenceRepository(),
     )
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize("count,extent,tight", [
+    (5, [12.474, 41.896, 12.478, 41.900], True),
+    (1, [12.476, 41.898, 12.476, 41.898], False),
+    (5, [12.476, 41.898, 12.476, 41.898], False),
+])
+async def test_derived_viewport_distinguishes_nearby_results_but_keeps_single_point_guard(
+    count: int, extent: list[float], tight: bool,
+) -> None:
+    builder = MapSessionBuilder(capability_registry=FakeCapabilityRegistry())  # type: ignore[arg-type]
+    candidate = await builder.build(
+        location=ResolvedLocation(label="Pantheon", latitude=41.898, longitude=12.476),
+        active_session=_active_session(),
+        evidence=[AgentEvidenceEnvelope(
+            ok=True, status="available", evidence_ref="ranked",
+            summary={"located_record_count": count, "bbox": extent},
+        )],
+        actions=[SetViewportAction(action="set_viewport", strategy="fit_evidence", evidence_refs=["ranked"])],
+    )
+    assert candidate.viewport.bbox is not None
+    west, south, east, north = candidate.viewport.bbox
+    if tight:
+        assert east - west < 0.01 and north - south < 0.01
+        assert west <= extent[0] <= extent[2] <= east
+        assert south <= extent[1] <= extent[3] <= north
+    else:
+        assert east - west >= 0.25 and north - south >= 0.25
 
 ###############################################################################
 @pytest.mark.parametrize(
