@@ -256,8 +256,11 @@ Recovery is semantic rather than a blind repeat:
 - `request_user_input` enters clarification;
 - `terminal` ends the run.
 
-Equivalent successful calls are replay-protected, and repeated failing
-fingerprints are suppressed. A capability excluded after an alternate-source or
+Equivalent successful calls are replay-protected only for tools registered
+`idempotent` (discovery, description, inspection, measurement, history); live
+or state-changing tools such as `execute_geospatial_capability` and
+`transform_evidence` always re-execute. Repeated failing fingerprints are
+suppressed. A capability excluded after an alternate-source or
 replan failure is rejected by policy for the rest of the run. Calls beyond the
 per-step batch limit are not executed and receive a typed
 `tool_call_not_executed` observation, so every model call ID is answered. A

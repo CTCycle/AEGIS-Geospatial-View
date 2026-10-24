@@ -2171,7 +2171,7 @@ class AgentLoop:
             self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
             cached = state.successful_fingerprints.get(fingerprint)
-            if cached is not None:
+            if cached is not None and self._result_cacheable(call.name):
                 if len(state.tool_trace) < 128:
                     state.tool_trace.append(
                         {
@@ -2275,7 +2275,10 @@ class AgentLoop:
                 }:
                     state.validation_corrections += 1
             elif result.tool_name != "apply_map_plan":
-                state.successful_fingerprints[fingerprint] = result
+                # Only idempotent observations are replayable; live or
+                # state-dependent tools must be re-executed for fresh results.
+                if self._result_cacheable(result.tool_name):
+                    state.successful_fingerprints[fingerprint] = result
             elif result.status == "success":
                 # Map candidates are only reusable after the browser proves
                 # that this action rendered.  Keep the semantic action
@@ -2387,6 +2390,11 @@ class AgentLoop:
         for evidence_ref in result.evidence_refs:
             if evidence_ref not in state.evidence_refs:
                 state.evidence_refs.append(evidence_ref)
+
+    # -------------------------------------------------------------------------
+    def _result_cacheable(self, tool_name: str) -> bool:
+        registered = self.tool_registry.get(tool_name)
+        return registered is not None and registered.idempotent
 
     # -------------------------------------------------------------------------
     def _fingerprint(self, call: LLMToolCall) -> str:
@@ -2951,6 +2959,11 @@ class AgentLoop:
             requirements=list(state.completion_requirements),
             location_required=route.location_mode != "none",
             evidence_required="required_data_retrieved" in state.completion_requirements,
+            data_obligations=(
+                list(dict.fromkeys(route.capability_queries))[:4]
+                if requires_provider_data and len(route.capability_queries) > 1
+                else []
+            ),
             map_preparation_required="map_candidate_prepared"
             in state.completion_requirements,
             temporal_scope_required=bool(

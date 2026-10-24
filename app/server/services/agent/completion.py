@@ -112,7 +112,7 @@ class CompletionEvaluator:
             # One numeric source may cover several queried metrics; the
             # registry still permits further distinct sources for analysis.
             return bool(matched) and (not required or required <= matched)
-        all_targets_covered = not uncovered_route_targets(state)
+        all_targets_covered = not uncovered_route_targets(state) and not uncovered_data_obligations(state)
         return {
             "required_data_retrieved": covered("data_valid") and all_targets_covered,
             "spatial_scope_applied": covered("spatial_scope_satisfied"),
@@ -357,6 +357,29 @@ def _native_spatial_scope_applied(
 
 
 ###############################################################################
+def uncovered_data_obligations(state: AgentRunState) -> list[str]:
+    """Return requested analytical components without validated evidence yet.
+
+    One source may satisfy several obligations when its manifest covers them;
+    the model still chooses the sources and their order.
+    """
+
+    contract = state.completion_contract
+    if contract is None or not contract.data_obligations:
+        return []
+    analysis = state.route is not None and state.route.analysis is not None
+    covered: set[str] = set()
+    for result in state.tool_results:
+        if result.tool_name != "execute_geospatial_capability" or not result.metadata.covered_queries:
+            continue
+        if analysis and result.metadata.result_type == "raster":
+            continue
+        if _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), analysis):
+            covered.update(result.metadata.covered_queries)
+    return [query for query in contract.data_obligations if query not in covered]
+
+
+###############################################################################
 def uncovered_route_targets(state: AgentRunState) -> list[str]:
     """Return resolved route targets that no data execution has covered yet.
 
@@ -429,4 +452,9 @@ def follow_up_location_keys(state: AgentRunState) -> set[str]:
     return keys
 
 
-__all__ = ["CompletionEvaluator", "follow_up_location_keys", "uncovered_route_targets"]
+__all__ = [
+    "CompletionEvaluator",
+    "follow_up_location_keys",
+    "uncovered_data_obligations",
+    "uncovered_route_targets",
+]

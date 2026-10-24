@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
-from server.services.agent.completion import uncovered_route_targets
+from server.services.agent.completion import uncovered_data_obligations, uncovered_route_targets
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
@@ -425,11 +425,11 @@ def _data_obligation_unmet(state: "AgentRunState") -> bool:
                and result.status in {"success", "partial", "valid_empty"}
                and result.metadata.result_type != "raster"
                and result.metadata.capability_id}
-        return len(ids) < min(3, max(1, len(state.route.capability_queries)))
+        return not ids or bool(uncovered_data_obligations(state))
     contract = state.completion_contract
     if contract is not None and contract.data_requirement != "provider_data":
         return True
-    if uncovered_route_targets(state):
+    if uncovered_route_targets(state) or uncovered_data_obligations(state):
         return True
     successful_data_tools = {
         "execute_geospatial_capability",
@@ -470,14 +470,7 @@ def follow_up_investigation_open(state: "AgentRunState") -> bool:
         or not analysis_complete(state)
     ):
         return False
-    executed = {
-        result.metadata.capability_id
-        for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability"
-        and result.status in {"success", "partial", "valid_empty"}
-        and result.metadata.capability_id
-    }
-    return len(executed) < min(3, len(route.capability_queries))
+    return bool(uncovered_data_obligations(state))
 
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:

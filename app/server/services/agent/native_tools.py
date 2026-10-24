@@ -437,7 +437,7 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
         )
         bound_request = _bind_execute_request(internal_request, state)
         location = _location_for_request(bound_request, state)
-        return await service.execute_capability(
+        result = await service.execute_capability(
             bound_request,
             ToolExecutionContext(
                 conversation_id=state.conversation_id,
@@ -445,6 +445,11 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
             ),
             location=location,
         )
+        if state.route is not None and result.status != "failed":
+            result.metadata.covered_queries = service.capability_registry.covered_queries(
+                bound_request.capability_id, state.route.capability_queries
+            )
+        return result
 
     return execute
 
