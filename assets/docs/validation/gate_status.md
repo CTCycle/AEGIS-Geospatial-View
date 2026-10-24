@@ -37,6 +37,19 @@ Production behavior commit: `558f1966afc3cef4b6e755d4edfdc87dfd258c11`;
 the final tested head adds only controlled-harness evidence capture and
 documentation reconciliation.
 
+## Planned high-priority native-loop remediation gates (`remediation/agent-loop-high-20261024`)
+
+The [H1–H4 remediation plan](../geospatial/agent_loop_high_remediation.md) addresses four **HIGH** findings identified by static inspection of `develop@dac3cc965149f216204d89fc1fdf94c9ab1514b3`. Track these as **supplemental gates**, in execution order `AL-H1` → `AL-H2` → `AL-H3` → `AL-H4`, under [ISSUE-007 and validation debt](../project_status_ledger.md). No implementation, regression tests, provider runs, live browser checks or hosted CI were performed for these findings when the gates were opened on 2026-10-24. All four are `UNRUN`; static evidence identifies risks rather than confirmed runtime incidents. Existing Tier 0–5 `PASS` statuses and campaign totals remain unchanged.
+
+| Gate | High finding and acceptance boundary | Status | Evidence required before promotion |
+| --- | --- | --- | --- |
+| `AL-H1` | Stale replay of state-dependent discovery. Repeated arguments after a capability exclusion must return a fresh eligible shortlist and allow alternative provider selection without breaking valid deduplication or budgets. | `UNRUN` | Deterministic discovery/fallback regression tests; focused backend gates; implementation commit. |
+| `AL-H2` | Render deadline is in-memory and `awaiting_render` is not startup-resumed. A restarted server must expire overdue persisted candidates, rearm remaining time for live candidates, and honor acknowledgement/version/terminal races once. | `UNRUN` | Persisted restart and timing integration tests with event/active-slot assertions; focused backend gates; implementation commit. |
+| `AL-H3` | Checkpoint truncation to 16 results can erase eligibility/target/obligation proof. After more than 16 tool results, before/after-checkpoint completion checks must agree; invalid evidence must never earn coverage. | `UNRUN` | Multi-target, multi-metric and eligibility checkpoint-parity tests; old-checkpoint compatibility/boundedness tests; implementation commit. |
+| `AL-H4` | Raw success checks can hide `execute_geospatial_capability` while canonical validated data requirements remain unmet. Tool exposure must agree with completion status across inspection, transform, analysis and checkpoint resume. | `UNRUN` | Exposure-versus-completion regressions, valid evidence control and route/budget tests; implementation commit. |
+
+**Closeout rule:** Advance each gate only after recording tested branch SHA, exact commands, pass/failure evidence, and validation limits. After H4, run a focused end-to-end fallback → multi-target completion → checkpoint/restart → render acknowledgement/timeout journey plus applicable backend quality checks. Do not retroactively relabel historical gates based on these newly scoped risks.
+
 ## Comprehensive validation campaign
 
 The long-term Tier 0–5 campaign is defined in the
