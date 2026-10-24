@@ -28,6 +28,14 @@ def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
     return parsed
 
 ###############################################################################
+def _is_eligible_evidence(result: ToolResult, assessment: EvidenceAssessment, analysis: bool) -> bool:
+    return bool(
+        assessment.tool_execution_success and assessment.data_valid is True
+        and assessment.data_relevant is True and (analysis or result.status != "partial")
+    )
+
+
+###############################################################################
 class CompletionEvaluator:
     """Keep render obligations independent of provider or model wording."""
 
@@ -96,8 +104,7 @@ class CompletionEvaluator:
                        and result.metadata.result_type != "raster"]
         assessments = [(result, CompletionEvaluator.assess_evidence(state, result)) for result in results]
         eligible = [(result, assessment) for result, assessment in assessments
-                    if assessment.tool_execution_success and assessment.data_valid is True
-                    and assessment.data_relevant is True and (analysis or result.status != "partial")]
+                    if _is_eligible_evidence(result, assessment, analysis)]
         required = set(state.route.explicit_capability_ids if state.route else [])
         def covered(field: str) -> bool:
             matched = {result.metadata.capability_id for result, assessment in eligible
@@ -370,7 +377,7 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
         str(json_object(json_object(result.data).get("query")).get("location_ref") or "").strip()
         for result in state.tool_results
         if result.tool_name == "execute_geospatial_capability"
-        and result.status in {"success", "partial", "valid_empty"}
+        and _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), False)
     }
     uncovered: list[str] = []
     for target in route.target_refs:
