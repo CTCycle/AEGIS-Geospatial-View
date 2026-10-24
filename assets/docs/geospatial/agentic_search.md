@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-10-20
+Last updated: 2026-10-24
 
 ## Summary
 
@@ -118,6 +118,7 @@ tool. The model-visible action names are:
 - `execute_geospatial_capability`
 - `inspect_evidence`
 - `transform_evidence`
+- `measure_geospatial`
 - `apply_map_plan`
 - `search_conversation_history` (conditional history-repository registration)
 
@@ -184,6 +185,46 @@ descriptors, where required by the catalog contract, remain bounded normalized
 observations behind the generic discovery responsibility. They are never
 unrestricted provider browsing, and the model is not offered two
 interchangeable discovery choices for the same unmet responsibility.
+
+### Spatial operations, multi-target completion, and current view
+
+`measure_geospatial` computes WGS84 ellipsoidal distances and bearings between
+resolved centres, bounding-box dimensions/area (not administrative polygon area),
+and point country membership against simplified Natural Earth polygons.
+`transform_evidence` supports `distance_from`, `country_tag`, projection that
+retains geometry, and provenance tags when combining evidence sets. Near-border
+country assignments inherit the reference geometry's simplification limits.
+
+Comparisons require successful data retrieval for every resolved route target.
+Compact checkpoints retain the execution's `query.location_ref` even when the
+model-facing weather projection omits query arguments. Analysis follow-ups can
+resolve a result point within the requested region, query another source there,
+and include that located source alongside the derived result on the map.
+
+Each browser request may carry bounded `map_view` state: viewport bounds, centre,
+zoom, basemap and overlay visibility/opacity. It is explicitly client-reported,
+not a render acknowledgment. Resolving `current map view` uses that viewport as
+an area and retains the existing provider-specific minimum-extent safeguards.
+Structured state is preferred for identity, visibility and viewport questions;
+screenshots remain subject to the configured vision policy and add value for
+visual quality or failure diagnosis that structured checks cannot establish.
+
+Render errors identify source and HTTP status where available. Overlay/style
+errors fail a candidate; an isolated basemap tile error does not discard useful
+overlays. The basemap selector is locked while a candidate awaits acknowledgment.
+A server watchdog expires an unacknowledged candidate and is cancelled on runtime
+shutdown. `results_in_viewport` is a planar bounding-box overlap fraction, not a
+count of visible features or proof of visible raster pixels.
+
+After a verified nearest-result rendering defect, distinct nearby derived points
+use their actual display extent with the existing 0.001° landmark presentation
+floor. Single or coincident points retain the 0.25° broad evidence view. This
+presentation exception does not lower provider query bounding-box constraints.
+
+A run gets at most one reserved terminal model call beyond its ordinary model
+call cap, within the remaining deadline. If synthesis fails, a bounded summary of
+successful tool results remains available. Exhaustion preserves failure/pending
+requirements; it cannot promote an incomplete run to successful completion.
 
 ## Observations and evidence
 

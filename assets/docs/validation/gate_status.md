@@ -1,6 +1,10 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-10-21
+Last updated: 2026-10-24
+
+## October 23–24 agentic-loop continuation (`loop-dev`)
+
+The [audit report](../../QA/2026-10-23-agent-loop-audit/report.md) and [scenario evidence](../../QA/2026-10-23-agent-loop-audit/post-change-runs.json) record inherited baseline failures, fixes, and new exact-lane browser runs. Local deterministic gates are **PASS**: 1,184 backend tests, strict full-server Pyright, Ruff, 304 frontend tests, production build, and strict production manifests. Live distance, two-city weather/render, earthquake-to-weather investigation, sampled rainfall with calendar-day windows, map opacity/visibility and no-ack timeout have direct evidence. The full audit remains **PARTIAL**; provider parity, all screenshot-policy combinations and comprehensive live rendering faults are not promoted. Hosted CI is **UNRUN** for this branch (the current push trigger covers main/develop). The user reboot on October 24 is recorded separately from task-owned runtime cleanup; saved history and map were restored through the UI. Panned-view earthquake retrieval remains **PARTIAL**: the correct viewport and resolver exposure did not lead to execution in the long live chat. Nearest-pharmacy results now fit a distinguishable display extent while provider query minimums remain unchanged. Historical gate counts below remain unchanged.
 
 The [2026-10-19 F-19 / T4-09 slice](../../QA/validation-20261019-f19-t4-09/report.md) closes F-19 (the USGS adapter now queries the catalog for explicit dated ranges; live Japan 1-7 March 2024 renders, Perth is an honest valid-empty; a full-month Japan query timed out once on upstream latency) and passes `T4-09` (exact OpenCode Go lane, multi-call tool continuation through render; reconstructed acceptance, LOW confidence). It fixes three defects (per-provider deadlines dropped inside agent runs, date-only temporal scopes always failing the completion check, stale live-test import and table-count assertions) and found F-26 (date text parsed as coordinates), since fixed: text coordinate search now skips pairs preceded by a month name, covered by a parametrized unit test (not re-run live). `T4-10` to `T4-13`, `T5-11` and `T5-13` stay `UNRUN`. 1,140 backend unit tests, Ruff, strict Pyright and the strict manifest audit pass.
 

@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-10-20
+Last updated: 2026-10-24
 
 ## Purpose
 
@@ -16,6 +16,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `openaq` | air-quality station observations | credentialed |
 | `openmeteo` | weather, air-quality forecasts, and numeric point elevation | public for eligible non-commercial use; restricted capabilities require explicit opt-in |
 | `overpass` | OpenStreetMap POI queries | public |
+| `wikidata` | geocoder-linked place population, area, elevation, and official website | public, keyless CC0 entity data |
 | `pvgis` | solar irradiation and photovoltaic estimates | public |
 | `rainviewer` | precipitation radar tiles | public |
 | `tomtom` | optional live traffic | credentialed |
