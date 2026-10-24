@@ -103,6 +103,9 @@ conversation-scoped `agent_evidence` store rather than model messages.
 - `geospatial/native_harness_bootstrap.md`
   Resume point, completed implementation slices, deletion order, and
   validation gates for the native-agent consolidation.
+- `geospatial/agent_loop_high_remediation.md`
+  Ordered, standalone H1–H4 native-agent reliability fixes; linked to `AL-H1`–`AL-H4`
+  validation gates and the active project issue/debt ledger.
 
 #### Providers
 
