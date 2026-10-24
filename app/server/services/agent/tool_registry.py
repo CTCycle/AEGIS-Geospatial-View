@@ -229,6 +229,7 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
         "set_layer_visibility",
         "set_layer_opacity",
         "set_basemap",
+        "change_basemap",
         "keep_only_layers",
         "fit_layer",
         "reset_view",
