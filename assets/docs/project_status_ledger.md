@@ -337,6 +337,19 @@ limitation.
 - **Required revalidation:** For every affected capability, verify discovery, exact location, execution, provider result semantics, and browser rendering where a map is requested.
 - **Related documentation:** [agentic search](geospatial/agentic_search.md), [provider framework](geospatial/providers/provider_framework.md), [EEA validation](../QA/validation-20261018-eea-end2022/report.md), [route matrix](../QA/tier3-validation-develop-20261001-route-matrix/report.md).
 
+### ISSUE-007: Native-loop recovery and completion state can diverge across execution boundaries
+
+- **Status:** `OPEN` / remediation planned; static code audit only, issue-specific runtime reproduction `UNRUN`.
+- **Severity:** HIGH.
+- **Affected components:** capability discovery/cache; persisted run/render lifecycle; checkpointed evidence and coverage; execution-tool exposure.
+- **Evidence baseline:** `develop@dac3cc965149f216204d89fc1fdf94c9ab1514b3`. [Ordered remediation plan](geospatial/agent_loop_high_remediation.md) and [supplemental validation gates `AL-H1`–`AL-H4`](validation/gate_status.md).
+- **H1:** `discover_geospatial_capabilities` is registered replayable although its shortlist is filtered by changing `excluded_capability_ids`. Repeat calls may resurrect excluded providers.
+- **H2:** An `awaiting_render` timeout uses a process-local task, while startup recovery selects only pending/running/updating runs. Restart may strand a browser-acknowledgement wait.
+- **H3:** Checkpoint retains the last 16 `tool_results`, but canonical completion recomputes obligations and route-target proof from that list. Longer resumed runs may lose already earned coverage.
+- **H4:** Tool-exposure logic counts inspect/transform success independently of the canonical eligible-data test, potentially concealing provider retrieval while it is still needed.
+- **Remediation order:** H1 → H2 → H3 → H4. Each is separately implementable and separately validated. Planned work is documentation-only on `remediation/agent-loop-high-20261024` until its implementation begins.
+- **Closure:** Require `AL-H1`–`AL-H4` evidence, targeted regression coverage, focused end-to-end recovery/render validation and applicable static/test gates. Do not downgrade earlier narrower `PASS` gates without a reproduced regression.
+
 ## Resolved / historical findings
 
 Resolved findings are retained only for provenance. They are not active issues
@@ -364,6 +377,7 @@ broken.
 
 | Component | Current confidence | Missing validation | Priority | Next validation action |
 | --- | --- | --- | --- | --- |
+| `agent.native-loop.high-reliability-edges` | `UNVALIDATED` | Four static HIGH findings H1–H4 lack issue-specific regression and restart/end-to-end evidence; this is not a measured failure of prior T0–T5 cases. | `HIGH` | Execute [H1–H4 plan](geospatial/agent_loop_high_remediation.md) in order and close [AL-H1–AL-H4](validation/gate_status.md) with commit-specific tests. |
 | `agent.capability-routing.live-language` | `PARTIAL` | Numeric elevation is disabled by licence opt-in and its SRTM alternative times out; F-19 explicit USGS time ranges; F-13 narration wording and radar browser acknowledgement; Overpass reliability; remaining route aliases and semantics and other live catalog families stay open. Census and imagery now pass live (2026-10-19). | `HIGH` | Decide on the elevation opt-in, then execute the remaining rows using the exact configured lane and browser-authoritative source/render evidence. |
 | `agent.capability-discovery.inventory` | `VALIDATED` | No current gap in the bounded 50-candidate discovery-only slice. | — | Re-run after catalog pagination, runtime-budget, or discovery-route changes; keep provider and map-render boundaries separate. |
 | `agent.intent-driven-discovery` | `MEDIUM` | Single exact lane only; no completed multi-source analysis or non-weather/seismic dataset coverage; image upload validated on one vision lane only. The 2026-10-20 branch audit reached Open-Meteo and EMSC capability descriptions, but HTTP 503 from the selected model provider blocked retrieval and rendering. | `MEDIUM` | When the configured provider is healthy, complete a multi-source request through retrieval and render; then test another model lane and the non-vision attachment path. |
