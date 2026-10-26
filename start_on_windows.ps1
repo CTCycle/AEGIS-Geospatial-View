@@ -226,6 +226,14 @@ function Write-Status {
     Write-Host "[$Level] $Message" -ForegroundColor $color
 }
 
+function Write-LaunchTiming {
+    param(
+        [Parameter(Mandatory)][string]$Phase,
+        [Parameter(Mandatory)][long]$ElapsedMilliseconds
+    )
+    Write-Host ('[TIME] {0,-42} {1,8} ms' -f "$($Phase):", $ElapsedMilliseconds) -ForegroundColor Gray
+}
+
 function Start-LauncherProgress {
     param([Parameter(Mandatory)][string]$Activity, [Parameter(Mandatory)][string]$Status)
     $id = $script:NextProgressId++
@@ -871,40 +879,72 @@ function Get-BrowserHost {
 }
 
 function Invoke-LaunchApplication {
-    Import-EnvironmentFile
-    Set-LauncherEnvironment
-    $applicationPorts = Get-ConfiguredApplicationPorts
-    Resolve-LaunchPortConflicts -Ports $applicationPorts
+    $launchStopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $environmentPreflightStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        Import-EnvironmentFile
+        Set-LauncherEnvironment
+        $applicationPorts = Get-ConfiguredApplicationPorts
+        Resolve-LaunchPortConflicts -Ports $applicationPorts
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Environment and port preflight' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $environmentPreflightStarted)
+    }
 
-    if (-not (Test-LaunchDependenciesReady)) {
-        Write-Status STEP 'Required application environments or frontend dependencies are missing or stale; installing dependencies.'
-        Ensure-PortableRuntimes
-        Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
+    $dependencySetupStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        if (-not (Test-LaunchDependenciesReady)) {
+            Write-Status STEP 'Required application environments or frontend dependencies are missing or stale; installing dependencies.'
+            Ensure-PortableRuntimes
+            Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
+        }
+        else {
+            Write-Status OK 'Application environments and frontend dependencies are ready; skipped dependency installation.'
+        }
     }
-    else {
-        Write-Status OK 'Application environments and frontend dependencies are ready; skipped dependency installation.'
+    finally {
+        Write-LaunchTiming -Phase 'Dependency check and setup' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $dependencySetupStarted)
     }
-    Ensure-FrontendBuildCurrent
+
+    $frontendBuildStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        Ensure-FrontendBuildCurrent
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Frontend production build check' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $frontendBuildStarted)
+    }
 
     $fastApiPort = [int]$env:FASTAPI_PORT
     $browserBackendHost = Get-BrowserHost -HostName $env:FASTAPI_HOST
     $appUri = "http://${browserBackendHost}:$fastApiPort/"
     $backendHealthUri = "${appUri}api/health"
 
-    Resolve-LaunchPortConflicts -Ports $applicationPorts
-
-    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
-    if (-not (Test-Path -LiteralPath $venvPython)) {
-        throw "Virtual-environment Python was not found at $venvPython."
+    $finalPortCheckStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        Resolve-LaunchPortConflicts -Ports $applicationPorts
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Final port check' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $finalPortCheckStarted)
     }
 
-    $backendModule = 'server.app:app'
-    $backendWorkingDirectory = $AppDir
-    $env:PYTHONPATH = $AppDir
+    $backendPreparationStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
+        $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+        if (-not (Test-Path -LiteralPath $venvPython)) {
+            throw "Virtual-environment Python was not found at $venvPython."
+        }
 
-    $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
-    if ($env:RELOAD -ieq 'true') {
-        $backendArguments += '--reload'
+        $backendModule = 'server.app:app'
+        $backendWorkingDirectory = $AppDir
+        $env:PYTHONPATH = $AppDir
+
+        $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
+        if ($env:RELOAD -ieq 'true') {
+            $backendArguments += '--reload'
+        }
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Backend launch preparation' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendPreparationStarted)
     }
 
     # The backend serves the built SPA and the API from one origin; this launcher
@@ -912,29 +952,43 @@ function Invoke-LaunchApplication {
     $backendProcess = $null
     $started = $false
     try {
-        Write-Status RUN "Launching backend ($backendModule)"
-        if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
-            # Sharing the launcher console lets Ctrl+C reach uvicorn for a graceful shutdown,
-            # with or without output redirection.
-            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -PassThru
+        $backendProcessStartStarted = $launchStopwatch.ElapsedMilliseconds
+        try {
+            Write-Status RUN "Launching backend ($backendModule)"
+            if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
+                # Sharing the launcher console lets Ctrl+C reach uvicorn for a graceful shutdown,
+                # with or without output redirection.
+                $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -PassThru
+            }
+            else {
+                New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
+                $stdoutLog = Join-Path $LogsDir 'backend-console.log'
+                $stderrLog = Join-Path $LogsDir 'backend-console.err.log'
+                $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
+                Write-Status INFO "Backend output is written to $stdoutLog and $stderrLog."
+            }
         }
-        else {
-            New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
-            $stdoutLog = Join-Path $LogsDir 'backend-console.log'
-            $stderrLog = Join-Path $LogsDir 'backend-console.err.log'
-            $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -NoNewWindow -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
-            Write-Status INFO "Backend output is written to $stdoutLog and $stderrLog."
+        finally {
+            Write-LaunchTiming -Phase 'Backend process start' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendProcessStartStarted)
         }
 
-        Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
-        if (-not (Wait-HttpHealth -Uri $backendHealthUri -Process $backendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
-            throw "Backend did not become ready within 60 seconds at $backendHealthUri."
+        $backendReadinessStarted = $launchStopwatch.ElapsedMilliseconds
+        try {
+            Write-Status WAIT "Waiting for backend readiness at $backendHealthUri"
+            if (-not (Wait-HttpHealth -Uri $backendHealthUri -Process $backendProcess -TimeoutSeconds 60 -IntervalSeconds 1)) {
+                throw "Backend did not become ready within 60 seconds at $backendHealthUri."
+            }
+            Write-Status OK 'Backend health check passed.'
+            if (-not (Wait-HttpHealth -Uri $appUri -Process $backendProcess -TimeoutSeconds 15 -IntervalSeconds 1)) {
+                throw "The backend did not serve the built frontend at $appUri."
+            }
+            $started = $true
+            $launchStopwatch.Stop()
+            Write-LaunchTiming -Phase 'Total time to application readiness' -ElapsedMilliseconds $launchStopwatch.ElapsedMilliseconds
         }
-        Write-Status OK 'Backend health check passed.'
-        if (-not (Wait-HttpHealth -Uri $appUri -Process $backendProcess -TimeoutSeconds 15 -IntervalSeconds 1)) {
-            throw "The backend did not serve the built frontend at $appUri."
+        finally {
+            Write-LaunchTiming -Phase 'API and frontend readiness checks' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendReadinessStarted)
         }
-        $started = $true
 
         try {
             Start-Process -FilePath $appUri -ErrorAction Stop | Out-Null
