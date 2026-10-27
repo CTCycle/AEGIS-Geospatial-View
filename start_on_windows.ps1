@@ -880,15 +880,22 @@ function Get-BrowserHost {
 
 function Invoke-LaunchApplication {
     $launchStopwatch = [Diagnostics.Stopwatch]::StartNew()
-    $environmentPreflightStarted = $launchStopwatch.ElapsedMilliseconds
+    $environmentStarted = $launchStopwatch.ElapsedMilliseconds
     try {
         Import-EnvironmentFile
         Set-LauncherEnvironment
         $applicationPorts = Get-ConfiguredApplicationPorts
+    }
+    finally {
+        Write-LaunchTiming -Phase 'Environment and launch configuration' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $environmentStarted)
+    }
+
+    $portPreflightStarted = $launchStopwatch.ElapsedMilliseconds
+    try {
         Resolve-LaunchPortConflicts -Ports $applicationPorts
     }
     finally {
-        Write-LaunchTiming -Phase 'Environment and port preflight' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $environmentPreflightStarted)
+        Write-LaunchTiming -Phase 'Port checks' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $portPreflightStarted)
     }
 
     $dependencySetupStarted = $launchStopwatch.ElapsedMilliseconds
@@ -979,16 +986,23 @@ function Invoke-LaunchApplication {
                 throw "Backend did not become ready within 60 seconds at $backendHealthUri."
             }
             Write-Status OK 'Backend health check passed.'
+        }
+        finally {
+            Write-LaunchTiming -Phase 'Backend health readiness' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendReadinessStarted)
+        }
+
+        $frontendReadinessStarted = $launchStopwatch.ElapsedMilliseconds
+        try {
             if (-not (Wait-HttpHealth -Uri $appUri -Process $backendProcess -TimeoutSeconds 15 -IntervalSeconds 1)) {
                 throw "The backend did not serve the built frontend at $appUri."
             }
             $started = $true
-            $launchStopwatch.Stop()
-            Write-LaunchTiming -Phase 'Total time to application readiness' -ElapsedMilliseconds $launchStopwatch.ElapsedMilliseconds
         }
         finally {
-            Write-LaunchTiming -Phase 'API and frontend readiness checks' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $backendReadinessStarted)
+            Write-LaunchTiming -Phase 'Frontend readiness' -ElapsedMilliseconds ($launchStopwatch.ElapsedMilliseconds - $frontendReadinessStarted)
         }
+        $launchStopwatch.Stop()
+        Write-LaunchTiming -Phase 'Total time to application readiness' -ElapsedMilliseconds $launchStopwatch.ElapsedMilliseconds
 
         try {
             Start-Process -FilePath $appUri -ErrorAction Stop | Out-Null

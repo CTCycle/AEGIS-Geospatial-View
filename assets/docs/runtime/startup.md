@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-10-22
+Last updated: 2026-10-27
 
 ## Local Development Via Launcher
 
@@ -81,6 +81,9 @@ foreground as the lifecycle owner. If readiness fails, only the process tree
 created by that launch is cleaned up. It launches the venv Python directly
 with `server.app:app` from the `app` directory and does not support an
 alternate import root, stale launcher arguments, or compatibility fallback.
+The launcher reports elapsed milliseconds for major launch steps and the total
+time to application readiness. Timings include any time spent answering port
+conflict prompts.
 The native route rejects provider aliases and never substitutes a different
 provider or model after a configured provider failure.
 
