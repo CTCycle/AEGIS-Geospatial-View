@@ -456,7 +456,7 @@ class GeospatialApiService:
         if relay is not None:
             upstream_url = f"{relay['base_url']}?{upstream_url}"
             fetch_headers = relay["required_headers"]
-        LOGGER.info(
+        LOGGER.debug(
             "geospatial_tile_proxy provider=%s capability=%s upstream=%s relay=%s",
             provider or "unknown",
             capability_id,

@@ -166,7 +166,7 @@ class RealtimeConnection:
             )
             await self._receive_loop()
         except WebSocketDisconnect:
-            LOGGER.info(
+            LOGGER.debug(
                 "realtime_disconnect conversation_id=%s run_id=%s",
                 self.conversation_id,
                 self._active_run_id,

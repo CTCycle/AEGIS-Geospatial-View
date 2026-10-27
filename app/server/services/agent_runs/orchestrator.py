@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 from contextlib import suppress
 from typing import Any, cast
 
@@ -27,6 +28,8 @@ from server.services.agent_runs.render_completion import (
     RenderCompletionService,
 )
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderError
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class AgentRunOrchestrator:
@@ -70,6 +73,7 @@ class AgentRunOrchestrator:
             elif snapshot.active_run_version != expected_version:
                 return await self.execute_run(run_id)
             return None
+        LOGGER.info("agent_run event=started run_id=%s version=%s", run_id, snapshot.active_run_version)
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
         await self._publish_trace(
             snapshot,

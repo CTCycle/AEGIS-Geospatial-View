@@ -2,16 +2,27 @@ from __future__ import annotations
 
 import logging
 import logging.config
+import os
 from datetime import datetime
 from typing import Any
 
-from server.common.paths import LOGS_PATH
+from dotenv import dotenv_values
+
+from server.common.paths import ENV_EXAMPLE_FILE_PATH, ENV_FILE_PATH, LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################
 LOGS_PATH.mkdir(parents=True, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 log_filename = LOGS_PATH / f"AEGIS_{current_timestamp}.log"
+
+# Read the setting early, before application startup imports emit diagnostics.
+_environment_path = ENV_FILE_PATH if ENV_FILE_PATH.is_file() else ENV_EXAMPLE_FILE_PATH
+_log_level = os.environ.get(
+    "AEGIS_LOG_LEVEL", dotenv_values(_environment_path).get("AEGIS_LOG_LEVEL") or "INFO"
+).upper()
+if _log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
+    _log_level = "INFO"
 
 # Define logger configuration
 ###############################################################################
@@ -27,15 +38,16 @@ LOG_CONFIG: dict[str, Any] = {
             "format": "[%(levelname)s] %(message)s",
         },
     },
+    "filters": {"access": {"()": "server.common.logging_handlers.AccessLogFilter"}},
     "handlers": {
         "console": {
             "class": "server.common.logging_handlers.SafeStreamHandler",
-            "level": "INFO",
+            "level": _log_level,
             "formatter": "minimal",
         },
         "file": {
             "class": "logging.FileHandler",
-            "level": "INFO",
+            "level": _log_level,
             "formatter": "default",
             "filename": str(log_filename),
             "mode": "a",
@@ -43,8 +55,14 @@ LOG_CONFIG: dict[str, Any] = {
         },
     },
     "loggers": {
+        "uvicorn": {
+            "level": _log_level,
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
         "uvicorn.access": {
-            "level": "WARNING",
+            "level": "DEBUG",
+            "filters": ["access"],
             "handlers": ["console", "file"],
             "propagate": False,
         },
@@ -90,7 +108,7 @@ LOG_CONFIG: dict[str, Any] = {
         },
     },
     "root": {
-        "level": "INFO",
+        "level": _log_level,
         "handlers": ["console", "file"],
     },
 }

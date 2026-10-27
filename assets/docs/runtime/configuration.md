@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-10-22
+Last updated: 2026-10-27
 
 ## Environment file
 
@@ -18,6 +18,7 @@ Common keys include:
 - `UI_PORT` (Angular dev server only)
 - `RELOAD`
 - `BACKEND_LOGS_VISIBLE`
+- `AEGIS_LOG_LEVEL` (defaults to `INFO`; set to `DEBUG` for successful HTTP access and detailed application diagnostics; accepts `WARNING` and `ERROR`)
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
   non-browser clients)
 - `AEGIS_ALLOW_RESTRICTED_SOURCES` (default `false`; explicitly opts the

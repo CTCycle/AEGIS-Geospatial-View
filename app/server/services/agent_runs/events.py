@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator
@@ -12,6 +13,8 @@ from server.contracts.events import (
     RunEventVisibility,
 )
 from server.repositories.agent_run_events import AgentRunEventRepository
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -57,6 +60,7 @@ class RunEventPublisher:
                 payload=payload,
             )
         )
+        self._log_lifecycle(event)
         if event.visibility == RunEventVisibility.USER:
             await self._fanout(event)
         return event
@@ -71,9 +75,27 @@ class RunEventPublisher:
         """
 
         event = self.event_repository.get_event(event_id)
-        if event is not None and event.visibility == RunEventVisibility.USER:
-            await self._fanout(event)
+        if event is not None:
+            self._log_lifecycle(event)
+            if event.visibility == RunEventVisibility.USER:
+                await self._fanout(event)
         return event
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _log_lifecycle(event: RunEvent) -> None:
+        if event.type in {
+            RunEventType.COMPLETED, RunEventType.CANCELLED, RunEventType.CLARIFICATION_NEEDED
+        }:
+            LOGGER.info(
+                "agent_run event=%s run_id=%s version=%s",
+                event.type.value, event.run_id, event.run_version,
+            )
+        elif event.type == RunEventType.ERROR:
+            LOGGER.error(
+                "agent_run event=error run_id=%s version=%s code=%s",
+                event.run_id, event.run_version, event.payload.get("code", "unknown"),
+            )
 
     # -------------------------------------------------------------------------
     async def _fanout(self, event: RunEvent) -> None:
