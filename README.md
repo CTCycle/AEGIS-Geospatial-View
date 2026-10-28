@@ -1,4 +1,4 @@
-<p align="center"><img src="app/client/public/favicon.png" alt="" width="80"></p>
+<p align="center"><img src="assets/figures/aegis-mark.svg" alt="AEGIS shield mark" width="80"></p>
 
 <h1 align="center">AEGIS Geospatial View</h1>
 
