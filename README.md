@@ -1,109 +1,112 @@
-<p align="center"><img src="app/client/public/favicon.png" alt="AEGIS mark" width="96"></p>
+<p align="center">
+  <img src="app/client/public/favicon.png" alt="" width="72">
+</p>
 
 <h1 align="center">AEGIS Geospatial View</h1>
 
-<p align="center">A chat-driven local geospatial workspace for exploring places, layers, and map context.</p>
+<p align="center">Ask location and geospatial data questions in chat. Inspect spatial results on a map.</p>
 
 <p align="center">
-  <a href="https://github.com/CTCycle/AEGIS-Geospatial-View/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CTCycle/AEGIS-Geospatial-View?style=flat-square"></a>
-  <a href="https://github.com/CTCycle/AEGIS-Geospatial-View/commits"><img alt="Last commit" src="https://img.shields.io/github/last-commit/CTCycle/AEGIS-Geospatial-View?style=flat-square"></a>
-  <a href="https://github.com/CTCycle/AEGIS-Geospatial-View/releases"><img alt="Release" src="https://img.shields.io/github/v/release/CTCycle/AEGIS-Geospatial-View?display_name=tag&style=flat-square"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/CTCycle/AEGIS-Geospatial-View?style=flat-square"></a>
-</p>
-
-<p align="center">
-  <a href="https://www.python.org/"><img alt="Python 3.14.7" src="https://img.shields.io/badge/Python-3.14.7-3776AB?logo=python&logoColor=white&style=flat-square"></a>
+  <a href="https://www.python.org/"><img alt="Python 3.14+" src="https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white&style=flat-square"></a>
   <a href="https://angular.dev/"><img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white&style=flat-square"></a>
-  <a href="https://www.microsoft.com/windows"><img alt="Platform: Windows" src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white&style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/CTCycle/AEGIS-Geospatial-View?style=flat-square"></a>
 </p>
 
-## Overview
+## What it does
 
-AEGIS Geospatial View is a chat-driven local geospatial workspace for exploring places, layers, and map context. Users describe a location, coordinates, or geospatial task in plain language and receive map-focused results with overlays and session context. The application can refine results through follow-up requests while preserving conversation context and supports direct coordinate lookups. It can discover conditions across an area and locate photos from visual clues using a vision-capable model. The default workflow uses public geospatial sources without a provider key, while optional cloud models and provider services require their own access. Local state persists in SQLite, and the interface requires a desktop browser window at least 1024 pixels wide.
+AEGIS is a local geospatial workspace built around chat and a map. Describe a
+place, coordinates, or a data question; the selected model can use the available
+geospatial tools and return a written answer, a map session, or both. Follow-up
+requests can refine the question or change active overlays while keeping the
+conversation context.
 
-## Key Features
-
-- Search by address or coordinates and review locations in their map context.
-- Explore base maps, overlays, and geospatial capabilities in the Geodata catalog.
-- Refine a map session with follow-up requests while preserving conversation context.
-- Discover conditions across an area with ranked samples, grid bins, and named places.
-- Locate a photo from visual cues as a hypothesis with confirmation.
-- Configure model selection, local Ollama access, provider credentials, and geospatial settings.
-- Keep local application state in SQLite with schema migrations via Alembic.
-- Use public sources by default, with optional provider keys for services such as TomTom and OpenAQ.
+The Geodata page catalogs providers, basemaps, layers, camera networks, transit
+feeds, and direct tools available to the application. It also shows source and
+access notes.
 
 ## Screenshots
 
-<p align="center">
-  <kbd><img src="assets/figures/search_page.png" alt="Search page" width="49%"></kbd>
-  <kbd><img src="assets/figures/database_browser.png" alt="Database browser" width="49%"></kbd>
-</p>
-<p align="center"><em>Search page and database browser.</em></p>
+![Search workspace with chat and map canvas ready for a request](assets/figures/workspace.png)
 
-## Technology Stack
+<sub>Search workspace. Map output appears when a request returns spatial results.</sub>
 
-| Layer | Technology |
-|---|---|
-| Backend | Python 3.14.7, FastAPI 0.136.3 |
-| Web client | Angular 22 (TypeScript 6.0) |
-| Database | SQLite (default) |
-| Schema migrations | Alembic |
-| Launcher | Windows PowerShell with portable Python, uv, and Node.js |
+![Geodata catalog listing providers and their access notes](assets/figures/geodata-catalog.png)
 
-## Installation and Usage
+<sub>Geodata catalog with source, update, access, and dependency details.</sub>
 
-From the repository root in PowerShell, start the launcher:
+## Capabilities
+
+- Search for places or coordinates and review results in their map context.
+- Add, hide, or remove map overlays in follow-up messages.
+- Compare conditions across an area with ranked samples or grid bins. Results
+  include source and coverage context; weather values are model estimates, not
+  station measurements.
+- Upload a photo for location clues with a vision-capable model. AEGIS treats
+  the result as a hypothesis and asks for confirmation when the clues are
+  ambiguous.
+- Browse available data sources and manage model and provider access in Settings.
+
+Example requests:
+
+- `Show current satellite context for Rome, Italy.`
+- `Where in Europe did it rain most today?`
+- `Give me the coordinates of Rome, Italy.`
+
+## Run locally on Windows
+
+The supported Windows launcher requires PowerShell 7 or later. Run it from the
+repository root:
 
 ```powershell
 .\start_on_windows.ps1
 ```
 
-Choose **Launch Application** and open the local address reported by the launcher. On first setup, the launcher prepares the runtimes and dependencies. Use a desktop browser window at least 1024 pixels wide; the interface does not provide a mobile layout.
+Choose **Launch application**. On first use, the launcher sets up its portable
+Python, `uv`, and Node.js runtimes, synchronizes dependencies, and builds the
+frontend when needed. It opens the application when the backend is ready; press
+**Ctrl+C** in the launcher to stop it.
 
-Manual (from source):
+Chat requires a model with native tool-calling support. Select an installed
+Ollama model in **Settings → Models**, or configure a supported cloud provider
+in **Settings → Model Providers**. Basic public geospatial sources do not need
+a provider key; some optional sources require credentials or have usage
+restrictions.
 
-```powershell
-cd app/server
-uv sync
-cd ../client
-npm install
-```
+The application requires a desktop browser viewport at least 1024 pixels wide.
+Smaller windows show a minimum-size notice instead of a mobile layout. For
+manual development setup and launcher details, see
+[Runtime startup](assets/docs/runtime/startup.md).
 
-Then launch the application (the backend serves the built UI and API at `http://<FASTAPI_HOST>:<FASTAPI_PORT>/`; press Ctrl+C in the launcher to stop) following [Runtime startup](assets/docs/runtime/startup.md).
+## Data and configuration
 
-## Configuration
+Application data is stored locally in SQLite under `data/runtime` by default.
+Set `AEGIS_DATA_DIR` in `settings/.env` to use another data directory. Model
+provider keys entered in Settings are encrypted in the local database. See
+[Runtime configuration](assets/docs/runtime/configuration.md) for the full
+settings reference.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `FASTAPI_HOST` | `127.0.0.1` | Backend host |
-| `FASTAPI_PORT` | `5002` | Backend port |
-| `UI_HOST` | `127.0.0.1` | Angular dev-server host (development only) |
-| `UI_PORT` | `5000` | Angular dev-server port (development only) |
-| `RELOAD` | `false` | Enable backend reload |
-| `BACKEND_LOGS_VISIBLE` | `true` | Show backend logs |
-| `REALTIME_ALLOW_MISSING_ORIGIN` | `false` | Allow missing-origin WebSocket connections |
-| `AEGIS_ALLOW_RESTRICTED_SOURCES` | `false` | Enable restricted public sources |
-| `AEGIS_DATA_DIR` | empty | Application data directory override |
+Provider coverage, freshness, credentials, and usage terms vary. Check the
+Geodata catalog and each provider's terms before relying on a source.
 
-Startup and deployment values are stored in `settings/.env`, created from `settings/.env.example` when missing. `AEGIS_DATA_DIR` can select a different local data directory. Enter optional model-provider credentials through **Settings**; the public-source workflow does not require them.
+## Technology
+
+| Area | Stack |
+| --- | --- |
+| Web client | Angular 22, TypeScript 6 |
+| API | Python 3.14+, FastAPI |
+| Map | MapLibre GL JS |
+| Storage | SQLite, Alembic migrations |
+| Windows launcher | PowerShell 7+ |
 
 ## Documentation
 
-- [Quick Start](assets/docs/user/quick_start.md)
-- [Runtime startup](assets/docs/runtime/startup.md)
-- [Runtime configuration](assets/docs/runtime/configuration.md)
+- [Quick start](assets/docs/user/quick_start.md)
+- [User workflows](assets/docs/user/workflows.md)
+- [Model and provider settings](assets/docs/user/settings_and_access.md)
+- [Runtime startup and development](assets/docs/runtime/startup.md)
+- [Configuration](assets/docs/runtime/configuration.md)
 - [Troubleshooting](assets/docs/user/troubleshooting.md)
-
-## Limitations
-
-- The interface requires a desktop browser window at least 1024 pixels wide; no mobile layout is provided.
-- Optional cloud models and provider services require their own access and availability.
-- Restricted public sources remain unavailable unless explicitly enabled by the deployment owner.
-
-## Contributing
-
-Contributions are welcome. Open an issue or pull request with a clear description of the change and its motivation.
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE).
+AEGIS Geospatial View is licensed under the [MIT License](LICENSE).
