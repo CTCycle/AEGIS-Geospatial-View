@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-10-22
+Last updated: 2026-10-29
 
 ## Python Quality Gates
 
@@ -54,6 +54,16 @@ stable across launchers, CI, development, and tests:
 - `angular`: Angular CLI cache
 - `coverage`: Python and Karma coverage output
 - `test-runtime`: disposable test databases and migration state
+- `mobility-database`: the regenerable Mobility Database feed catalog
+
+Normal tooling writes caches under `runtimes/cache`. Launcher cleanup also
+removes recognized source-local leftovers such as repository-root and
+validation-script Python bytecode, pytest/Ruff caches, the legacy
+`app/runtimes/cache` test-runtime tree, local Angular cache, and coverage
+output. It skips dependency environments, retained QA evidence, and
+unrecognized directories. Use
+`start_on_windows.ps1 -Action ClearCache -WhatIf` to inspect paths before
+cleanup.
 
 Retained QA evidence is not cache data: screenshots, reports, logs, and
 validation notes remain under `assets/QA` and are not removed by cache cleanup.

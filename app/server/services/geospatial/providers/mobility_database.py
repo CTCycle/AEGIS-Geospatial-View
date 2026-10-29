@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from server.common.paths import resolve_runtime_data_root
+from server.common.paths import ROOT_DIR
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
@@ -37,15 +37,14 @@ class MobilityDatabaseProvider(GeospatialProvider):
         fetcher: TextFetcher | None = None,
         catalog_url: str = MOBILITY_DATABASE_CSV_URL,
     ) -> None:
+        cache_root = Path(
+            os.getenv("AEGIS_CACHE_ROOT", str(ROOT_DIR / "runtimes" / "cache"))
+        )
         self.catalog_path = Path(
             catalog_path
             or os.getenv(
                 "AEGIS_MOBILITY_DATABASE_CATALOG_PATH",
-                str(
-                    resolve_runtime_data_root()
-                    / "geospatial"
-                    / "mobility_database_feeds_v2.csv"
-                ),
+                str(cache_root / "mobility-database" / "feeds_v2.csv"),
             )
         ).expanduser()
         self.fetcher = fetcher or fetch_text_url

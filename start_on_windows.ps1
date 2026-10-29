@@ -1,8 +1,10 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-    [ValidateSet('Launch', 'ClearCache')]
-    [string]$Action
+    [ValidateSet('Launch', 'ClearCache', 'RemoveLogs', 'Uninstall', 'RemoveAllData')]
+    [string]$Action,
+    [switch]$WhatIf,
+    [switch]$ConfirmRemoval
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +23,8 @@ $DefaultRuntimeDataDir = Join-Path $DataDir 'runtime'
 $IngestionDataDir = Join-Path $DataDir 'geospatial'
 $VectorsDir = Join-Path $DataDir 'vectors'
 $RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
+$MobilityDatabaseCacheDir = Join-Path $RuntimeCacheDir 'mobility-database'
+$MobilityDatabaseCatalogPath = Join-Path $MobilityDatabaseCacheDir 'feeds_v2.csv'
 $PythonDir = Join-Path $RuntimesDir 'python'
 $PythonExe = Join-Path $PythonDir 'python.exe'
 $PythonPth = Join-Path $PythonDir 'python314._pth'
@@ -72,6 +76,8 @@ $NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
 $script:NextProgressId = 1
 $script:ActiveProgressActivities = [Collections.Generic.Dictionary[int, string]]::new()
 $script:LauncherInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected
+$script:PreviewOnly = [bool]$WhatIf
+$script:CleanupDiscoveryErrors = [Collections.Generic.List[string]]::new()
 
 # -----------------------------------------------------------------------------
 # RUNTIME AND DOWNLOAD HELPERS
@@ -386,7 +392,7 @@ function Ensure-NodeRuntime {
     $nestedNodeDir = Join-Path $NodeDir "node-v$NodeVersion-win-x64"
     if (Test-Path -LiteralPath (Join-Path $nestedNodeDir 'node.exe')) {
         Get-ChildItem -LiteralPath $nestedNodeDir -Force | Move-Item -Destination $NodeDir -Force
-        [void](Remove-LauncherPath -Path $nestedNodeDir -Activity 'AEGIS: flatten Node.js runtime' -Strict)
+        [void](Remove-LauncherPath -Path $nestedNodeDir -AllowedRoot $NodeDir -Activity 'AEGIS: flatten Node.js runtime' -Strict)
     }
     if (-not (Test-Path -LiteralPath $NodeExe) -or -not (Test-Path -LiteralPath $NpmCmd)) {
         throw "The portable Node.js runtime is incomplete at $NodeDir."
@@ -1043,7 +1049,7 @@ function Invoke-InstallOrUpdate {
     $installationType = Read-InstallationType
     Sync-Dependencies -BuildFrontend $true -InstallationType $installationType
     if (Test-Path -LiteralPath $UvCacheDir) {
-        [void](Remove-PathBestEffort -Path $UvCacheDir)
+        [void](Remove-PathBestEffort -Path $UvCacheDir -AllowedRoot $RuntimeCacheDir)
     }
     Write-Status SUCCESS 'Dependencies installed, frontend built, and uv cache pruning attempted.'
 }
@@ -1197,7 +1203,58 @@ function Get-ConfiguredDataDirectory {
 function Get-NormalizedPath {
     param([Parameter(Mandatory)][string]$Path)
 
-    return ([IO.Path]::GetFullPath($Path)).TrimEnd([char]'\', [char]'/')
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw 'Refusing to use an empty filesystem path.'
+    }
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $pathRoot = [IO.Path]::GetPathRoot($fullPath)
+    if ($fullPath.Equals($pathRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        return $pathRoot
+    }
+    return $fullPath.TrimEnd([char]'\', [char]'/')
+}
+
+function Test-PathWithin {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Root
+    )
+
+    $candidate = Get-NormalizedPath -Path $Path
+    $boundary = Get-NormalizedPath -Path $Root
+    return $candidate.Equals($boundary, [StringComparison]::OrdinalIgnoreCase) -or
+        $candidate.StartsWith($boundary.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-ValidatedCleanupTarget {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$AllowedRoot
+    )
+
+    $candidate = Get-NormalizedPath -Path $Path
+    $boundary = Get-NormalizedPath -Path $AllowedRoot
+    $volumeRoot = [IO.Path]::GetPathRoot($candidate)
+    if ($candidate.Equals($volumeRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $candidate.Equals((Get-NormalizedPath -Path $RootDir), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove a filesystem or repository root: $candidate"
+    }
+    if (-not (Test-PathWithin -Path $candidate -Root $boundary)) {
+        throw "Refusing to remove a path outside its approved application location: $candidate"
+    }
+
+    $current = $candidate
+    while ($current) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing to traverse or remove a symbolic link or junction: $current"
+            }
+        }
+        if ($current.Equals($volumeRoot, [StringComparison]::OrdinalIgnoreCase)) { break }
+        $current = [IO.Path]::GetDirectoryName($current)
+    }
+    return $candidate
 }
 
 function Test-SafeDataDirectory {
@@ -1205,77 +1262,134 @@ function Test-SafeDataDirectory {
 
     $candidate = Get-NormalizedPath -Path $Path
     $root = Get-NormalizedPath -Path $RootDir
-    $protectedPaths = @(
-        $root,
-        (Get-NormalizedPath -Path $AppDir),
-        (Get-NormalizedPath -Path $DataDir),
-        (Get-NormalizedPath -Path $ServerDir),
-        (Get-NormalizedPath -Path $ClientDir),
-        (Get-NormalizedPath -Path $SettingsDir),
-        (Get-NormalizedPath -Path $RuntimesDir)
-    )
+    $defaultRuntimeRoot = Get-NormalizedPath -Path $DefaultRuntimeDataDir
+    $volumeRoot = [IO.Path]::GetPathRoot($candidate)
+    $userProfile = Get-NormalizedPath -Path ([Environment]::GetFolderPath('UserProfile'))
+    $windowsDirectory = Get-NormalizedPath -Path ([Environment]::GetFolderPath('Windows'))
 
-    if ($candidate -eq (Get-NormalizedPath -Path $DefaultRuntimeDataDir)) {
+    if ($candidate.Equals($defaultRuntimeRoot, [StringComparison]::OrdinalIgnoreCase)) {
         return
     }
-    if ($candidate -in $protectedPaths) {
-        throw "Refusing to remove application files from the configured data path: $Path"
+    if (Test-PathWithin -Path $candidate -Root $defaultRuntimeRoot) {
+        return
     }
-    if ($root.StartsWith("$candidate\", [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to remove a data path that contains the application checkout: $Path"
+    if ((Test-PathWithin -Path $candidate -Root $root) -or
+        (Test-PathWithin -Path $root -Root $candidate)) {
+        throw "Refusing to use a configured data directory that overlaps the application checkout: $Path"
+    }
+    if ($candidate.Equals($volumeRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Test-PathWithin -Path $userProfile -Root $candidate) -or
+        (Test-PathWithin -Path $windowsDirectory -Root $candidate)) {
+        throw "Refusing to use a filesystem, profile, or Windows directory as the application data root: $Path"
     }
 }
 
-function Remove-DirectoryContents {
-    [CmdletBinding()]
+function Resolve-DatabasePathValue {
     param(
-        [Parameter(Mandatory)]
-        [string]$Path,
-        [string[]]$PreserveNames = @('.gitkeep')
+        [Parameter(Mandatory)][string]$Value,
+        [Parameter(Mandatory)][string]$DataRoot
     )
-
-    $result = Remove-LauncherPath -Path $Path -KeepRoot -PreserveNames $PreserveNames -Activity "AEGIS: remove data from $Path"
-    return [pscustomobject]@{
-        Path = $result.Path
-        Removed = $result.Removed
-        Skipped = $result.Skipped + $result.EnumerationErrors.Count
-        Planned = $result.Planned
-        Preserved = $result.Preserved
-        RemovedPaths = $result.RemovedPaths
-        PreservedPaths = $result.PreservedEntries
-        SkippedPaths = $result.SkippedPaths
-        EnumerationErrors = $result.EnumerationErrors
+    $candidate = $Value.Trim()
+    if (-not $candidate) { throw 'Database configuration contains an empty database_path.' }
+    if ($candidate.StartsWith('~')) {
+        $profile = [Environment]::GetFolderPath('UserProfile')
+        $candidate = Join-Path $profile $candidate.TrimStart([char]'~', [char]'\', [char]'/')
     }
+    if (-not [IO.Path]::IsPathRooted($candidate)) { $candidate = Join-Path $DataRoot $candidate }
+    $candidate = Get-NormalizedPath -Path $candidate
+    $forbiddenRoots = @($AppDir, $SettingsDir, $RuntimesDir)
+    foreach ($forbiddenRoot in $forbiddenRoots) {
+        if (Test-PathWithin -Path $candidate -Root $forbiddenRoot) {
+            throw "Configured SQLite path overlaps application source or managed runtimes: $candidate"
+        }
+    }
+    if ((Test-PathWithin -Path $candidate -Root $RootDir) -and
+        -not (Test-PathWithin -Path $candidate -Root $DataDir)) {
+        throw "Configured SQLite path is inside the repository but outside its application data area: $candidate"
+    }
+    if (Test-PathWithin -Path $candidate -Root (Join-Path $DataDir 'catalog')) {
+        throw "Refusing to remove a SQLite file from the static source catalog: $candidate"
+    }
+    if (Test-Path -LiteralPath $candidate -PathType Container) {
+        throw "Configured SQLite path is a directory, not a file: $candidate"
+    }
+    return $candidate
+}
+
+function Get-CompleteRemovalTargets {
+    param([Parameter(Mandatory)][string]$DataRoot)
+    Test-SafeDataDirectory -Path $DataRoot
+    $targets = [Collections.Generic.List[object]]::new()
+    $settingsPath = Join-Path $DataRoot 'database-settings.json'
+    $settingsBackup = "$settingsPath.bak"
+    $activeDatabasePath = $null
+    $primaryExists = Test-Path -LiteralPath $settingsPath -PathType Leaf
+    $backupExists = Test-Path -LiteralPath $settingsBackup -PathType Leaf
+    foreach ($configurationPath in @($settingsPath, $settingsBackup)) {
+        if (-not (Test-Path -LiteralPath $configurationPath -PathType Leaf)) { continue }
+        try {
+            Test-ValidatedCleanupTarget -Path $configurationPath -AllowedRoot $DataRoot | Out-Null
+            $configuration = Get-Content -LiteralPath $configurationPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            $activeDatabasePath = Resolve-DatabasePathValue -Value ([string]$configuration.database_path) -DataRoot $DataRoot
+            if ($configurationPath -eq $settingsBackup -and -not $primaryExists) {
+                Write-Status WARN 'Primary database settings are missing; using the recovery copy to resolve the active SQLite path.'
+            }
+            elseif ($configurationPath -eq $settingsBackup) {
+                Write-Status WARN 'Primary database settings are invalid; using the recovery copy to resolve the active SQLite path.'
+            }
+            break
+        }
+        catch {
+            if ($configurationPath -eq $settingsPath -and $backupExists) { continue }
+            throw "Cannot safely resolve the active SQLite data path from $configurationPath. No persistent data was removed. $($_.Exception.Message)"
+        }
+    }
+    if (-not $activeDatabasePath) {
+        if ($primaryExists -or $backupExists) {
+            throw 'Cannot safely resolve the active SQLite data path from the available settings. No persistent data was removed.'
+        }
+        $activeDatabasePath = Get-NormalizedPath -Path (Join-Path $DataRoot 'database.db')
+    }
+
+    [void]$targets.Add((New-CleanupTarget -Path $settingsPath -AllowedRoot $DataRoot -PreserveNames @()))
+    [void]$targets.Add((New-CleanupTarget -Path $settingsBackup -AllowedRoot $DataRoot -PreserveNames @()))
+    foreach ($databasePath in @($activeDatabasePath)) {
+        $databaseParent = Split-Path -Parent $databasePath
+        $databaseName = Split-Path -Leaf $databasePath
+        $databaseBoundary = [IO.Path]::GetPathRoot($databasePath)
+        foreach ($suffix in @('', '-journal', '-wal', '-shm', '.migration.lock')) {
+            $targetPath = "$databasePath$suffix"
+            [void]$targets.Add((New-CleanupTarget -Path $targetPath -AllowedRoot $databaseBoundary -PreserveNames @()))
+        }
+        if (Test-Path -LiteralPath $databaseParent -PathType Container) {
+            $backupPattern = "$databaseName.migration-backup-*.db"
+            try {
+                foreach ($backup in @(Get-ChildItem -LiteralPath $databaseParent -Filter $backupPattern -File -Force -ErrorAction Stop)) {
+                    [void]$targets.Add((New-CleanupTarget -Path $backup.FullName -AllowedRoot $databaseParent -PreserveNames @()))
+                }
+            }
+            catch { throw "Unable to enumerate SQLite recovery files beside $databasePath. No persistent data was removed. $($_.Exception.Message)" }
+        }
+    }
+
+    # These are AEGIS-owned persistent data roots, shown and confirmed as complete trees.
+    foreach ($dataDirectory in @($IngestionDataDir, $VectorsDir, (Join-Path $DataRoot 'geospatial'))) {
+        [void]$targets.Add((New-CleanupTarget -Path $dataDirectory -AllowedRoot (Split-Path -Parent $dataDirectory) -KeepRoot))
+    }
+    foreach ($target in @(Get-LogCleanupTargets)) { [void]$targets.Add($target) }
+    return @($targets | Sort-Object Path -Unique)
 }
 
 function Invoke-RemoveAllData {
+    $script:CleanupDiscoveryErrors = [Collections.Generic.List[string]]::new()
     Import-EnvironmentFile
     $configuredDataDir = Get-ConfiguredDataDirectory
-    Test-SafeDataDirectory -Path $configuredDataDir
-
-    if (-not (Confirm-DestructiveAction 'remove all user-generated application data')) {
-        return
-    }
-
-    $targets = @(
-        $configuredDataDir,
-        $IngestionDataDir,
-        $VectorsDir,
-        $LogsDir
-    ) | ForEach-Object { Get-NormalizedPath -Path $_ } | Select-Object -Unique
-
-    Write-Status INFO 'Stopping configured local application services before removing data.'
-    Stop-PortListeners -Port ([int]$env:FASTAPI_PORT)
-
-    $removed = 0
-    $skipped = 0
-    foreach ($target in $targets) {
-        $result = Remove-DirectoryContents -Path $target
-        $removed += $result.Removed
-        $skipped += $result.Skipped
-    }
-    $statusLevel = if ($skipped -gt 0) { 'WARN' } else { 'SUCCESS' }
-    Write-Status $statusLevel "User-generated data removal completed where permitted; removed $removed item(s), skipped $skipped locked or inaccessible item(s)."
+    $targets = @(Get-CompleteRemovalTargets -DataRoot $configuredDataDir)
+    Show-CleanupPlan -Targets $targets -Activity 'AEGIS: remove all application data'
+    if ($WhatIf -or $script:PreviewOnly) { return }
+    if (-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'remove all listed application data')) { return }
+    Assert-NoActiveAegisProcesses
+    [void](Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: remove all application data' -Strict)
 }
 
 function Invoke-TestSuite {
@@ -1291,37 +1405,13 @@ function Invoke-TestSuite {
 }
 
 function Remove-ApplicationLogs {
-    if (-not (Confirm-DestructiveAction 'remove application log files')) { return }
-    if (-not (Test-Path -LiteralPath $LogsDir)) {
-        Write-Status INFO "Log directory does not exist: $LogsDir"
-        return
-    }
-    $logs = @(Get-ChildItem -LiteralPath $LogsDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
-    if ($logs.Count -eq 0) {
-        Write-Status INFO 'No log files found.'
-        return
-    }
-    $removed = 0
-    $skipped = 0
-    $progressId = Start-LauncherProgress -Activity 'AEGIS: remove application logs' -Status "0 of $($logs.Count) files"
-    try {
-        for ($index = 0; $index -lt $logs.Count; $index++) {
-            $log = $logs[$index]
-            $percent = [int](($index + 1) * 100 / $logs.Count)
-            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: remove application logs' -Status "$($index + 1) of $($logs.Count): $($log.Name)" -PercentComplete $percent
-            if (Remove-PathBestEffort -Path $log.FullName) {
-                $removed++
-            }
-            else {
-                $skipped++
-            }
-        }
-    }
-    finally {
-        Complete-LauncherProgress $progressId
-    }
-    Write-Status SUCCESS "Removed $removed log file(s); skipped $skipped locked or inaccessible file(s)."
+    $script:CleanupDiscoveryErrors = [Collections.Generic.List[string]]::new()
+    $targets = @(Get-LogCleanupTargets)
+    Show-CleanupPlan -Targets $targets -Activity 'AEGIS: remove application logs'
+    if ($WhatIf -or $script:PreviewOnly) { return }
+    if (-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'remove the listed application log files')) { return }
+    Assert-NoActiveAegisProcesses
+    [void](Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: remove application logs' -Strict)
 }
 
 function Remove-LauncherPath {
@@ -1329,6 +1419,8 @@ function Remove-LauncherPath {
     param(
         [Parameter(Mandatory)]
         [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$AllowedRoot,
         [switch]$KeepRoot,
         [string[]]$PreserveNames = @('.gitkeep'),
         [switch]$Strict,
@@ -1336,7 +1428,7 @@ function Remove-LauncherPath {
         [string]$Activity = 'AEGIS: remove files'
     )
 
-    $fullPath = [IO.Path]::GetFullPath($Path)
+    $fullPath = Test-ValidatedCleanupTarget -Path $Path -AllowedRoot $AllowedRoot
     $removed = [Collections.Generic.List[string]]::new()
     $skipped = [Collections.Generic.List[string]]::new()
     $preserved = [Collections.Generic.List[string]]::new()
@@ -1357,10 +1449,10 @@ function Remove-LauncherPath {
         WhatIf = [bool]$WhatIf
     }
 
-    try {
-        $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop
-    } catch {
+    try { $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop }
+    catch {
         if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            Write-Status INFO "Cleanup target is already absent: $fullPath"
             return [pscustomobject]$result
         }
         $message = "$fullPath ($($_.Exception.Message))"
@@ -1372,39 +1464,64 @@ function Remove-LauncherPath {
         return [pscustomobject]$result
     }
 
-    $entries = if ($item.PSIsContainer) {
-        $errors = @()
-        $found = @(Get-ChildItem -LiteralPath $item.FullName -Force -Recurse -ErrorAction SilentlyContinue -ErrorVariable errors)
-        foreach ($errorRecord in $errors) {
-            [void]$enumerationErrors.Add("$($errorRecord.Exception.Message)")
-            Write-Status WARN "Skipped inaccessible path below $fullPath ($($errorRecord.Exception.Message))"
-        }
-        if (-not $KeepRoot) { $found += $item }
-        $found
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        $message = "$fullPath (symbolic links and junctions are never traversed)"
+        [void]$skipped.Add($message)
+        Write-Status WARN "Skipped reparse point: $message"
+        $result.Skipped = 1
+        $result.SkippedPaths = $skipped
+        if ($Strict) { throw "Removal of '$fullPath' was incomplete because it is a reparse point." }
+        return [pscustomobject]$result
     }
-    else { @($item) }
 
-    $protectedDirectories = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $entries = [Collections.Generic.List[object]]::new()
+    $pending = [Collections.Generic.Stack[string]]::new()
+    if ($item.PSIsContainer) { $pending.Push($fullPath) } else { [void]$entries.Add($item) }
+    while ($pending.Count -gt 0) {
+        $directoryPath = $pending.Pop()
+        try { $children = @(Get-ChildItem -LiteralPath $directoryPath -Force -ErrorAction Stop) }
+        catch {
+            $message = "$directoryPath ($($_.Exception.Message))"
+            [void]$enumerationErrors.Add($message)
+            [void]$skipped.Add($message)
+            Write-Status WARN "Unable to enumerate cleanup path: $message"
+            continue
+        }
+        foreach ($child in $children) {
+            if (($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                $message = "$($child.FullName) (symbolic links and junctions are never traversed)"
+                [void]$skipped.Add($message)
+                [void]$preserved.Add($child.FullName)
+                Write-Status WARN "Skipped reparse point: $message"
+                continue
+            }
+            [void]$entries.Add($child)
+            if ($child.PSIsContainer) { $pending.Push($child.FullName) }
+        }
+    }
+    if ($item.PSIsContainer -and -not $KeepRoot) { [void]$entries.Add($item) }
+
     $preservedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    if ($KeepRoot -and $item.PSIsContainer) {
+        [void]$preservedPaths.Add($fullPath)
+        [void]$preserved.Add($fullPath)
+    }
     foreach ($entry in @($entries)) {
-        if ($entry.Name -in $PreserveNames) {
+        if ($entry.Name -in $PreserveNames -and
+            (Get-NormalizedPath -Path ([IO.Path]::GetDirectoryName($entry.FullName))).Equals($fullPath, [StringComparison]::OrdinalIgnoreCase)) {
             [void]$preservedPaths.Add($entry.FullName)
             [void]$preserved.Add($entry.FullName)
-            [void]$protectedDirectories.Add($item.FullName)
-            $ancestor = [IO.Path]::GetDirectoryName($entry.FullName)
-            while ($ancestor -and $ancestor.StartsWith($item.FullName.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                [void]$protectedDirectories.Add($ancestor)
-                $ancestor = [IO.Path]::GetDirectoryName($ancestor)
-            }
         }
     }
-
     $candidates = @($entries |
-        Where-Object { -not $preservedPaths.Contains($_.FullName) -and -not $protectedDirectories.Contains($_.FullName) } |
+        Where-Object { -not $preservedPaths.Contains($_.FullName) } |
         Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false })
     $result.Planned = $candidates.Count
     $result.PlannedCount = $candidates.Count
     $result.Preserved = $preserved.Count
+    foreach ($preservedPath in $preserved) {
+        Write-Host "  PRESERVED $preservedPath" -ForegroundColor DarkGray
+    }
     $progressId = $null
     try {
         if ($candidates.Count -gt 0) {
@@ -1412,17 +1529,22 @@ function Remove-LauncherPath {
         }
         for ($index = 0; $index -lt $candidates.Count; $index++) {
             $entry = $candidates[$index]
+            if ($WhatIf) {
+                Write-Host "  WOULD REMOVE $($entry.FullName)"
+                continue
+            }
             if ($null -ne $progressId) {
                 Update-LauncherProgress -Id $progressId -Activity $Activity -Status "$($index + 1) of $($candidates.Count): $($entry.Name)" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $candidates.Count)))
             }
-            if ($WhatIf) { continue }
             try {
+                Test-ValidatedCleanupTarget -Path $entry.FullName -AllowedRoot $AllowedRoot | Out-Null
                 Remove-Item -LiteralPath $entry.FullName -Force -Confirm:$false -ErrorAction Stop
                 [void]$removed.Add($entry.FullName)
             }
             catch {
-                [void]$skipped.Add("$($entry.FullName) ($($_.Exception.Message))")
-                Write-Status WARN "Skipped locked or protected path: $($entry.FullName) ($($_.Exception.Message))"
+                $message = "$($entry.FullName) ($($_.Exception.Message))"
+                [void]$skipped.Add($message)
+                Write-Status WARN "Failed to remove cleanup path: $message"
             }
         }
     }
@@ -1432,96 +1554,316 @@ function Remove-LauncherPath {
     $result.Removed = $removed.Count
     $result.RemovedCount = $removed.Count
     $result.Skipped = $skipped.Count
+    $result.SkippedPaths = $skipped
 
     if ($Strict -and ($skipped.Count -gt 0 -or $enumerationErrors.Count -gt 0)) {
         throw "Removal of '$fullPath' was incomplete. Skipped $($skipped.Count) item(s) and encountered $($enumerationErrors.Count) enumeration error(s)."
     }
+    if ($WhatIf) { Write-Status INFO "Previewed $($candidates.Count) path(s) under $fullPath; no files were changed." }
     return [pscustomobject]$result
 }
 
-function Remove-PathBestEffort([string]$Path) {
-    $result = Remove-LauncherPath -Path $Path -Activity "AEGIS: remove $([IO.Path]::GetFileName($Path))"
+function Remove-PathBestEffort([string]$Path, [string]$AllowedRoot) {
+    $result = Remove-LauncherPath -Path $Path -AllowedRoot $AllowedRoot -Activity "AEGIS: remove $([IO.Path]::GetFileName($Path))"
     return $result.Skipped -eq 0 -and $result.EnumerationErrors.Count -eq 0
 }
 
-function Remove-PythonCaches {
-    $scriptsDir = Join-Path $AppDir 'scripts'
-    $searchRoots = @(
-        Get-ChildItem -LiteralPath $ServerDir -Directory -Force -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ne '.venv' } |
-            Select-Object -ExpandProperty FullName
-        $TestsDir
-        $scriptsDir
+function New-CleanupTarget {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$AllowedRoot,
+        [string[]]$PreserveNames = @('.gitkeep'),
+        [switch]$KeepRoot
     )
-    $cacheDirectories = @(
-        Get-ChildItem -LiteralPath $ServerDir -Directory -Filter '__pycache__' -Force -ErrorAction SilentlyContinue
-        foreach ($searchRoot in $searchRoots) {
-            if (Test-Path -LiteralPath $searchRoot) {
-                Get-ChildItem -LiteralPath $searchRoot -Directory -Filter '__pycache__' -Recurse -Force -ErrorAction SilentlyContinue
+    return [pscustomobject]@{
+        Path = [IO.Path]::GetFullPath($Path)
+        AllowedRoot = [IO.Path]::GetFullPath($AllowedRoot)
+        PreserveNames = $PreserveNames
+        KeepRoot = [bool]$KeepRoot
+    }
+}
+
+function Get-ConfiguredExternalFilePath {
+    param([Parameter(Mandatory)][string]$Path)
+    $expanded = $Path.Trim()
+    if ($expanded.StartsWith('~')) {
+        $profile = [Environment]::GetFolderPath('UserProfile')
+        $expanded = Join-Path $profile $expanded.TrimStart([char]'~', [char]'\', [char]'/')
+    }
+    if (-not [IO.Path]::IsPathRooted($expanded)) {
+        $expanded = Join-Path $AppDir $expanded
+    }
+    return Get-NormalizedPath -Path $expanded
+}
+
+function Get-RecognizedLocalCacheTargets {
+    $targets = [Collections.Generic.List[object]]::new()
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $roots = @($ServerDir, $TestsDir, (Join-Path $AppDir 'scripts'), $ClientDir, (Join-Path $RootDir 'scripts'))
+    $cacheDirectoryNames = @('__pycache__', '.pytest_cache', '.ruff_cache', 'htmlcov')
+    $qaRoots = @(
+        (Get-NormalizedPath -Path (Join-Path $RootDir 'assets\QA')),
+        (Get-NormalizedPath -Path (Join-Path $ServerDir 'assets\QA'))
+    )
+
+    # Catch old source-root cache residue without recursively walking unrelated
+    # repository content such as data, QA evidence, dependencies, or runtimes.
+    try { $rootItems = @(Get-ChildItem -LiteralPath $RootDir -Force -ErrorAction Stop) }
+    catch {
+        [void]$script:CleanupDiscoveryErrors.Add("$RootDir ($($_.Exception.Message))")
+        Write-Status WARN "Unable to inspect repository-root cache leftovers under $RootDir ($($_.Exception.Message))"
+        $rootItems = @()
+    }
+    foreach ($item in $rootItems) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+        if ($item.PSIsContainer -and $item.Name -in $cacheDirectoryNames) {
+            if ($seen.Add((Get-NormalizedPath -Path $item.FullName))) {
+                [void]$targets.Add((New-CleanupTarget -Path $item.FullName -AllowedRoot $RootDir -PreserveNames @()))
             }
         }
-    ) | Sort-Object @{ Expression = { $_.FullName.Length }; Descending = $true }, @{ Expression = { $_.FullName.ToUpperInvariant() }; Descending = $false }
-    foreach ($cacheDirectory in $cacheDirectories) {
-        [void](Remove-PathBestEffort -Path $cacheDirectory.FullName)
+        elseif (-not $item.PSIsContainer -and
+            ($item.Name -match '^\.coverage(?:\..+)?$' -or $item.Extension -in @('.pyc', '.pyo'))) {
+            if ($seen.Add((Get-NormalizedPath -Path $item.FullName))) {
+                [void]$targets.Add((New-CleanupTarget -Path $item.FullName -AllowedRoot $RootDir -PreserveNames @()))
+            }
+        }
+    }
+
+    foreach ($scanRoot in $roots) {
+        if (-not (Test-Path -LiteralPath $scanRoot -PathType Container)) { continue }
+        $pending = [Collections.Generic.Stack[string]]::new()
+        $pending.Push((Get-NormalizedPath -Path $scanRoot))
+        while ($pending.Count -gt 0) {
+            $directory = $pending.Pop()
+            if (@($qaRoots | Where-Object { Test-PathWithin -Path $directory -Root $_ }).Count -gt 0) { continue }
+            try { $children = @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop) }
+            catch {
+                [void]$script:CleanupDiscoveryErrors.Add("$directory ($($_.Exception.Message))")
+                Write-Status WARN "Unable to inspect for local caches under $directory ($($_.Exception.Message))"
+                continue
+            }
+            foreach ($child in $children) {
+                if (($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+                if ($child.PSIsContainer) {
+                    if ($child.Name -eq '.venv') { continue }
+                    if ($child.Name -in @('dist', 'dist-ssr')) { continue }
+                    if ($child.Name -eq 'node_modules') {
+                        $nodeCache = Join-Path $child.FullName '.cache'
+                        if ((Test-Path -LiteralPath $nodeCache) -and $seen.Add((Get-NormalizedPath -Path $nodeCache))) {
+                            [void]$targets.Add((New-CleanupTarget -Path $nodeCache -AllowedRoot $child.FullName -PreserveNames @()))
+                        }
+                        continue
+                    }
+                    if ($child.Name -eq '.angular') {
+                        $angularCache = Join-Path $child.FullName 'cache'
+                        if ((Test-Path -LiteralPath $angularCache) -and $seen.Add((Get-NormalizedPath -Path $angularCache))) {
+                            [void]$targets.Add((New-CleanupTarget -Path $angularCache -AllowedRoot $child.FullName -PreserveNames @()))
+                        }
+                        continue
+                    }
+                    if ($child.Name -in $cacheDirectoryNames) {
+                        if ($seen.Add((Get-NormalizedPath -Path $child.FullName))) {
+                            [void]$targets.Add((New-CleanupTarget -Path $child.FullName -AllowedRoot $scanRoot -PreserveNames @()))
+                        }
+                        continue
+                    }
+                    [void]$pending.Push($child.FullName)
+                    continue
+                }
+                if ($child.Name -match '^\.coverage(?:\..+)?$' -or $child.Extension -in @('.pyc', '.pyo')) {
+                    if ($seen.Add((Get-NormalizedPath -Path $child.FullName))) {
+                        [void]$targets.Add((New-CleanupTarget -Path $child.FullName -AllowedRoot $scanRoot -PreserveNames @()))
+                    }
+                }
+            }
+        }
+    }
+    return @($targets)
+}
+
+function Get-CacheCleanupTargets {
+    Import-EnvironmentFile
+    $targets = [Collections.Generic.List[object]]::new()
+    [void]$targets.Add((New-CleanupTarget -Path $RuntimeCacheDir -AllowedRoot $RuntimesDir -KeepRoot))
+    [void]$targets.Add((New-CleanupTarget -Path (Join-Path $AppDir 'runtimes\cache') -AllowedRoot (Join-Path $AppDir 'runtimes') -KeepRoot))
+    [void]$targets.Add((New-CleanupTarget -Path (Join-Path $ClientDir 'dist') -AllowedRoot $ClientDir -PreserveNames @()))
+    foreach ($localTarget in @(Get-RecognizedLocalCacheTargets)) { [void]$targets.Add($localTarget) }
+
+    foreach ($target in @(Get-MobilityCatalogCacheTargets)) { [void]$targets.Add($target) }
+    return @($targets | Sort-Object Path -Unique)
+}
+
+function Get-MobilityCatalogCacheTargets {
+    $targets = [Collections.Generic.List[object]]::new()
+    $configuredDataDir = Get-ConfiguredDataDirectory
+    $legacyCatalog = Join-Path $configuredDataDir 'geospatial\mobility_database_feeds_v2.csv'
+    [void]$targets.Add((New-CleanupTarget -Path $legacyCatalog -AllowedRoot $configuredDataDir -PreserveNames @()))
+
+    $catalogOverride = [Environment]::GetEnvironmentVariable('AEGIS_MOBILITY_DATABASE_CATALOG_PATH', 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($catalogOverride)) {
+        $overridePath = Get-ConfiguredExternalFilePath -Path $catalogOverride
+        if (Test-Path -LiteralPath $overridePath -PathType Container) {
+            throw "Configured Mobility Database cache path is a directory; refusing recursive deletion: $overridePath"
+        }
+        $protectedRoots = @(
+            $SettingsDir,
+            (Join-Path $DataDir 'catalog'),
+            (Join-Path $RootDir 'assets\QA'),
+            (Join-Path $ServerDir 'assets\QA'),
+            $VectorsDir,
+            (Join-Path $IngestionDataDir 'uploads')
+        )
+        foreach ($protectedRoot in $protectedRoots) {
+            if (Test-PathWithin -Path $overridePath -Root $protectedRoot) {
+                throw "Configured Mobility Database cache path overlaps protected application data: $overridePath"
+            }
+        }
+        if ($overridePath -in @(
+            (Join-Path $configuredDataDir 'database-settings.json'),
+            (Join-Path $configuredDataDir 'database-settings.json.bak')
+        )) {
+            throw "Configured Mobility Database cache path overlaps database settings: $overridePath"
+        }
+        [void]$targets.Add((New-CleanupTarget -Path $overridePath -AllowedRoot $overridePath -PreserveNames @()))
+    }
+    return @($targets)
+}
+
+function Get-LogCleanupTargets {
+    $targets = [Collections.Generic.List[object]]::new()
+    if (Test-Path -LiteralPath $LogsDir -PathType Container) {
+        try {
+            foreach ($log in @(Get-ChildItem -LiteralPath $LogsDir -Filter '*.log' -File -Force -ErrorAction Stop)) {
+                [void]$targets.Add((New-CleanupTarget -Path $log.FullName -AllowedRoot $LogsDir -PreserveNames @()))
+            }
+        }
+        catch {
+            [void]$script:CleanupDiscoveryErrors.Add("$LogsDir ($($_.Exception.Message))")
+            Write-Status WARN "Unable to enumerate application logs under $LogsDir ($($_.Exception.Message))"
+        }
+    }
+    return @($targets)
+}
+
+function Show-CleanupPlan {
+    param(
+        [Parameter(Mandatory)][object[]]$Targets,
+        [Parameter(Mandatory)][string]$Activity
+    )
+    Write-Status INFO "$Activity target preview:"
+    if ($Targets.Count -eq 0) {
+        Write-Host '  No matching locations found.' -ForegroundColor DarkGray
+        return
+    }
+    foreach ($target in $Targets) {
+        try {
+            $result = Remove-LauncherPath -Path $target.Path -AllowedRoot $target.AllowedRoot -PreserveNames $target.PreserveNames -KeepRoot:$target.KeepRoot -WhatIf -Activity $Activity
+            if ($result.Planned -eq 0 -and $result.Preserved -eq 0 -and $result.Skipped -eq 0) {
+                Write-Host "  NO CHANGE $($target.Path)" -ForegroundColor DarkGray
+            }
+        }
+        catch {
+            [void]$script:CleanupDiscoveryErrors.Add("$($target.Path) ($($_.Exception.Message))")
+            Write-Status WARN "Skipped unsafe cleanup target: $($target.Path) ($($_.Exception.Message))"
+        }
+    }
+}
+
+function Invoke-CleanupTargets {
+    param(
+        [Parameter(Mandatory)][object[]]$Targets,
+        [Parameter(Mandatory)][string]$Activity,
+        [switch]$Strict
+    )
+    $removed = 0
+    $skipped = 0
+    $failed = $script:CleanupDiscoveryErrors.Count
+    foreach ($target in $Targets) {
+        try {
+            $result = Remove-LauncherPath -Path $target.Path -AllowedRoot $target.AllowedRoot -PreserveNames $target.PreserveNames -KeepRoot:$target.KeepRoot -Activity $Activity
+            $removed += $result.Removed
+            $skipped += $result.Skipped
+            $failed += $result.EnumerationErrors.Count
+            if ($result.Removed -gt 0) {
+                Write-Status INFO "Cleaned $($target.Path): removed $($result.Removed) item(s)."
+            }
+        }
+        catch {
+            $failed++
+            Write-Status WARN "Cleanup failed for $($target.Path) ($($_.Exception.Message))"
+        }
+    }
+    $level = if ($skipped -gt 0 -or $failed -gt 0) { 'WARN' } else { 'SUCCESS' }
+    Write-Status $level "$Activity completed: removed $removed path(s), skipped $skipped, failed $failed."
+    if ($Strict -and ($skipped -gt 0 -or $failed -gt 0)) {
+        throw "$Activity was incomplete: $skipped path(s) skipped and $failed failure(s)."
+    }
+    return [pscustomobject]@{ Removed = $removed; Skipped = $skipped; Failed = $failed }
+}
+
+function Assert-NoActiveAegisProcesses {
+    try { $processes = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop) }
+    catch { throw "Unable to verify AEGIS process state; cleanup was cancelled. $($_.Exception.Message)" }
+    $active = @(
+        $processes | Where-Object {
+            $_.ProcessId -ne $PID -and
+                ($_.Name -in @('python.exe', 'node.exe')) -and
+                (([string]$_.ExecutablePath).StartsWith($RootDir, [StringComparison]::OrdinalIgnoreCase) -or
+                    ([string]$_.CommandLine).IndexOf($RootDir, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+        }
+    )
+    if ($active.Count -gt 0) {
+        $details = @($active | ForEach-Object { "PID $($_.ProcessId) $($_.Name)" }) -join ', '
+        throw "AEGIS-owned processes are still running ($details). Stop the application or test process before cleanup. No processes were terminated."
     }
 }
 
 function Clear-ApplicationCache {
-    param(
-        [switch]$SkipConfirmation,
-        [switch]$Strict
-    )
-    if (-not $SkipConfirmation -and -not (Confirm-DestructiveAction 'clear runtime and test caches')) { return }
-    Remove-PythonCaches
-    $result = Remove-LauncherPath -Path $RuntimeCacheDir -KeepRoot -Strict:$Strict -Activity 'AEGIS: clear canonical cache'
-    $skipped = $result.Skipped + $result.EnumerationErrors.Count
-    if ($skipped -gt 0) {
-        Write-Status WARN "Canonical cache cleanup skipped $skipped locked or inaccessible item(s)."
-    }
+    $script:CleanupDiscoveryErrors = [Collections.Generic.List[string]]::new()
+    $targets = @(Get-CacheCleanupTargets)
+    Show-CleanupPlan -Targets $targets -Activity 'AEGIS: clear caches and generated frontend output'
+    if ($WhatIf -or $script:PreviewOnly) { return }
+    if (-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'clear application caches and generated frontend output')) { return }
+    Assert-NoActiveAegisProcesses
+    $result = Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: clear caches and generated frontend output' -Strict
     New-Item -ItemType Directory -Path $RuntimeCacheDir -Force -ErrorAction Stop | Out-Null
-    Write-Status SUCCESS "Development caches cleared where permitted; skipped $skipped locked or inaccessible item(s)."
+    if (-not (Test-Path -LiteralPath (Join-Path $RuntimeCacheDir '.gitkeep'))) {
+        New-Item -ItemType File -Path (Join-Path $RuntimeCacheDir '.gitkeep') -Force | Out-Null
+    }
+    if ($result.Skipped -gt 0 -or $result.Failed -gt 0) { return }
 }
 
 function Uninstall-Application {
-    if (-not (Confirm-DestructiveAction 'remove local runtimes, dependencies, caches, and build outputs')) { return }
-    $targets = @(
+    $script:CleanupDiscoveryErrors = [Collections.Generic.List[string]]::new()
+    Import-EnvironmentFile
+    $targets = [Collections.Generic.List[object]]::new()
+    foreach ($path in @(
         $RuntimesDir,
+        (Join-Path $AppDir 'runtimes\cache'),
         $VenvDir,
         (Join-Path $RootDir '.venv'),
         (Join-Path $ClientDir 'node_modules'),
         (Join-Path $ClientDir 'dist')
-    ) | Select-Object -Unique
-    $skipped = 0
-    $progressId = Start-LauncherProgress -Activity 'AEGIS: uninstall application' -Status "0 of $($targets.Count) paths"
-    try {
-        for ($index = 0; $index -lt $targets.Count; $index++) {
-            $target = $targets[$index]
-            Update-LauncherProgress -Id $progressId -Activity 'AEGIS: uninstall application' -Status "$($index + 1) of $($targets.Count): $target" -PercentComplete ([int](($index + 1) * 100 / [Math]::Max(1, $targets.Count)))
-        try {
-            $targetExists = Test-Path -LiteralPath $target -ErrorAction Stop
-        }
-        catch {
-            Write-Status WARN "Skipped inaccessible uninstall target: $target ($($_.Exception.Message))"
-            $skipped++
-            continue
-        }
-        if ($targetExists -and -not (Remove-PathBestEffort -Path $target)) {
-            $skipped++
-        }
+    )) {
+        $keepRoot = $path -in @($RuntimesDir, (Join-Path $AppDir 'runtimes\cache'))
+        $preserveNames = if ($keepRoot) { @('.gitkeep') } else { @() }
+        [void]$targets.Add((New-CleanupTarget -Path $path -AllowedRoot $RootDir -PreserveNames $preserveNames -KeepRoot:$keepRoot))
     }
-    }
-    finally {
-        Complete-LauncherProgress $progressId
-    }
+    foreach ($target in @(Get-RecognizedLocalCacheTargets)) { [void]$targets.Add($target) }
+    foreach ($target in @(Get-MobilityCatalogCacheTargets)) { [void]$targets.Add($target) }
+    foreach ($target in @(Get-LogCleanupTargets)) { [void]$targets.Add($target) }
+    $targets = @($targets | Sort-Object Path -Unique)
+    Show-CleanupPlan -Targets $targets -Activity 'AEGIS: uninstall application'
+    if ($WhatIf -or $script:PreviewOnly) { return }
+    if (-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'remove managed runtimes, dependencies, caches, builds, and application logs')) { return }
+    Assert-NoActiveAegisProcesses
+    $result = Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: uninstall application' -Strict
 
-    # Keep dependency lockfiles: install/update uses them for reproducible restores.
+    # Keep the runtime placeholder so subsequent installs can recreate managed runtimes.
     New-Item -ItemType Directory -Path $RuntimesDir -Force | Out-Null
     $runtimeKeepFile = Join-Path $RuntimesDir '.gitkeep'
-    if (-not (Test-Path -LiteralPath $runtimeKeepFile)) {
-        New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null
-    }
-    Remove-PythonCaches
-    Write-Status SUCCESS "Application runtimes, dependencies, caches, and build outputs uninstalled where permitted; skipped $skipped locked or inaccessible item(s). Dependency lockfiles and user data were preserved."
+    if (-not (Test-Path -LiteralPath $runtimeKeepFile)) { New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null }
+    if ($result.Skipped -gt 0 -or $result.Failed -gt 0) { return }
 }
 
 function Wait-ForMenuReturn {
@@ -1556,9 +1898,9 @@ function Get-LauncherMenuEntries {
         [pscustomobject]@{ Section = 'SOURCE CONTROL'; Label = 'Check for updates'; Description = 'Report main branch status only'; Key = 'Check'; Destructive = $false }
         [pscustomobject]@{ Section = 'SOURCE CONTROL'; Label = 'Update application'; Description = 'Pull the latest main branch'; Key = 'Update'; Destructive = $false }
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove logs'; Description = 'Clear application logs'; Key = 'Logs'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove runtime and test caches'; Key = 'Cache'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Clear cache'; Description = 'Remove caches and generated frontend output'; Key = 'Cache'; Destructive = $true }
         [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Remove all data'; Description = 'Delete user-generated data'; Key = 'AllData'; Destructive = $true }
-        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove local dependencies'; Key = 'Uninstall'; Destructive = $true }
+        [pscustomobject]@{ Section = 'DATA & MAINTENANCE'; Label = 'Uninstall application'; Description = 'Remove local runtimes, dependencies, caches, builds, and logs'; Key = 'Uninstall'; Destructive = $true }
         [pscustomobject]@{ Section = 'EXIT'; Label = 'Exit'; Description = 'Close launcher'; Key = 'Exit'; Destructive = $false }
     )
 }
@@ -1630,7 +1972,7 @@ if ($Action -eq 'Launch') {
 if ($Action -eq 'ClearCache') {
     try {
         Invoke-TrackedLauncherAction -Name 'Clear canonical cache' -Action {
-            Clear-ApplicationCache -SkipConfirmation -Strict
+            Clear-ApplicationCache
         }
         exit 0
     }
@@ -1638,6 +1980,34 @@ if ($Action -eq 'ClearCache') {
         Write-Status FATAL $_.Exception.Message
         exit 1
     }
+}
+
+if ($Action -in @('RemoveLogs', 'Uninstall', 'RemoveAllData')) {
+    try {
+        $selectedAction = $Action
+        $actionName = switch ($Action) {
+            'RemoveLogs' { 'Remove application logs' }
+            'Uninstall' { 'Uninstall application' }
+            'RemoveAllData' { 'Remove all application data' }
+        }
+        Invoke-TrackedLauncherAction -Name $actionName -Action {
+            switch ($selectedAction) {
+                'RemoveLogs' { Remove-ApplicationLogs }
+                'Uninstall' { Uninstall-Application }
+                'RemoveAllData' { Invoke-RemoveAllData }
+            }
+        }
+        exit 0
+    }
+    catch {
+        Write-Status FATAL $_.Exception.Message
+        exit 1
+    }
+}
+
+if ($WhatIf) {
+    Write-Status FATAL 'Use -WhatIf with a cleanup action, for example -Action Uninstall -WhatIf.'
+    exit 2
 }
 
 while ($true) {

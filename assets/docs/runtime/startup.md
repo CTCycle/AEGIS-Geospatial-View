@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-10-27
+Last updated: 2026-10-29
 
 ## Local Development Via Launcher
 
@@ -8,14 +8,20 @@ Last updated: 2026-10-27
 .\start_on_windows.ps1
 ```
 
-For a non-interactive clean-cache step in setup scripts, use:
+Use `-WhatIf` to preview the exact paths for any cleanup action:
 
 ```powershell
-.\start_on_windows.ps1 -Action ClearCache
+.\start_on_windows.ps1 -Action ClearCache -WhatIf
+.\start_on_windows.ps1 -Action Uninstall -WhatIf
+.\start_on_windows.ps1 -Action RemoveAllData -WhatIf
 ```
 
-That action strictly clears and recreates `runtimes/cache` and fails if a
-canonical cache item is locked or inaccessible.
+`-Action ClearCache` strictly clears `runtimes/cache`, recognized source-local
+cache leftovers, the generated client build, and the Mobility Database catalog
+cache. Locked or inaccessible paths are reported and cause a non-zero exit.
+Direct cleanup actions require an interactive confirmation or `-ConfirmRemoval`
+after reviewing their `-WhatIf` preview; menu actions continue to ask for
+confirmation.
 
 The interactive launcher installs or updates portable Python 3.14.7, uv, and
 Node.js runtimes; synchronizes backend and frontend dependencies; optionally
@@ -32,10 +38,15 @@ blank value keeps the default `data/runtime` root.
 The menu is grouped into clear sections. Application options launch the
 application, install or update dependencies, rebuild the frontend independently,
 and initialize the database explicitly. Maintenance options run the test suite,
-remove logs, clear caches, and uninstall local dependencies. Cache and data
-removal enumerates each target and removes individual files and directories in a
-deterministic, deepest-first order. Locked or protected items are reported and
-skipped so cleanup can continue. The update action
+remove logs, clear caches, and uninstall local dependencies. Cleanup previews
+enumerate the exact paths, then remove them in a deterministic, deepest-first
+order. Locked, inaccessible, and reparse-point paths are reported; cleanup does
+not follow symbolic links or junctions. Uninstallation removes managed runtimes,
+dependencies, generated builds, caches, and application logs while preserving
+settings, databases, ingested data, vectors, source catalogs, and retained QA
+evidence. The separate remove-all-data action lists and confirms the active
+SQLite file and companions, recognized geospatial/vector data, and logs; unknown
+files beside a custom data root are preserved. The update action
 requires a non-detached, clean checkout of `main` and pulls it with
 `git pull --ff-only origin main`; it never switches branches or modifies local
 changes. The check action reports `origin/main` status without downloading or
@@ -116,13 +127,19 @@ An existing `app\server\.venv` is reused. The launcher recreates it only when
 repository or runtime folder is moved. An unrelated dependency-sync failure
 does not delete the environment.
 
-The launcher stores every disposable runtime and test cache under
+The launcher and test runner store disposable runtime and test caches under
 `runtimes/cache`, including uv, npm, pip, Python bytecode, Playwright, Ruff,
-pytest, Angular, coverage, and test-runtime databases. Launching preserves the
-cache contents. Use menu option 2 to install or update dependencies and prune
-uv, or menu option 9 to clear the complete canonical cache tree without
-reinstalling. Persistent application data under `data/runtime`, `data/geospatial`,
-`data/vectors`, and `data/logs` is outside this cleanup boundary.
+pytest, Angular, coverage, test-runtime databases, and the Mobility Database
+catalog. Cache cleanup also removes recognized legacy cache folders at the
+repository root and under backend, tests, validation scripts, and client, the
+old `app/runtimes/cache` test-runtime location, and the generated client `dist`
+output. It leaves application logs, databases, ingested datasets, vectors, and
+retained QA evidence intact; only the exact Mobility Database catalog cache
+file is removed from its legacy geospatial-data location. Persistent data under
+`data/runtime`, `data/geospatial`, and `data/vectors` is removed only by the
+separate remove-all-data action after its paths are displayed and confirmed.
+Application logs under `data/logs` are removed by the remove-logs, uninstall,
+or remove-all-data action.
 
 ## Local Development Manual
 
@@ -194,8 +211,9 @@ app\tests\run_tests.bat
 ```
 
 The cache-cleanup menu option can be run before this command from a clean
-machine state. It removes only `runtimes/cache`, recreates the root, and leaves
-persistent application data and retained QA evidence untouched.
+machine state. It clears the canonical cache tree and recognized local cache
+residue, recreates `runtimes/cache`, and leaves persistent application data and
+retained QA evidence untouched.
 
 For bounded backend-only validation without starting local servers or Angular:
 

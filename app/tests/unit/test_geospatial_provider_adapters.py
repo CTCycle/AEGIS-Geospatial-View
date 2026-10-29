@@ -1210,6 +1210,17 @@ def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:
     assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
     assert response.payload["feeds"][0]["authentication"]["required"] is True
 
+
+###############################################################################
+def test_mobility_database_default_cache_uses_canonical_cache_root(monkeypatch, tmp_path) -> None:
+    cache_root = tmp_path / "canonical-cache"
+    monkeypatch.setenv("AEGIS_CACHE_ROOT", str(cache_root))
+    monkeypatch.delenv("AEGIS_MOBILITY_DATABASE_CATALOG_PATH", raising=False)
+
+    provider = MobilityDatabaseProvider()
+
+    assert provider.catalog_path == cache_root / "mobility-database" / "feeds_v2.csv"
+
 # --- test_geospatial_provider_hardening.py ---
 
 

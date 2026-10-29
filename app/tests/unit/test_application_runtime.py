@@ -1045,19 +1045,25 @@ def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> N
     assert "$ToolCacheDir" not in launcher
     assert "$LegacyCache" not in launcher
     assert "$LegacyUvCache" not in launcher
-    assert "ValidateSet('Launch', 'ClearCache')" in launcher
-    assert "Clear-ApplicationCache -SkipConfirmation -Strict" in launcher
+    assert "ValidateSet('Launch', 'ClearCache', 'RemoveLogs', 'Uninstall', 'RemoveAllData')" in launcher
+    assert "Clear-ApplicationCache" in launcher
+    assert "Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: clear caches and generated frontend output' -Strict" in launcher
+    assert "-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'clear application caches" in launcher
+    assert "-WhatIf" in launcher
+    assert "'.ruff_cache'" in launcher
+    assert "'.pytest_cache'" in launcher
+    assert "node_modules" in launcher and "'.cache'" in launcher
+    assert "mobility-database" in launcher
 
     forbidden_fragments = (
         "/".join(("app", "tests", "cache")),
         "/".join(("assets", "cache")),
-        "." + "pytest_cache",
-        "." + "ruff_cache",
         "." + "tmp_pytest",
         "." + "angular",
     )
+    cache_configuration_text = "\n".join((batch_runner, karma_config, workflow_text, vscode_launch, gitignore_text)).replace("\\", "/")
     for fragment in forbidden_fragments:
-        assert fragment not in active_tooling_text
+        assert fragment not in cache_configuration_text
 
     dot_pytest_cache = "." + "pytest" + "_cache"
     dot_ruff_cache = "." + "ruff" + "_cache"
