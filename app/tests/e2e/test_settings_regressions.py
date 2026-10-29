@@ -365,7 +365,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
 
         provider_grid = page.locator(".settings-provider-list")
         expect(provider_grid).to_be_visible(timeout=15000)
-        expect(provider_grid.locator(".settings-provider-card").first).to_be_visible(
+        expect(provider_grid.locator(".settings-provider").first).to_be_visible(
             timeout=15000
         )
 
@@ -382,7 +382,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
                 bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
                 columnCount: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length : 0,
                 gridRect: gridRect ? rect(grid) : null,
-                cards: [...document.querySelectorAll('.settings-provider-list .settings-provider-card')].map((card) => ({
+                cards: [...document.querySelectorAll('.settings-provider-list .settings-provider')].map((card) => ({
                   card: rect(card),
                   input: card.querySelector('input') ? rect(card.querySelector('input')) : null,
                   actions: card.querySelector('.settings-actions') ? rect(card.querySelector('.settings-actions')) : null,
@@ -412,7 +412,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
 
         page.get_by_role("button", name="Geospatial Access").click()
         geospatial_card = page.locator(
-            ".settings-provider-list .settings-provider-card"
+            ".settings-provider-list .settings-provider"
         ).first
         expect(geospatial_card).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Get API key").click()
@@ -585,7 +585,7 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     page.goto(f"{base_url.rstrip('/')}/settings")
     page.get_by_role("button", name="Model Providers").click()
 
-    card = page.locator(".settings-provider-card").filter(
+    card = page.locator(".settings-provider").filter(
         has=page.get_by_role("heading", name="OpenAI", exact=True)
     )
     key_input = card.get_by_label("OpenAI API key")
@@ -661,7 +661,7 @@ def test_model_provider_credential_safe_save_clear_and_reload(
     page.goto(f"{base_url.rstrip('/')}/settings")
     page.get_by_role("button", name="Model Providers").click()
 
-    card = page.locator(".settings-provider-card").filter(
+    card = page.locator(".settings-provider").filter(
         has=page.get_by_role("heading", name="OpenAI", exact=True)
     )
     key_input = card.get_by_label("OpenAI API key")
@@ -741,7 +741,7 @@ def test_geospatial_credential_safe_save_clear_and_reload(
     page.goto(f"{base_url.rstrip('/')}/settings")
     page.get_by_role("button", name="Geospatial Access").click()
 
-    card = page.locator(".settings-provider-card").filter(
+    card = page.locator(".settings-provider").filter(
         has=page.get_by_role("heading", name="TomTom", exact=True)
     )
     key_input = card.get_by_label("TomTom API key")
@@ -810,7 +810,7 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
     page.goto(f"{base_url.rstrip('/')}/settings")
     page.get_by_role("button", name="Geospatial Access").click()
 
-    card = page.locator(".settings-provider-card").filter(
+    card = page.locator(".settings-provider").filter(
         has=page.get_by_role("heading", name="TomTom", exact=True)
     )
     key_input = card.get_by_label("TomTom API key")

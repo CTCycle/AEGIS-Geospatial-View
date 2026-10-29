@@ -8,10 +8,8 @@
   display: grid;
   align-content: start;
   gap: 0.9rem;
-  border: 1px solid #205064;
-  border-radius: 0.5rem;
-  background: #101c23;
-  padding: 1rem;
+  border-left: 1px solid #1f323c;
+  padding: 0 0 0 1.5rem;
   color: #d9e6eb;
   min-height: 0;
   width: 100%;
@@ -24,8 +22,7 @@
 .selected-model-summary header {
   display: grid;
   gap: 0.2rem;
-  border-bottom: 1px solid #263a45;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
 }
 
 .selected-model-summary header p,

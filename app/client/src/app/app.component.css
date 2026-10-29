@@ -3,6 +3,7 @@
     background: #0b141a;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     min-width: var(--minimum-desktop-viewport-width);
 }
 
@@ -154,4 +155,5 @@
     width: 100%;
     flex: 1 1 auto;
     min-height: 0;
+    overflow: hidden;
 }

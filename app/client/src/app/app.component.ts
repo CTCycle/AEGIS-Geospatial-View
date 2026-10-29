@@ -9,9 +9,11 @@ import {
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { WorkspaceStatusBarComponent } from './components/workspace-status-bar.component';
+
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, WorkspaceStatusBarComponent],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.css',
@@ -19,6 +21,8 @@ import { Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   readonly minimumDesktopViewportWidth = 1024;
   isDesktopViewport = true;
+  /** The search workspace renders its own richer status bar. */
+  showShellStatusBar = false;
 
   @ViewChild('desktopViewportGate') private desktopViewportGate?: ElementRef<HTMLElement>;
 
@@ -35,6 +39,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.updateDocumentMetadata();
     this.routerEventsSubscription = this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
+        this.showShellStatusBar = event.urlAfterRedirects.split(/[?#]/)[0] !== '/';
         this.updateDocumentMetadata();
       }
     });

@@ -13,6 +13,15 @@ label {
   font: inherit;
 }
 
+.settings-api-key-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 input {
   width: 100%;
   min-width: 0;
