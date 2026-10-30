@@ -59,3 +59,16 @@ def match_requested_basemap(
         if terms & words:
             matched.append(basemap_id)
     return matched[0] if len(matched) == 1 else None
+
+###############################################################################
+def refers_to_basemap(text: str, basemaps: Iterable[Mapping[str, Any]]) -> bool:
+    """Return whether a route target names a basemap rather than a place or layer."""
+
+    words = set(re.findall(r"\w+", text.casefold()))
+    if words & {"basemap", "basemaps"}:
+        return True
+    for item in basemaps:
+        known = {*basemap_terms(item), *re.findall(r"\w+", basemap_label(item).casefold())}
+        if known & words:
+            return True
+    return False

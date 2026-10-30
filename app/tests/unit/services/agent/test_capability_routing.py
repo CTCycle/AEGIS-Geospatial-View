@@ -1022,7 +1022,7 @@ def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> N
             presentation="map",
             location_mode="target",
             operation="show",
-            target_refs=["satellite imagery"],
+            target_refs=["satellite basemap"],
         ),
         user_message="Now switch to satellite imagery",
         active_state=state,
@@ -1030,7 +1030,7 @@ def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> N
 
     assert decision.status in {"accepted", "discovery_required"}
     assert decision.route.location_mode == "none"
-    assert decision.route.target_refs == ["satellite imagery"]
+    assert decision.route.target_refs == []
 
 ###############################################################################
 def test_router_handles_runtime_disabled_explicit_candidate() -> None:

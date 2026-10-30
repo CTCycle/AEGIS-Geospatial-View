@@ -13,6 +13,7 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.agent.basemap_intent import refers_to_basemap
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -300,12 +301,15 @@ class CapabilityRouter:
                         "prepare a new map first?"
                     ),
                 )
-            if proposed.location_mode != "none" and not any(
-                "current" in ref.casefold() for ref in proposed.target_refs
-            ):
-                # An update to the active map names a style or layer, not a
-                # place; requiring a resolved location would hide apply_map_plan.
-                proposed = proposed.model_copy(update={"location_mode": "none"})
+            basemaps = self.capability_registry.list_basemaps()
+            refs = [
+                ref for ref in proposed.target_refs if not refers_to_basemap(ref, basemaps)
+            ]
+            if refs != proposed.target_refs:
+                # A basemap is a style of the active map, not a place or layer.
+                proposed = proposed.model_copy(
+                    update={"target_refs": refs, "location_mode": "none"}
+                )
 
         if proposed.task_mode == "clarify":
             if not proposed.clarification_question:
