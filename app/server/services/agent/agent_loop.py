@@ -51,6 +51,7 @@ from server.prompts.agent import (
 from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.capability_router import (
     CapabilityRouter,
+    build_conversation_fallback_route,
     build_location_map_fallback_route,
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
@@ -1523,11 +1524,18 @@ class AgentLoop:
                             separators=(",", ":"),
                         )
                         if validation_errors
-                        else "Return one valid route_request call matching the supplied schema."
+                        else self._route_missing_call_instruction(call, route_tool.name)
                     ),
                 }
             )
         fallback = build_location_map_fallback_route(request.state.user_message)
+        if (
+            fallback is None
+            and not result.tool_calls
+            and (result.content or "").strip()
+        ):
+            # The model answered in plain text instead of calling route_request.
+            fallback = build_conversation_fallback_route()
         if fallback is not None:
             decision = self.capability_router.validate_route(
                 fallback,
@@ -1538,6 +1546,19 @@ class AgentLoop:
                 request.state.capability_ids = list(decision.capability_ids)
                 return None, "", decision.route
         return None, "", None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _route_missing_call_instruction(call: Any, tool_name: str) -> str:
+        if call is None:
+            problem = f"No tool call was returned; reply only by calling {tool_name}."
+        elif call.name != tool_name:
+            problem = f"Unexpected tool {call.name}; call only {tool_name}."
+        elif call.parse_error is not None:
+            problem = f"The {tool_name} arguments were not valid JSON."
+        else:
+            problem = f"The {tool_name} call had no arguments."
+        return f"{problem} Return one valid {tool_name} call matching the supplied schema."
 
     # -------------------------------------------------------------------------
     @staticmethod

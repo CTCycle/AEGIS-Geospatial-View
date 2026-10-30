@@ -123,6 +123,17 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
     )
 
 ###############################################################################
+def build_conversation_fallback_route() -> CapabilityRoute:
+    """Build a text-only answer route when the model replied in plain text."""
+
+    return CapabilityRoute(
+        primary_domain=CapabilityDomain.CONVERSATION,
+        task_mode="answer",
+        presentation="text",
+        location_mode="none",
+    )
+
+###############################################################################
 class CapabilityRouter:
 
     # -------------------------------------------------------------------------

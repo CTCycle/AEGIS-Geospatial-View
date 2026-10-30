@@ -356,6 +356,24 @@ async def test_route_missing_required_field_is_never_salvaged() -> None:
     )
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_plain_text_reply_instead_of_route_call_falls_back_to_conversation() -> None:
+    provider = FakeProvider(
+        [
+            LLMResult(content="Hello!"),
+            LLMResult(content="Hello!"),
+            LLMResult(content="Hello! How can I help?"),
+        ]
+    )
+
+    outcome = await _run_route(provider)
+
+    assert outcome.stopped_reason == "goal_satisfied"
+    assert outcome.state.route is not None
+    assert outcome.state.route.primary_domain is CapabilityDomain.CONVERSATION
+    assert "No tool call was returned" in provider.requests[1]["request"].messages[-1]["content"]
+
+###############################################################################
 def test_native_route_promotes_the_execution_profile_once() -> None:
     simple_budget = AgentExecutionBudget(
         total_seconds=90,
