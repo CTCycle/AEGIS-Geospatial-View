@@ -23,6 +23,7 @@ from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
     RemoveLayerAction,
+    SetBasemapAction,
     SetLayerVisibilityAction,
     SetViewportAction,
 )
@@ -614,6 +615,28 @@ async def test_location_only_plan_uses_basemap_named_by_the_user(message: str) -
         MapPlan(
             expected_collection_revision=0,
             actions=[
+                SetViewportAction(action="set_viewport", strategy="fit_location"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.basemap_id == "esri_world_imagery"
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_named_basemap_style_overrides_a_different_model_choice() -> None:
+    state = _state()
+    state.evidence_refs = []
+    state.user_message = "Show Sanremo in satellite view"
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                SetBasemapAction(action="set_basemap", capability_id="basemap:osm"),
                 SetViewportAction(action="set_viewport", strategy="fit_location"),
             ],
         ),

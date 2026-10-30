@@ -275,15 +275,23 @@ class MapPlanService:
         active_session: Any | None,
         user_message: str,
     ) -> list[Any]:
-        if active_session is not None or any(
-            isinstance(action, SetBasemapAction) for action in actions
-        ):
-            return list(actions)
         try:
             basemaps = self.capability_registry.list_basemaps()
         except AttributeError:
             basemaps = []
         requested = match_requested_basemap(user_message, basemaps)
+        if any(isinstance(action, SetBasemapAction) for action in actions):
+            # A style the user named outranks a different model-chosen basemap.
+            if requested is None:
+                return list(actions)
+            return [
+                action.model_copy(update={"capability_id": requested})
+                if isinstance(action, SetBasemapAction)
+                else action
+                for action in actions
+            ]
+        if active_session is not None:
+            return list(actions)
         return [
             SetBasemapAction(
                 action="set_basemap",
