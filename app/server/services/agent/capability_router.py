@@ -300,6 +300,12 @@ class CapabilityRouter:
                         "prepare a new map first?"
                     ),
                 )
+            if proposed.location_mode != "none" and not any(
+                "current" in ref.casefold() for ref in proposed.target_refs
+            ):
+                # An update to the active map names a style or layer, not a
+                # place; requiring a resolved location would hide apply_map_plan.
+                proposed = proposed.model_copy(update={"location_mode": "none"})
 
         if proposed.task_mode == "clarify":
             if not proposed.clarification_question:

@@ -1008,6 +1008,31 @@ def test_router_requires_active_map_for_map_state_follow_up() -> None:
     assert "active_map_required" in decision.reason_codes
 
 ###############################################################################
+def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> None:
+    state = _state()
+    state.active_map_session = cast(
+        Any, SimpleNamespace(
+            overlay_collection=SimpleNamespace(instances=[]),
+            resolved_location=ResolvedLocation(label="Florence", latitude=43.77, longitude=11.25),
+        )
+    )
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            presentation="map",
+            location_mode="target",
+            operation="show",
+            target_refs=["satellite imagery"],
+        ),
+        user_message="Now switch to satellite imagery",
+        active_state=state,
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.location_mode == "none"
+    assert decision.route.target_refs == ["satellite imagery"]
+
+###############################################################################
 def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     decision = _router(_Runtime(disabled={"traffic"})).validate_route(
         _route(explicit_capability_ids=["traffic"]),
