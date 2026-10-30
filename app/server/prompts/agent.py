@@ -136,7 +136,9 @@ def build_native_context_messages(
     }
     return [
         {"role": "system", "content": build_native_agent_system_prompt()},
-        *recent_messages,
+        # Stored history records carry id/turn_index bookkeeping; strict
+        # chat endpoints reject unknown message fields.
+        *({"role": item["role"], "content": item["content"]} for item in recent_messages),
         {
             "role": "system",
             "content": (

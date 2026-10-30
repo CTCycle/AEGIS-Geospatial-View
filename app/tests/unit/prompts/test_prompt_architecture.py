@@ -20,7 +20,9 @@ def test_native_system_prompt_owns_loop_safety_and_grounding_rules() -> None:
 def test_native_context_projection_carries_canonical_state_and_observations() -> None:
     messages = build_native_context_messages(
         current_user_message="Show rainfall around Lugano.",
-        recent_messages=[{"role": "assistant", "content": "Prior answer."}],
+        recent_messages=[
+            {"id": 7, "turn_index": 2, "role": "assistant", "content": "Prior answer."}
+        ],
         active_directives=[{"directive_id": "d1", "text": "Exclude motorways."}],
         task_state={"conversation_id": "conversation-1", "revision": 4},
         map_memory={"active_location": {"label": "Lugano"}},
@@ -31,6 +33,7 @@ def test_native_context_projection_carries_canonical_state_and_observations() ->
     )
 
     assert messages[0]["role"] == "system"
+    assert messages[1] == {"role": "assistant", "content": "Prior answer."}
     context = messages[-2]["content"]
     assert "CANONICAL_NATIVE_CONTEXT" in context
     assert "Exclude motorways." in context
