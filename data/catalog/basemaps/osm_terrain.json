@@ -17,7 +17,12 @@
       "terrain",
       "elevation",
       "relief",
-      "topographic"
+      "topographic",
+      "terreno",
+      "rilievo",
+      "topografica",
+      "topografico",
+      "relieve"
     ],
     "map_type_tags": [
       "terrain"

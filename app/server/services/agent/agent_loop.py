@@ -49,6 +49,7 @@ from server.prompts.agent import (
     build_native_context_messages,
 )
 from server.prompts.capability_route import build_capability_route_prompt
+from server.services.agent.basemap_intent import basemap_label, match_requested_basemap
 from server.services.agent.capability_router import (
     CapabilityRouter,
     build_conversation_fallback_route,
@@ -856,7 +857,26 @@ class AgentLoop:
         verified_map_state = self._verified_map_state_summary(state)
         if verified_map_state is not None:
             return verified_map_state
-        return candidate or "The map is ready and the rendering was verified."
+        final = candidate or "The map is ready and the rendering was verified."
+        note = self._basemap_mismatch_note(state)
+        return f"{final}\n\n{note}" if note else final
+
+    # -------------------------------------------------------------------------
+    def _basemap_mismatch_note(self, state: AgentRunState) -> str | None:
+        """Disclose when the rendered basemap differs from the one the user named."""
+
+        session = state.prepared_map_session or state.active_map_session
+        if session is None:
+            return None
+        basemaps = self.capability_router.capability_registry.list_basemaps()
+        requested = match_requested_basemap(state.user_message, basemaps)
+        if requested is None or requested == session.basemap_id:
+            return None
+        labels = {str(item.get("id")): basemap_label(item) for item in basemaps}
+        return (
+            f"Note: you asked for {labels.get(requested, requested)}, but the map "
+            f"uses {labels.get(session.basemap_id, session.basemap_id)}."
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

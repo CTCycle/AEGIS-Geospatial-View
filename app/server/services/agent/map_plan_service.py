@@ -22,6 +22,7 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.services.agent.basemap_intent import match_requested_basemap
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -97,6 +98,7 @@ class MapPlanService:
         effective_actions = self._with_default_basemap(
             plan.actions,
             active_session=active_session,
+            user_message=state.user_message,
         )
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
@@ -271,15 +273,21 @@ class MapPlanService:
         actions: list[Any],
         *,
         active_session: Any | None,
+        user_message: str,
     ) -> list[Any]:
         if active_session is not None or any(
             isinstance(action, SetBasemapAction) for action in actions
         ):
             return list(actions)
+        try:
+            basemaps = self.capability_registry.list_basemaps()
+        except AttributeError:
+            basemaps = []
+        requested = match_requested_basemap(user_message, basemaps)
         return [
             SetBasemapAction(
                 action="set_basemap",
-                capability_id=self._default_basemap_id(),
+                capability_id=requested or self._default_basemap_id(),
             ),
             *actions,
         ]

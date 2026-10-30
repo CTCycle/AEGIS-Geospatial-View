@@ -23,6 +23,7 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolDefinition
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.repositories.chat_history import ChatHistoryRepository
+from server.services.agent.basemap_intent import basemap_descriptions
 from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
@@ -93,7 +94,9 @@ def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]
 
 ###############################################################################
 def _map_plan_schema(
-    input_model: type[BaseModel], basemap_ids: list[str]
+    input_model: type[BaseModel],
+    basemap_ids: list[str],
+    basemap_descriptions: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Specialize the public map schema with the active canonical basemaps."""
 
@@ -111,6 +114,12 @@ def _map_plan_schema(
                     and isinstance(capability_id, dict)
                 ):
                     capability_id["enum"] = list(basemap_ids)
+                    if basemap_descriptions:
+                        capability_id["description"] = "Basemap IDs: " + "; ".join(
+                            f"{basemap_id} = {basemap_descriptions[basemap_id]}"
+                            for basemap_id in basemap_ids
+                            if basemap_id in basemap_descriptions
+                        )
             for child in value.values():
                 specialize(child)
         elif isinstance(value, list):
@@ -358,7 +367,11 @@ def register_agent_tools(
                 "exact evidence references from successful tool results."
             ),
             input_model=ApplyMapPlanInput,
-            parameters_json_schema=_map_plan_schema(ApplyMapPlanInput, basemap_ids),
+            parameters_json_schema=_map_plan_schema(
+                ApplyMapPlanInput,
+                basemap_ids,
+                basemap_descriptions(capability_registry.list_basemaps()),
+            ),
             handler=_apply_map_plan_handler(map_plan),
             domains=_MAP,
             phases=_MODEL_PHASE,

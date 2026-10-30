@@ -42,7 +42,10 @@ class FakeCapabilityRegistry:
 
     # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, object]]:
-        return [{"id": "basemap:osm"}]
+        return [
+            {"id": "basemap:osm"},
+            {"id": "esri_world_imagery", "metadata": {"keywords": ["satellite", "satellitare"]}},
+        ]
 
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
@@ -53,6 +56,13 @@ class FakeCapabilityRegistry:
                 "provider": "osm",
                 "type": "basemap",
                 "metadata": {"tile_url": "https://tiles.example/{z}/{x}/{y}"},
+            },
+            "esri_world_imagery": {
+                "id": "esri_world_imagery",
+                "name": "Satellite Imagery",
+                "provider": "arcgis",
+                "type": "basemap",
+                "metadata": {"tile_url": "https://tiles.example/sat/{z}/{x}/{y}"},
             },
             "places:hospitals": {
                 "id": "places:hospitals",
@@ -592,6 +602,28 @@ async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "basemap:osm"
     assert state.prepared_map_session.overlay_collection.instances == []
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize("message", ["Show me Sanremo in satellite view", "vista satellitare di Sanremo"])
+async def test_location_only_plan_uses_basemap_named_by_the_user(message: str) -> None:
+    state = _state()
+    state.evidence_refs = []
+    state.user_message = message
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                SetViewportAction(action="set_viewport", strategy="fit_location"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.basemap_id == "esri_world_imagery"
 
 ###############################################################################
 @pytest.mark.asyncio
