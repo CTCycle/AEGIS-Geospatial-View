@@ -9,7 +9,7 @@ from server.services.agent.basemap_intent import (
 )
 
 BASEMAPS = [
-    {"id": "osm_default", "metadata": {"label": "OpenStreetMap", "keywords": ["street"]}},
+    {"id": "osm_default", "metadata": {"label": "OpenStreetMap", "keywords": ["street", "street map"]}},
     {
         "id": "esri_world_imagery",
         "metadata": {"label": "Satellite Imagery", "keywords": ["satellite", "aerial", "from above"]},
@@ -29,7 +29,8 @@ BASEMAPS = [
         ("the layers above 500 m", None),
         ("satellite but dark please", None),
         ("show the light rail stations", None),
-        ("show me a street map", None),
+        ("show me a street map", "osm_default"),
+        ("show the street names", None),
         ("show Sanremo", None),
     ],
 )

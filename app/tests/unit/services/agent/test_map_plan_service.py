@@ -44,7 +44,7 @@ class FakeCapabilityRegistry:
     # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, object]]:
         return [
-            {"id": "basemap:osm"},
+            {"id": "basemap:osm", "metadata": {"keywords": ["street map"]}},
             {"id": "esri_world_imagery", "metadata": {"keywords": ["satellite", "satellitare"]}},
         ]
 
@@ -647,6 +647,28 @@ async def test_named_basemap_style_overrides_a_different_model_choice() -> None:
     assert result.status == "success"
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "esri_world_imagery"
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_named_basemap_applies_on_an_active_map_without_set_basemap() -> None:
+    state = _state(
+        active_map_session=_active_session().model_copy(
+            update={"basemap_id": "esri_world_imagery"}
+        )
+    )
+    state.user_message = "Go back to the street map"
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.basemap_id == "basemap:osm"
 
 ###############################################################################
 @pytest.mark.asyncio

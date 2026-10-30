@@ -291,7 +291,12 @@ class MapPlanService:
                 for action in actions
             ]
         if active_session is not None:
-            return list(actions)
+            if requested is None or requested == active_session.basemap_id:
+                return list(actions)
+            return [
+                SetBasemapAction(action="set_basemap", capability_id=requested),
+                *actions,
+            ]
         return [
             SetBasemapAction(
                 action="set_basemap",

@@ -714,11 +714,17 @@ def _location_for_request(
 ###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
     async def apply(request: ApplyMapPlanInput, state: AgentRunState) -> ToolResult:
-        # A new map has no prior collection revision.  Bind this invariant on
-        # the server so a model's speculative revision cannot reject a valid
-        # first candidate; active-map updates still use the exact CAS revision.
-        if state.active_map_session is None:
-            request = request.model_copy(update={"expected_collection_revision": 0})
+        # The run owns the only live map session, so the model cannot know the
+        # collection revision better than the server: bind it here so a
+        # speculative or stale value cannot reject a valid plan.
+        active = state.active_map_session
+        request = request.model_copy(
+            update={
+                "expected_collection_revision": (
+                    active.overlay_collection.revision if active is not None else 0
+                )
+            }
+        )
         plan = MapPlan.model_validate(request.model_dump(mode="python"))
         return await service.apply(
             plan,

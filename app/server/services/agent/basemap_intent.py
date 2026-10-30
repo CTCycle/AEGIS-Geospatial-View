@@ -6,10 +6,20 @@ from typing import Any
 
 from server.common.typing import json_object
 
-_DEFAULT_BASEMAP_ID = "osm_default"
 # Terms too generic to signal a basemap choice on their own.
 _GENERIC_TERMS = frozenset(
-    {"light", "clean", "places", "presentation", "contrast", "roads", "street", "vector"}
+    {
+        "light",
+        "clean",
+        "places",
+        "presentation",
+        "contrast",
+        "roads",
+        "street",
+        "vector",
+        "navigation",
+        "addresses",
+    }
 )
 
 ###############################################################################
@@ -47,13 +57,13 @@ def basemap_descriptions(basemaps: Iterable[Mapping[str, Any]]) -> dict[str, str
 def match_requested_basemaps(
     user_message: str, basemaps: Iterable[Mapping[str, Any]]
 ) -> list[str]:
-    """Return every non-default basemap whose keywords the message names."""
+    """Return every basemap whose specific keywords the message names."""
 
     padded = " " + " ".join(re.findall(r"\w+", user_message.casefold())) + " "
     matched: list[str] = []
     for item in basemaps:
         basemap_id = str(item.get("id") or "").strip()
-        if not basemap_id or basemap_id == _DEFAULT_BASEMAP_ID:
+        if not basemap_id:
             continue
         terms = (term for term in basemap_terms(item) if term not in _GENERIC_TERMS)
         if any(f" {term} " in padded for term in terms):
@@ -64,7 +74,7 @@ def match_requested_basemaps(
 def match_requested_basemap(
     user_message: str, basemaps: Iterable[Mapping[str, Any]]
 ) -> str | None:
-    """Return the one non-default basemap the message names, or None if unclear."""
+    """Return the one basemap the message names, or None if unclear."""
 
     matched = match_requested_basemaps(user_message, basemaps)
     return matched[0] if len(matched) == 1 else None
