@@ -49,7 +49,10 @@ from server.prompts.agent import (
     build_native_context_messages,
 )
 from server.prompts.capability_route import build_capability_route_prompt
-from server.services.agent.basemap_intent import basemap_label, match_requested_basemap
+from server.services.agent.basemap_intent import (
+    basemap_label,
+    match_requested_basemaps,
+)
 from server.services.agent.capability_router import (
     CapabilityRouter,
     build_conversation_fallback_route,
@@ -869,13 +872,20 @@ class AgentLoop:
         if session is None:
             return None
         basemaps = self.capability_router.capability_registry.list_basemaps()
-        requested = match_requested_basemap(state.user_message, basemaps)
-        if requested is None or requested == session.basemap_id:
-            return None
+        requested = match_requested_basemaps(state.user_message, basemaps)
         labels = {str(item.get("id")): basemap_label(item) for item in basemaps}
+        rendered = labels.get(session.basemap_id, session.basemap_id)
+        if len(requested) > 1:
+            named = " and ".join(labels.get(item, item) for item in requested)
+            return (
+                f"Note: you asked for {named}, but a map shows one basemap, "
+                f"so it uses {rendered}."
+            )
+        if not requested or requested[0] == session.basemap_id:
+            return None
         return (
-            f"Note: you asked for {labels.get(requested, requested)}, but the map "
-            f"uses {labels.get(session.basemap_id, session.basemap_id)}."
+            f"Note: you asked for {labels.get(requested[0], requested[0])}, "
+            f"but the map uses {rendered}."
         )
 
     # -------------------------------------------------------------------------

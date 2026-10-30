@@ -44,20 +44,29 @@ def basemap_descriptions(basemaps: Iterable[Mapping[str, Any]]) -> dict[str, str
     return descriptions
 
 ###############################################################################
-def match_requested_basemap(
+def match_requested_basemaps(
     user_message: str, basemaps: Iterable[Mapping[str, Any]]
-) -> str | None:
-    """Return the one non-default basemap the message names, or None if unclear."""
+) -> list[str]:
+    """Return every non-default basemap whose keywords the message names."""
 
-    words = set(re.findall(r"\w+", user_message.casefold()))
+    padded = " " + " ".join(re.findall(r"\w+", user_message.casefold())) + " "
     matched: list[str] = []
     for item in basemaps:
         basemap_id = str(item.get("id") or "").strip()
         if not basemap_id or basemap_id == _DEFAULT_BASEMAP_ID:
             continue
-        terms = {term for term in basemap_terms(item) if term not in _GENERIC_TERMS}
-        if terms & words:
+        terms = (term for term in basemap_terms(item) if term not in _GENERIC_TERMS)
+        if any(f" {term} " in padded for term in terms):
             matched.append(basemap_id)
+    return matched
+
+###############################################################################
+def match_requested_basemap(
+    user_message: str, basemaps: Iterable[Mapping[str, Any]]
+) -> str | None:
+    """Return the one non-default basemap the message names, or None if unclear."""
+
+    matched = match_requested_basemaps(user_message, basemaps)
     return matched[0] if len(matched) == 1 else None
 
 ###############################################################################
