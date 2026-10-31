@@ -189,6 +189,7 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
     provider_request_seconds: 10,
     vision_policy: 'disabled',
     vision_max_calls: 2,
+    max_output_tokens: 16384,
   },
   restart_required: false,
   message: null,

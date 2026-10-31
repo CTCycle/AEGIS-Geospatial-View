@@ -4781,6 +4781,13 @@
             "minimum": 1.0,
             "title": "Vision Max Calls",
             "default": 2
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 262144.0,
+            "minimum": 1024.0,
+            "title": "Max Output Tokens",
+            "default": 16384
           }
         },
         "additionalProperties": false,

@@ -274,6 +274,21 @@ def resolve_model_context_profile(
     )
 
 ###############################################################################
+def request_output_token_cap(request: LLMRequest) -> int | None:
+    """Return the configured output-token cap, clamped to the model maximum."""
+
+    metadata = _request_metadata(request)
+    configured = _positive_int(
+        metadata.get("max_tokens")
+        or metadata.get("max_output_tokens")
+        or metadata.get("max_completion_tokens")
+    )
+    maximum = _positive_int(metadata.get("maximum_output_tokens"))
+    if configured is None:
+        return None
+    return min(configured, maximum) if maximum is not None else configured
+
+###############################################################################
 def _expected_output_tokens(
     request: LLMRequest, profile: ModelContextProfile | None
 ) -> int:

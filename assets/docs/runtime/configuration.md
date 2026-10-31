@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-10-27
+Last updated: 2026-11-01
 
 ## Environment file
 
@@ -79,8 +79,11 @@ policy and exposes 31 editable fields. Defaults are grouped as follows:
   `model_max_attempts=2`, `provider_max_attempts=2`,
   `retry_backoff_base_seconds=0.25`, `retry_backoff_max_seconds=2`, and
   `provider_request_seconds=10`.
-- Advanced limits: `max_parallel_tool_calls=8` and
-  `max_tool_result_chars=4096`.
+- Advanced limits: `max_parallel_tool_calls=8`,
+  `max_tool_result_chars=4096`, and `max_output_tokens=16384` (global
+  per-call output cap for every model, clamped to the model's published
+  maximum). Reasoning models spend this budget on thinking first; an empty
+  reply that hit the cap fails the run with a message pointing to this setting.
 
 Smaller provider/model limits still win. These values are one typed policy block
 rather than independent environment knobs. Provider request settings are

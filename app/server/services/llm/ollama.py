@@ -20,6 +20,7 @@ from server.services.llm.context_budget import (
     apply_reported_usage,
     compute_context_usage,
     prepare_request,
+    request_output_token_cap,
 )
 from server.services.llm.multimodal import normalize_image_content_for_ollama
 from server.services.llm.errors import (
@@ -620,6 +621,9 @@ class OllamaProvider(LLMProvider):
         }
         if usage.selected_context_window is not None:
             payload["options"]["num_ctx"] = usage.selected_context_window
+        output_cap = request_output_token_cap(effective_request)
+        if output_cap is not None:
+            payload["options"]["num_predict"] = output_cap
         if native_tools:
             payload["tools"] = [
                 self.tool_to_ollama_schema(tool) for tool in native_tools

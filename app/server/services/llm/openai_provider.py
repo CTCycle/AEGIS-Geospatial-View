@@ -454,9 +454,24 @@ class OpenAIProvider(LLMProvider):
             content=str(getattr(response, "output_text", "") or ""),
             raw=raw,
             tool_calls=self._parse_tool_calls(raw),
-            finish_reason=raw.get("finish_reason") if is_json_object(raw) else None,
+            finish_reason=self._response_finish_reason(raw),
             context_usage=usage.to_dict(),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_finish_reason(raw: dict[str, Any]) -> str | None:
+        # The Responses API reports truncation as an incomplete status rather
+        # than a ``finish_reason`` field.
+        details = raw.get("incomplete_details")
+        if raw.get("status") == "incomplete" and is_json_object(details):
+            reason = details.get("reason")
+            if reason == "max_output_tokens":
+                return "length"
+            if isinstance(reason, str) and reason:
+                return reason
+        reason = raw.get("finish_reason")
+        return reason if isinstance(reason, str) else None
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:

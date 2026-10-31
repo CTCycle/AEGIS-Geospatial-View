@@ -86,6 +86,7 @@ class AgentExecutionSettings:
     provider_request_seconds: float = 10.0
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
+    max_output_tokens: int = 16384
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -230,6 +231,7 @@ class JsonAgentExecutionSettings(StrictJsonSettings):
         "disabled"
     )
     vision_max_calls: int = Field(default=2, ge=1, le=8)
+    max_output_tokens: int = Field(default=16384, ge=1024, le=262144)
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):
@@ -434,6 +436,7 @@ class AppSettings(BaseSettings):
                 provider_request_seconds=self.agent_execution.provider_request_seconds,
                 vision_policy=self.agent_execution.vision_policy,
                 vision_max_calls=self.agent_execution.vision_max_calls,
+                max_output_tokens=self.agent_execution.max_output_tokens,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

@@ -22,6 +22,7 @@ from server.services.llm.context_budget import (
     apply_reported_usage,
     compute_context_usage,
     prepare_request,
+    request_output_token_cap,
 )
 from server.services.llm.multimodal import normalize_image_content_for_google
 from server.services.llm.errors import (
@@ -609,4 +610,7 @@ class GoogleProvider(LLMProvider):
         config: dict[str, Any] = {"temperature": request.temperature}
         if system_instruction:
             config["system_instruction"] = system_instruction
+        output_cap = request_output_token_cap(request)
+        if output_cap is not None:
+            config["max_output_tokens"] = output_cap
         return config

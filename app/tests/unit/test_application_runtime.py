@@ -737,7 +737,9 @@ def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path
     assert payload["agent_execution"]["max_discovery_attempts"] == 2
     assert payload["restart_required"] is False
     assert "credentials" not in payload
-    serialized = json.dumps(payload).casefold()
+    assert payload["agent_execution"]["max_output_tokens"] == 16384
+    # ``max_output_tokens`` is a model output cap, not a credential.
+    serialized = json.dumps(payload).casefold().replace("max_output_tokens", "")
     assert not any(
         secret_field in serialized
         for secret_field in ("api_key", "password", "secret", "token")

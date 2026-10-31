@@ -1681,7 +1681,7 @@ export const parseRuntimeSettingsResponse = (value: unknown): RuntimeSettingsRes
         'max_consecutive_tool_failures', 'max_same_failed_fingerprint', 'max_route_corrections',
         'max_validation_corrections', 'model_max_attempts', 'provider_max_attempts',
         'retry_backoff_base_seconds', 'retry_backoff_max_seconds', 'provider_request_seconds',
-        'vision_max_calls',
+        'vision_max_calls', 'max_output_tokens',
       ],
     ),
     restart_required: requireApiBoolean(record, 'restart_required', endpoint),

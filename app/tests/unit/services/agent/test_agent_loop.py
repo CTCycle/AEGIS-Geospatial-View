@@ -419,6 +419,30 @@ async def test_conversation_with_empty_answers_uses_the_reserved_answer_call() -
     )
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_empty_answer_truncated_by_output_cap_fails_and_sends_global_cap() -> None:
+    conversation = _route_call_with(
+        primary_domain="conversation", task_mode="answer", capability_queries=[]
+    )
+    provider = FakeProvider(
+        [conversation, LLMResult(content="", finish_reason="length")]
+    )
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_model_calls=2,
+            max_output_tokens=4096,
+        )
+    )
+
+    assert outcome.stopped_reason == "failed"
+    assert "Max output tokens" in outcome.final_text
+    assert provider.requests[-1]["request"].metadata["max_output_tokens"] == 4096
+
+###############################################################################
 @pytest.mark.parametrize(
     "text,expected",
     [

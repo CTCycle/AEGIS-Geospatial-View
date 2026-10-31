@@ -617,8 +617,9 @@
           <details class="runtime-settings__disclosure">
             <summary>Advanced limits</summary>
             <div class="runtime-settings__disclosure-content">
-              <p>Limit parallel work and the size of each model-visible tool observation.</p>
+              <p>Limit parallel work, the size of each model-visible tool observation, and the output tokens a model may generate per call. Reasoning models spend this budget on thinking first, so raise it if a model returns empty answers; each model's own maximum still applies.</p>
               <div class="runtime-settings__fields">
+                <label>Max output tokens per model call <input class="settings-control" type="number" max="262144" min="1024" step="1024" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_output_tokens" /></label>
                 <label>Maximum parallel tool calls <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_parallel_tool_calls" /></label>
                 <label>Maximum tool result characters <input class="settings-control" type="number" max="100000" min="128" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_tool_result_chars" /></label>
               </div>

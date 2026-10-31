@@ -177,6 +177,7 @@ class AgentLoopRequest:
     max_render_attempts: int = 3
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
+    max_output_tokens: int = 16384
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     trace_callback: Callable[
@@ -615,6 +616,17 @@ class AgentLoop:
                 )
             return None
 
+        if not result.content.strip() and self._hit_output_limit(result):
+            # Reasoning models can spend the whole output budget thinking and
+            # return nothing; surface that instead of treating it as an answer.
+            return self._failed(
+                state,
+                request,
+                "The model used its entire output-token limit before producing "
+                "an answer. Raise 'Max output tokens' in Settings, or choose a "
+                "model that reasons less.",
+                category="model_capability",
+            )
         final_text = result.content.strip()
         recovery_results = await self._recover_location_only_map(request, route, state)
         self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
@@ -1703,6 +1715,12 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _hit_output_limit(result: LLMResult) -> bool:
+        reason = (result.finish_reason or "").strip().lower()
+        return reason in {"length", "max_tokens", "max_output_tokens"}
+
+    # -------------------------------------------------------------------------
     async def _attach_vision_capture(
         self,
         request: AgentLoopRequest,
@@ -2018,6 +2036,9 @@ class AgentLoop:
             and profile_metadata.get("context_profile_model") == request.model
         ):
             metadata.update(profile_metadata)
+        # The user's global cap applies to every model; providers still clamp
+        # it to the model's published ``maximum_output_tokens``.
+        metadata["max_output_tokens"] = request.max_output_tokens
         llm_request = LLMRequest(
             model=request.model,
             provider=request.provider,

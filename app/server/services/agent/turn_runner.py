@@ -205,6 +205,9 @@ class AgentTurnRunner:
                     vision_max_calls=int(
                         _setting(configured, "vision_max_calls", 2)
                     ),
+                    max_output_tokens=int(
+                        _setting(configured, "max_output_tokens", 16384)
+                    ),
                     context_usage_callback=request.context_usage_callback,
                     trace_callback=request.trace_callback,
                     checkpoint_callback=request.checkpoint_callback,

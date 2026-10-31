@@ -1089,6 +1089,7 @@ export interface RuntimeAgentExecutionSettings {
   provider_request_seconds: number;
   vision_policy: VisionPolicy;
   vision_max_calls: number;
+  max_output_tokens: number;
 }
 
 export type VisionPolicy = 'disabled' | 'always' | 'on_failure' | 'final_check';
