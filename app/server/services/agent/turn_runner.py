@@ -260,6 +260,7 @@ class AgentResponseBuilder:
             execution_trace={
                 "stopped_reason": outcome.stopped_reason,
                 "model_calls": outcome.model_calls,
+                "route_source": state.route_source,
                 "tool_calls": state.tool_calls,
                 "transitions": state.transitions,
                 "transition_trace": list(state.transition_trace[-64:]),

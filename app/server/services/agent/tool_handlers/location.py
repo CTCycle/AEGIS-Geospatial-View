@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import time
 import re
 
 from pydantic import ValidationError
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import json_object
 from server.contracts.geospatial import ClientMapView
 from server.contracts.location import LocationSignal
@@ -46,6 +48,14 @@ _LOCATION_TYPES = frozenset(
         "state",
     }
 )
+
+LOGGER = logging.getLogger(__name__)
+
+# An untyped name defaults to a settlement lookup. A landmark match replaces it
+# only when it is a different place and clearly more prominent, as for
+# "Colosseum" (Rome) against the Queensland locality of the same name.
+_LANDMARK_CONFIDENCE_MARGIN = 0.05
+_DISTINCT_PLACE_DEGREES = 0.02
 
 # Reserved target for "this area" requests: the viewport the user sees.
 _CURRENT_VIEW_NAMES = frozenset({"current map view", "current view"})
@@ -190,6 +200,14 @@ class LocationToolHandler:
         result = await self.resolver.resolve_location_signals(
             [signal], memory_snapshot
         )
+        if (
+            request.expected_location_type is None
+            and coordinates is None
+            and isinstance(result, ResolvedLocation)
+        ):
+            result = await self._prefer_prominent_landmark(
+                query, result, memory_snapshot, state
+            )
         if isinstance(result, ClarificationRequest):
             return _failure(
                 code="clarification_required",
@@ -206,6 +224,44 @@ class LocationToolHandler:
             )
         state.location_refs[target_key] = result
         return _success(location=result, target_key=target_key, started=started)
+
+    # -------------------------------------------------------------------------
+    async def _prefer_prominent_landmark(
+        self,
+        query: str,
+        settlement: ResolvedLocation,
+        memory_snapshot: dict[str, object],
+        state: AgentRunState,
+    ) -> ResolvedLocation:
+        signal = LocationSignal(
+            signal_type="landmark",
+            raw_value=query,
+            normalized_value=query,
+            confidence=1.0,
+            source="model",
+        )
+        try:
+            landmark = await self.resolver.resolve_location_signals(
+                [signal], memory_snapshot
+            )
+        except Exception as exc:
+            # The settlement already resolved; a failed second look keeps it.
+            log_unexpected_failure(
+                LOGGER, exc, stage="landmark_lookup", level=logging.WARNING,
+                run_id=state.run_id or state.request_id,
+            )
+            return settlement
+        if not isinstance(landmark, ResolvedLocation):
+            return settlement
+        distance = abs(landmark.latitude - settlement.latitude) + abs(
+            landmark.longitude - settlement.longitude
+        )
+        if (
+            distance > _DISTINCT_PLACE_DEGREES
+            and landmark.confidence > settlement.confidence + _LANDMARK_CONFIDENCE_MARGIN
+        ):
+            return landmark
+        return settlement
 
 ###############################################################################
 def _current_view_location(state: AgentRunState) -> ResolvedLocation | None:

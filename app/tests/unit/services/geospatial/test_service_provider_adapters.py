@@ -345,7 +345,7 @@ def _service_with_elevation_payload(
     )
     calls: list[dict[str, object]] = []
 
-    def fake_get_json(
+    async def fake_get_json(
         *, endpoint: str, params: dict[str, str], provider_key: str
     ) -> dict[str, object]:
         calls.append(
@@ -429,7 +429,7 @@ def test_openmeteo_service_propagates_provider_request_errors(
         min_call_interval_s=0.05,
     )
 
-    def fail_get_json(**_kwargs: object) -> dict[str, object]:
+    async def fail_get_json(**_kwargs: object) -> dict[str, object]:
         raise OpenMeteoRequestError("HTTP 503 from Open-Meteo")
 
     monkeypatch.setattr(service, "_get_json", fail_get_json)

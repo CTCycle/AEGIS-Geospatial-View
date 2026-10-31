@@ -49,6 +49,22 @@ def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.MISS
 
 ###############################################################################
+def test_geospatial_cache_sweeps_expired_entries_and_bounds_size() -> None:
+    clock = _Clock()
+    cache = GeospatialCache(clock=clock, max_entries=3)
+
+    cache.set("old", 0, ttl_seconds=1, stale_while_revalidate_seconds=1)
+    clock.value = 5.0
+    cache.set("a", 1, ttl_seconds=60)
+    cache.set("b", 2, ttl_seconds=60)
+    assert list(cache._entries) == ["a", "b"]
+    cache.set("c", 3, ttl_seconds=60)
+    cache.set("d", 4, ttl_seconds=60)
+
+    assert cache.get("a").status == CacheLookupStatus.MISS
+    assert [cache.get(key).value for key in ("b", "c", "d")] == [2, 3, 4]
+
+###############################################################################
 def test_geospatial_cache_can_invalidate_entries() -> None:
     cache = GeospatialCache()
 

@@ -1971,7 +1971,15 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
         for message in latest_request.messages
         if "CANONICAL_NATIVE_CONTEXT" in message.get("content", "")
     )
-    assert "tool completed" in canonical_context
+    # The latest observation is model-visible exactly once: through its
+    # protocol tool message, not again in the canonical or working state.
+    assert "tool completed" not in canonical_context
+    visible = [
+        message
+        for message in latest_request.messages
+        if "tool completed" in str(message.get("content", ""))
+    ]
+    assert [message.get("role") for message in visible] == ["tool"]
     assert any(
         message.get("content") == "Earlier context."
         for message in latest_request.messages
@@ -2048,6 +2056,51 @@ def test_capability_description_observation_preserves_contract_and_schema() -> N
         "show",
         "forecast",
     ]
+
+###############################################################################
+def test_trimmed_tool_results_stay_visible_through_canonical_context() -> None:
+    state = _state()
+    state.context_hydrated = True
+    state.tool_results = [
+        ToolResult(
+            call_id=call_id,
+            tool_name="test_tool",
+            status="success",
+            summary=f"{call_id} observation",
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+        for call_id in ("trimmed", "retained")
+    ]
+    protocol = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "retained", "type": "function", "function": {"name": "test_tool", "arguments": "{}"}}],
+        },
+        {"role": "tool", "tool_call_id": "retained", "name": "test_tool", "content": "retained observation"},
+    ]
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+
+    messages = _loop(FakeProvider([]))._model_context_messages(  # pyright: ignore[reportPrivateUsage]
+        request, protocol
+    )
+
+    canonical = next(
+        message["content"]
+        for message in messages
+        if "CANONICAL_NATIVE_CONTEXT" in str(message.get("content", ""))
+    )
+    assert "trimmed observation" in canonical
+    assert "retained observation" not in canonical
+    working = json.loads(
+        AgentLoop._working_state_message(state, 4096)  # pyright: ignore[reportPrivateUsage]
+    )
+    assert "tool_results" not in working and "render_observations" not in working
 
 ###############################################################################
 def test_working_state_remains_valid_json_when_compacted() -> None:

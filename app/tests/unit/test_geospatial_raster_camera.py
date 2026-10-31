@@ -7,14 +7,15 @@ from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers._request import grid_points
 from server.services.geospatial.openmeteo import OpenMeteoRateLimitError, OpenMeteoRequestError, OpenMeteoService
 from server.services.geospatial.land_mask import country_shapes, land_mask
+from server.services.geospatial.providers import http as provider_http
 from server.services.catalog.loader import find_macro_region_entry, load_macro_regions
 from shapely.geometry import Point
 from urllib.parse import urlencode
 from unittest.mock import patch
 import pytest
 import asyncio
+import httpx
 import json
-import threading
 import time
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
@@ -210,16 +211,13 @@ async def test_weather_grid_keeps_points_aligned_when_a_batch_is_short_or_fails(
 @pytest.mark.asyncio
 async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
     in_flight = max_in_flight = 0
-    lock = threading.Lock()
-    def get_json(**kwargs):
+    async def get_json(**kwargs):
         nonlocal in_flight, max_in_flight
-        with lock:
-            in_flight += 1
-            max_in_flight = max(max_in_flight, in_flight)
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
         # Longer than the rate interval, so permitted batches overlap.
-        time.sleep(0.2)
-        with lock:
-            in_flight -= 1
+        await asyncio.sleep(0.2)
+        in_flight -= 1
         return {"locations": [{}] * len(kwargs["params"]["latitude"].split(","))}
     points = [(float(index), 0.0) for index in range(400)]
     service = OpenMeteoService(grid_batch_concurrency=2)
@@ -241,19 +239,84 @@ async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
 def test_openmeteo_rate_slots_are_reserved_atomically():
     service = OpenMeteoService(min_call_interval_s=0.1)
     with patch("server.services.geospatial.openmeteo.time.monotonic", return_value=50.0):
-        delays = [service._reserve_rate_limit_slot("grid") for _ in range(3)]
+        delays = [service._reserve_rate_limit_slot("grid")[0] for _ in range(3)]
     assert delays == pytest.approx([0.0, 0.1, 0.2])
 
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_openmeteo_cancelled_rate_wait_releases_its_slot():
+    service = OpenMeteoService(min_call_interval_s=5)
+    service._reserve_rate_limit_slot("grid")
+    waiter = asyncio.create_task(
+        service._fetch_json(endpoint="https://weather.example", params={}, provider_key="grid")
+    )
+    await asyncio.sleep(0.01)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    # Without the release the next caller would queue a second interval out.
+    assert service._reserve_rate_limit_slot("grid")[0] <= 5
+
+
+###############################################################################
+def test_openmeteo_cache_sweeps_expired_entries_and_stays_bounded(monkeypatch):
+    monkeypatch.setattr("server.services.geospatial.openmeteo.OPENMETEO_CACHE_MAX_ENTRIES", 3)
+    service = OpenMeteoService(cache_ttl_s=60)
+    with patch("server.services.geospatial.openmeteo.time.time", return_value=0.0):
+        service._cache_set("old", {})
+    with patch("server.services.geospatial.openmeteo.time.time", return_value=100.0):
+        service._cache_set("a", {})
+        service._cache_set("b", {})
+        assert list(service._cache) == ["a", "b"]
+        service._cache_set("c", {})
+        service._cache_set("d", {})
+    assert list(service._cache) == ["b", "c", "d"]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_openmeteo_http_maps_statuses_and_normalizes_arrays(monkeypatch):
+    responses = {
+        "array": httpx.Response(200, json=[{"elevation": 1}]),
+        "limited": httpx.Response(429, headers={"Retry-After": "7"}),
+        "down": httpx.Response(503),
+        "garbled": httpx.Response(200, content=b"not json"),
+    }
+    agents = set()
+    def handler(request: httpx.Request) -> httpx.Response:
+        agents.add(request.headers["User-Agent"])
+        case = request.url.params["case"]
+        if case == "offline":
+            raise httpx.ConnectError("offline", request=request)
+        return responses[case]
+    service = OpenMeteoService(user_agent="aegis-test")
+    async def get(case):
+        return await service._get_json(
+            endpoint="https://weather.example/forecast", params={"case": case}, provider_key="k"
+        )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        monkeypatch.setattr(provider_http, "_ASYNC_HTTP_CLIENT", client)
+        assert await get("array") == {"locations": [{"elevation": 1}]}
+        with pytest.raises(OpenMeteoRateLimitError) as limited:
+            await get("limited")
+        assert limited.value.retry_after_seconds == 7
+        for case in ("down", "garbled", "offline"):
+            with pytest.raises(OpenMeteoRequestError) as error:
+                await get(case)
+            assert not isinstance(error.value, OpenMeteoRateLimitError)
+    assert agents == {"aegis-test"}
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_weather_grid_rate_limit_cancels_waiting_and_in_flight_batches():
-    release = threading.Event()
-    def get_json(**kwargs):
+    release = asyncio.Event()
+    async def get_json(**kwargs):
         if kwargs["params"]["latitude"].startswith("0.00000"):
-            time.sleep(0.05)
+            await asyncio.sleep(0.05)
             raise OpenMeteoRateLimitError("slow down", retry_after_seconds=30)
-        release.wait(5)
+        await release.wait()
         return {"locations": [{}] * len(kwargs["params"]["latitude"].split(","))}
     points = [(float(index), 0.0) for index in range(300)]
     service = OpenMeteoService(grid_batch_concurrency=3)
@@ -262,8 +325,8 @@ async def test_weather_grid_rate_limit_cancels_waiting_and_in_flight_batches():
         with patch.object(service, "_get_json", side_effect=get_json):
             with pytest.raises(OpenMeteoRateLimitError):
                 await service.get_weather_grid(points, 0)
-        # Siblings blocked in urlopen are abandoned, not awaited to completion,
-        # and no batch task outlives the call.
+        # In-flight siblings are cancelled, not awaited to completion, and
+        # no batch task outlives the call.
         assert time.monotonic() - started < 2
         assert asyncio.all_tasks() == {asyncio.current_task()}
     finally:

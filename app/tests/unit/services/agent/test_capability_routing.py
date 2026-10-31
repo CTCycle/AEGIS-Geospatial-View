@@ -1595,3 +1595,59 @@ def test_router_normalizes_discovery_area(mode: str, refs: list[str], analysis: 
 ###############################################################################
 def test_location_fallback_does_not_swallow_analysis_query() -> None:
     assert build_location_map_fallback_route("Show me where in Europe it rained most") is None
+
+###############################################################################
+def _catalog_router() -> CapabilityRouter:
+    capabilities = CapabilityRegistry()
+    runtime = RuntimeRegistry(catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None)
+    return CapabilityRouter(capability_registry=capabilities, runtime_registry=runtime)
+
+###############################################################################
+@pytest.mark.parametrize(
+    "message, target",
+    [
+        ("Show the Colosseum", "Colosseum"),
+        ("show me Rome on the map", "Rome"),
+        ("Show 41.89, 12.49", "41.89, 12.49"),
+        ("Show EUR Roma", "EUR Roma"),
+        # An ambiguous place still fast-routes; the resolver asks which one.
+        ("Show Springfield", "Springfield"),
+    ],
+)
+def test_fast_route_accepts_single_place_display(message: str, target: str) -> None:
+    router = _catalog_router()
+    route = router.fast_route(message)
+
+    assert route is not None and route.target_refs == [target]
+    decision = router.validate_route(
+        route,
+        user_message=message,
+        active_state=AgentRunState(
+            request_id="fast", conversation_id="fast", phase=AgentPhase.ROUTE_REQUEST, user_message=message
+        ),
+    )
+    # The loop proceeds on either status, exactly as for a model route.
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.operation == "show_location_on_map"
+
+###############################################################################
+@pytest.mark.parametrize(
+    "message",
+    [
+        "show the weather in Rome",
+        "show Paris and Berlin",
+        "show rainfall in Europe",
+        "show pharmacies near me",
+        "show it",
+        "show Rome on satellite",
+        "compare Rome and Milan",
+        "show Rome then zoom out",
+        "how far is Rome from Milan",
+        "Show airports",
+        "show me the city centre",
+        "show 95, 12",
+        "show Rome?",
+    ],
+)
+def test_fast_route_defers_everything_else_to_the_model(message: str) -> None:
+    assert _catalog_router().fast_route(message) is None

@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 import httpx
+from unittest.mock import AsyncMock
 from server.services.geospatial.api_service import GeospatialApiService, GeospatialInvalidRequestError, GeospatialProviderResponseError, normalize_geojson_feature_collection
 from server.services.geospatial.spatial_constraints import SpatialConstraintError, feature_matches_constraint, geodesic_distance_m, normalize_bbox, validate_geojson_geometry, validate_point
 from server.services.geospatial.providers import http as provider_http
@@ -25,7 +26,7 @@ def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata(
     )
     captured: dict[str, object] = {}
 
-    def get_json(**kwargs):  # noqa: ANN003
+    async def get_json(**kwargs):  # noqa: ANN003
         captured.update(kwargs)
         return {
             "timezone": "Europe/Rome",
@@ -88,7 +89,7 @@ def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata(
 ###############################################################################
 def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
-    service._get_json = lambda **kwargs: {  # type: ignore[method-assign]
+    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
         "current": {"time": "2026-09-01T09:00", "temperature_2m": 22.0},
         "hourly": {
             "time": ["2026-09-01T09:00"],
@@ -96,7 +97,7 @@ def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> Non
             "precipitation": [0.0],
             "weather_code": [1],
         },
-    }
+    })
 
     result = run_async_in_thread(
         service.get_weather_forecast(latitude=43.817, longitude=7.777)
@@ -109,10 +110,10 @@ def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> Non
 ###############################################################################
 def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
-    service._get_json = lambda **kwargs: {  # type: ignore[method-assign]
+    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
         "hourly": {},
         "current": {},
-    }
+    })
 
     result = run_async_in_thread(
         service.get_weather_forecast(latitude=43.817, longitude=7.777)
@@ -125,7 +126,7 @@ def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
 def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
     service = OpenMeteoService(air_quality_base_url="https://air.example/forecast")
     timeline = [f"2026-09-01T{hour:02d}:00" for hour in range(24)]
-    service._get_json = lambda **kwargs: {  # type: ignore[method-assign]
+    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
         "timezone": "Europe/Rome",
         "hourly": {
             "time": timeline,
@@ -134,7 +135,7 @@ def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
                 for name in OpenMeteoService.AIR_QUALITY_VARIABLES
             },
         },
-    }
+    })
 
     result = run_async_in_thread(
         service.get_air_quality_forecast(latitude=41.9, longitude=12.5)

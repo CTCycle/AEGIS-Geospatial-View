@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 import json
 import asyncio
+import time
 from server.services.llm.factory import LLMFactory
 from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError, LLMStructuredOutputError
 from server.services.llm.google_provider import GoogleProvider
@@ -1135,6 +1136,37 @@ def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
         pass
     else:
         raise AssertionError("Open circuit did not reject the provider.")
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_provider_registry_concurrent_rate_waits_start_an_interval_apart() -> None:
+    registry = ProviderRegistry(providers=[])
+    registry._min_call_interval_s["paced"] = 0.1
+    started: list[float] = []
+
+    async def wait() -> None:
+        await registry._wait_for_rate_limit("paced")
+        started.append(time.monotonic())
+
+    await asyncio.gather(wait(), wait())
+
+    assert started[1] - started[0] >= 0.09
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_provider_registry_cancelled_rate_wait_releases_its_slot() -> None:
+    registry = ProviderRegistry(providers=[])
+    registry._min_call_interval_s["paced"] = 5.0
+    await registry._wait_for_rate_limit("paced")
+    first_slot = registry._last_call_at["paced"]
+
+    waiter = asyncio.create_task(registry._wait_for_rate_limit("paced"))
+    await asyncio.sleep(0.01)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+
+    assert registry._last_call_at["paced"] == first_slot
 
 ###############################################################################
 def test_provider_registry_recovers_circuit_after_recovery_window() -> None:

@@ -8,11 +8,13 @@ model-directed work to ``AgentLoop`` through ``AgentTurnRunner``.
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import contextmanager
 from collections.abc import Awaitable, Iterable, Mapping
 from typing import Any, Callable, Generator, cast
 from uuid import uuid4
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_object
 from server.configurations.settings import AgentExecutionSettings
 from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
@@ -39,6 +41,8 @@ from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.provider_contract import require_canonical_provider
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class NativeAgentOrchestrator:
@@ -81,7 +85,9 @@ class NativeAgentOrchestrator:
         )
         self.instruction_state_service = ConversationInstructionService()
         self.context_assembler = AgentContextAssembler(context_profile_resolver)
-        self._conversation_locks: dict[str, asyncio.Lock] = {}
+        # Lock plus the number of turns holding or awaiting it, so idle
+        # conversations do not keep an entry forever.
+        self._conversation_locks: dict[str, tuple[asyncio.Lock, int]] = {}
 
     # -------------------------------------------------------------------------
     async def run_turn(
@@ -97,21 +103,30 @@ class NativeAgentOrchestrator:
         checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None,
         run_state_check: Callable[[], str | None] | None = None,
     ) -> ChatTurnResponse:
-        lock = self._conversation_locks.setdefault(
-            payload.conversation_id, asyncio.Lock()
+        conversation_id = payload.conversation_id
+        lock, holders = self._conversation_locks.get(
+            conversation_id, (asyncio.Lock(), 0)
         )
-        async with lock:
-            return await self._run_serialized(
-                payload,
-                progress_callback,
-                trace_callback,
-                defer_map_commit=defer_map_commit,
-                agent_run_id=agent_run_id,
-                agent_run_version=agent_run_version,
-                checkpoint=checkpoint,
-                checkpoint_callback=checkpoint_callback,
-                run_state_check=run_state_check,
-            )
+        self._conversation_locks[conversation_id] = (lock, holders + 1)
+        try:
+            async with lock:
+                return await self._run_serialized(
+                    payload,
+                    progress_callback,
+                    trace_callback,
+                    defer_map_commit=defer_map_commit,
+                    agent_run_id=agent_run_id,
+                    agent_run_version=agent_run_version,
+                    checkpoint=checkpoint,
+                    checkpoint_callback=checkpoint_callback,
+                    run_state_check=run_state_check,
+                )
+        finally:
+            lock, holders = self._conversation_locks[conversation_id]
+            if holders <= 1:
+                del self._conversation_locks[conversation_id]
+            else:
+                self._conversation_locks[conversation_id] = (lock, holders - 1)
 
     # -------------------------------------------------------------------------
     async def _run_serialized(
@@ -494,7 +509,11 @@ class NativeAgentOrchestrator:
                     limit=100,
                 ),
             )
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="evidence_summaries",
+                conversation_id=conversation_id,
+            )
             return []
         result: list[dict[str, Any]] = []
         for item in values:
@@ -571,7 +590,11 @@ class NativeAgentOrchestrator:
                     "context_usage": payload.get("context_usage"),
                 }
             )
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="load_existing_response",
+                conversation_id=conversation_id, request_id=request_id,
+            )
             return None
 
     # -------------------------------------------------------------------------

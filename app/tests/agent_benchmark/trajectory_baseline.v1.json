@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "scenarios": {
+    "show_colosseum": {
+      "termination_reason": "awaiting_render",
+      "model_calls": 1,
+      "total_estimated_input_tokens": 2642
+    },
+    "show_coordinates": {
+      "termination_reason": "awaiting_render",
+      "model_calls": 1,
+      "total_estimated_input_tokens": 2657
+    },
+    "springfield_clarification": {
+      "termination_reason": "clarification_required",
+      "model_calls": 1,
+      "total_estimated_input_tokens": 2668
+    },
+    "paris_berlin_weather": {
+      "termination_reason": "goal_satisfied",
+      "model_calls": 4,
+      "total_estimated_input_tokens": 12050
+    },
+    "europe_rainfall_rank": {
+      "termination_reason": "awaiting_render",
+      "model_calls": 4,
+      "total_estimated_input_tokens": 17016
+    },
+    "follow_up_weather": {
+      "termination_reason": "goal_satisfied",
+      "model_calls": 4,
+      "total_estimated_input_tokens": 10811
+    }
+  }
+}

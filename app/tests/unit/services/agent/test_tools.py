@@ -365,6 +365,11 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
     state.tool_results.append(executed("berlin"))
     assert uncovered_route_targets(state) == ["Paris"]
 
+    # The model may name a target by its route spelling, not the stored key.
+    state.tool_results.clear()
+    state.tool_results.extend([executed("Paris"), executed("Berlin")])
+    assert uncovered_route_targets(state) == []
+
     state.tool_results.clear()
     state.tool_results.append(executed("paris"))
     assert uncovered_route_targets(state) == ["Berlin"]

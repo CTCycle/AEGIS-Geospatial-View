@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from datetime import UTC, datetime, time, timedelta
 
-from server.common.identifiers import location_ref_matches
+from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import (
@@ -396,8 +396,10 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
         or len(route.target_refs) < 2
     ):
         return []
+    # Executions name a target by any spelling the model chose; stored refs
+    # are normalized keys, so compare both sides normalized.
     covered_keys = {
-        str(json_object(json_object(result.data).get("query")).get("location_ref") or "").strip()
+        normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or ""))
         for result in state.tool_results
         if result.tool_name == "execute_geospatial_capability"
         and _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), False)
@@ -409,7 +411,7 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
             for key, location in state.location_refs.items()
             if location_ref_matches(str(target), str(key), location.label)
         ]
-        if matches and not covered_keys.intersection(matches):
+        if matches and not covered_keys.intersection(normalize_target_key(key) for key in matches):
             uncovered.append(str(target))
     return uncovered
 

@@ -488,6 +488,9 @@ class AgentRunState(BaseModel):
     )
     consecutive_tool_failures: int = Field(default=0, ge=0)
     route_corrections: int = Field(default=0, ge=0)
+    # How the route was chosen: the routing model, the deterministic fast
+    # path, or the deterministic fallback after routing failed.
+    route_source: Literal["model", "fast", "fallback"] = "model"
     validation_corrections: int = Field(default=0, ge=0)
     # Iterations are one-based once the first model decision starts.
     current_iteration: int = Field(default=0, ge=0)

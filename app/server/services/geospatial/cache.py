@@ -11,6 +11,8 @@ from server.services.geospatial.providers.base import (
     provider_cache_key,
 )
 
+DEFAULT_MAX_ENTRIES = 2048
+
 ###############################################################################
 @dataclass(frozen=True)
 class _CacheEntry:
@@ -22,8 +24,11 @@ class _CacheEntry:
 class GeospatialCache:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, clock: Any | None = None) -> None:
+    def __init__(
+        self, *, clock: Any | None = None, max_entries: int = DEFAULT_MAX_ENTRIES
+    ) -> None:
         self._clock = clock or time.monotonic
+        self._max_entries = max(1, int(max_entries))
         self._lock = RLock()
         self._entries: dict[str, _CacheEntry] = {}
 
@@ -57,11 +62,21 @@ class GeospatialCache:
         now = float(self._clock())
         expires_at = now + ttl
         with self._lock:
+            for expired in [
+                name for name, entry in self._entries.items()
+                if now > entry.stale_expires_at
+            ]:
+                del self._entries[expired]
+            # Re-inserting moves the key to the end, so dict order is
+            # insertion age and the front holds the oldest entries.
+            self._entries.pop(normalized, None)
             self._entries[normalized] = _CacheEntry(
                 value=value,
                 expires_at=expires_at,
                 stale_expires_at=expires_at + stale_ttl,
             )
+            while len(self._entries) > self._max_entries:
+                del self._entries[next(iter(self._entries))]
 
     # -------------------------------------------------------------------------
     def invalidate(self, key: str) -> None:

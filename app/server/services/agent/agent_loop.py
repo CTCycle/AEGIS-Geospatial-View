@@ -257,7 +257,8 @@ class AgentLoop:
             route_result = (
                 (None, "", state.route)
                 if state.route is not None
-                else await self._route(request, provider, messages)
+                else self._fast_route(request)
+                or await self._route(request, provider, messages)
             )
             if route_result[0] is not None:
                 final_text, reason = route_result[0], route_result[1]
@@ -1598,8 +1599,35 @@ class AgentLoop:
             )
             if decision.status in {"accepted", "discovery_required"}:
                 request.state.capability_ids = list(decision.capability_ids)
+                request.state.route_source = "fallback"
                 return None, "", decision.route
         return None, "", None
+
+    # -------------------------------------------------------------------------
+    def _fast_route(
+        self, request: AgentLoopRequest
+    ) -> tuple[None, str, CapabilityRoute] | None:
+        """Skip the routing call for an unequivocal single-place display."""
+
+        state = request.state
+        capture_store = getattr(self, "capture_store", None)
+        if capture_store is not None and capture_store.attachment_for_run(
+            state.run_id or state.request_id
+        ) is not None:
+            return None
+        proposed = self.capability_router.fast_route(state.user_message)
+        if proposed is None:
+            return None
+        decision = self.capability_router.validate_route(
+            proposed,
+            user_message=state.user_message,
+            active_state=state,
+        )
+        if decision.status not in {"accepted", "discovery_required"}:
+            return None
+        state.capability_ids = list(decision.capability_ids)
+        state.route_source = "fast"
+        return None, "", decision.route
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1867,12 +1895,21 @@ class AgentLoop:
         state = request.state
         if not state.context_hydrated:
             return list(messages)
+        protocol_messages = self._protocol_messages(messages)
+        if not protocol_messages and state.provider_continuation:
+            protocol_messages = self._protocol_messages(
+                [dict(item) for item in state.provider_continuation]
+            )
+        # A result whose tool message is still in the protocol window is
+        # already model-visible; repeat only results the window trimmed.
+        answered = self._protocol_result_call_ids(protocol_messages)
         observations = [
             ModelObservation.from_tool_result(
                 result,
                 max_chars=min(request.max_tool_result_chars, 2048),
             ).model_dump(mode="json", exclude_none=True)
             for result in state.tool_results[-8:]
+            if result.call_id not in answered
         ]
         view = AgentContextView.from_state(
             state,
@@ -1895,12 +1932,22 @@ class AgentLoop:
             policy_constraints=view.policy_constraints,
             context_selection=view.context_selection,
         )
-        protocol_messages = self._protocol_messages(messages)
-        if not protocol_messages and state.provider_continuation:
-            protocol_messages = self._protocol_messages(
-                [dict(item) for item in state.provider_continuation]
-            )
         return [*context, *protocol_messages]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _protocol_result_call_ids(messages: list[dict[str, Any]]) -> set[str]:
+        ids: set[str] = set()
+        for message in messages:
+            if message.get("role") == "tool":
+                value = message.get("tool_call_id")
+            elif message.get("type") == "function_call_output":
+                value = message.get("call_id")
+            else:
+                continue
+            if isinstance(value, str) and value:
+                ids.add(value)
+        return ids
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -3117,6 +3164,9 @@ class AgentLoop:
     # -------------------------------------------------------------------------
     @staticmethod
     def _working_state_message(state: AgentRunState, limit: int) -> str:
+        # A hydrated run already carries tool and render observations in the
+        # canonical context; repeating them here only spends input tokens.
+        observed = not state.context_hydrated
         tool_result_summaries: list[dict[str, Any]] = [
             {
                 "call_id": item.call_id,
@@ -3127,7 +3177,7 @@ class AgentLoop:
                 "error_code": item.error.code if item.error else None,
             }
             for item in state.tool_results[-8:]
-        ]
+        ] if observed else []
         payload: dict[str, Any] = {
             "phase": state.phase.value,
             "goal": (
@@ -3148,34 +3198,36 @@ class AgentLoop:
             "prepared_map": bool(state.prepared_map_session),
             "render_verified": state.render_verified,
             "render_attempts": state.render_attempts,
-            "render_observations": [
-                item.model_dump(mode="json") for item in state.render_observations[-4:]
-            ],
             "active_map_collection_revision": (
                 state.active_map_session.overlay_collection.revision
                 if state.active_map_session is not None
                 else 0
             ),
-            "tool_results": tool_result_summaries,
         }
+        if observed:
+            payload["render_observations"] = [
+                item.model_dump(mode="json") for item in state.render_observations[-4:]
+            ]
+            payload["tool_results"] = tool_result_summaries
         serialized = json.dumps(payload, separators=(",", ":"), default=str)
         if len(serialized) <= max(256, limit):
             return serialized
         compact = dict(payload)
-        compact["tool_results"] = [
-            {
-                "tool_name": item["tool_name"],
-                "status": item["status"],
-                "summary": str(item["summary"])[:240],
-                "error_code": item["error_code"],
-            }
-            for item in tool_result_summaries[-3:]
-        ]
+        if observed:
+            compact["tool_results"] = [
+                {
+                    "tool_name": item["tool_name"],
+                    "status": item["status"],
+                    "summary": str(item["summary"])[:240],
+                    "error_code": item["error_code"],
+                }
+                for item in tool_result_summaries[-3:]
+            ]
         compact["evidence_refs"] = list(state.evidence_refs[-8:])
         serialized = json.dumps(compact, separators=(",", ":"), default=str)
         if len(serialized) <= max(256, limit):
             return serialized
-        minimal = {
+        minimal: dict[str, Any] = {
             "phase": state.phase.value,
             "goal": AgentLoop._compact_goal(state),
             "completion_contract": AgentLoop._compact_completion_contract(state),
@@ -3186,10 +3238,11 @@ class AgentLoop:
             "prepared_map": bool(state.prepared_map_session),
             "render_verified": state.render_verified,
             "render_attempts": state.render_attempts,
-            "render_observations": [
-                item.model_dump(mode="json") for item in state.render_observations[-2:]
-            ],
         }
+        if observed:
+            minimal["render_observations"] = [
+                item.model_dump(mode="json") for item in state.render_observations[-2:]
+            ]
         return json.dumps(minimal, separators=(",", ":"), default=str)
 
     # -------------------------------------------------------------------------

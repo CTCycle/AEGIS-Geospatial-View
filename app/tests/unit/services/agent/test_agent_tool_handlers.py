@@ -307,6 +307,55 @@ async def test_unresolved_target_id_is_resolved_as_initial_location_query() -> N
     assert state.location_refs["japan"].label == "Japan"
 
 ###############################################################################
+class _TypedResolver:
+    """Answer each signal type with a scripted geocoder outcome."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self, outcomes: dict[str, ResolvedLocation | ClarificationRequest]) -> None:
+        self.outcomes = outcomes
+        self.types: list[str] = []
+
+    # -------------------------------------------------------------------------
+    async def resolve_location_signals(self, signals: Any, _memory: Any) -> Any:
+        self.types.append(signals[0].signal_type)
+        return self.outcomes[signals[0].signal_type]
+
+_QUEENSLAND = ResolvedLocation(label="Colosseum, Queensland, Australia", latitude=-24.43, longitude=151.56,
+                               source="geocoder", confidence=0.77)
+_ROME_LANDMARK = ResolvedLocation(label="Colosseum, Rome, Italy", latitude=41.89, longitude=12.49,
+                                  source="geocoder", confidence=0.87)
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("expected_type", "landmark", "label", "types"),
+    [
+        # Untyped: a clearly more prominent landmark wins over the default settlement.
+        (None, _ROME_LANDMARK, "Colosseum, Rome, Italy", ["city", "landmark"]),
+        # Untyped: a city whose landmark lookup fails keeps the city.
+        (None, ClarificationRequest(question="?", reason="none", missing_fields=["location"]),
+         "Colosseum, Queensland, Australia", ["city", "landmark"]),
+        # An explicit type is never second-guessed.
+        ("city", _ROME_LANDMARK, "Colosseum, Queensland, Australia", ["city"]),
+    ],
+)
+async def test_untyped_name_prefers_a_clearly_more_prominent_landmark(
+    expected_type: str | None, landmark: Any, label: str, types: list[str]
+) -> None:
+    resolver = _TypedResolver({"city": _QUEENSLAND, "landmark": landmark})
+    state = AgentRunState(request_id="request-1", conversation_id="conversation-1",
+                          phase=AgentPhase.BUILD_TOOL_CONTEXT, user_message="Show the Colosseum")
+
+    result = await LocationToolHandler(resolver=resolver).resolve(  # type: ignore[arg-type]
+        ResolveLocationInput(query="Colosseum", target_id="Colosseum", expected_location_type=expected_type),
+        state,
+    )
+
+    assert result.status == "success"
+    assert state.location_refs["colosseum"].label == label
+    assert resolver.types == types
+
+###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("query", "user_message", "expected"),

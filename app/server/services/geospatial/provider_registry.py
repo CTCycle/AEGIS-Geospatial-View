@@ -485,8 +485,22 @@ class ProviderRegistry:
         if min_interval <= 0:
             self._last_call_at[provider_id] = monotonic()
             return
+        # Reserve the slot with no await between read and write so concurrent
+        # callers queue behind each other instead of sharing one gap.
         now = monotonic()
-        delay = min_interval - (now - self._last_call_at.get(provider_id, 0.0))
-        if delay > 0:
-            await asyncio.sleep(delay)
-        self._last_call_at[provider_id] = monotonic()
+        previous = self._last_call_at.get(provider_id)
+        slot = max(now, (-math.inf if previous is None else previous) + min_interval)
+        self._last_call_at[provider_id] = slot
+        if slot <= now:
+            return
+        try:
+            await asyncio.sleep(slot - now)
+        except asyncio.CancelledError:
+            # A cancelled caller never sends; release its slot unless a later
+            # caller has already queued behind it.
+            if self._last_call_at.get(provider_id) == slot:
+                if previous is None:
+                    self._last_call_at.pop(provider_id, None)
+                else:
+                    self._last_call_at[provider_id] = previous
+            raise

@@ -111,6 +111,49 @@ _PLACE_SEARCH_DATA_TERMS = frozenset(
     }
 )
 
+# Fast routing accepts one display verb and one target, nothing else: a
+# wrong deterministic route costs more than the routing call it saves.
+_FAST_ROUTE_PATTERN = re.compile(
+    r"^(?:please\s+)?(?:show|display|locate)(?:\s+me)?\s+(?:the\s+)?(?P<target>.+?)"
+    r"(?:\s+on\s+(?:the\s+|a\s+)?map)?\s*[.!]?$",
+    re.IGNORECASE,
+)
+_FAST_ROUTE_COORDINATES = re.compile(
+    r"^(?P<lat>[+-]?\d{1,2}(?:\.\d+)?)\s*,\s*(?P<lon>[+-]?\d{1,3}(?:\.\d+)?)$"
+)
+_FAST_ROUTE_PLACE = re.compile(r"^[^\W\d_]+(?:(?:\s+|['’.-]\s*)[^\W\d_]+)*\.?$")
+_FAST_ROUTE_MAX_PLACE_TOKENS = 5
+_FAST_ROUTE_EXCLUDED_TERMS = _LOCATION_MAP_DATA_TERMS | frozenset(
+    {
+        # Compound, comparative or relational requests.
+        "and", "or", "then", "also", "plus", "with", "without", "vs", "versus",
+        "compare", "between", "from", "to", "in", "on", "at", "over", "for",
+        "by", "via", "into", "all", "every", "each",
+        # References to conversation or map state.
+        "it", "its", "there", "that", "this", "these", "those", "here",
+        "them", "my", "our", "your", "same", "again", "previous", "last",
+        # Map operations and data words outside the catalog vocabulary.
+        "zoom", "pan", "layer", "layers", "basemap", "style", "route",
+        "routes", "directions", "distance", "far", "nearest", "closest",
+        "weather", "forecast", "rainfall", "snow", "wind", "flight",
+        "flights", "ship", "ships", "volcano", "volcanoes", "wildfire",
+        "wildfires", "fire", "fires", "flood", "floods",
+    }
+)
+
+###############################################################################
+def build_location_map_route(target_refs: list[str] | None = None) -> CapabilityRoute:
+    return CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        secondary_domains=[CapabilityDomain.MAP_RENDERING],
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        capability_queries=["place search", "map viewport"],
+        operation="show_location_on_map",
+        target_refs=list(target_refs or []),
+    )
+
 ###############################################################################
 def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | None:
     """Build a bounded map route when route bootstrap misses a plain place request."""
@@ -120,15 +163,26 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
         return None
     if terms.intersection(_LOCATION_MAP_DATA_TERMS):
         return None
-    return CapabilityRoute(
-        primary_domain=CapabilityDomain.PLACE_SEARCH,
-        secondary_domains=[CapabilityDomain.MAP_RENDERING],
-        task_mode="execute",
-        presentation="map",
-        location_mode="target",
-        capability_queries=["place search", "map viewport"],
-        operation="show_location_on_map",
-    )
+    return build_location_map_route()
+
+###############################################################################
+def _fast_route_target(user_message: str) -> str | None:
+    match = _FAST_ROUTE_PATTERN.match(" ".join(user_message.split()))
+    if match is None:
+        return None
+    target = match.group("target").strip()
+    coordinates = _FAST_ROUTE_COORDINATES.match(target)
+    if coordinates is not None:
+        latitude, longitude = float(coordinates["lat"]), float(coordinates["lon"])
+        return target if abs(latitude) <= 90 and abs(longitude) <= 180 else None
+    if _FAST_ROUTE_PLACE.match(target) is None:
+        return None
+    tokens = re.findall(r"[^\W\d_]+", target.casefold())
+    if not tokens or len(tokens) > _FAST_ROUTE_MAX_PLACE_TOKENS:
+        return None
+    if _FAST_ROUTE_EXCLUDED_TERMS.intersection(tokens) or names_centre(target):
+        return None
+    return target
 
 ###############################################################################
 def build_conversation_fallback_route() -> CapabilityRoute:
@@ -153,6 +207,27 @@ class CapabilityRouter:
     ) -> None:
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
+
+    # -------------------------------------------------------------------------
+    def fast_route(self, user_message: str) -> CapabilityRoute | None:
+        """Route an unequivocal single-place display request without a model call.
+
+        Accepts one display verb plus one named place or coordinate pair.
+        Anything compound, relational, referential or naming catalog content
+        returns None, so the caller falls back to model routing.
+        """
+
+        target = _fast_route_target(user_message)
+        if target is None:
+            return None
+        if not _FAST_ROUTE_COORDINATES.match(target):
+            # A catalog word ("airports", "webcams") names a layer, not a place.
+            mentions_capability = getattr(
+                self.capability_registry, "mentions_capability", None
+            )
+            if not callable(mentions_capability) or mentions_capability(target):
+                return None
+        return build_location_map_route([target])
 
     # -------------------------------------------------------------------------
     def validate_route(

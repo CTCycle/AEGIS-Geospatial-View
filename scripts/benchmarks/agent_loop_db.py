@@ -7,6 +7,9 @@ targeted by the agent-loop optimization plan:
   every trace, checkpoint and cancellation probe, against a run with 256 events.
 - ``turn_history``: the conversation-history work performed once per agent
   turn, for conversations of 10, 500, 5,000 and 10,000 messages.
+- ``evidence_write``: one synchronous evidence persistence (sanitize, serialize,
+  hash, compress, insert) for 1, 4 and ~16 MiB payloads. It runs on the event
+  loop today, so its wall time is the loop stall it causes.
 
 Each scenario reports SQL statement count, median/p95 wall time and peak
 Python allocation. Results are printed as JSON; pass ``--output`` to save them.
@@ -39,6 +42,7 @@ from sqlalchemy import event  # noqa: E402
 from server.configurations import DatabaseSettings  # noqa: E402
 from server.contracts.events import RunEventCreate, RunEventType, RunEventVisibility  # noqa: E402
 from server.repositories.agent_run_events import AgentRunEventRepository  # noqa: E402
+from server.repositories.agent_evidence import AgentEvidenceRepository  # noqa: E402
 from server.repositories.agent_runs import AgentRunRepository  # noqa: E402
 from server.repositories.chat_history import ChatHistoryRepository  # noqa: E402
 from server.repositories.conversations import ConversationRepository  # noqa: E402
@@ -50,6 +54,7 @@ from server.services.chat.history_service import ChatHistoryService  # noqa: E40
 HISTORY_SIZES = (10, 500, 5_000, 10_000)
 RUN_EVENT_COUNT = 256
 HISTORY_LIMIT = 10_000
+EVIDENCE_SIZES_MIB = (1, 4, 15.5)
 
 
 ###############################################################################
@@ -146,6 +151,29 @@ def turn_history(history: ChatHistoryService, conversation_id: str) -> int:
 
 
 ###############################################################################
+def _evidence_payload(size_mib: float) -> dict[str, Any]:
+    feature = {"latitude": 41.89, "longitude": 12.49, "precipitation_sum_mm": 9.25, "time": "2026-10-31T00:00"}
+    count = int(size_mib * 1024 * 1024 / (len(json.dumps(feature)) + 12))
+    return {"features": [dict(feature, id=index) for index in range(count)]}
+
+
+###############################################################################
+def evidence_write(evidence: AgentEvidenceRepository, conversation_id: str, payload: Any) -> str:
+    """Mirror one capability-execution evidence write."""
+
+    return evidence.create(
+        conversation_id=conversation_id,
+        run_id=None,
+        kind="vector",
+        media_type="application/json",
+        status="available",
+        payload=payload,
+        summary={"feature_count": len(payload["features"])},
+        provenance={"provider_id": "benchmark"},
+    ).evidence_id
+
+
+###############################################################################
 def _measure(
     counter: _StatementCounter,
     operation: Callable[[], object],
@@ -212,6 +240,15 @@ def main() -> None:
             _seed_history(database, conversation_id, size)
             results["scenarios"][f"turn_history_{size}"] = _measure(
                 counter, lambda: turn_history(history, conversation_id), args.repetitions
+            )
+        evidence = AgentEvidenceRepository(database)
+        evidence_conversation = conversations.create_conversation("evidence").id
+        for size_mib in EVIDENCE_SIZES_MIB:
+            payload = _evidence_payload(size_mib)
+            results["scenarios"][f"evidence_write_{size_mib:g}mib"] = _measure(
+                counter,
+                lambda: evidence_write(evidence, evidence_conversation, payload),
+                max(3, args.repetitions // 3),
             )
         database.engine.dispose()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -12,6 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from shapely.geometry import Point, box, shape
 from shapely.errors import GEOSException
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import json_object, is_json_array, is_json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
 from server.domain.agent.decision import ResolvedLocation
@@ -39,6 +41,8 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class EvidenceStore(Protocol):
@@ -106,7 +110,11 @@ class CapabilityExecutionService:
 
         try:
             manifest = self.capability_registry.get_capability(capability_id)
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="capability_lookup", run_id=context.run_id,
+                capability=capability_id, call_id=context.call_id,
+            )
             return self._failure(
                 context=context,
                 capability_id=capability_id,
@@ -148,7 +156,11 @@ class CapabilityExecutionService:
                     message="The requested capability is not currently available.",
                     recovery="choose_alternate_tool",
                 )
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="runtime_eligibility", run_id=context.run_id,
+                capability=capability_id, call_id=context.call_id,
+            )
             return self._failure(
                 context=context,
                 capability_id=capability_id,

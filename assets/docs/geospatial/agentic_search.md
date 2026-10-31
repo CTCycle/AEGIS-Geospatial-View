@@ -76,6 +76,22 @@ the model's route bootstrap misses the request. The rescue is limited to
 non-data display/navigation language and still enters the normal location
 resolver, so it cannot select a place or suppress a required clarification.
 
+A narrower deterministic fast route runs before `route_request` and skips the
+routing model call. It accepts only one display verb (`show`, `display`,
+`locate`) followed by a single coordinate pair, or a single place of at most
+five words, optionally followed by "on the map". It defers to model routing
+when the message:
+
+- contains a conjunction, preposition, pronoun or deictic word;
+- contains a data, weather or map-operation word, or the word "centre";
+- uses any word a catalog entry is named or tagged by;
+- arrives with an attached image.
+
+The fast route is validated by `CapabilityRouter.validate_route` like a model
+route, and resolution still runs normally, so "Show Springfield" still asks
+which Springfield. The choice is recorded as `route_source` (`model`, `fast`
+or `fallback`) on the run state and in the execution trace.
+
 The completion contract can require location resolution, data retrieval,
 spatial and temporal filtering, renderable geometry, map-state commit, viewport
 evidence, and final response readiness. A valid empty result remains data with

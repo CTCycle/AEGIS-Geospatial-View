@@ -79,6 +79,12 @@ _REQUEST_TIMEOUT_SECONDS: ContextVar[float | None] = ContextVar(
 
 
 ###############################################################################
+def async_http_client() -> httpx.AsyncClient:
+    """Return the shared pooled client for services outside the provider helpers."""
+
+    return _ASYNC_HTTP_CLIENT
+
+###############################################################################
 @contextmanager
 def raster_diagnostic_scope(
     *, provider_id: str, capability_id: str

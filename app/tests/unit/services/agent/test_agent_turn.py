@@ -1,6 +1,8 @@
 from __future__ import annotations
+import asyncio
 from collections import deque
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 import pytest
 from pydantic import BaseModel
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -12,6 +14,7 @@ from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop
 from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.native_orchestrator import NativeAgentOrchestrator
 from server.services.agent.turn_runner import AgentTurnRequest, AgentTurnRunner
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
@@ -415,3 +418,33 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
 def test_factory_rejects_invalid_lifecycle_inputs(kwargs: dict[str, str]) -> None:
     with pytest.raises(ValueError):
         AgentStateFactory.create(**kwargs)
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_orchestrator_serializes_turns_and_drops_idle_conversation_locks() -> None:
+    orchestrator = NativeAgentOrchestrator(
+        agent_turn_runner=cast(Any, None),
+        settings_repo=cast(Any, None),
+        history_service=cast(Any, None),
+        conversation_repository=cast(Any, None),
+    )
+    active = max_active = 0
+
+    async def run_serialized(payload: Any, *_args: Any, **_kwargs: Any) -> Any:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return payload.conversation_id
+
+    orchestrator._run_serialized = run_serialized  # type: ignore[method-assign]
+    payload = cast(Any, SimpleNamespace(conversation_id="conv-1"))
+
+    results = await asyncio.gather(
+        orchestrator.run_turn(payload), orchestrator.run_turn(payload)
+    )
+
+    assert results == ["conv-1", "conv-1"]
+    assert max_active == 1
+    assert orchestrator._conversation_locks == {}

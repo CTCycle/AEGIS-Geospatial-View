@@ -3,25 +3,25 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 import asyncio
-import json
 import logging
 import math
 import threading
 import time
 from datetime import UTC, datetime
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+
+import httpx
 
 from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
-from server.services.geospatial.providers.http import parse_retry_after
+from server.services.geospatial.providers.http import async_http_client, parse_retry_after
 
 WEATHER_GRID_BATCH_SIZE = 100
 # Grid batches in flight per call. Every request still reserves its own rate
 # slot, so this bounds overlap rather than the provider request rate.
 WEATHER_GRID_MAX_CONCURRENT_BATCHES = 3
 OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
+OPENMETEO_CACHE_MAX_ENTRIES = 512
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,10 +153,9 @@ class OpenMeteoService:
         try:
             outcomes = await asyncio.gather(*tasks)
         finally:
-            # Cancellation is best-effort: a batch still waiting for its rate
-            # slot never sends, but a request already inside urlopen finishes
-            # in its worker thread (at most grid_batch_concurrency requests,
-            # each bounded by timeout_s). No task outlives this call.
+            # A batch still waiting for its rate slot never sends and one
+            # already in flight is cancelled with its request. No task
+            # outlives this call.
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -449,38 +448,44 @@ class OpenMeteoService:
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
-        # Wait on the event loop, not in the worker thread, so a cancelled
-        # caller never goes on to send its request.
-        delay = self._reserve_rate_limit_slot(provider_key)
+        delay, slot, previous = self._reserve_rate_limit_slot(provider_key)
         if delay > 0:
-            await asyncio.sleep(delay)
-        data = await asyncio.to_thread(
-            self._get_json, endpoint=endpoint, params=params, provider_key=provider_key
+            try:
+                await asyncio.sleep(delay)
+            except asyncio.CancelledError:
+                self._release_rate_limit_slot(provider_key, slot, previous)
+                raise
+        data = await self._get_json(
+            endpoint=endpoint, params=params, provider_key=provider_key
         )
         self._cache_set(cache_key, data)
         return data
 
     # -------------------------------------------------------------------------
-    def _get_json(
+    async def _get_json(
         self, *, endpoint: str, params: dict[str, str], provider_key: str
     ) -> dict[str, Any]:
-        url = f"{endpoint}?{urlencode(params)}"
-        request = Request(url, headers={"User-Agent": self.user_agent})
         try:
-            with urlopen(request, timeout=self.timeout_s) as response:
-                payload = response.read().decode("utf-8")
-        except HTTPError as exc:
-            if exc.code == 429:
-                raise OpenMeteoRateLimitError(
-                    "Open-Meteo rate limit reached.",
-                    retry_after_seconds=parse_retry_after(exc.headers.get("Retry-After")),
-                ) from exc
+            response = await async_http_client().get(
+                endpoint,
+                params=params,
+                headers={"User-Agent": self.user_agent},
+                timeout=self.timeout_s,
+            )
+        except httpx.HTTPError as exc:
             raise OpenMeteoRequestError(f"Open-Meteo request failed: {exc}") from exc
-        except (URLError, TimeoutError) as exc:
-            raise OpenMeteoRequestError(f"Open-Meteo request failed: {exc}") from exc
+        if response.status_code == 429:
+            raise OpenMeteoRateLimitError(
+                "Open-Meteo rate limit reached.",
+                retry_after_seconds=parse_retry_after(response.headers.get("Retry-After")),
+            )
+        if not response.is_success:
+            raise OpenMeteoRequestError(
+                f"Open-Meteo request failed: HTTP {response.status_code}"
+            )
         try:
-            data = json.loads(payload)
-        except json.JSONDecodeError as exc:
+            data = response.json()
+        except ValueError as exc:
             raise OpenMeteoRequestError(
                 "Open-Meteo response was not valid JSON."
             ) from exc
@@ -504,16 +509,44 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     def _cache_set(self, cache_key: str, payload: dict[str, Any]) -> None:
+        now = time.time()
         with self._lock:
-            self._cache[cache_key] = (time.time(), payload)
+            for expired in [
+                key for key, (ts, _) in self._cache.items()
+                if now - ts > self.cache_ttl_s
+            ]:
+                del self._cache[expired]
+            # Re-inserting keeps dict order equal to insertion age.
+            self._cache.pop(cache_key, None)
+            self._cache[cache_key] = (now, payload)
+            while len(self._cache) > OPENMETEO_CACHE_MAX_ENTRIES:
+                del self._cache[next(iter(self._cache))]
 
     # -------------------------------------------------------------------------
-    def _reserve_rate_limit_slot(self, key: str) -> float:
+    def _reserve_rate_limit_slot(self, key: str) -> tuple[float, float, float | None]:
         # Reserve the slot under the lock so concurrent callers queue behind
         # each other instead of reading the same previous call time. Returns
-        # the delay until the reserved slot.
+        # the delay until the slot, the slot and the value it replaced.
         with self._lock:
             now = time.monotonic()
-            slot = max(now, self._last_call_by_key.get(key, -math.inf) + self.min_call_interval_s)
+            previous = self._last_call_by_key.get(key)
+            slot = max(
+                now,
+                (-math.inf if previous is None else previous) + self.min_call_interval_s,
+            )
             self._last_call_by_key[key] = slot
-        return slot - now
+        return slot - now, slot, previous
+
+    # -------------------------------------------------------------------------
+    def _release_rate_limit_slot(
+        self, key: str, slot: float, previous: float | None
+    ) -> None:
+        # A cancelled caller never sends; free its slot unless a later caller
+        # has already queued behind it.
+        with self._lock:
+            if self._last_call_by_key.get(key) != slot:
+                return
+            if previous is None:
+                self._last_call_by_key.pop(key, None)
+            else:
+                self._last_call_by_key[key] = previous

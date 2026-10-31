@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from functools import cached_property
 from typing import Any, Protocol
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
@@ -398,6 +399,44 @@ class CapabilityRegistry:
     @property
     def snapshot(self) -> CapabilityRegistrySnapshot:
         return self._snapshot
+
+    # -------------------------------------------------------------------------
+    def mentions_capability(self, text: str) -> bool:
+        """Return whether the text uses a word a catalog entry is named or tagged by."""
+
+        return bool(_raw_query_tokens([text]).intersection(self._capability_terms))
+
+    # -------------------------------------------------------------------------
+    @cached_property
+    def _capability_terms(self) -> frozenset[str]:
+        # Narrower than the full searchable text: descriptions and examples
+        # mention place names, while names, intent tags and keywords name what
+        # a capability shows.
+
+        snapshot = self._ensure_snapshot()
+        terms: set[str] = set()
+        for item in (
+            *snapshot.basemaps,
+            *snapshot.overlays,
+            *snapshot.cameras,
+            *snapshot.transit,
+            *snapshot.tools,
+        ):
+            agentic_use = json_object(item.get("agenticUse"))
+            metadata = json_object(item.get("metadata"))
+            terms.update(
+                _raw_query_tokens(
+                    [
+                        item.get("id"),
+                        item.get("name"),
+                        agentic_use.get("intentTags"),
+                        metadata.get("keywords"),
+                        metadata.get("supported_categories"),
+                        metadata.get("action_tags"),
+                    ]
+                )
+            )
+        return frozenset(terms.difference(_ROUTING_CONTEXT_TOKENS))
 
     # -------------------------------------------------------------------------
     def _ensure_snapshot(self) -> CapabilityRegistrySnapshot:

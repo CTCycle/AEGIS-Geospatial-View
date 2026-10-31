@@ -153,6 +153,13 @@ tokens, output reserve, usable limit, compaction, and cumulative run usage.
 Provider continuation items are kept separately from semantic context and are
 bounded to the most recent protocol window.
 
+Each tool observation is model-visible once. A result whose tool message is
+still in the protocol window appears only there. The canonical context's
+`recent_observations` carries only results that the window trimmed. For a
+hydrated run, the trailing working-state message carries obligations and flags
+(goal, completion contract, route, refs, render state) but no copies of tool or
+render observations.
+
 ## Tool and manifest boundaries
 
 `ToolRegistry` is the only registry and exposes the small permanent tool set:

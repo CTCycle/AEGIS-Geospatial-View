@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any, Protocol, cast
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession, OverlayInstance
 from server.domain.agent.capability_route import AgentRunState
@@ -30,6 +32,8 @@ from server.services.geospatial.map_session_builder import (
     MapPlanBuildError,
     MapSessionBuilder,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class EvidenceReader(Protocol):
@@ -177,7 +181,11 @@ class MapPlanService:
                     else "correct_arguments"
                 ),
             )
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="map_candidate_build",
+                run_id=context.run_id or state.run_id, call_id=context.call_id,
+            )
             return self._failure(
                 context=context,
                 started=started,
