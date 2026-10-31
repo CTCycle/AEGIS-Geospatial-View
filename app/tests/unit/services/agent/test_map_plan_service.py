@@ -672,6 +672,87 @@ async def test_named_basemap_applies_on_an_active_map_without_set_basemap() -> N
 
 ###############################################################################
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "view,action,expected",
+    [
+        ([8.0, 45.0, 10.0, 46.0], {"strategy": "zoom_in"}, [8.5, 45.25, 9.5, 45.75]),
+        ([8.0, 45.0, 10.0, 46.0], {"strategy": "zoom_out", "steps": 2}, [5.0, 43.5, 13.0, 47.5]),
+        ([8.0, 45.0, 10.0, 46.0], {"strategy": "pan", "direction": "north"}, [8.0, 45.5, 10.0, 46.5]),
+        (
+            [8.0, 45.0, 10.0, 46.0],
+            {"strategy": "zoom_in", "anchor": "location"},
+            [8.04, 47.128, 9.04, 47.628],
+        ),
+        # Zooming far out stops at the renderable world.
+        ([-100.0, -40.0, 100.0, 40.0], {"strategy": "zoom_out", "steps": 4}, [-180.0, -85.0, 180.0, 85.0]),
+    ],
+)
+async def test_zoom_and_pan_move_the_client_reported_view(
+    view: list[float], action: dict[str, object], expected: list[float]
+) -> None:
+    state = _state(active_map_session=_active_session())
+    state.user_message = "Zoom or pan the map"
+    state.map_memory = {"current_view": {"bounds": view, "source": "client_reported"}}
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[SetViewportAction.model_validate({"action": "set_viewport", **action})],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.bounds == pytest.approx(expected)
+    assert state.prepared_map_session.basemap_id == "basemap:osm"
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_zoom_on_the_city_centre_centres_on_the_shown_place() -> None:
+    state = _state(active_map_session=_active_session())
+    state.user_message = "Zoom in on the city centre"
+    state.map_memory = {"current_view": {"bounds": [8.0, 45.0, 10.0, 46.0]}}
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[SetViewportAction(action="set_viewport", strategy="zoom_in")],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.center == pytest.approx(
+        {"latitude": LOCATION.latitude, "longitude": LOCATION.longitude}
+    )
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_first_map_uses_the_style_named_before_the_place_was_given() -> None:
+    state = _state()
+    state.evidence_refs = []
+    state.user_message = "Zurich"
+    state.recent_messages = [
+        {"role": "user", "content": "Switch to satellite view"},
+        {"role": "assistant", "content": "There is no map yet. Which place should I show?"},
+    ]
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert state.prepared_map_session.basemap_id == "esri_world_imagery"
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_valid_empty_location_only_plan_carries_completion_status() -> None:
     state = _state()
     state.evidence_refs = []

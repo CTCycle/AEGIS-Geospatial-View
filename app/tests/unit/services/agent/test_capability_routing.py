@@ -1059,6 +1059,70 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
     assert "discovery_required" in decision.reason_codes
 
 ###############################################################################
+@pytest.mark.parametrize(
+    "target,kept",
+    [("Milan city center", []), ("Rome city centre", ["Rome city centre"])],
+)
+def test_zoom_on_the_shown_city_centre_is_not_a_new_place(target: str, kept: list[str]) -> None:
+    state = _state()
+    state.active_map_session = cast(
+        Any, SimpleNamespace(
+            overlay_collection=SimpleNamespace(instances=[]),
+            resolved_location=ResolvedLocation(
+                label="Milan, Lombardy, Italy", latitude=45.46, longitude=9.19
+            ),
+        )
+    )
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            location_mode="target",
+            capability_queries=[],
+            operation="zoom_in",
+            target_refs=[target],
+        ),
+        user_message=f"Zoom in on {target}",
+        active_state=state,
+    )
+
+    assert decision.route.target_refs == kept
+    assert decision.route.location_mode == "none"
+
+###############################################################################
+def test_map_state_route_naming_a_place_without_a_map_becomes_a_new_map() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            location_mode="target",
+            capability_queries=[],
+            target_refs=["satellite basemap", "Genoa, Italy"],
+        ),
+        user_message="Genoa, Italy",
+        active_state=_state(),
+    )
+
+    assert decision.status in {"accepted", "discovery_required"}
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert decision.route.location_mode == "target"
+    assert decision.route.target_refs == ["Genoa, Italy"]
+
+###############################################################################
+def test_basemap_inventory_question_is_limited_to_basemaps() -> None:
+    decision = _router().validate_route(
+        CapabilityRoute(
+            primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+            task_mode="execute",
+            presentation="text",
+            capability_queries=["available maps"],
+        ),
+        user_message="Which basemaps are available?",
+        active_state=_state(),
+    )
+
+    assert decision.route.operation == "discover_available_map_data"
+    assert decision.route.capability_queries == ["basemap"]
+
+###############################################################################
 def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> None:
     router = _router()
     router.capability_registry.shortlist = lambda **_kwargs: pytest.fail(  # type: ignore[method-assign]

@@ -6,6 +6,7 @@ from server.services.agent.basemap_intent import (
     basemap_descriptions,
     match_requested_basemap,
     match_requested_basemaps,
+    unsupported_basemap_styles,
 )
 
 BASEMAPS = [
@@ -49,3 +50,15 @@ def test_match_requested_basemaps_reports_conflicting_styles() -> None:
         "esri_world_imagery",
         "osm_dark",
     ]
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("Switch to Google hybrid view", ["Google", "Hybrid"]),
+        ("show it like Bing maps", ["Bing"]),
+        ("Switch to satellite view", []),
+    ],
+)
+def test_unsupported_basemap_styles_are_named(message: str, expected: list[str]) -> None:
+    assert unsupported_basemap_styles(message) == expected

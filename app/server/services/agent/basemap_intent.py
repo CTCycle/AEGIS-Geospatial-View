@@ -21,6 +21,10 @@ _GENERIC_TERMS = frozenset(
         "addresses",
     }
 )
+# Words that point at the centre of the place already on the map.
+CENTRE_TERMS = frozenset({"center", "centre", "downtown", "centro", "middle"})
+# Commercial styles users name that no catalog basemap provides.
+_UNSUPPORTED_STYLE_TERMS = frozenset({"google", "bing", "mapbox", "apple", "yandex", "hybrid"})
 
 ###############################################################################
 def basemap_label(item: Mapping[str, Any]) -> str:
@@ -78,6 +82,23 @@ def match_requested_basemap(
 
     matched = match_requested_basemaps(user_message, basemaps)
     return matched[0] if len(matched) == 1 else None
+
+###############################################################################
+def names_centre(text: str) -> bool:
+    """Return whether the text points at a place's centre ("the city centre")."""
+
+    return bool(set(re.findall(r"\w+", text.casefold())) & CENTRE_TERMS)
+
+###############################################################################
+def unsupported_basemap_styles(user_message: str) -> list[str]:
+    """Return third-party basemap styles the message names that the catalog lacks."""
+
+    words = re.findall(r"\w+", user_message.casefold())
+    return [
+        word.capitalize()
+        for word in dict.fromkeys(words)
+        if word in _UNSUPPORTED_STYLE_TERMS
+    ]
 
 ###############################################################################
 def refers_to_basemap(text: str, basemaps: Iterable[Mapping[str, Any]]) -> bool:

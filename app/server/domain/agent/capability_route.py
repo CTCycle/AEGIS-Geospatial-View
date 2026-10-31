@@ -35,7 +35,9 @@ class CapabilityRoute(BaseModel):
     )
     task_mode: Literal["answer", "execute", "clarify"]
     presentation: Literal["text", "map", "both"]
-    location_mode: Literal["none", "target", "search_area"]
+    # Models often omit this field; the router upgrades "none" to "target" when
+    # a new map or a semantic target needs a place, so the default is safe.
+    location_mode: Literal["none", "target", "search_area"] = "none"
     analysis: AgentAnalysisIntent | None = None
     capability_queries: list[str] = Field(
         default_factory=lambda: list[str](), max_length=4

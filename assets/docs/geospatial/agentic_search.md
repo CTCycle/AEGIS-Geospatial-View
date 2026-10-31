@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-10-24
+Last updated: 2026-10-31
 
 ## Summary
 
@@ -305,6 +305,33 @@ the candidate to the committed map, while a failed observation leaves the
 last-known-good map untouched and gives the model a correction opportunity.
 Three render attempts are allowed by default, with duplicate failed action
 fingerprints rejected and a finalization-only response after exhaustion.
+
+### Basemap and viewport control
+
+Basemap changes, zoom, pan and recentring of the shown map are `map_state`
+routes. A centre phrase that names the shown place ("the city centre") is not
+resolved as a new place. `set_viewport` supports `fit_location`,
+`fit_evidence`, `preserve_current`, `zoom_in`, `zoom_out` and `pan`. The model
+picks only `steps` (1–4 zoom levels or half-view moves), `direction` (pan) and
+`anchor` (`current_view` or the shown place). The server computes the new
+bounds from the client-reported view, and the browser fits to them. A request
+that names a centre always zooms on the shown place. Bounds are clamped to the
+renderable world (±85° latitude).
+
+A basemap style named by the user outranks the model's choice. Conflicting
+styles, unsupported commercial styles (Google, Bing, Mapbox, Apple, Yandex,
+hybrid) and mismatches are disclosed in the final answer. A `map_state` request
+with no map yet asks which place to show. If the next turn names a place, that
+starts a new map in the style named in the previous turn. "Which basemaps…"
+questions list the catalog basemaps only.
+
+Route robustness for weaker tool-calling models: `location_mode` defaults to
+`none` (the router upgrades it when a place is needed). A final route attempt
+with a map presentation but no `task_mode` executes. A model question while the
+place is still unresolved ends as a clarification. A Chat Completions response
+with reasoning but no answer or tool call is resampled once. A text-only answer
+route may use the reserved terminal call when its ordinary calls returned no
+text.
 
 The public `ChatTurnResponse` is canonical and contains the assistant message,
 operation, bounded tool summaries, route, goal, completion contract,

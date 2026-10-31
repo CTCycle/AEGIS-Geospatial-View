@@ -332,6 +332,35 @@ def test_async_chat_uses_native_transport_and_closes_client(monkeypatch) -> None
     assert client.closed is True
 
 ###############################################################################
+def test_async_chat_resamples_once_when_the_model_only_reasoned(monkeypatch) -> None:
+    def response(content: str | None) -> object:
+        message = SimpleNamespace(content=content, tool_calls=None, reasoning_content="thinking")
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+
+    completions = _AsyncCompletions()
+    replies = iter([response(None), response("Canberra.")])
+
+    async def create(**kwargs):  # noqa: ANN003, ANN202
+        completions.calls.append(kwargs)
+        return next(replies)
+
+    completions.create = create  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "server.services.llm.deepseek_provider.AsyncOpenAI",
+        lambda **_kwargs: _AsyncClient(completions),
+    )
+    provider = DeepSeekProvider(api_key="test")
+
+    result = run_async_in_thread(
+        provider.achat(
+            LLMRequest(model="deepseek-v4-flash", messages=[{"role": "user", "content": "Hi"}])
+        )
+    )
+
+    assert result.content == "Canberra."
+    assert len(completions.calls) == 2
+
+###############################################################################
 def test_async_structured_output_uses_native_transport(monkeypatch) -> None:
     completions = _AsyncCompletions()
     client = _AsyncClient(completions)

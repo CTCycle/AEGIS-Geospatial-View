@@ -2338,7 +2338,8 @@
               "target",
               "search_area"
             ],
-            "title": "Location Mode"
+            "title": "Location Mode",
+            "default": "none"
           },
           "analysis": {
             "anyOf": [
@@ -2423,8 +2424,7 @@
         "required": [
           "primary_domain",
           "task_mode",
-          "presentation",
-          "location_mode"
+          "presentation"
         ],
         "title": "CapabilityRoute"
       },

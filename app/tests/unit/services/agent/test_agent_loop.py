@@ -139,6 +139,10 @@ class FakeCapabilityRegistry:
     def shortlist(self, **kwargs: Any) -> list[dict[str, object]]:
         return [{"id": "places:hospitals"}]
 
+    # -------------------------------------------------------------------------
+    def list_basemaps(self) -> list[dict[str, object]]:
+        return []
+
 ###############################################################################
 class FakeRuntimeRegistry:
 
@@ -372,6 +376,77 @@ async def test_plain_text_reply_instead_of_route_call_falls_back_to_conversation
     assert outcome.state.route is not None
     assert outcome.state.route.primary_domain is CapabilityDomain.CONVERSATION
     assert "No tool call was returned" in provider.requests[1]["request"].messages[-1]["content"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_final_route_attempt_infers_execute_for_a_map_route_without_task_mode() -> None:
+    incomplete = _route_call_with(drop="task_mode", presentation="map")
+    provider = FakeProvider(
+        [incomplete, incomplete, *(LLMResult(content="Done.") for _ in range(4))]
+    )
+
+    outcome = await _run_route(provider)
+
+    assert outcome.state.route is not None
+    assert outcome.state.route.task_mode == "execute"
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_conversation_with_empty_answers_uses_the_reserved_answer_call() -> None:
+    conversation = _route_call_with(
+        primary_domain="conversation", task_mode="answer", capability_queries=[]
+    )
+    provider = FakeProvider(
+        [conversation, LLMResult(content=""), LLMResult(content="Canberra.")]
+    )
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_model_calls=2,
+        )
+    )
+
+    assert outcome.stopped_reason == "goal_satisfied"
+    assert outcome.final_text == "Canberra."
+    # An empty assistant turn is not replayed to the model.
+    assert all(
+        message.get("content") != ""
+        for message in provider.requests[-1]["request"].messages
+        if message.get("role") == "assistant"
+    )
+
+###############################################################################
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("What would you like me to show? Name a place or dataset.", "clarification_required"),
+        ("Here is the map.", "no_progress"),
+    ],
+)
+def test_question_instead_of_unresolved_place_is_a_clarification(
+    text: str, expected: str
+) -> None:
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+    )
+    state = _state()
+    state.user_message = "Show it"
+    state.context_hydrated = True
+    state.completion_contract = CompletionContract(
+        operation="show", requirements=["location_resolved"]
+    )
+
+    stop = AgentLoop._evaluate_text_stop(  # pyright: ignore[reportPrivateUsage]
+        state, route, text, available_tools=["resolve_geospatial_location"]
+    )
+
+    assert stop == (expected, text)
 
 ###############################################################################
 def test_native_route_promotes_the_execution_profile_once() -> None:

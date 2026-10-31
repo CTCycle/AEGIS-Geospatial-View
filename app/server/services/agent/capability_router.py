@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentRunState,
@@ -13,7 +14,13 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.capability_registry import CapabilityRegistry
-from server.services.agent.basemap_intent import refers_to_basemap
+from server.services.agent.basemap_intent import (
+    CENTRE_TERMS,
+    basemap_label,
+    match_requested_basemap,
+    names_centre,
+    refers_to_basemap,
+)
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -289,26 +296,62 @@ class CapabilityRouter:
             proposed = proposed.model_copy(update={"operation": "show" if proposed.presentation in {"map", "both"} else "inspect"})
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
+        basemaps = (
+            self.capability_registry.list_basemaps()
+            if proposed.primary_domain is CapabilityDomain.MAP_STATE
+            else []
+        )
+        places = [ref for ref in proposed.target_refs if not refers_to_basemap(ref, basemaps)]
+        if basemaps and active_state.active_map_session is None and places:
+            # With no map yet, a named place makes this a new map (for example
+            # the answer to "Which place should I show?"); the requested style
+            # is applied when the map plan is built.
+            proposed = proposed.model_copy(
+                update={
+                    "primary_domain": CapabilityDomain.PLACE_SEARCH,
+                    "secondary_domains": [CapabilityDomain.MAP_RENDERING],
+                    "presentation": "map",
+                    "location_mode": "target",
+                    "target_refs": places,
+                    "capability_queries": ["place search", "map viewport"],
+                    "operation": "show_location_on_map",
+                }
+            )
+            route_domains = {proposed.primary_domain, *proposed.secondary_domains}
+            reasons.append("map_state_without_map_becomes_new_map")
         if proposed.primary_domain is CapabilityDomain.MAP_STATE:
             if active_state.active_map_session is None:
+                requested = match_requested_basemap(user_message, basemaps)
+                style = next(
+                    (basemap_label(item) for item in basemaps if item.get("id") == requested),
+                    None,
+                )
                 return CapabilityRouteDecision(
                     status="clarification",
                     route=proposed,
                     rejected_capability_ids=rejected,
                     reason_codes=[*dict.fromkeys([*reasons, "active_map_required"])],
                     clarification_question=(
-                        "Which active map should I update, or would you like me to "
-                        "prepare a new map first?"
+                        f"There is no map yet. Which place should I show with {style}?"
+                        if style
+                        else "There is no map yet. Which place should I show first?"
                     ),
                 )
-            basemaps = self.capability_registry.list_basemaps()
             refs = [
-                ref for ref in proposed.target_refs if not refers_to_basemap(ref, basemaps)
+                ref
+                for ref in proposed.target_refs
+                if not refers_to_basemap(ref, basemaps)
+                and not _is_view_anchor(ref, active_state.active_map_session)
             ]
             if refs != proposed.target_refs:
-                # A basemap is a style of the active map, not a place or layer.
+                # A basemap is a style of the active map and "the city centre" is
+                # a spot on it: neither is a new place or layer.
                 proposed = proposed.model_copy(
-                    update={"target_refs": refs, "location_mode": "none"}
+                    update={
+                        "target_refs": refs,
+                        "location_mode": "none",
+                        "spatial_scope": proposed.spatial_scope if refs else None,
+                    }
                 )
 
         if proposed.task_mode == "clarify":
@@ -454,6 +497,19 @@ class CapabilityRouter:
             rejected_capability_ids=rejected,
             reason_codes=list(dict.fromkeys(reasons)),
         )
+
+###############################################################################
+_VIEW_ANCHOR_FILLER = frozenset({"the", "city", "of", "s", "town", "historic"})
+
+
+def _is_view_anchor(ref: str, session: MapSession) -> bool:
+    """Return whether a map-state target is the centre of the place already shown."""
+
+    if not names_centre(ref):
+        return False
+    words = set(re.findall(r"\w+", ref.casefold()))
+    place_words = set(re.findall(r"\w+", session.resolved_location.label.casefold()))
+    return words - CENTRE_TERMS - _VIEW_ANCHOR_FILLER <= place_words
 
 ###############################################################################
 def _is_executable_candidate(capability: dict[str, object]) -> bool:
@@ -749,6 +805,13 @@ def _normalize_capability_inventory_route(
     }
     has_specific_subject = bool(message_terms - generic_terms - target_terms)
     operation = "discover_available_map_data"
+    if message_terms & {"basemap", "basemaps"} and not message_terms & {
+        "layer", "layers", "data", "dataset", "datasets", "capability", "capabilities"
+    }:
+        return (
+            route.model_copy(update={"operation": operation, "capability_queries": ["basemap"]}),
+            "capability_inventory_route_normalized",
+        )
     if route.operation == operation and has_specific_subject:
         return route, None
     if has_specific_subject:

@@ -60,10 +60,27 @@ class KeepOnlyLayersAction(MapActionBase):
 ###############################################################################
 class SetViewportAction(MapActionBase):
     action: Literal["set_viewport"]
-    strategy: Literal["fit_evidence", "fit_location", "preserve_current"]
+    strategy: Literal[
+        "fit_evidence", "fit_location", "preserve_current", "zoom_in", "zoom_out", "pan"
+    ]
     location_ref: str | None = None
     evidence_refs: list[str] = Field(
         default_factory=lambda: list[str](), max_length=16
+    )
+    # zoom_in/zoom_out/pan move the view the user sees; the server computes
+    # the geometry, the model only chooses how far and which way.
+    steps: int = Field(
+        default=1,
+        ge=1,
+        le=4,
+        description="zoom_in/zoom_out: zoom levels (2 or more for 'a lot'); pan: half-view moves.",
+    )
+    direction: Literal["north", "south", "east", "west"] | None = Field(
+        default=None, description="Required for pan."
+    )
+    anchor: Literal["current_view", "location"] = Field(
+        default="current_view",
+        description="zoom centre: the current view, or the map's place (its city centre).",
     )
 
 

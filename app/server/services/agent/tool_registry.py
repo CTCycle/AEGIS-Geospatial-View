@@ -233,6 +233,10 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
         "keep_only_layers",
         "fit_layer",
         "reset_view",
+        "zoom_in",
+        "zoom_out",
+        "pan",
+        "recenter",
     }
 )
 

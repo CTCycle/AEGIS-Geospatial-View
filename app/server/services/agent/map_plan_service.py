@@ -22,7 +22,7 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.repositories.agent_evidence import AgentEvidenceRepository
-from server.services.agent.basemap_intent import match_requested_basemap
+from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -99,7 +99,24 @@ class MapPlanService:
             plan.actions,
             active_session=active_session,
             user_message=state.user_message,
+            previous_user_message=next(
+                (
+                    str(message.get("content") or "")
+                    for message in reversed(state.recent_messages)
+                    if message.get("role") == "user"
+                ),
+                "",
+            ),
         )
+        if names_centre(state.user_message):
+            # "Zoom in on the city centre" centres on the shown place, whatever
+            # anchor the model chose.
+            effective_actions = [
+                action.model_copy(update={"anchor": "location"})
+                if isinstance(action, SetViewportAction) and action.strategy == "zoom_in"
+                else action
+                for action in effective_actions
+            ]
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
             evidence = self._evidence_for_plan(effective_plan, state, context)
@@ -108,6 +125,9 @@ class MapPlanService:
                 evidence=evidence,
                 active_session=active_session,
                 actions=effective_actions,
+                current_view_bounds=json_object(
+                    state.map_memory.get("current_view")
+                ).get("bounds"),
             )
             candidate = self._annotate_scope_metadata(
                 candidate,
@@ -274,12 +294,17 @@ class MapPlanService:
         *,
         active_session: Any | None,
         user_message: str,
+        previous_user_message: str = "",
     ) -> list[Any]:
         try:
             basemaps = self.capability_registry.list_basemaps()
         except AttributeError:
             basemaps = []
         requested = match_requested_basemap(user_message, basemaps)
+        if requested is None and active_session is None:
+            # Before the first map, a style named in the previous turn ("switch
+            # to satellite", answered with "which place?") still applies.
+            requested = match_requested_basemap(previous_user_message, basemaps)
         if any(isinstance(action, SetBasemapAction) for action in actions):
             # A style the user named outranks a different model-chosen basemap.
             if requested is None:

@@ -25,6 +25,7 @@ from server.domain.agent.map_plan import (
     SetBasemapAction,
     SetLayerOpacityAction,
     SetLayerVisibilityAction,
+    SetViewportAction,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
@@ -38,6 +39,8 @@ MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 # A single point fits to about city scale, not street level.
 MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
+# Web Mercator renders latitudes up to about 85.05 degrees.
+_MAX_VIEW_LATITUDE = 85.0
 _GEOJSON_RENDERING_MODES = frozenset(
     {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points", "circles"}
 )
@@ -80,6 +83,7 @@ class MapSessionBuilder:
         evidence: list[AgentEvidenceEnvelope],
         active_session: MapSession | None,
         actions: list[MapAction],
+        current_view_bounds: object = None,
     ) -> MapSession:
         evidence_by_ref = {
             item.evidence_ref: item for item in evidence if item.evidence_ref
@@ -90,6 +94,7 @@ class MapSessionBuilder:
                 candidate,
                 action,
                 evidence_by_ref=evidence_by_ref,
+                current_view_bounds=current_view_bounds,
             )
         return candidate.model_copy(
             update={"session_id": f"candidate-{uuid4().hex}"},
@@ -154,6 +159,7 @@ class MapSessionBuilder:
         action: MapAction,
         *,
         evidence_by_ref: dict[str, AgentEvidenceEnvelope],
+        current_view_bounds: object = None,
     ) -> MapSession:
         if isinstance(action, SetBasemapAction):
             return session.model_copy(
@@ -317,6 +323,10 @@ class MapSessionBuilder:
             return OverlayCollectionService.merge_into_map_session(session, collection)
         if action.strategy == "preserve_current":
             return session
+        if action.strategy in {"zoom_in", "zoom_out", "pan"}:
+            return _with_viewport(
+                session, _moved_viewport(session, action, current_view_bounds)
+            )
         evidence = [
             evidence_by_ref[ref]
             for ref in action.evidence_refs
@@ -693,6 +703,58 @@ def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
             "bounds": viewport.bbox,
         },
         deep=True,
+    )
+
+###############################################################################
+def _moved_viewport(
+    session: MapSession,
+    action: SetViewportAction,
+    current_view_bounds: object,
+) -> ViewportPolicy:
+    """Zoom or pan the view the user sees (client-reported, else the session's)."""
+
+    bbox = (
+        _valid_bbox(current_view_bounds)
+        or _valid_bbox(session.bounds)
+        or _valid_bbox(session.viewport.bbox)
+    )
+    if bbox is None:
+        raise MapPlanBuildError(
+            "viewport_bounds_unavailable",
+            "The current map view is unknown, so it cannot be zoomed or panned.",
+        )
+    min_lon, min_lat, max_lon, max_lat = bbox
+    half_width, half_height = (max_lon - min_lon) / 2, (max_lat - min_lat) / 2
+    center_lon, center_lat = (min_lon + max_lon) / 2, (min_lat + max_lat) / 2
+    if action.strategy == "pan":
+        if action.direction is None:
+            raise MapPlanBuildError("viewport_direction_required", "pan requires a direction.")
+        east = {"east": 1, "west": -1}.get(action.direction, 0)
+        north = {"north": 1, "south": -1}.get(action.direction, 0)
+        center_lon += east * half_width * action.steps
+        center_lat += north * half_height * action.steps
+    else:
+        if action.anchor == "location":
+            center_lon = session.resolved_location.longitude
+            center_lat = session.resolved_location.latitude
+        factor = 2.0 ** (-action.steps if action.strategy == "zoom_in" else action.steps)
+        half_width *= factor
+        half_height *= factor
+    min_half_span = MIN_LOCATION_VIEWPORT_SPAN_DEGREES / 2
+    half_width = min(max(half_width, min_half_span), 180.0)
+    half_height = min(max(half_height, min_half_span), _MAX_VIEW_LATITUDE)
+    center_lon = min(max(center_lon, -180.0 + half_width), 180.0 - half_width)
+    center_lat = min(
+        max(center_lat, -_MAX_VIEW_LATITUDE + half_height), _MAX_VIEW_LATITUDE - half_height
+    )
+    return _viewport_for_bbox(
+        [
+            center_lon - half_width,
+            center_lat - half_height,
+            center_lon + half_width,
+            center_lat + half_height,
+        ],
+        session.viewport,
     )
 
 ###############################################################################

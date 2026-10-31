@@ -86,48 +86,57 @@ class CatalogToolHandler:
                 location,
             )
         route_filters = route if route is not None and not follow_up else None
-        candidates = self.capability_registry.shortlist(
-            domains=route_domains,
-            queries=query_values,
-            explicit_ids=request.capability_ids,
-            runtime_registry=self.runtime_registry,
-            # Pagination is applied after deterministic ranking so a cursor
-            # always addresses the same catalog snapshot.
-            limit=None if catalog_discovery else 50,
-            operation=(
-                None
-                if catalog_discovery or route_filters is None
-                else route_filters.operation
-            ),
-            scope_kind=(
-                None
-                if catalog_discovery or follow_up
-                else _resolved_scope_kind(route, location)
-            ),
-            temporal_mode=(
-                route_filters.temporal_scope.mode
-                if route_filters is not None and route_filters.temporal_scope.mode != "none"
-                else None
-            ),
-            temporal_granularity=(
-                route_filters.temporal_scope.granularity if route_filters is not None else None
-            ),
-            has_explicit_time_range=(
-                route_filters is not None
-                and any(
-                    value is not None
-                    for value in (
-                        route_filters.temporal_scope.reference_time_iso,
-                        route_filters.temporal_scope.start_time_iso,
-                        route_filters.temporal_scope.end_time_iso,
+        if catalog_discovery and any("basemap" in query.casefold() for query in query_values):
+            # A basemap inventory is the catalog's basemap list, not a ranked
+            # search that pages through every overlay and provider.
+            candidates = [
+                item
+                for item in self.capability_registry.list_basemaps()
+                if self.runtime_registry.is_enabled(str(item.get("id") or ""))
+            ]
+        else:
+            candidates = self.capability_registry.shortlist(
+                domains=route_domains,
+                queries=query_values,
+                explicit_ids=request.capability_ids,
+                runtime_registry=self.runtime_registry,
+                # Pagination is applied after deterministic ranking so a cursor
+                # always addresses the same catalog snapshot.
+                limit=None if catalog_discovery else 50,
+                operation=(
+                    None
+                    if catalog_discovery or route_filters is None
+                    else route_filters.operation
+                ),
+                scope_kind=(
+                    None
+                    if catalog_discovery or follow_up
+                    else _resolved_scope_kind(route, location)
+                ),
+                temporal_mode=(
+                    route_filters.temporal_scope.mode
+                    if route_filters is not None and route_filters.temporal_scope.mode != "none"
+                    else None
+                ),
+                temporal_granularity=(
+                    route_filters.temporal_scope.granularity if route_filters is not None else None
+                ),
+                has_explicit_time_range=(
+                    route_filters is not None
+                    and any(
+                        value is not None
+                        for value in (
+                            route_filters.temporal_scope.reference_time_iso,
+                            route_filters.temporal_scope.start_time_iso,
+                            route_filters.temporal_scope.end_time_iso,
+                        )
                     )
-                )
-            ),
-            requires_render=(
-                route_filters is not None and route_filters.presentation in {"map", "both"}
-            ),
-            location=location,
-        )
+                ),
+                requires_render=(
+                    route_filters is not None and route_filters.presentation in {"map", "both"}
+                ),
+                location=location,
+            )
         if state.excluded_capability_ids:
             excluded = set(state.excluded_capability_ids)
             candidates = [

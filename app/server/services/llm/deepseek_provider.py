@@ -318,13 +318,15 @@ class DeepSeekProvider(LLMProvider):
             client = self._client_for_request(effective_request, stage="chat")
             if client is None:
                 raise RuntimeError("DeepSeek client was not initialized.")
-            response = client.chat.completions.create(
+            kwargs.update(
                 model=effective_request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
                 temperature=effective_request.temperature,
                 stream=False,
-                **kwargs,
             )
+            response = client.chat.completions.create(**kwargs)
+            if _is_reasoning_only(response):
+                response = client.chat.completions.create(**kwargs)
         except LLMProviderRequestError:
             raise
         except Exception as exc:
@@ -410,13 +412,15 @@ class DeepSeekProvider(LLMProvider):
                 with_options = getattr(client, "with_options", None)
                 if callable(with_options):
                     request_client = with_options(timeout=remaining)
-            response = await request_client.chat.completions.create(
+            kwargs.update(
                 model=effective_request.model,
                 messages=self.normalize_tool_messages(effective_request.messages),
                 temperature=effective_request.temperature,
                 stream=False,
-                **kwargs,
             )
+            response = await request_client.chat.completions.create(**kwargs)
+            if _is_reasoning_only(response):
+                response = await request_client.chat.completions.create(**kwargs)
         except asyncio.CancelledError:
             raise
         except LLMProviderRequestError:
@@ -1012,3 +1016,16 @@ class DeepSeekProvider(LLMProvider):
             return None
         finish_reason = getattr(choices[0], "finish_reason", None)
         return str(finish_reason) if finish_reason else None
+
+###############################################################################
+def _is_reasoning_only(response: Any) -> bool:
+    """Return whether a reasoning model stopped after thinking, with no answer or tool call."""
+
+    choices: list[Any] = list(getattr(response, "choices", None) or [])
+    message = getattr(choices[0], "message", None) if choices else None
+    if message is None or getattr(message, "tool_calls", None):
+        return False
+    content = getattr(message, "content", None)
+    return not (isinstance(content, str) and content.strip()) and bool(
+        getattr(message, "reasoning_content", None)
+    )

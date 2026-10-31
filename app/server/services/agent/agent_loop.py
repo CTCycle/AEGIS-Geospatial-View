@@ -52,6 +52,7 @@ from server.prompts.capability_route import build_capability_route_prompt
 from server.services.agent.basemap_intent import (
     basemap_label,
     match_requested_basemaps,
+    unsupported_basemap_styles,
 )
 from server.services.agent.capability_router import (
     CapabilityRouter,
@@ -640,7 +641,9 @@ class AgentLoop:
             )
             state.termination_reason = stop[0]
             return self._outcome(state, final_text, stop[0], request)
-        messages.append({"role": "assistant", "content": final_text})
+        if final_text:
+            # An empty assistant turn carries nothing and nudges the model to repeat it.
+            messages.append({"role": "assistant", "content": final_text})
         await self._emit_iteration_completed(request, "continue")
         if iteration + 1 >= state.max_iterations:
             final_text = await self._finalize_iteration_exhaustion(
@@ -857,10 +860,11 @@ class AgentLoop:
         candidate = await self._terminal_synthesis(
             request, provider, messages, reason="verified_render"
         )
-        verified_map_state = self._verified_map_state_summary(state)
-        if verified_map_state is not None:
-            return verified_map_state
-        final = candidate or "The map is ready and the rendering was verified."
+        final = (
+            self._verified_map_state_summary(state)
+            or candidate
+            or "The map is ready and the rendering was verified."
+        )
         note = self._basemap_mismatch_note(state)
         return f"{final}\n\n{note}" if note else final
 
@@ -880,6 +884,12 @@ class AgentLoop:
             return (
                 f"Note: you asked for {named}, but a map shows one basemap, "
                 f"so it uses {rendered}."
+            )
+        unsupported = unsupported_basemap_styles(state.user_message)
+        if unsupported and not requested:
+            return (
+                f"Note: {' '.join(unsupported)} basemaps are not available, so the "
+                f"map uses {rendered}. Available basemaps: {', '.join(labels.values())}."
             )
         if not requested or requested[0] == session.basemap_id:
             return None
@@ -1595,8 +1605,18 @@ class AgentLoop:
     def _salvage_route(
         arguments: dict[str, Any], error: ValidationError
     ) -> CapabilityRoute | None:
-        """Drop invalid optional route fields; required fields are never guessed."""
+        """Drop invalid optional route fields; required fields are never guessed.
 
+        The one implied value is ``task_mode``: answer and clarify routes cannot
+        present a map, so a map route that omits it can only execute.
+        """
+
+        if "task_mode" not in arguments and arguments.get("presentation") in {"map", "both"}:
+            arguments = {**arguments, "task_mode": "execute"}
+            try:
+                return CapabilityRoute.model_validate(arguments)
+            except ValidationError as exc:
+                error = exc
         fields = CapabilityRoute.model_fields
         invalid = {str(item["loc"][0]) for item in error.errors() if item["loc"]}
         if not invalid or any(
@@ -2665,6 +2685,10 @@ class AgentLoop:
         if text:
             tools = list(available_tools or [])
             pending = AgentLoop._pending_native_requirements(state)
+            if "location_resolved" in pending and not state.location_refs and "?" in text:
+                # No place was given (for example "Show it" in a new chat): asking
+                # which place or data to show is a clarification, not a stall.
+                return "clarification_required", text
             if pending:
                 return (
                     "no_progress" if tools else "insufficient_evidence",
@@ -3426,6 +3450,19 @@ class AgentLoop:
 
         state = request.state
         text: str | None = None
+        if state.route is not None and state.route.task_mode == "answer" and not state.tool_results:
+            # Reasoning models can end a plain-answer turn with reasoning only
+            # and no content; the reserved slot gives a conversation one more
+            # chance, and a text answer is the whole goal of that route.
+            text = await self._terminal_synthesis(
+                request, provider, messages, reason="conversation_answer"
+            )
+            if text:
+                await self._emit_completion_decision(
+                    request, reason="goal_satisfied", status="terminal"
+                )
+                state.termination_reason = "goal_satisfied"
+                return self._outcome(state, text, "goal_satisfied", request)
         if any(result.status != "failed" for result in state.tool_results):
             text = await self._finalize_iteration_exhaustion(
                 request, provider, messages, stop_reason=reason
