@@ -1823,7 +1823,7 @@ export const parseChatOperation = (value: unknown, endpoint: string): ChatOperat
     ? record.failure_category ?? null
     : requireApiString(record, 'failure_category', endpoint);
   if (failureCategory !== null
-    && !['model_capability', 'provider_api', 'provider_failure', 'schema_definition', 'response_parsing', 'context_limit', 'insufficient_evidence', 'model_budget_exhausted', 'tool_budget_exhausted', 'transition_budget_exhausted', 'iteration_budget_exhausted', 'run_deadline_exhausted', 'no_progress', 'cancelled', 'superseded'].includes(failureCategory)) {
+    && !['model_capability', 'provider_api', 'provider_failure', 'internal_error', 'schema_definition', 'response_parsing', 'context_limit', 'insufficient_evidence', 'model_budget_exhausted', 'tool_budget_exhausted', 'transition_budget_exhausted', 'iteration_budget_exhausted', 'run_deadline_exhausted', 'no_progress', 'render_recovery_exhausted', 'cancelled', 'superseded'].includes(failureCategory)) {
     return apiContract(endpoint, 'operation.failure_category is unsupported', failureCategory);
   }
   return {

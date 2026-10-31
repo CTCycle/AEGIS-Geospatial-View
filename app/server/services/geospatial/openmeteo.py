@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
+from server.services.geospatial.providers.http import parse_retry_after
 
 WEATHER_GRID_BATCH_SIZE = 100
 # Grid batches in flight per call. Every request still reserves its own rate
@@ -152,8 +153,13 @@ class OpenMeteoService:
         try:
             outcomes = await asyncio.gather(*tasks)
         finally:
+            # Cancellation is best-effort: a batch still waiting for its rate
+            # slot never sends, but a request already inside urlopen finishes
+            # in its worker thread (at most grid_batch_concurrency requests,
+            # each bounded by timeout_s). No task outlives this call.
             for task in tasks:
                 task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
         failures = [error for _, error in outcomes if error is not None]
         if len(failures) == len(batches):
             raise failures[0]
@@ -171,8 +177,8 @@ class OpenMeteoService:
             "past_days": str(max(0, min(14, past_days))),
             "forecast_days": "1", "timezone": "auto",
         }
-        payload = await asyncio.to_thread(self._get_json, endpoint=self.weather_base_url,
-                                          params=params, provider_key="openmeteo_weather_grid")
+        payload = await self._fetch_json(endpoint=self.weather_base_url,
+                                         params=params, provider_key="openmeteo_weather_grid")
         locations = payload.get("locations", [payload])
         if not is_json_array(locations):
             raise OpenMeteoRequestError("Open-Meteo grid response is malformed.")
@@ -197,8 +203,7 @@ class OpenMeteoService:
             "forecast_days": "3",
             "timezone": "auto",
         }
-        payload = await asyncio.to_thread(
-            self._get_json,
+        payload = await self._fetch_json(
             endpoint=self.weather_base_url,
             params=params,
             provider_key="openmeteo_weather",
@@ -275,8 +280,7 @@ class OpenMeteoService:
             "timezone": "auto",
             "forecast_days": "3",
         }
-        payload = await asyncio.to_thread(
-            self._get_json,
+        payload = await self._fetch_json(
             endpoint=self.air_quality_base_url,
             params=params,
             provider_key="openmeteo_air_quality",
@@ -335,8 +339,7 @@ class OpenMeteoService:
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
         }
-        payload = await asyncio.to_thread(
-            self._get_json,
+        payload = await self._fetch_json(
             endpoint=self.elevation_base_url,
             params=params,
             provider_key="openmeteo_elevation",
@@ -439,14 +442,28 @@ class OpenMeteoService:
         return "valid_empty"
 
     # -------------------------------------------------------------------------
-    def _get_json(
+    async def _fetch_json(
         self, *, endpoint: str, params: dict[str, str], provider_key: str
     ) -> dict[str, Any]:
         cache_key = f"{provider_key}:{urlencode(sorted(params.items()))}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
-        self._wait_for_rate_limit_slot(provider_key)
+        # Wait on the event loop, not in the worker thread, so a cancelled
+        # caller never goes on to send its request.
+        delay = self._reserve_rate_limit_slot(provider_key)
+        if delay > 0:
+            await asyncio.sleep(delay)
+        data = await asyncio.to_thread(
+            self._get_json, endpoint=endpoint, params=params, provider_key=provider_key
+        )
+        self._cache_set(cache_key, data)
+        return data
+
+    # -------------------------------------------------------------------------
+    def _get_json(
+        self, *, endpoint: str, params: dict[str, str], provider_key: str
+    ) -> dict[str, Any]:
         url = f"{endpoint}?{urlencode(params)}"
         request = Request(url, headers={"User-Agent": self.user_agent})
         try:
@@ -456,7 +473,7 @@ class OpenMeteoService:
             if exc.code == 429:
                 raise OpenMeteoRateLimitError(
                     "Open-Meteo rate limit reached.",
-                    retry_after_seconds=_retry_after_seconds(exc.headers.get("Retry-After")),
+                    retry_after_seconds=parse_retry_after(exc.headers.get("Retry-After")),
                 ) from exc
             raise OpenMeteoRequestError(f"Open-Meteo request failed: {exc}") from exc
         except (URLError, TimeoutError) as exc:
@@ -471,7 +488,6 @@ class OpenMeteoService:
             data = {"locations": data}
         if not is_json_object(data):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
-        self._cache_set(cache_key, data)
         return data
 
     # -------------------------------------------------------------------------
@@ -492,20 +508,12 @@ class OpenMeteoService:
             self._cache[cache_key] = (time.time(), payload)
 
     # -------------------------------------------------------------------------
-    def _wait_for_rate_limit_slot(self, key: str) -> None:
+    def _reserve_rate_limit_slot(self, key: str) -> float:
         # Reserve the slot under the lock so concurrent callers queue behind
-        # each other instead of reading the same previous call time.
+        # each other instead of reading the same previous call time. Returns
+        # the delay until the reserved slot.
         with self._lock:
             now = time.monotonic()
             slot = max(now, self._last_call_by_key.get(key, -math.inf) + self.min_call_interval_s)
             self._last_call_by_key[key] = slot
-        if slot > now:
-            time.sleep(slot - now)
-
-###############################################################################
-def _retry_after_seconds(value: str | None) -> float | None:
-    try:
-        seconds = float(value) if value is not None else None
-    except ValueError:
-        return None
-    return seconds if seconds is not None and math.isfinite(seconds) and seconds >= 0 else None
+        return slot - now

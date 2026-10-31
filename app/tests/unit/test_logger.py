@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 
 from server.common.logger import LOG_CONFIG
-from server.common.logging_handlers import AccessLogFilter, SafeStreamHandler
+from server.common.logging_handlers import (
+    AccessLogFilter,
+    SafeStreamHandler,
+    log_unexpected_failure,
+)
 
 
 ###############################################################################
@@ -87,3 +91,19 @@ def test_access_filter_preserves_unrecognized_records() -> None:
     )
     assert AccessLogFilter().filter(record)
     assert record.levelno == logging.WARNING
+
+
+###############################################################################
+def test_unexpected_failure_context_is_single_line_and_redacted(caplog) -> None:
+    logger = logging.getLogger("tests.unexpected_failure")
+    with caplog.at_level(logging.ERROR, logger=logger.name):
+        log_unexpected_failure(
+            logger,
+            RuntimeError("boom"),
+            stage="tool_execution",
+            tool="search\nunexpected_failure stage=forged api_key=abc123",
+        )
+
+    header = caplog.records[0].getMessage().splitlines()[0]
+    assert "tool=search unexpected_failure stage=forged api_key=<redacted>" in header
+    assert "abc123" not in caplog.text

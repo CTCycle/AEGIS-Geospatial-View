@@ -11,6 +11,8 @@ _SECRET_ASSIGNMENT = re.compile(
     re.IGNORECASE,
 )
 _BEARER = re.compile(r"(bearer\s+)[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]+")
+_MAX_CONTEXT_VALUE_CHARS = 200
 
 
 ###############################################################################
@@ -82,7 +84,9 @@ def log_unexpected_failure(
     """
 
     fields = " ".join(
-        f"{key}={value}" for key, value in context.items() if value is not None
+        f"{key}={_context_value(value)}"
+        for key, value in context.items()
+        if value is not None
     )
     trace = redact_secrets("".join(traceback.format_exception(exc)).rstrip())
     logger.log(
@@ -90,3 +94,13 @@ def log_unexpected_failure(
         "unexpected_failure stage=%s %s exception_type=%s\n%s",
         stage, fields, type(exc).__name__, trace,
     )
+
+
+###############################################################################
+def _context_value(value: object) -> str:
+    # Context values may echo caller input: keep each one on a single line,
+    # bounded and free of credentials.
+    text = _CONTROL_CHARS.sub(" ", redact_secrets(str(value))).strip()
+    if len(text) > _MAX_CONTEXT_VALUE_CHARS:
+        return text[:_MAX_CONTEXT_VALUE_CHARS] + "..."
+    return text

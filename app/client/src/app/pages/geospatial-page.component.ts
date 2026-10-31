@@ -1668,6 +1668,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       case 'response_parsing':
       case 'insufficient_evidence':
         return 'The selected model or data provider could not complete the request.';
+      case 'internal_error':
+        return 'The request stopped after an internal error. Open Tool activity for execution details.';
       case 'cancelled':
       case 'superseded':
         return 'The request stopped before completion.';

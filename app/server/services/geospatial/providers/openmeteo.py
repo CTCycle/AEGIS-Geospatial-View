@@ -145,6 +145,8 @@ class OpenMeteoProvider(GeospatialProvider):
         if refined_points:
             try:
                 refined_samples = await self.service.get_weather_grid(refined_points, past_days)
+            except OpenMeteoRateLimitError as exc:
+                raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
             except (OpenMeteoServiceError, ValueError):
                 refined_samples = []
             refined = _grid_features(refined_points, refined_samples, past_days, "refined")
@@ -381,7 +383,7 @@ def _grid_feature(
     times = hourly.get("time", [])
     temperatures = hourly.get("temperature_2m", [])
     precipitation = hourly.get("precipitation", [])
-    if not isinstance(current_time, str) or not isinstance(times, list):
+    if not isinstance(current_time, str) or not all(isinstance(series, list) for series in (times, temperatures, precipitation)):
         return None
     # Open-Meteo times share each point's local timezone. Compare local
     # instants only within that point and disclose the per-point window.
@@ -392,7 +394,8 @@ def _grid_feature(
         stamps = [datetime.fromisoformat(stamp) if isinstance(stamp, str) else None for stamp in cast(list[object], times)]
     except ValueError:
         return None
-    if any(stamp is None for stamp in stamps):
+    # Aware and naive stamps cannot be ordered against each other.
+    if any(stamp is None or (stamp.tzinfo is None) != (local_end.tzinfo is None) for stamp in stamps):
         return None
     local_start = local_end - timedelta(days=past_days) if past_days else local_end.replace(hour=0, minute=0, second=0)
     selected = [i for i, stamp in enumerate(stamps) if stamp is not None and local_start <= stamp <= local_end]

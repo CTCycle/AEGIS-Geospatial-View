@@ -409,7 +409,7 @@ class AgentLoop:
                 LOGGER, exc, stage="agent_loop", run_id=state.run_id or state.request_id,
                 phase=state.phase.value, iteration=state.current_iteration,
             )
-            return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="provider_error")
+            return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="internal_error")
 
     # -------------------------------------------------------------------------
     def _attach_client_map_view(self, state: AgentRunState) -> None:

@@ -3,6 +3,8 @@ from tests.conftest import run_async_in_thread
 import pytest
 import time
 import httpx
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.overpass import OverpassInvalidQueryError, OverpassRateLimitError, OverpassRequestError
@@ -1311,6 +1313,15 @@ def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
 
     assert error.value.retry_after_seconds == 7.0
     assert "retry-after" not in str(error.value).lower()
+
+###############################################################################
+def test_retry_after_accepts_delta_seconds_and_http_dates() -> None:
+    future = format_datetime(datetime.now(UTC) + timedelta(seconds=120), usegmt=True)
+    assert provider_http.parse_retry_after("7") == 7.0
+    assert provider_http.parse_retry_after(future) == pytest.approx(120, abs=2)
+    assert provider_http.parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT") == 0.0
+    assert provider_http.parse_retry_after("soon") is None
+    assert provider_http.parse_retry_after("nan") is None
 
 ###############################################################################
 def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:

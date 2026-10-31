@@ -116,6 +116,7 @@ class ChatOperationResult(BaseModel):
             "model_capability",
             "provider_api",
             "provider_failure",
+            "internal_error",
             "schema_definition",
             "response_parsing",
             "context_limit",

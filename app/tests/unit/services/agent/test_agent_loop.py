@@ -2253,6 +2253,27 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
     assert outcome.failure_category == "model_capability"
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_unexpected_loop_exception_is_an_internal_error_not_a_provider_error() -> None:
+    loop = _loop(FakeProvider([]))
+
+    async def defective_route(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("internal defect")
+
+    loop._route = defective_route  # type: ignore[method-assign]
+    outcome = await loop.run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert outcome.stopped_reason == "failed"
+    assert outcome.failure_category == "internal_error"
+
+###############################################################################
 @pytest.mark.parametrize('coverage,observed,expected', [
     ({'spatial_scope_satisfied': False}, '2026-09-01T00:00:00Z', False),
     ({'spatial_scope_satisfied': True}, '2026-08-01T00:00:00Z', False),

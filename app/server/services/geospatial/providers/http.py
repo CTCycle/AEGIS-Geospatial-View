@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import inspect
+import math
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -530,13 +531,20 @@ def _valid_content_length(value: str) -> int:
 
 ###############################################################################
 def _retry_after_seconds(headers: httpx.Headers) -> float | None:
-    raw = headers.get("retry-after")
+    return parse_retry_after(headers.get("retry-after"))
+
+###############################################################################
+def parse_retry_after(raw: str | None) -> float | None:
+    """Seconds to wait from a Retry-After value: delta-seconds or HTTP-date."""
+
     if not raw:
         return None
     try:
-        return max(0.0, float(raw))
+        seconds = float(raw)
     except ValueError:
         pass
+    else:
+        return max(0.0, seconds) if math.isfinite(seconds) else None
     try:
         retry_at = parsedate_to_datetime(raw)
         if retry_at.tzinfo is None:

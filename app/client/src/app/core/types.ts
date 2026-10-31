@@ -843,7 +843,7 @@ export interface ChatOperationResult {
   warnings?: string[];
   direct_result?: Record<string, JsonValue> | null;
   provider_error?: Record<string, JsonValue> | null;
-  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'iteration_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'cancelled' | 'superseded' | null;
+  failure_category?: 'model_capability' | 'provider_api' | 'provider_failure' | 'internal_error' | 'schema_definition' | 'response_parsing' | 'context_limit' | 'insufficient_evidence' | 'model_budget_exhausted' | 'tool_budget_exhausted' | 'transition_budget_exhausted' | 'iteration_budget_exhausted' | 'run_deadline_exhausted' | 'no_progress' | 'render_recovery_exhausted' | 'cancelled' | 'superseded' | null;
 }
 
 export type RealtimeConnectionState =

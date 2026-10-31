@@ -1,4 +1,4 @@
-import { normalizeMapOverlayEntry, parseModelLibraryResponse } from './api-parsers';
+import { normalizeMapOverlayEntry, parseChatOperation, parseModelLibraryResponse } from './api-parsers';
 
 describe('model library API parsing', () => {
   it('preserves the source stale flag without rejecting the response contract', () => {
@@ -37,6 +37,18 @@ describe('value encoding parsing', () => {
     expect(normalizeMapOverlayEntry({...base, value_encoding: valid})?.value_encoding).toEqual(valid as never);
     for (const encoding of [{...valid, max: -1}, {...valid, min: NaN}, {...valid, field: ''}, {...valid, mode: 'random'}]) {
       expect(normalizeMapOverlayEntry({...base, value_encoding: encoding})?.value_encoding).toBeUndefined();
+    }
+  });
+});
+
+describe('chat operation parsing', () => {
+  it('accepts the internal and render-recovery failure categories', () => {
+    for (const category of ['internal_error', 'render_recovery_exhausted']) {
+      const parsed = parseChatOperation(
+        { kind: 'error', status: 'failed', message: 'Stopped.', failure_category: category },
+        '/api/chat',
+      );
+      expect(parsed.failure_category).toBe(category as typeof parsed.failure_category);
     }
   });
 });
