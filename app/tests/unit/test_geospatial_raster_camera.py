@@ -1,11 +1,11 @@
 from __future__ import annotations
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.providers.base import ProviderRequest, ProviderAuthError
+from server.services.geospatial.providers.base import ProviderRequest, ProviderAuthError, ProviderUnavailableError
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers._request import grid_points
-from server.services.geospatial.openmeteo import OpenMeteoService
+from server.services.geospatial.openmeteo import OpenMeteoRateLimitError, OpenMeteoRequestError, OpenMeteoService
 from server.services.geospatial.land_mask import country_shapes, land_mask
 from server.services.catalog.loader import find_macro_region_entry, load_macro_regions
 from shapely.geometry import Point
@@ -13,6 +13,8 @@ from urllib.parse import urlencode
 from unittest.mock import patch
 import pytest
 import json
+import threading
+import time
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 from server.services.geospatial.cache import GeospatialCache
@@ -171,6 +173,126 @@ async def test_weather_grid_batches_requests_under_8kb():
     assert len(result) == len(points) and len(calls) == 3
     assert all(call["params"]["past_days"] == "14" for call in calls)
     assert all(len(call["endpoint"] + "?" + urlencode(call["params"])) < 8192 for call in calls)
+
+###############################################################################
+def _grid_sample(latitude: float, *, stamp: str = "2026-10-20T12:00") -> dict:
+    return {"latitude": latitude, "current": {"time": "2026-10-20T12:00", "temperature_2m": 20},
+            "hourly": {"time": [stamp], "temperature_2m": [20], "precipitation": [latitude]}}
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_keeps_points_aligned_when_a_batch_is_short_or_fails():
+    points = [(float(index), 0.0) for index in range(250)]
+    def get_json(**kwargs):
+        latitudes = [float(value) for value in kwargs["params"]["latitude"].split(",")]
+        if latitudes[0] == 100.0:
+            # Short middle batch: positional alignment would shift samples.
+            return {"locations": [_grid_sample(latitude) for latitude in latitudes[1:]]}
+        if latitudes[0] == 200.0:
+            raise OpenMeteoRequestError("boom")
+        return {"locations": [_grid_sample(latitude) for latitude in latitudes]}
+    service = OpenMeteoService(grid_batch_concurrency=3)
+    with patch.object(service, "_get_json", side_effect=get_json):
+        samples = await service.get_weather_grid(points, 0)
+    assert len(samples) == len(points)
+    assert all(samples[i] is not None and samples[i]["latitude"] == points[i][0] for i in range(100))
+    assert all(sample is None for sample in samples[100:])
+    with patch.object(service, "_get_json", side_effect=OpenMeteoRequestError("down")):
+        with pytest.raises(OpenMeteoRequestError):
+            await service.get_weather_grid(points, 0)
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
+    in_flight = max_in_flight = 0
+    lock = threading.Lock()
+    def get_json(**kwargs):
+        nonlocal in_flight, max_in_flight
+        with lock:
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+        time.sleep(0.05)
+        with lock:
+            in_flight -= 1
+        return {"locations": [{}] * len(kwargs["params"]["latitude"].split(","))}
+    points = [(float(index), 0.0) for index in range(400)]
+    service = OpenMeteoService(grid_batch_concurrency=2)
+    with patch.object(service, "_get_json", side_effect=get_json):
+        assert len(await service.get_weather_grid(points, 0)) == 400
+    assert max_in_flight == 2
+    calls = []
+    def rate_limited(**kwargs):
+        calls.append(kwargs)
+        raise OpenMeteoRateLimitError("slow down", retry_after_seconds=30)
+    service = OpenMeteoService(grid_batch_concurrency=1)
+    with patch.object(service, "_get_json", side_effect=rate_limited):
+        with pytest.raises(OpenMeteoRateLimitError):
+            await service.get_weather_grid(points, 0)
+    assert len(calls) == 1
+
+
+###############################################################################
+def test_openmeteo_rate_slots_are_reserved_atomically():
+    service = OpenMeteoService(min_call_interval_s=0.1)
+    sleeps: list[float] = []
+    with patch("server.services.geospatial.openmeteo.time.monotonic", return_value=50.0),             patch("server.services.geospatial.openmeteo.time.sleep", side_effect=sleeps.append):
+        for _ in range(3):
+            service._wait_for_rate_limit_slot("grid")
+    assert sleeps == pytest.approx([0.1, 0.2])
+
+
+###############################################################################
+class _GridService:
+    weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+    def __init__(self, coarse, refined):
+        self.stages = [coarse, refined]
+
+    async def get_weather_grid(self, points, past_days):
+        stage = self.stages.pop(0)
+        if isinstance(stage, Exception):
+            raise stage
+        return stage(points)
+
+
+###############################################################################
+def _grid_request() -> ProviderRequest:
+    return ProviderRequest(capability_id="openmeteo_weather_forecast", bbox=(8.0, 45.0, 10.0, 47.0),
+                           params={"sampling": "area"})
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_counts_every_missing_sample_across_both_stages():
+    def coarse(points):
+        samples = [_grid_sample(lat) for lat, _ in points]
+        samples[1] = None
+        samples[2] = _grid_sample(points[2][0], stamp="not-a-time")
+        return samples
+    result = await OpenMeteoProvider(service=_GridService(coarse, OpenMeteoRequestError("x"))).fetch(_grid_request())
+    coverage = result.coverage
+    assert result.result_status == "partial" and result.partial
+    assert coverage["refinement_requested_point_count"] > 0 and coverage["refined_point_count"] == 0
+    assert coverage["point_count"] + coverage["missing_point_count"] == (
+        coverage["requested_point_count"] + coverage["refinement_requested_point_count"])
+    # Each feature keeps the coordinates of the point it was sampled for.
+    assert all(f["precipitation_sum_mm"] == f["latitude"] for f in result.payload["features"])
+
+    short = lambda points: [_grid_sample(lat) for lat, _ in points][1:]
+    result = await OpenMeteoProvider(service=_GridService(
+        lambda points: [_grid_sample(lat) for lat, _ in points], short)).fetch(_grid_request())
+    assert result.result_status == "partial" and result.coverage["refined_point_count"] == 0
+    assert result.coverage["missing_point_count"] == result.coverage["refinement_requested_point_count"]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_without_usable_samples_is_a_failure_not_empty():
+    unusable = lambda points: [_grid_sample(lat, stamp="bad") for lat, _ in points]
+    with pytest.raises(ProviderUnavailableError):
+        await OpenMeteoProvider(service=_GridService(unusable, unusable)).fetch(_grid_request())
 
 # --- test_geospatial_webcam_provider.py ---
 

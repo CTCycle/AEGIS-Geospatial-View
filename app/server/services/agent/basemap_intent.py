@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import Any, cast
 
 from server.common.typing import json_object
 
@@ -40,7 +40,7 @@ def basemap_terms(item: Mapping[str, Any]) -> list[str]:
     for key in ("keywords", "map_type_tags"):
         raw = metadata.get(key)
         if isinstance(raw, list):
-            terms.extend(str(term).strip().casefold() for term in raw if str(term).strip())
+            terms.extend(str(term).strip().casefold() for term in cast(list[object], raw) if str(term).strip())
     return list(dict.fromkeys(terms))
 
 ###############################################################################

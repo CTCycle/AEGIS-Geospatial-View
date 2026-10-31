@@ -10,13 +10,18 @@ from typing import Any, Literal, cast
 from shapely.geometry import Point
 
 from server.configurations.settings import OpenMeteoSettings
-from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
+from server.services.geospatial.openmeteo import (
+    OpenMeteoRateLimitError,
+    OpenMeteoService,
+    OpenMeteoServiceError,
+)
 from server.services.catalog.loader import find_macro_region_entry
 from server.services.geospatial.land_mask import MASK_SOURCE, LandMask, land_mask
 from server.services.geospatial.providers._request import request_center, grid_points
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
+    ProviderRateLimitError,
     ProviderResponse,
     ProviderUnavailableError,
     safe_request_params,
@@ -63,6 +68,8 @@ class OpenMeteoProvider(GeospatialProvider):
                     latitude=latitude,
                     longitude=longitude,
                 )
+        except OpenMeteoRateLimitError as exc:
+            raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
         except (OpenMeteoServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
         payload = dict(payload)
@@ -121,39 +128,40 @@ class OpenMeteoProvider(GeospatialProvider):
         now = datetime.now(UTC)
         past_days = min(14, max(0, math.ceil(max(0.0, (now - request.time).total_seconds() - 60) / 86400))) if request.time else 0
         try:
-            locations = await self.service.get_weather_grid(points, past_days)
+            samples = await self.service.get_weather_grid(points, past_days)
+        except OpenMeteoRateLimitError as exc:
+            raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
         except (OpenMeteoServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        partial = len(locations) != len(points)
-        features: list[dict[str, Any]] = []
-        for index, payload in enumerate(locations[:len(points)]):
-            feature = _grid_feature(f"openmeteo:grid:{index}", points[index], payload, past_days, "coarse")
-            partial = partial or feature is None
-            if feature is not None:
-                features.append(feature)
+        features = _grid_features(points, samples, past_days, "coarse")
+        if not features:
+            # Land points always have model weather; no usable sample is a
+            # failed retrieval, not a legitimately empty area.
+            raise ProviderUnavailableError(f"Open-Meteo returned no usable samples for {len(points)} requested points.")
         # Sampling misses local extremes between cells. Re-sample a finer
         # 3x3 neighbourhood around the strongest coarse cells of each metric.
         refined_points = _refinement_points(features, spacing, mask, set(points))
         refined: list[dict[str, Any]] = []
         if refined_points:
             try:
-                refined_locations = await self.service.get_weather_grid(refined_points, past_days)
+                refined_samples = await self.service.get_weather_grid(refined_points, past_days)
             except (OpenMeteoServiceError, ValueError):
-                refined_locations = []
-                partial = True
-            for index, payload in enumerate(refined_locations[:len(refined_points)]):
-                feature = _grid_feature(f"openmeteo:grid:r{index}", refined_points[index], payload, past_days, "refined")
-                if feature is not None:
-                    refined.append(feature)
+                refined_samples = []
+            refined = _grid_features(refined_points, refined_samples, past_days, "refined")
+        # Every requested coarse and refined point is either a feature or
+        # missing: point_count + missing_point_count == all requested points.
+        missing = len(points) + len(refined_points) - len(features) - len(refined)
+        partial = missing > 0
         features.extend(refined)
         units = {"precipitation_sum_mm": "mm", "temperature_2m_max_c": "\u00b0C", "temperature_2m_current_c": "\u00b0C", "elevation": "m"}
         coverage: dict[str, Any] = {"type": "grid_sample", "bbox": list(bbox), "point_count": len(features),
                     "requested_point_count": len(points), "spacing_deg": spacing,
                     "excluded_outside_region_points": excluded, "mask_source": MASK_SOURCE,
                     "region": region.name if region is not None else None,
-                    "refined_point_count": len(refined), "refinement_spacing_deg": spacing / 3,
+                    "refined_point_count": len(refined), "refinement_requested_point_count": len(refined_points),
+                    "refinement_spacing_deg": spacing / 3,
                     "temporal_scope_satisfied": request.time is None or now - request.time <= timedelta(days=14),
-                    "missing_point_count": len(points) + len(refined_points) - len(features),
+                    "missing_point_count": missing,
                     "window_start": min((f["window_start"] for f in features), default=None),
                     "window_end": max((f["window_end"] for f in features), default=None),
                     "value_kind": "model_estimate", "location_labels": "coordinates"}
@@ -161,8 +169,8 @@ class OpenMeteoProvider(GeospatialProvider):
             capability_id=request.capability_id, provider_id=self.provider_id,
             payload={"features": features, "renderingMode": "circles", "value_kind": "model_estimate", "units": units, "coverage": coverage},
             attribution=["Open-Meteo"], coverage=coverage, units=units,
-            result_type="features", result_status="valid_empty" if not features else "partial" if partial else "ok",
-            partial=partial and bool(features), source_url=self.service.weather_base_url,
+            result_type="features", result_status="partial" if partial else "ok",
+            partial=partial, source_url=self.service.weather_base_url,
             observation_time=coverage["window_end"], spatial_resolution=f"{spacing:.2f} degree grid",
         )
 
@@ -347,6 +355,23 @@ class OpenMeteoProvider(GeospatialProvider):
         return datetime.now(UTC)
 
 ###############################################################################
+def _grid_features(
+    points: list[tuple[float, float]], samples: list[dict[str, Any] | None], past_days: int, stage: str
+) -> list[dict[str, Any]]:
+    # Samples join their points by position only; an unaligned list cannot
+    # be trusted at any index, so every point of the stage counts as missing.
+    if len(samples) != len(points):
+        return []
+    prefix = "r" if stage == "refined" else ""
+    features: list[dict[str, Any]] = []
+    for index, (point, sample) in enumerate(zip(points, samples)):
+        feature = _grid_feature(f"openmeteo:grid:{prefix}{index}", point, sample, past_days, stage) if sample is not None else None
+        if feature is not None:
+            features.append(feature)
+    return features
+
+
+###############################################################################
 def _grid_feature(
     feature_id: str, point: tuple[float, float], payload: dict[str, Any], past_days: int, stage: str
 ) -> dict[str, Any] | None:
@@ -356,14 +381,21 @@ def _grid_feature(
     times = hourly.get("time", [])
     temperatures = hourly.get("temperature_2m", [])
     precipitation = hourly.get("precipitation", [])
-    if not isinstance(current_time, str):
+    if not isinstance(current_time, str) or not isinstance(times, list):
         return None
     # Open-Meteo times share each point's local timezone. Compare local
     # instants only within that point and disclose the per-point window.
-    local_end = datetime.fromisoformat(current_time)
+    # One malformed stamp makes the whole sample unusable: dropping just
+    # that hour would silently understate the window totals.
+    try:
+        local_end = datetime.fromisoformat(current_time)
+        stamps = [datetime.fromisoformat(stamp) if isinstance(stamp, str) else None for stamp in cast(list[object], times)]
+    except ValueError:
+        return None
+    if any(stamp is None for stamp in stamps):
+        return None
     local_start = local_end - timedelta(days=past_days) if past_days else local_end.replace(hour=0, minute=0, second=0)
-    selected = [i for i, stamp in enumerate(times) if isinstance(stamp, str)
-                and local_start <= datetime.fromisoformat(stamp) <= local_end]
+    selected = [i for i, stamp in enumerate(stamps) if stamp is not None and local_start <= stamp <= local_end]
     rain = [precipitation[i] if i < len(precipitation) else None for i in selected]
     heat = [temperatures[i] if i < len(temperatures) else None for i in selected]
     def numeric(value: Any) -> bool:

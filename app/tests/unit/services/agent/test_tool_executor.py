@@ -370,6 +370,32 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert [item.stage for item in map_budget.observations] == ["map_assembly"]
 
 ###############################################################################
+def test_unexpected_handler_failure_is_logged_with_context_but_not_exposed(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        raise RuntimeError("upstream rejected https://api.example/x?api_key=sk-secret")
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(_tool(handler))
+    with caplog.at_level("ERROR", logger="server.services.agent.tool_executor"):
+        result = asyncio.run(
+            ToolExecutor(tool_registry=registry).execute_tool(
+                LLMToolCall(id="call-9", name="test_tool", arguments={"value": 1}),
+                _state(),
+                _budget(),
+            )
+        )
+
+    assert result.error is not None and result.error.code == "tool_execution_error"
+    assert "sk-secret" not in result.error.message
+    log = caplog.text
+    for expected in ("stage=tool_execution", "run_id=request-1", "tool=test_tool",
+                     "call_id=call-9", "exception_type=RuntimeError", "Traceback", "in handler"):
+        assert expected in log
+    assert "sk-secret" not in log and "api_key=<redacted>" in log
+
+###############################################################################
 def test_manifest_validation_correction_contains_bounded_applicable_schema() -> None:
     calls: list[int] = []
 

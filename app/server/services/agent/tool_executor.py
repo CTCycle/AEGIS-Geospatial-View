@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import time
 from collections.abc import Awaitable, Callable, Collection
 from typing import Any, cast
@@ -11,6 +12,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
@@ -30,6 +32,8 @@ from server.domain.agent.tool_result import (
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall
 from server.services.agent.tool_registry import ToolRegistry
+
+LOGGER = logging.getLogger(__name__)
 
 
 # Some model lanes emit the concise discovery name even though the native
@@ -503,9 +507,13 @@ class ToolExecutor:
             )
         except ExecutionBudgetExceeded:
             raise
-        except Exception:
+        except Exception as exc:
             # Provider-specific failures are normalized by the capability
             # handler.  The outer boundary never exposes exception details.
+            log_unexpected_failure(
+                LOGGER, exc, stage="tool_execution", run_id=state.run_id or state.request_id,
+                tool=tool_call.name, call_id=call_id,
+            )
             return self._failure(
                 call_id=call_id,
                 tool_name=tool_call.name,
@@ -521,7 +529,11 @@ class ToolExecutor:
 
         try:
             result = registered.result_normalizer(raw_result, call_id)
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="result_normalization", run_id=state.run_id or state.request_id,
+                tool=tool_call.name, call_id=call_id,
+            )
             return self._failure(
                 call_id=call_id,
                 tool_name=tool_call.name,

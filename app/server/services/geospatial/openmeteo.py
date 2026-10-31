@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 
 import asyncio
 import json
+import logging
 import math
 import threading
 import time
@@ -16,7 +17,12 @@ from urllib.request import Request, urlopen
 from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
 
 WEATHER_GRID_BATCH_SIZE = 100
+# Grid batches in flight per call. Every request still reserves its own rate
+# slot, so this bounds overlap rather than the provider request rate.
+WEATHER_GRID_MAX_CONCURRENT_BATCHES = 3
 OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class OpenMeteoServiceError(Exception):
@@ -25,6 +31,17 @@ class OpenMeteoServiceError(Exception):
 ###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
     """Raised when Open-Meteo cannot fulfill a request."""
+
+###############################################################################
+class OpenMeteoRateLimitError(OpenMeteoRequestError):
+    """Raised when Open-Meteo answers HTTP 429."""
+
+    # -------------------------------------------------------------------------
+    def __init__(
+        self, message: str, *, retry_after_seconds: float | None = None
+    ) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
 
 ###############################################################################
 class OpenMeteoService:
@@ -70,6 +87,7 @@ class OpenMeteoService:
         timeout_s: float | None = None,
         cache_ttl_s: float | None = None,
         min_call_interval_s: float | None = None,
+        grid_batch_concurrency: int = WEATHER_GRID_MAX_CONCURRENT_BATCHES,
     ) -> None:
         configured = settings or OpenMeteoSettings(
             **JsonOpenMeteoSettings().model_dump()
@@ -91,33 +109,81 @@ class OpenMeteoService:
             else configured.min_call_interval_s,
             0.05,
         )
+        self.grid_batch_concurrency = max(1, grid_batch_concurrency)
         self._lock = threading.Lock()
         self._last_call_by_key: dict[str, float] = {}
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
     # -------------------------------------------------------------------------
-    async def get_weather_grid(self, points: list[tuple[float, float]], past_days: int) -> list[dict[str, Any]]:
-        """Fetch a grid in cached multi-location calls of at most 100 points."""
+    async def get_weather_grid(
+        self, points: list[tuple[float, float]], past_days: int
+    ) -> list[dict[str, Any] | None]:
+        """Fetch a grid in cached multi-location calls of at most 100 points.
+
+        The result is aligned with ``points``: entry ``i`` is the sample for
+        ``points[i]`` or ``None`` when it is missing. A failed batch leaves its
+        points missing; the call raises only when every batch failed or the
+        provider rate-limited the grid, which also cancels pending batches.
+        """
         if not points:
             raise ValueError("Weather grids require at least one point.")
-        results: list[dict[str, Any]] = []
-        for start in range(0, len(points), WEATHER_GRID_BATCH_SIZE):
-            batch = points[start:start + WEATHER_GRID_BATCH_SIZE]
-            params = {
-                "latitude": ",".join(f"{lat:.5f}" for lat, _ in batch),
-                "longitude": ",".join(f"{lon:.5f}" for _, lon in batch),
-                "current": "temperature_2m,precipitation",
-                "hourly": "temperature_2m,precipitation",
-                "past_days": str(max(0, min(14, past_days))),
-                "forecast_days": "1", "timezone": "auto",
-            }
-            payload = await asyncio.to_thread(self._get_json, endpoint=self.weather_base_url,
-                                              params=params, provider_key="openmeteo_weather_grid")
-            locations = payload.get("locations", [payload])
-            if not is_json_array(locations) or not all(is_json_object(item) for item in locations):
-                raise OpenMeteoRequestError("Open-Meteo grid response is malformed.")
-            results.extend(item for item in locations if is_json_object(item))
-        return results
+        batches = [
+            points[start:start + WEATHER_GRID_BATCH_SIZE]
+            for start in range(0, len(points), WEATHER_GRID_BATCH_SIZE)
+        ]
+        semaphore = asyncio.Semaphore(self.grid_batch_concurrency)
+
+        async def fetch(
+            batch: list[tuple[float, float]],
+        ) -> tuple[list[dict[str, Any] | None], OpenMeteoServiceError | None]:
+            async with semaphore:
+                try:
+                    return await self._weather_grid_batch(batch, past_days), None
+                except OpenMeteoRateLimitError:
+                    raise
+                except OpenMeteoServiceError as exc:
+                    LOGGER.warning(
+                        "openmeteo grid batch failed points=%d error=%s",
+                        len(batch), exc,
+                    )
+                    return [None] * len(batch), exc
+
+        tasks = [asyncio.create_task(fetch(batch)) for batch in batches]
+        try:
+            outcomes = await asyncio.gather(*tasks)
+        finally:
+            for task in tasks:
+                task.cancel()
+        failures = [error for _, error in outcomes if error is not None]
+        if len(failures) == len(batches):
+            raise failures[0]
+        return [sample for samples, _ in outcomes for sample in samples]
+
+    # -------------------------------------------------------------------------
+    async def _weather_grid_batch(
+        self, batch: list[tuple[float, float]], past_days: int
+    ) -> list[dict[str, Any] | None]:
+        params = {
+            "latitude": ",".join(f"{lat:.5f}" for lat, _ in batch),
+            "longitude": ",".join(f"{lon:.5f}" for _, lon in batch),
+            "current": "temperature_2m,precipitation",
+            "hourly": "temperature_2m,precipitation",
+            "past_days": str(max(0, min(14, past_days))),
+            "forecast_days": "1", "timezone": "auto",
+        }
+        payload = await asyncio.to_thread(self._get_json, endpoint=self.weather_base_url,
+                                          params=params, provider_key="openmeteo_weather_grid")
+        locations = payload.get("locations", [payload])
+        if not is_json_array(locations):
+            raise OpenMeteoRequestError("Open-Meteo grid response is malformed.")
+        # Locations come back in request order and carry grid-snapped
+        # coordinates, so position is the only join key. Any other
+        # cardinality would shift samples onto the wrong points.
+        if len(locations) != len(batch):
+            raise OpenMeteoRequestError(
+                f"Open-Meteo grid returned {len(locations)} locations for {len(batch)} points."
+            )
+        return [item if is_json_object(item) else None for item in locations]
 
     # -------------------------------------------------------------------------
     async def get_weather_forecast(
@@ -386,7 +452,14 @@ class OpenMeteoService:
         try:
             with urlopen(request, timeout=self.timeout_s) as response:
                 payload = response.read().decode("utf-8")
-        except (HTTPError, URLError, TimeoutError) as exc:
+        except HTTPError as exc:
+            if exc.code == 429:
+                raise OpenMeteoRateLimitError(
+                    "Open-Meteo rate limit reached.",
+                    retry_after_seconds=_retry_after_seconds(exc.headers.get("Retry-After")),
+                ) from exc
+            raise OpenMeteoRequestError(f"Open-Meteo request failed: {exc}") from exc
+        except (URLError, TimeoutError) as exc:
             raise OpenMeteoRequestError(f"Open-Meteo request failed: {exc}") from exc
         try:
             data = json.loads(payload)
@@ -420,11 +493,19 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self, key: str) -> None:
+        # Reserve the slot under the lock so concurrent callers queue behind
+        # each other instead of reading the same previous call time.
         with self._lock:
-            now = time.time()
-            previous = self._last_call_by_key.get(key, 0.0)
-            delay = self.min_call_interval_s - (now - previous)
-        if delay > 0:
-            time.sleep(delay)
-        with self._lock:
-            self._last_call_by_key[key] = time.time()
+            now = time.monotonic()
+            slot = max(now, self._last_call_by_key.get(key, -math.inf) + self.min_call_interval_s)
+            self._last_call_by_key[key] = slot
+        if slot > now:
+            time.sleep(slot - now)
+
+###############################################################################
+def _retry_after_seconds(value: str | None) -> float | None:
+    try:
+        seconds = float(value) if value is not None else None
+    except ValueError:
+        return None
+    return seconds if seconds is not None and math.isfinite(seconds) and seconds >= 0 else None

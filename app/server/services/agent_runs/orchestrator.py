@@ -7,6 +7,7 @@ import logging
 from contextlib import suppress
 from typing import Any, cast
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_object
 from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
@@ -104,10 +105,13 @@ class AgentRunOrchestrator:
                         visibility=visibility,
                         payload=payload,
                     )
-                except Exception:
+                except Exception as exc:
                     # Context telemetry must not turn a valid agent result into
                     # a failed run when the event sink is unavailable.
-                    pass
+                    log_unexpected_failure(
+                        LOGGER, exc, stage="context_event_persistence", level=logging.WARNING,
+                        run_id=snapshot.run_id, event_type=event_type.value,
+                    )
                 finally:
                     context_events.task_done()
 
@@ -202,6 +206,10 @@ class AgentRunOrchestrator:
             if latest.cancel_requested_at is not None:
                 await self._publish_cancelled(latest)
                 return None
+            log_unexpected_failure(
+                LOGGER, exc, stage="agent_execution", run_id=run_id,
+                run_version=snapshot.active_run_version,
+            )
             safe_message = self._safe_failure_message(exc)
             failed, transitioned = self.run_repository.mark_failed_if_current(
                 run_id,

@@ -146,6 +146,59 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
 ###############################################################################
+def test_overflowing_subscriber_is_evicted_and_resumes_from_durable_log(
+    run_repositories,
+) -> None:
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        session.add(ConversationRecord(id="conv_1", title="Events"))
+        session.add(
+            AgentRunRecord(
+                id="run_1",
+                conversation_id="conv_1",
+                original_request="events",
+                aggregated_request="events",
+                active_slot=1,
+            )
+        )
+        session.commit()
+    publisher = RunEventPublisher(run_repositories["events"], subscriber_queue_size=2)
+
+    async def publish(label: str):
+        return await publisher.publish(
+            conversation_id="conv_1", run_id="run_1", run_version=1,
+            type=RunEventType.PROGRESS, payload={"label": label},
+        )
+
+    async def _run() -> None:
+        received: list = []
+        first_seen = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_consumer() -> None:
+            async for event in publisher.events("run_1"):
+                received.append(event)
+                first_seen.set()
+                await release.wait()
+
+        consumer = asyncio.create_task(slow_consumer())
+        await asyncio.sleep(0)
+        published = [await publish("0")]
+        await first_seen.wait()
+        published += [await publish(str(index)) for index in range(1, 6)]
+        release.set()
+        # The evicted consumer must end instead of waiting on a dead queue.
+        await asyncio.wait_for(consumer, timeout=1)
+
+        resumed = publisher.events("run_1", after_sequence=received[-1].sequence)
+        replayed = [await anext(resumed) for _ in range(len(published) - len(received))]
+        await resumed.aclose()
+        assert [event.event_id for event in received + replayed] == [
+            event.event_id for event in published
+        ]
+
+    run_async_in_thread(_run())
+
+###############################################################################
 def test_event_repository_loads_latest_native_checkpoint_for_run_version(
     run_repositories,
 ) -> None:

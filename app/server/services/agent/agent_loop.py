@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import logging
 import re
 from collections.abc import Awaitable, Collection, Sequence
 from dataclasses import dataclass, field
@@ -15,6 +16,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
+from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_route import (
     AgentGoal,
@@ -77,6 +79,8 @@ from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOut
 from server.services.llm.multimodal import attach_image, messages_contain_image
 from server.services.llm.request_deadline import REQUEST_DEADLINE_METADATA_KEY
 from server.services.llm.transport import LLMTransportPolicy
+
+LOGGER = logging.getLogger(__name__)
 
 USER_IMAGE_CAPTION = (
     "Image attached by the user to this request. Use its visual clues as evidence "
@@ -400,7 +404,11 @@ class AgentLoop:
             return self._outcome(state, final_text, "run_deadline_exhausted", request)
         except LLMStructuredOutputError as exc:
             return self._failed(state, request, "The selected model could not complete this request.", category=exc.category)
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="agent_loop", run_id=state.run_id or state.request_id,
+                phase=state.phase.value, iteration=state.current_iteration,
+            )
             return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="provider_error")
 
     # -------------------------------------------------------------------------
@@ -1017,7 +1025,11 @@ class AgentLoop:
             TimeoutError,
         ):
             outcome = "provider_error"
-        except Exception:
+        except Exception as exc:
+            log_unexpected_failure(
+                LOGGER, exc, stage="finalization",
+                run_id=request.state.run_id or request.state.request_id, reason=reason,
+            )
             outcome = "error"
         finally:
             await self._emit_finalization_trace(
@@ -1472,6 +1484,7 @@ class AgentLoop:
             {"role": "system", "content": build_capability_route_prompt()},
             *(message for message in messages if message.get("content") != native_prompt),
         ]
+        result: LLMResult | None = None
         for attempt in range(request.max_route_corrections + 1):
             result = await self._model_call(
                 request,
@@ -1571,6 +1584,7 @@ class AgentLoop:
         fallback = build_location_map_fallback_route(request.state.user_message)
         if (
             fallback is None
+            and result is not None
             and not result.tool_calls
             and (result.content or "").strip()
         ):
@@ -2056,6 +2070,13 @@ class AgentLoop:
             except (AgentRunControlSignal, LLMStructuredOutputError):
                 raise
             except Exception as exc:
+                # Raw exceptions here are adapter or transport faults that the
+                # normalized provider error would otherwise hide.
+                log_unexpected_failure(
+                    LOGGER, exc, stage="model_call", level=logging.WARNING,
+                    run_id=request.state.run_id or request.state.request_id,
+                    provider=request.provider, model=request.model, attempt=attempts,
+                )
                 normalized = LLMProviderRequestError.from_exception(
                     exc,
                     provider=request.provider,

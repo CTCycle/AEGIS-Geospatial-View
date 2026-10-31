@@ -107,10 +107,17 @@ class RunEventPublisher:
                 queue.put_nowait(event)
             except asyncio.QueueFull:
                 stale.append(queue)
-                try:
-                    queue.put_nowait(None)
-                except asyncio.QueueFull:
-                    pass
+                # Queued items are only wake-ups for a durable-log reread, so
+                # dropping them loses nothing. Emptying the queue guarantees
+                # the eviction sentinel fits; otherwise the consumer would
+                # drain the backlog and then wait forever on a dead queue.
+                while not queue.empty():
+                    queue.get_nowait()
+                queue.put_nowait(None)
+                LOGGER.warning(
+                    "agent_run subscriber evicted run_id=%s sequence=%s",
+                    event.run_id, event.sequence,
+                )
         for queue in stale:
             await self.unsubscribe(RunEventSubscription(event.run_id, queue))
 
