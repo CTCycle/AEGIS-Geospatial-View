@@ -128,21 +128,16 @@ class AgentRunOrchestrator:
         async def on_agent_trace(trace: AgentTraceEvent) -> None:
             """Persist the redacted trace and publish concise tool progress."""
 
-            current = self.run_repository.get_run(run_id)
-            if (
-                current is None
-                or current.active_run_version != snapshot.active_run_version
-                or current.cancel_requested_at is not None
-            ):
+            if self._control_status(run_id, snapshot.active_run_version) is not None:
                 return
-            await self._publish_trace(current, trace)
+            await self._publish_trace(snapshot, trace)
             if trace.kind not in {"tool_selected", "tool_result"}:
                 return
             completed = trace.kind == "tool_result"
             await self.event_publisher.publish(
-                conversation_id=current.conversation_id,
-                run_id=current.run_id,
-                run_version=current.active_run_version,
+                conversation_id=snapshot.conversation_id,
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
                 type=(
                     RunEventType.TOOL_COMPLETED
                     if completed
@@ -152,35 +147,25 @@ class AgentRunOrchestrator:
             )
 
         def run_state_check() -> str | None:
-            latest = self.run_repository.get_run(run_id)
-            if latest is None or latest.cancel_requested_at is not None:
-                return "cancelled"
-            if latest.active_run_version != snapshot.active_run_version:
-                return "superseded"
-            return None
+            return self._control_status(run_id, snapshot.active_run_version)
 
         async def on_checkpoint(state: NativeRunState) -> None:
             """Persist each safe native boundary in the internal run log."""
 
-            current = self.run_repository.get_run(run_id)
-            if (
-                current is None
-                or current.active_run_version != snapshot.active_run_version
-                or current.cancel_requested_at is not None
-            ):
+            if self._control_status(run_id, snapshot.active_run_version) is not None:
                 return
             run_state = state.checkpoint()
             await self._publish_trace(
-                current,
+                snapshot,
                 AgentTraceEvent(
                     kind="checkpoint",
-                    run_id=current.run_id,
-                    run_version=current.active_run_version,
+                    run_id=snapshot.run_id,
+                    run_version=snapshot.active_run_version,
                     sequence=max(1, state.transitions),
                     payload=AgentCheckpoint(
-                        run_id=current.run_id,
-                        conversation_id=current.conversation_id,
-                        run_version=current.active_run_version,
+                        run_id=snapshot.run_id,
+                        conversation_id=snapshot.conversation_id,
+                        run_version=snapshot.active_run_version,
                         conversation_state={},
                         run_state=run_state,
                         state_hash=_hash_json(run_state),
@@ -707,6 +692,17 @@ class AgentRunOrchestrator:
             visibility=RunEventVisibility.INTERNAL,
             payload=trace.model_dump(mode="json"),
         )
+
+    # -------------------------------------------------------------------------
+    def _control_status(self, run_id: str, run_version: int) -> str | None:
+        """Return why a run version may no longer execute, or ``None``."""
+
+        control = self.run_repository.get_run_control(run_id)
+        if control is None or control.cancel_requested_at is not None:
+            return "cancelled"
+        if control.active_run_version != run_version:
+            return "superseded"
+        return None
 
     # -------------------------------------------------------------------------
     def _latest_checkpoint(

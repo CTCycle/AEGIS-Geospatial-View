@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-10-24
+Last updated: 2026-10-31
 
 ## Layering
 
@@ -55,7 +55,10 @@ Chat requests flow through:
 1. `chat.py` validates the request and conversation identity.
 2. `ChatRuntime` supplies the composed native orchestrator and repositories.
 3. `NativeAgentOrchestrator` hydrates `ConversationState`, history, directives,
-   map memory, and relevant evidence summaries.
+   map memory, and relevant evidence summaries. History is read once per turn
+   as a text-only projection (id, turn index, request id, role, content); the
+   turn index comes from a count query, and structured, tool and map payloads
+   are not loaded.
 4. `AgentContextAssembler` builds one bounded `AgentContextPackage`.
 5. `AgentStateFactory` creates the canonical checkpointable `AgentRunState`.
 6. `AgentLoop` routes, compiles the goal, exposes tools, calls the model,
@@ -275,7 +278,10 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
   `render_retry_exhausted` trace events. These events expose operational state
   and sanitized outcomes without private model reasoning.
 - Cancellation and version checks occur before/after external work and before
-  durable commits. Tracked lifecycle tasks are directly cancelled on request.
+  durable commits. Per-trace, per-checkpoint and run-state checks use
+  `AgentRunRepository.get_run_control()`, a single-row read of version, state
+  and cancellation that never scans the event log; full snapshots remain for
+  API responses and checkpoint restoration. Tracked lifecycle tasks are directly cancelled on request.
 
 ### Threaded
 

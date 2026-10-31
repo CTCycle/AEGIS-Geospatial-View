@@ -194,18 +194,50 @@ class ChatHistoryRepository:
         return payload if is_json_object(payload) else None
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(
+    def count_messages(self, conversation_id: str) -> int:
+        with self._session_factory() as session:
+            value = session.scalar(
+                select(func.count())
+                .select_from(ChatMessageRecord)
+                .where(ChatMessageRecord.conversation_id == conversation_id)
+            )
+        return int(value or 0)
+
+    # -------------------------------------------------------------------------
+    def list_context_messages(
         self, conversation_id: str, limit: int
     ) -> list[dict[str, Any]]:
+        """Return the newest messages, oldest first, as linguistic history.
+
+        Model context is a projection of message text; structured, tool and
+        map payloads stay in their authoritative stores, so they are not
+        loaded here.
+        """
+
         with self._session_factory() as session:
             statement = (
-                select(ChatMessageRecord)
+                select(
+                    ChatMessageRecord.id,
+                    ChatMessageRecord.turn_index,
+                    ChatMessageRecord.request_id,
+                    ChatMessageRecord.role,
+                    ChatMessageRecord.content,
+                )
                 .where(ChatMessageRecord.conversation_id == conversation_id)
                 .order_by(ChatMessageRecord.turn_index.desc())
                 .limit(max(1, limit))
             )
-            rows = list(reversed(session.execute(statement).scalars().all()))
-        return [self._to_message_dict(row) for row in rows]
+            rows = list(reversed(session.execute(statement).all()))
+        return [
+            {
+                "id": row.id,
+                "turn_index": row.turn_index,
+                "request_id": row.request_id,
+                "role": row.role,
+                "content": row.content,
+            }
+            for row in rows
+        ]
 
     # -------------------------------------------------------------------------
     def get_last_assistant_message(self, conversation_id: str) -> dict[str, Any] | None:

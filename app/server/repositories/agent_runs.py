@@ -5,6 +5,7 @@ import json
 import math
 import re
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -73,6 +74,16 @@ def _finalize_pending_presentation(
         presentation["error_code"] = error_code
     presentation.pop("pending_response", None)
     return presentation
+
+###############################################################################
+@dataclass(frozen=True, slots=True)
+class AgentRunControl:
+    """Execution-control projection of one run, without its event history."""
+
+    run_id: str
+    active_run_version: int
+    state: AgentRunState
+    cancel_requested_at: datetime | None
 
 ###############################################################################
 class AgentRunRepository:
@@ -209,6 +220,33 @@ class AgentRunRepository:
             record = session.get(AgentRunRecord, run_id)
             snapshot = self._to_snapshot(record) if record is not None else None
         return self._attach_task_state(snapshot)
+
+    # -------------------------------------------------------------------------
+    def get_run_control(self, run_id: str) -> AgentRunControl | None:
+        """Read only the fields that decide whether execution may continue.
+
+        Hot execution paths probe this for every trace, checkpoint and
+        cancellation check, so it never scans the event log for task state.
+        It is always read fresh because cancellation is mutable.
+        """
+
+        with self._session_factory() as session:
+            row = session.execute(
+                select(
+                    AgentRunRecord.active_run_version,
+                    AgentRunRecord.state,
+                    AgentRunRecord.cancel_requested_at,
+                ).where(AgentRunRecord.id == run_id)
+            ).one_or_none()
+        if row is None:
+            return None
+        version, state, cancel_requested_at = row
+        return AgentRunControl(
+            run_id=run_id,
+            active_run_version=int(version),
+            state=AgentRunState(state),
+            cancel_requested_at=cancel_requested_at,
+        )
 
     # -------------------------------------------------------------------------
     def get_task_state(

@@ -7,6 +7,7 @@ from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse, ContextUsageResponse
 from server.contracts.geospatial import MapSession, OverlayCollectionState, ViewportPolicy
 from server.contracts.events import RunEventType
+from server.repositories.agent_runs import AgentRunControl
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 from server.services.geospatial.map_session_builder import _geojson_render_data, _viewport_for_location
 
@@ -53,6 +54,17 @@ class _FakeRunRepository:
     # -------------------------------------------------------------------------
     def get_run(self, run_id: str) -> AgentRunSnapshot | None:
         return self.snapshot if run_id == self.snapshot.run_id else None
+
+    # -------------------------------------------------------------------------
+    def get_run_control(self, run_id: str) -> AgentRunControl | None:
+        if run_id != self.snapshot.run_id:
+            return None
+        return AgentRunControl(
+            run_id=run_id,
+            active_run_version=self.snapshot.active_run_version,
+            state=self.snapshot.state,
+            cancel_requested_at=self.snapshot.cancel_requested_at,
+        )
 
     # -------------------------------------------------------------------------
     def mark_started(self, run_id: str) -> AgentRunSnapshot:

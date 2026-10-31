@@ -162,12 +162,7 @@ class NativeAgentOrchestrator:
             ConversationDirective.model_validate(item)
             for item in conversation_state.active_directives
         ]
-        recent_count = len(
-            self.history_service.list_recent_messages(
-                conversation_id,
-                limit=10_000,
-            )
-        )
+        recent_count = self.history_service.count_messages(conversation_id)
         directives = self.instruction_state_service.apply_user_message(
             directives,
             payload.message,
@@ -198,7 +193,7 @@ class NativeAgentOrchestrator:
                 request_id=request_id,
             )
 
-        recent_messages = self.history_service.list_recent_messages(
+        recent_messages = self.history_service.list_context_messages(
             conversation_id,
             limit=10_000,
         )

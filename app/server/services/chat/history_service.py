@@ -21,10 +21,14 @@ class ChatHistoryService:
         return revision
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(
+    def count_messages(self, conversation_id: str) -> int:
+        return self.repo.count_messages(conversation_id)
+
+    # -------------------------------------------------------------------------
+    def list_context_messages(
         self, conversation_id: str, limit: int
     ) -> list[dict[str, Any]]:
-        return self.repo.list_recent_messages(conversation_id, limit)
+        return self.repo.list_context_messages(conversation_id, limit)
 
     # -------------------------------------------------------------------------
     def list_messages(self, *, conversation_id: str) -> list[dict[str, Any]]:

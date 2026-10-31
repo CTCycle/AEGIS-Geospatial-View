@@ -86,6 +86,67 @@ def test_history_search_is_scoped_bounded_and_deterministic() -> None:
     assert [item["turn_index"] for item in before_current["messages"]] == [1, 2]
 
 ###############################################################################
+def test_context_history_is_a_newest_text_window_in_chronological_order() -> None:
+    backend = _backend()
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Context")
+    other = conversations.create_conversation("Other")
+    for index in range(5):
+        history.append_message(
+            conversation_id=conversation.id,
+            role="user" if index % 2 == 0 else "assistant",
+            content=f"message {index}",
+            request_id=f"req-{index}",
+            map_session={"session_id": "heavy"},
+        )
+    history.append_message(conversation_id=other.id, role="user", content="elsewhere")
+
+    window = history.list_context_messages(conversation.id, limit=3)
+
+    assert history.count_messages(conversation.id) == 5
+    assert [item["content"] for item in window] == ["message 2", "message 3", "message 4"]
+    assert window[0]["request_id"] == "req-2"
+    assert set(window[0]) == {"id", "turn_index", "request_id", "role", "content"}
+
+###############################################################################
+def test_run_control_is_one_fresh_query_that_never_scans_events() -> None:
+    backend = _backend()
+    conversations = ConversationRepository(backend)
+    events = AgentRunEventRepository(backend)
+    runs = AgentRunRepository(backend, event_repository=events)
+    conversation = conversations.create_conversation("Control")
+    run = runs.create_run(conversation.id, "request", "request")
+    for sequence in range(20):
+        events.append_event(
+            RunEventCreate(
+                conversation_id=conversation.id,
+                run_id=run.run_id,
+                run_version=1,
+                type=RunEventType.TRACE,
+                visibility=RunEventVisibility.INTERNAL,
+                payload={"kind": "tool_result", "sequence": sequence},
+            )
+        )
+    statements: list[str] = []
+    sqlalchemy.event.listen(
+        backend.engine,
+        "before_cursor_execute",
+        lambda _conn, _cursor, statement, *_rest: statements.append(statement),
+    )
+
+    control = runs.get_run_control(run.run_id)
+    assert control is not None
+    assert (control.active_run_version, control.cancel_requested_at) == (1, None)
+    assert len(statements) == 1
+    assert "agent_run_events" not in statements[0]
+
+    runs.request_cancel(run.run_id)
+    cancelled = runs.get_run_control(run.run_id)
+    assert cancelled is not None and cancelled.cancel_requested_at is not None
+    assert runs.get_run_control("run_missing") is None
+
+###############################################################################
 def test_conversation_page_searches_original_messages_and_uses_keyset_cursor() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)
