@@ -1,54 +1,73 @@
 <div class="geospatial-page">
-  <h1 class="page-title">Search workspace</h1>
+  <h1 class="page-title sr-only">Search workspace</h1>
   <div
     class="geospatial-workspace"
     [class.geospatial-workspace--toolbar-collapsed]="isToolbarCollapsed"
+    [class.geospatial-workspace--canvas-collapsed]="isCanvasCollapsed"
+    [class.geospatial-workspace--history-collapsed]="isHistoryCollapsed"
     [style.--toolbar-width.px]="toolbarWidth"
   >
     <aside class="toolbar-panel" aria-label="Chat toolbar">
       <div class="toolbar-panel__content">
         <section class="agent-chat-panel" aria-label="Agent Chat">
-          <div class="agent-chat-panel__actions">
-            <button
-              type="button"
-              class="agent-chat-panel__icon-button"
-              aria-label="Start new chat"
-              title="Start new chat"
-              (click)="startNewChat()"
-            >
-              <span class="sr-only">Start new chat</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-                <path d="M19.6 6.8a8.1 8.1 0 1 0 1.6 8 .9.9 0 1 0-1.8-.3 6.3 6.3 0 1 1-1.3-6.2l-2.2.2a.9.9 0 0 0 .1 1.8h4.1a.9.9 0 0 0 .9-.9V5.3a.9.9 0 1 0-1.8 0l.4 1.5Z" fill="currentColor" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="agent-chat-panel__history-button"
-              [attr.aria-expanded]="isConversationHistoryOpen"
-              aria-controls="conversation-history-drawer"
-              (click)="toggleConversationHistory()"
-            >
-              <span aria-hidden="true">History</span>
-              <span class="sr-only">{{ isConversationHistoryOpen ? 'Hide' : 'Show' }} conversation history</span>
-            </button>
-          </div>
-          @if (isConversationHistoryOpen) {
-            <div id="conversation-history-drawer" class="conversation-history-drawer">
-              <app-conversation-history
-                [conversations]="conversationHistory"
-                [query]="conversationHistoryQuery"
-                [selectedConversationId]="conversationId"
-                [loading]="conversationHistoryLoading"
-                [error]="conversationHistoryError"
-                [nextCursor]="conversationHistoryCursor"
-                (queryChange)="onConversationHistoryQuery($event)"
-                (selectConversation)="selectConversation($event)"
-                (loadMore)="loadMoreConversations()"
-                (close)="isConversationHistoryOpen = false"
-                (newConversation)="startNewChat()"
-              ></app-conversation-history>
+          <header class="panel-header">
+            <h2 class="panel-header__title">Agent chat</h2>
+            <div class="panel-header__actions">
+              <button
+                type="button"
+                class="panel-icon-button"
+                aria-label="Start new chat"
+                title="Start new chat"
+                (click)="startNewChat()"
+              >
+                <span class="sr-only">Start new chat</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </button>
+              <app-execution-status
+                [runId]="inspectedRunId"
+                [runVersion]="activeRunVersion"
+                [taskState]="taskState"
+                [toolProgress]="toolProgress"
+                [traceEntries]="traceEntries"
+                [active]="isLoading"
+                [traceLoading]="runTraceLoading"
+                [runError]="runFailureSummary"
+                [traceError]="runTraceError"
+                [expanded]="isExecutionStatusOpen"
+                (expandedChange)="toggleExecutionStatus($event)"
+                (refresh)="refreshRunTrace()"
+              ></app-execution-status>
+              @if (isCanvasCollapsed) {
+                <button
+                  type="button"
+                  class="panel-icon-button"
+                  aria-label="Show map"
+                  title="Show map"
+                  (click)="toggleCanvas()"
+                >
+                  <span class="sr-only">Show map</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M4 6.5 9 5l6 1.5L20 5v12.5L15 19l-6-1.5L4 19zM9 5v12.5M15 6.5V19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="panel-icon-button"
+                  aria-label="Hide chat panel"
+                  title="Hide chat"
+                  (click)="toggleToolbar()"
+                >
+                  <span class="sr-only">Hide chat</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M4 5.5h16v13H4zM9 5.5v13M16 10l-2 2 2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              }
             </div>
-          }
+          </header>
           <div
             #transcript
             class="chat-transcript"
@@ -180,44 +199,28 @@
     ></div>
 
     <section class="canvas-panel" aria-label="Map canvas">
-      <header class="canvas-header">
-        <div class="canvas-header__status" role="status" aria-live="polite">
-          @if (isLoading) {
+      <div class="canvas-panel__body">
+        <div class="canvas-chip" [attr.title]="canvasTitle">{{ canvasTitle }}</div>
+        @if (isLoading) {
+          <div class="activity-pill" role="status" aria-live="polite">
             <span class="chat-progress-spinner" aria-hidden="true"></span>
-          }
-          <span>
-            {{ showProgressIndicator && streamState === 'reconnecting'
-              ? 'Connection lost; reconnecting to the server…'
-              : showProgressIndicator
-              ? (progressLabel || status)
-              : (mapSession?.resolved_location?.label || 'Ready for a location or data request') }}
-          </span>
-        </div>
-        <div class="canvas-header__actions">
+            <span class="activity-pill__label">{{ activityLabel }}</span>
+            <button
+              type="button"
+              class="activity-pill__stop"
+              aria-label="Stop generating"
+              title="Stop generating"
+              (click)="onComposerAction()"
+            >
+              <span class="composer-stop-icon" aria-hidden="true"></span>
+            </button>
+          </div>
+        }
+        <div class="canvas-actions">
           <button
             type="button"
-            class="canvas-header__icon-button"
-            [attr.aria-pressed]="!isToolbarCollapsed"
-            [attr.aria-label]="isToolbarCollapsed ? 'Show chat panel' : 'Hide chat panel'"
-            [attr.title]="isToolbarCollapsed ? 'Show chat' : 'Hide chat'"
-            (click)="toggleToolbar()"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path
-                d="M4 5.5h16v13H4zM9 5.5v13M6.2 8.3h.8M6.2 11.3h.8M6.2 14.3h.8"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <span class="sr-only">{{ isToolbarCollapsed ? 'Show chat' : 'Hide chat' }}</span>
-          </button>
-          <button
-            type="button"
-            class="canvas-header__icon-button"
-            [class.canvas-header__icon-button--active]="isAlertsOpen"
+            class="panel-icon-button panel-icon-button--map"
+            [class.panel-icon-button--active]="isAlertsOpen"
             aria-label="Alerts"
             title="Alerts"
             [attr.aria-expanded]="isAlertsOpen"
@@ -230,6 +233,18 @@
               />
             </svg>
             <span class="sr-only">Alerts</span>
+          </button>
+          <button
+            type="button"
+            class="panel-icon-button panel-icon-button--map"
+            aria-label="Hide map"
+            title="Hide map"
+            (click)="toggleCanvas()"
+          >
+            <span class="sr-only">Hide map</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M4 5.5h16v13H4zM15 5.5v13M8 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </button>
         </div>
         @if (isAlertsOpen) {
@@ -249,8 +264,20 @@
             }
           </section>
         }
-      </header>
-      <div class="canvas-panel__body">
+        @if (isToolbarCollapsed) {
+          <button
+            type="button"
+            class="panel-restore"
+            aria-label="Show chat panel"
+            title="Show chat"
+            (click)="toggleToolbar()"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="sr-only">Show chat</span>
+          </button>
+        }
         <app-map-preview
           [payload]="payload"
           [isLoading]="isLoading"
@@ -266,6 +293,37 @@
         ></app-map-preview>
       </div>
     </section>
+
+    <aside
+      class="history-sidebar"
+      [class.history-sidebar--collapsed]="isHistoryCollapsed"
+      aria-label="Session history"
+    >
+      @if (isHistoryCollapsed) {
+        <button
+          type="button"
+          class="panel-icon-button history-sidebar__open"
+          aria-label="Show history"
+          title="Show history"
+          [attr.aria-expanded]="false"
+          (click)="toggleHistory()"
+        >
+          <span class="sr-only">Show history</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+            <path d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 5v3.5H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      } @else {
+        <app-conversation-history
+          [conversations]="conversationHistory"
+          [selectedConversationId]="conversationId"
+          [loading]="conversationHistoryLoading"
+          [error]="conversationHistoryError"
+          (selectConversation)="selectConversation($event)"
+          (collapse)="toggleHistory()"
+        ></app-conversation-history>
+      }
+    </aside>
 
     <footer class="workspace-status-bar" role="group" aria-label="Workspace status">
       <div class="workspace-status-bar__capabilities">
@@ -287,20 +345,6 @@
           }"
         ></app-capability-status-list>
       </div>
-      <app-execution-status
-        [runId]="inspectedRunId"
-        [runVersion]="activeRunVersion"
-        [taskState]="taskState"
-        [toolProgress]="toolProgress"
-        [traceEntries]="traceEntries"
-        [active]="isLoading"
-        [traceLoading]="runTraceLoading"
-        [runError]="runFailureSummary"
-        [traceError]="runTraceError"
-        [expanded]="isExecutionStatusOpen"
-        (expandedChange)="toggleExecutionStatus($event)"
-        (refresh)="refreshRunTrace()"
-      ></app-execution-status>
     </footer>
 
   </div>

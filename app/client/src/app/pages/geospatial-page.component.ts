@@ -65,6 +65,8 @@ import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 import { mapSessionOverlayEntries, reconcileOverlayOrder } from '../components/map-preview-rendering';
 
+const RECENT_SESSION_LIMIT = 12;
+
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
@@ -90,6 +92,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   payload?: SearchResponsePayload;
   toolbarWidthState = 480;
   isToolbarCollapsed = false;
+  isCanvasCollapsed = false;
+  isHistoryCollapsed = false;
   mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] } as PersistedChatPageState['mapState'];
 
   conversationId?: string;
@@ -108,9 +112,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   runTraceError = '';
   runFailureSummary = '';
   conversationHistory: ConversationSummary[] = [];
-  conversationHistoryQuery = '';
-  conversationHistoryCursor?: string | null;
-  isConversationHistoryOpen = false;
   conversationHistoryLoading = false;
   conversationHistoryError = '';
   conversationNonce = 1;
@@ -180,6 +181,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private removeRealtimeStateListener?: () => void;
   private cancelRequested = false;
   private historyRequestNonce = 0;
+  private sessionListNonce = 0;
 
   get mapRenderIdentity(): MapRenderIdentity | undefined {
     return this.pendingRenderContext;
@@ -199,6 +201,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.chatPageState = this.appStateStore.getChatPage();
     this.toolbarWidthState = this.chatPageState.toolbarWidth;
     this.isToolbarCollapsed = this.chatPageState.isToolbarCollapsed;
+    this.isCanvasCollapsed = this.chatPageState.isCanvasCollapsed;
+    this.isHistoryCollapsed = this.chatPageState.isHistoryCollapsed;
     this.mapState = this.chatPageState.mapState;
 
     this.conversationId = this.chatPageState.chatPanel.conversationId;
@@ -219,6 +223,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.conversationId) {
       void this.hydrateConversation(this.conversationId);
     }
+    void this.loadConversationHistory();
     void this.loadAgentStatus();
     void this.loadCatalog();
     void this.loadModelContext();
@@ -233,6 +238,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   ngOnDestroy(): void {
     this.isDestroyed = true;
     this.historyRequestNonce += 1;
+    this.sessionListNonce += 1;
     this.removeRealtimeMessageListener?.();
     this.removeRealtimeStateListener?.();
     this.realtimeService.disconnect({ discardPending: true });
@@ -246,6 +252,17 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get maxToolbarWidth(): number {
     return Math.max(this.minWidth, window.innerWidth - this.canvasMinWidth);
+  }
+
+  get canvasTitle(): string {
+    return this.mapSession?.resolved_location?.label || 'Ready for a location or data request';
+  }
+
+  get activityLabel(): string {
+    if (this.streamState === 'reconnecting') {
+      return 'Reconnecting…';
+    }
+    return this.progressLabel || this.status;
   }
 
   get renderedMessages(): ChatMessage[] {
@@ -501,7 +518,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] };
     this.progressPercent = 0;
     this.isAlertsOpen = false;
-    this.isConversationHistoryOpen = false;
     this.cancelRequested = false;
     this.appStateStore.resetChatPage();
     this.syncState();
@@ -514,41 +530,25 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   @HostListener('document:keydown.escape')
   closeTransientPanels(): void {
-    if (!this.isAlertsOpen && !this.isConversationHistoryOpen) {
+    if (!this.isAlertsOpen) {
       return;
     }
     this.isAlertsOpen = false;
-    this.isConversationHistoryOpen = false;
     this.changeDetectorRef.detectChanges();
   }
 
-  toggleConversationHistory(): void {
-    this.isConversationHistoryOpen = !this.isConversationHistoryOpen;
-    if (this.isConversationHistoryOpen && this.conversationHistory.length === 0) {
-      void this.loadConversationHistory(true);
-    }
-  }
-
-  onConversationHistoryQuery(query: string): void {
-    this.conversationHistoryQuery = query;
-    void this.loadConversationHistory(true);
-  }
-
-  loadMoreConversations(): void {
-    if (!this.conversationHistoryCursor || this.conversationHistoryLoading) {
-      return;
-    }
-    void this.loadConversationHistory(false);
+  toggleHistory(): void {
+    this.isHistoryCollapsed = !this.isHistoryCollapsed;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
   }
 
   async selectConversation(conversation: ConversationSummary): Promise<void> {
     if (!conversation.conversation_id || conversation.conversation_id === this.conversationId) {
-      this.isConversationHistoryOpen = false;
       return;
     }
     this.startNewChat();
     this.conversationId = conversation.conversation_id;
-    this.isConversationHistoryOpen = false;
     this.syncState();
     await this.hydrateConversation(conversation.conversation_id);
   }
@@ -566,44 +566,27 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
-  private async loadConversationHistory(reset: boolean): Promise<void> {
-    const requestNonce = ++this.historyRequestNonce;
+  private async loadConversationHistory(): Promise<void> {
+    const requestNonce = ++this.sessionListNonce;
     this.conversationHistoryLoading = true;
     this.conversationHistoryError = '';
-    const cursor = reset ? undefined : this.conversationHistoryCursor ?? undefined;
-    if (reset) {
-      this.conversationHistoryCursor = undefined;
-    }
     this.changeDetectorRef.detectChanges();
     try {
-      const result = await this.apiClient.fetchConversations({
-        query: this.conversationHistoryQuery.trim() || undefined,
-        limit: 30,
-        cursor,
-      });
-      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+      const result = await this.apiClient.fetchConversations({ limit: RECENT_SESSION_LIMIT });
+      if (this.isDestroyed || requestNonce !== this.sessionListNonce) {
         return;
       }
-      const merged = reset ? result.conversations : [...this.conversationHistory, ...result.conversations];
-      const seen = new Set<string>();
-      this.conversationHistory = merged.filter((item) => {
-        if (seen.has(item.conversation_id)) {
-          return false;
-        }
-        seen.add(item.conversation_id);
-        return true;
-      });
-      this.conversationHistoryCursor = result.next_cursor;
+      this.conversationHistory = result.conversations;
     } catch (error: unknown) {
-      if (this.isDestroyed || requestNonce !== this.historyRequestNonce) {
+      if (this.isDestroyed || requestNonce !== this.sessionListNonce) {
         return;
       }
       this.conversationHistoryError = this.userFacingErrorService.toUserFacingError(
         error,
-        'Could not load conversation history.',
+        'Could not load sessions.',
       );
     } finally {
-      if (!this.isDestroyed && requestNonce === this.historyRequestNonce) {
+      if (!this.isDestroyed && requestNonce === this.sessionListNonce) {
         this.conversationHistoryLoading = false;
         this.changeDetectorRef.detectChanges();
       }
@@ -649,6 +632,18 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   toggleToolbar(): void {
     this.isToolbarCollapsed = !this.isToolbarCollapsed;
+    if (this.isToolbarCollapsed) {
+      this.isCanvasCollapsed = false;
+    }
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  toggleCanvas(): void {
+    this.isCanvasCollapsed = !this.isCanvasCollapsed;
+    if (this.isCanvasCollapsed) {
+      this.isToolbarCollapsed = false;
+    }
     this.syncState();
     this.changeDetectorRef.detectChanges();
   }
@@ -683,6 +678,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.resizeHasMoved = true;
     this.isToolbarCollapsed = false;
+    this.isCanvasCollapsed = false;
     this.toolbarWidthState = Math.min(
       this.maxToolbarWidth,
       this.clampToolbarWidth(this.resizeStartWidth + delta),
@@ -713,6 +709,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     event.preventDefault();
     this.isToolbarCollapsed = false;
+    this.isCanvasCollapsed = false;
     this.toolbarWidthState = Math.min(this.maxToolbarWidth, this.clampToolbarWidth(nextWidth));
     this.syncState();
     this.changeDetectorRef.detectChanges();
@@ -1566,6 +1563,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.runFailureSummary = '';
         break;
     }
+    if (event.type === 'completed' || event.type === 'cancelled' || event.type === 'clarification_needed') {
+      void this.loadConversationHistory();
+    }
     this.syncState();
     this.changeDetectorRef.detectChanges();
     this.queueTranscriptScroll();
@@ -2169,6 +2169,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const next: PersistedChatPageState = {
       toolbarWidth: this.toolbarWidthState,
       isToolbarCollapsed: this.isToolbarCollapsed,
+      isCanvasCollapsed: this.isCanvasCollapsed,
+      isHistoryCollapsed: this.isHistoryCollapsed,
       chatPanel: {
         conversationId: this.conversationId,
         lastRunSequence: this.lastRunSequence,

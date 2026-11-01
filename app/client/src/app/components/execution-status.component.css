@@ -5,29 +5,29 @@
 }
 
 .execution-status {
-  position: relative;
+  position: static;
 }
 
 .execution-status__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.42rem;
-  min-height: 1.7rem;
-  max-width: 21rem;
-  padding: 0.2rem 0.48rem;
-  border: 1px solid #344953;
-  border-radius: 0.3rem;
-  background: #162833;
-  color: #cbd9de;
-  font: inherit;
-  font-size: 0.68rem;
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #b8cbd2;
   cursor: pointer;
 }
 
 .execution-status__trigger:hover,
-.execution-status__trigger:focus-visible {
+.execution-status__trigger:focus-visible,
+.execution-status__trigger[aria-expanded='true'] {
   border-color: #2f9bd7;
   background: #1b3340;
+  color: #f8fcff;
 }
 
 .execution-status__trigger:focus-visible,
@@ -36,43 +36,40 @@
   outline-offset: 2px;
 }
 
-.execution-status__trigger--active {
-  color: #dff4ff;
+.execution-status__trigger--active::after,
+.execution-status__trigger--error::after {
+  content: "";
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #2f9bd7;
 }
 
-.execution-status__trigger--error {
-  border-color: #8b4f55;
-  color: #ffd8db;
+.execution-status__trigger--error::after {
+  background: #e76f76;
 }
 
-.execution-status__label {
-  flex: 0 0 auto;
-  font-weight: 700;
-}
-
+.execution-status__label,
 .execution-status__summary {
-  min-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
   overflow: hidden;
-  color: #8fa6b0;
-  text-overflow: ellipsis;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-.execution-status__trigger--active .execution-status__summary {
-  color: #8dc8ea;
-}
-
-.execution-status__trigger--error .execution-status__summary {
-  color: #ffb5b5;
 }
 
 .execution-status__panel {
   position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.55rem);
-  z-index: 90;
-  width: min(38rem, calc(100vw - 1.5rem));
-  max-height: min(70vh, 42rem);
+  top: 2.6rem;
+  right: 0.5rem;
+  left: 0.5rem;
+  z-index: 20;
+  max-height: calc(100% - 3.2rem);
   overflow: auto;
   border: 1px solid #344953;
   border-radius: 0.4rem;

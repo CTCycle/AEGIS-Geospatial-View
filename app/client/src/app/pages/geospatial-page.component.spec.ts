@@ -1260,8 +1260,7 @@ describe('pages/geospatial-page.component', () => {
     expect(footer?.textContent).toContain('Satellite');
     expect(footer?.textContent).not.toContain('Weather');
     expect(footer?.textContent).toContain('Optional Keys');
-    expect(footer?.textContent).toContain('Tool activity');
-    expect(footer?.querySelector('app-execution-status')).not.toBeNull();
+    expect(footer?.querySelector('app-execution-status')).toBeNull();
     expect(fixture.nativeElement.querySelector('.context-window-row')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.context-window-row progress')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chat-status-strip')).toBeNull();
@@ -1278,51 +1277,88 @@ describe('pages/geospatial-page.component', () => {
 
     expect(chat.querySelector('.tool-progress-row')).toBeNull();
     expect(chat.querySelector('app-run-inspector')).toBeNull();
-    expect(chat.querySelector('app-execution-status')).toBeNull();
-    expect(footer.querySelector('app-execution-status')).not.toBeNull();
+    expect(footer.querySelector('app-execution-status')).toBeNull();
+    expect(chat.querySelector('.panel-header app-execution-status')).not.toBeNull();
   });
 
-  it('closes the alerts and history panels with Escape', () => {
+  it('closes the alerts panel with Escape', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
-    const component = fixture.componentInstance;
-    component.isAlertsOpen = true;
-    component.isConversationHistoryOpen = true;
+    fixture.componentInstance.isAlertsOpen = true;
     fixture.detectChanges();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.workspace-alerts')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.conversation-history-drawer')).toBeNull();
   });
 
-  it('keeps canvas icon actions fixed on the right when progress text becomes long', () => {
+  it('shows agent activity as a map overlay with a stop control instead of a canvas header', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.canvas-header')).toBeNull();
+    expect(root.querySelector('.activity-pill')).toBeNull();
+
     component.isLoading = true;
-    component.progressLabel = 'Searching several geospatial providers and validating a deliberately long execution status that must truncate before the controls.';
+    component.progressLabel = 'Fetching weather';
     fixture.detectChanges();
 
-    const header = fixture.nativeElement.querySelector('.canvas-header') as HTMLElement;
-    const status = header.querySelector('.canvas-header__status') as HTMLElement;
-    const actions = header.querySelector('.canvas-header__actions') as HTMLElement;
-    const buttons = actions.querySelectorAll('.canvas-header__icon-button');
+    const pill = root.querySelector('.canvas-panel__body .activity-pill') as HTMLElement;
+    expect(pill.textContent).toContain('Fetching weather');
+    expect(pill.querySelector('button')?.getAttribute('aria-label')).toBe('Stop generating');
+  });
 
-    expect(status.textContent).toContain('Searching several geospatial providers');
-    expect(buttons.length).toBe(2);
-    expect(actions.querySelector('.canvas-header__text-button')).toBeNull();
-    expect(actions.querySelector('.canvas-header__alert-button')).toBeNull();
-    expect((buttons[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Hide chat panel');
-    expect((buttons[1] as HTMLButtonElement).getAttribute('aria-label')).toBe('Alerts');
+  it('lets either panel be hidden and restored, keeping at least one visible', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    const label = (selector: string) => root.querySelector(selector)?.getAttribute('aria-label');
+
+    expect(label('.panel-header [aria-label="Hide chat panel"]')).toBe('Hide chat panel');
+    expect(label('.canvas-actions [aria-label="Hide map"]')).toBe('Hide map');
 
     component.toggleToolbar();
     fixture.detectChanges();
-    expect((actions.querySelectorAll('.canvas-header__icon-button')[0] as HTMLButtonElement).getAttribute('aria-label')).toBe('Show chat panel');
+    expect(label('.panel-restore')).toBe('Show chat panel');
+
+    component.toggleCanvas();
+    fixture.detectChanges();
+    expect(component.isToolbarCollapsed).toBeFalse();
+    expect(component.isCanvasCollapsed).toBeTrue();
+    expect(label('.panel-header [aria-label="Show map"]')).toBe('Show map');
   });
 
-  it('shows tool activity in the footer without adding tool diagnostics to messages', () => {
+  it('collapses and reopens the history sidebar and lists recent sessions', async () => {
+    apiClient.fetchConversations.and.resolveTo({
+      conversations: [{ conversation_id: 'c1', title: 'Rome parks', updated_at: '2026-10-30T10:00:00Z' }],
+      next_cursor: null,
+    } as never);
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.componentInstance.isHistoryCollapsed = false;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(apiClient.fetchConversations).toHaveBeenCalledWith({ limit: 12 });
+    expect(root.querySelector('.history-sidebar .conversation-history__item-title')?.textContent)
+      .toContain('Rome parks');
+
+    (root.querySelector('[aria-label="Hide history"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.isHistoryCollapsed).toBeTrue();
+    expect(root.querySelector('.conversation-history')).toBeNull();
+
+    (root.querySelector('[aria-label="Show history"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.conversation-history')).not.toBeNull();
+  });
+
+  it('shows tool activity in the chat header without adding tool diagnostics to messages', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -1353,7 +1389,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages).toEqual([{ role: 'user', content: 'Find parks in Rome.' }]);
     expect(fixture.nativeElement.querySelector('.agent-chat-panel')?.textContent)
       .not.toContain('discover_geospatial_capabilities');
-    expect(fixture.nativeElement.querySelector('.workspace-status-bar')?.textContent)
+    expect(fixture.nativeElement.querySelector('.panel-header .execution-status__trigger')?.getAttribute('title'))
       .toContain('Discovering capabilities');
   });
 

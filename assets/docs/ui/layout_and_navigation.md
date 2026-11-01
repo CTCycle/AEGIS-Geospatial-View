@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-10-19
+Last updated: 2026-11-01
 
 ## Desktop Viewport Contract
 
@@ -13,13 +13,16 @@ can display the full desktop interface at the supported width.
 
 ## Workspace Layout
 
-The main workspace uses a two-pane content grid with a thin footer row:
+The main workspace uses a three-pane content grid with a thin footer row:
 
-- chat and toolbar pane
+- chat and toolbar pane, with a compact "Agent chat" header (new chat, Tool
+  activity, hide chat); Tool activity opens its execution details inside the
+  chat pane because they belong to the current session
 - resize handle
-- map pane
-- compact full-width workspace status footer spanning chat and map, with a
-  Tool activity entry point for expandable execution details
+- map pane, with no header row; small overlays hold the location chip,
+  Alerts, Hide map, and the agent activity pill
+- session-history sidebar on the right (15rem; collapses to a 2.5rem rail)
+- compact full-width workspace status footer spanning chat and map (capability status only)
 
 The composer owns a separate 20px context-window progress row directly below
 the send controls. It is not part of the footer. The progress indicator is
@@ -34,8 +37,12 @@ Toolbar width constraints:
 
 The chat rail and map remain side by side at all supported widths. Drag the
 divider to resize the panes, or focus it and use the arrow keys; Home and End
-move it to the minimum and maximum chat widths. The chat rail can be collapsed
-when map focus is useful.
+move it to the minimum and maximum chat widths. Either the chat rail or the
+map can be hidden from its own panel (Hide chat in the chat header, Hide map
+in the map overlay); the other panel fills the space, and the hidden panel is
+restored from a tab on the map's left edge or from the chat header. At most
+one panel is hidden at a time. The history sidebar starts collapsed below
+1280px viewport width.
 
 Map tools (basemap selector, layer controls, legend, and metadata-only/no-result
 notes) are hidden by default and open from the Map tools button at the map's
@@ -43,9 +50,9 @@ top-left. Zoom controls, failures, attribution, and compliance notices stay
 visible. The layer list stays collapsed until expanded, and its rows keep
 layer names on one line to conserve canvas space.
 
-The map header keeps its status/progress region in a flexible left column and
-its icon actions in a fixed right column. Long status text truncates rather
-than wrapping, resizing, or displacing the controls.
+The location chip truncates on one line at the top center of the map; the
+activity pill sits beneath it and never blocks map gestures outside its Stop
+button.
 
 ## Other Page Layouts
 
@@ -57,8 +64,8 @@ than wrapping, resizing, or displacing the controls.
 ## Primary Screens
 
 - `/`
-  chat workspace, map pane, resizable divider, inline alerts, context progress,
-  and full-width status footer
+  chat workspace, map pane, history sidebar, resizable divider, inline alerts,
+  context progress, and full-width status footer
 - `/settings`
   persistent Models, Model Providers, Geospatial Access, Application,
   Map & Search, Data Sources, and Agent Runtime navigation; a scrollable model row list,

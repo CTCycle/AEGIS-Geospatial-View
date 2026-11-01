@@ -47,7 +47,8 @@ All interactive components must provide:
 - Keep agent availability shown as ready between requests; use run progress labels only while work is active.
 - Describe a cloud agent as configured until a live request succeeds. Mark it verified after a successful run and needs attention after a terminal run error; never infer live provider readiness from stored credential health or model-catalog access alone.
 - Settings dialogs move focus inside on open, trap keyboard focus, close with Escape, and restore focus to their opener.
-- The workspace Alerts popover and conversation-history drawer close with Escape. The history drawer scrolls only its conversation list; its Load more and Start a new chat actions stay visible.
+- The workspace Alerts popover closes with Escape. The right-hand session-history sidebar lists the 12 most recent sessions (title, last-activity time, Active badge); only its list scrolls, and its header chevron collapses it to a thin rail with a restore button.
+- Agent activity appears as a floating pill at the top of the map (spinner, concise label, Stop button) only while a run is active; details, errors, and traces stay in the chat-header Tool activity panel and the Alerts popover.
 - Scrollbars use the dark app palette globally (`styles.css`).
 - Keep chat input within the realtime contract's 12,000-character message limit before sending.
 - Treat normalized backend render descriptors as the only source for raster and

@@ -1,38 +1,25 @@
 <section class="conversation-history" aria-labelledby="conversation-history-title">
   <header class="conversation-history__header">
-    <div>
-      <h2 id="conversation-history-title">Conversation history</h2>
-      <p>Resume a saved request or find an earlier result.</p>
-    </div>
+    <h2 id="conversation-history-title">History</h2>
     <button
       type="button"
       class="conversation-history__icon-button"
-      aria-label="Close conversation history"
-      title="Close conversation history"
-      (click)="close.emit()"
+      aria-label="Hide history"
+      title="Hide history"
+      (click)="collapse.emit()"
     >
-      <span aria-hidden="true">×</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+        <path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
     </button>
   </header>
 
-  <div class="conversation-history__search">
-    <label for="conversation-history-search">Search conversations</label>
-    <input
-      id="conversation-history-search"
-      type="search"
-      autocomplete="off"
-      [value]="query"
-      placeholder="Search requests and titles"
-      (input)="onSearchInput($event)"
-    />
-  </div>
-
   @if (loading && conversations.length === 0) {
-    <p class="conversation-history__status" role="status">Loading saved conversations…</p>
+    <p class="conversation-history__status" role="status">Loading sessions…</p>
   } @else if (error) {
     <p class="conversation-history__error" role="alert">{{ error }}</p>
   } @else if (conversations.length === 0) {
-    <p class="conversation-history__empty">No matching conversations yet.</p>
+    <p class="conversation-history__empty">No saved sessions yet.</p>
   } @else {
     <ul class="conversation-history__list">
       @for (conversation of conversations; track trackConversation($index, conversation)) {
@@ -42,33 +29,19 @@
             class="conversation-history__item"
             [class.conversation-history__item--selected]="conversation.conversation_id === selectedConversationId"
             [attr.aria-current]="conversation.conversation_id === selectedConversationId ? 'page' : null"
+            [attr.title]="titleFor(conversation)"
             (click)="selectConversation.emit(conversation)"
           >
             <span class="conversation-history__item-title">{{ titleFor(conversation) }}</span>
-            <span class="conversation-history__item-preview">{{ previewFor(conversation) }}</span>
             <span class="conversation-history__item-meta">
               {{ updatedLabelFor(conversation) }}
               @if (conversation.active_run) {
-                <span class="conversation-history__item-state">Active run</span>
+                <span class="conversation-history__item-state">Active</span>
               }
             </span>
           </button>
         </li>
       }
     </ul>
-    @if (nextCursor) {
-      <button
-        type="button"
-        class="conversation-history__load-more"
-        [disabled]="loading"
-        (click)="loadMore.emit()"
-      >
-        {{ loading ? 'Loading…' : 'Load more' }}
-      </button>
-    }
   }
-
-  <button type="button" class="conversation-history__new" (click)="newConversation.emit()">
-    Start a new chat
-  </button>
 </section>

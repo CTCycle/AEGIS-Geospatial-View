@@ -7,10 +7,10 @@
     [attr.aria-expanded]="expanded"
     [attr.aria-controls]="panelId"
     aria-label="Tool activity and execution details"
-    title="Tool activity and execution details"
+    [attr.title]="'Tool activity: ' + summaryLabel"
     (click)="toggle()"
   >
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
       <path
         d="M5 4.5h9.2a3.3 3.3 0 0 1 0 6.6H9.8a3.3 3.3 0 0 0 0 6.6H19M6.5 2.8v3.4M17.5 16v3.4"
         fill="none"

@@ -4,6 +4,7 @@ import { isRecord } from './type-guards';
 export const APP_STATE_STORAGE_KEY = 'aegis:webapp-ui-state:v1';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_CHAT_PANEL_RATIO = 0.3;
+const NARROW_DESKTOP_WIDTH = 1280;
 
 export interface PersistedChatPanelState {
   conversationId?: string;
@@ -17,6 +18,8 @@ export interface PersistedMapState extends OverlayStateChange {}
 export interface PersistedChatPageState {
   toolbarWidth: number;
   isToolbarCollapsed: boolean;
+  isCanvasCollapsed: boolean;
+  isHistoryCollapsed: boolean;
   chatPanel: PersistedChatPanelState;
   mapState: PersistedMapState;
   scrollY: number;
@@ -84,12 +87,18 @@ const defaultToolbarWidth = (): number => {
   return Math.max(280, Math.min(760, width));
 };
 
+const defaultHistoryCollapsed = (): boolean => (
+  typeof window !== 'undefined' && window.innerWidth < NARROW_DESKTOP_WIDTH
+);
+
 export const defaultAppState = (): PersistedAppState => ({
   version: 1,
   savedAt: Date.now(),
   chatPage: {
     toolbarWidth: defaultToolbarWidth(),
     isToolbarCollapsed: false,
+    isCanvasCollapsed: false,
+    isHistoryCollapsed: defaultHistoryCollapsed(),
     chatPanel: {
       conversationId: undefined,
       lastRunSequence: 0,
@@ -152,6 +161,11 @@ export const loadPersistedAppState = (): PersistedAppState => {
         ? Math.max(280, Math.min(760, parsed.chatPage.toolbarWidth))
         : defaults.chatPage.toolbarWidth;
       next.chatPage.isToolbarCollapsed = Boolean(parsed.chatPage.isToolbarCollapsed);
+      next.chatPage.isCanvasCollapsed = !next.chatPage.isToolbarCollapsed
+        && Boolean(parsed.chatPage.isCanvasCollapsed);
+      next.chatPage.isHistoryCollapsed = typeof parsed.chatPage.isHistoryCollapsed === 'boolean'
+        ? parsed.chatPage.isHistoryCollapsed
+        : defaults.chatPage.isHistoryCollapsed;
       next.chatPage.scrollY = parseNonNegativeNumber(parsed.chatPage.scrollY, 0);
 
       if (isRecord(parsed.chatPage.mapState)) {

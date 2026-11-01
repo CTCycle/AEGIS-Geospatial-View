@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-10-21
+Last updated: 2026-11-01
 
 ## Overview
 
@@ -23,7 +23,7 @@ current state contract has no migration from older keys or versions.
 
 Persisted chat state includes:
 
-- toolbar width and collapsed state
+- toolbar width, chat-collapsed, map-collapsed, and history-sidebar-collapsed state
 - chat-panel conversation ID, last run sequence, composer draft, and transcript
   scroll position
 - map overlay visibility, opacity, and order

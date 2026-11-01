@@ -13,17 +13,12 @@ import { ConversationSummary } from '../core/types';
 })
 export class ConversationHistoryComponent {
   @Input() conversations: ConversationSummary[] = [];
-  @Input() query = '';
   @Input() selectedConversationId?: string;
   @Input() loading = false;
   @Input() error = '';
-  @Input() nextCursor?: string | null;
 
-  @Output() readonly queryChange = new EventEmitter<string>();
   @Output() readonly selectConversation = new EventEmitter<ConversationSummary>();
-  @Output() readonly loadMore = new EventEmitter<void>();
-  @Output() readonly close = new EventEmitter<void>();
-  @Output() readonly newConversation = new EventEmitter<void>();
+  @Output() readonly collapse = new EventEmitter<void>();
 
   trackConversation(_: number, conversation: ConversationSummary): string {
     return conversation.conversation_id;
@@ -33,15 +28,6 @@ export class ConversationHistoryComponent {
     return conversation.title?.trim()
       || conversation.last_message_preview?.trim()
       || 'Untitled conversation';
-  }
-
-  previewFor(conversation: ConversationSummary): string {
-    const preview = conversation.last_message_preview?.trim();
-    if (preview && preview !== this.titleFor(conversation)) {
-      return preview;
-    }
-    const count = conversation.message_count;
-    return typeof count === 'number' ? `${count} message${count === 1 ? '' : 's'}` : 'Conversation';
   }
 
   updatedLabelFor(conversation: ConversationSummary): string {
@@ -57,9 +43,5 @@ export class ConversationHistoryComponent {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(date);
-  }
-
-  onSearchInput(event: Event): void {
-    this.queryChange.emit((event.target as HTMLInputElement | null)?.value ?? '');
   }
 }
