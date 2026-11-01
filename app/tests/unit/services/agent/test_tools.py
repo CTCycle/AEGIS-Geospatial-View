@@ -219,6 +219,35 @@ def test_map_only_routes_expose_map_preparation_without_data_execution() -> None
     assert "execute_geospatial_capability" not in exposed
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("target", "satisfied"),
+    [("Springfield, Illinois", True), ("Springfield Illinois", True), ("Illinois", False)],
+)
+def test_route_target_answers_to_a_more_qualified_resolved_key(
+    target: str, satisfied: bool
+) -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=[target],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.location_refs["springfield, illinois, united states"] = ResolvedLocation(
+        label="Springfield, Sangamon County, Illinois, United States",
+        latitude=39.8,
+        longitude=-89.64,
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    assert ("apply_map_plan" in exposed) is satisfied
+    assert ("resolve_geospatial_location" in exposed) is not satisfied
+
+###############################################################################
 def test_new_route_target_location_mode_resolution_even_with_active_map() -> None:
     registry = _registry()
     state = _state()
@@ -231,7 +260,8 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
-        overlay_collection=SimpleNamespace(instances=[])
+        resolved_location=ResolvedLocation(label="Vermont, United States", latitude=44.0, longitude=-72.7),
+        overlay_collection=SimpleNamespace(instances=[]),
     )
     state.location_refs = {
         "vermont, united states": ResolvedLocation(
@@ -242,6 +272,38 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
     exposed = {tool.name for tool in registry.expose(state)}
 
     assert "resolve_geospatial_location" in exposed
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("target", "exposed_resolver"),
+    [("Potsdam", True), ("Berlin", False), ("city centre", False), ("Traffic", False)],
+)
+def test_viewport_change_naming_a_new_place_can_resolve_it(
+    target: str, exposed_resolver: bool
+) -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        location_mode="none",
+        operation="pan",
+        target_refs=[target],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
+        resolved_location=ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        overlay_collection=SimpleNamespace(
+            instances=[SimpleNamespace(instance_id="traffic-1", capability_id="traffic", label="Traffic")]
+        ),
+    )
+
+    exposed = {tool.name for tool in registry.expose(state)}
+
+    # The map plan follows once the named place has been resolved.
+    assert ("resolve_geospatial_location" in exposed) is exposed_resolver
+    assert ("apply_map_plan" in exposed) is not exposed_resolver
 
 ###############################################################################
 def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() -> None:

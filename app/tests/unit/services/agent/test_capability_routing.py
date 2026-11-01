@@ -1008,6 +1008,24 @@ def test_router_requires_active_map_for_map_state_follow_up() -> None:
     assert "active_map_required" in decision.reason_codes
 
 ###############################################################################
+def test_layer_edit_without_a_map_is_not_searched_as_a_place() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            presentation="map",
+            location_mode="target",
+            operation="hide",
+            target_refs=["earthquake layer"],
+        ),
+        user_message="Hide the earthquake layer.",
+        active_state=_state(),
+    )
+
+    assert decision.status == "clarification"
+    assert decision.route.primary_domain is CapabilityDomain.MAP_STATE
+    assert "no layer to change" in str(decision.clarification_question)
+
+###############################################################################
 def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> None:
     state = _state()
     state.active_map_session = cast(

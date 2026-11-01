@@ -878,6 +878,8 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == "missing_location"
+    # A named but unresolved place is a tool-order correction, not a question.
+    assert result.error.recovery == "choose_alternate_tool"
     assert state.prepared_map_session is None
 
 ###############################################################################
@@ -1065,6 +1067,35 @@ async def test_visibility_mutation_increments_candidate_revision(operation: str)
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances[0].visible is False
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_unknown_layer_error_names_the_layers_on_the_map() -> None:
+    state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_STATE, task_mode="execute",
+        presentation="map", location_mode="none", operation="hide",
+        target_refs=["Traffic"],
+    )
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                SetLayerVisibilityAction(
+                    action="set_layer_visibility",
+                    instance_id="earthquakes_italy_30d",
+                    visible=False,
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.error is not None
+    assert result.error.code == "unknown_layer"
+    # A guessed id is answered with the real ones so the retry can differ.
+    assert result.error.message.endswith("Layers on the map: traffic-1 (Traffic).")
 
 ###############################################################################
 @pytest.mark.asyncio

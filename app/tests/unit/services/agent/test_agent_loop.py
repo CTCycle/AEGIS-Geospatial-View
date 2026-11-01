@@ -769,9 +769,10 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_verified_render_suppresses_raw_dsml_finalization_content() -> None:
+@pytest.mark.parametrize("bar", ["｜", "｜｜", "|"])
+async def test_verified_render_suppresses_raw_dsml_finalization_content(bar: str) -> None:
     protocol_content = (
-        '<｜｜DSML｜｜ calls> <｜｜DSML｜｜ invoke '
+        f'<{bar}DSML{bar} calls>\n<{bar}DSML{bar} invoke '
         'name="apply_map_plan">fit_location="florence, italy"'
     )
     provider = FakeProvider([LLMResult(content=protocol_content)])
@@ -2659,3 +2660,26 @@ async def test_awaiting_render_capture_flag_is_policy_and_capability_gated() -> 
     assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
         _request("always", None)
     ) is False
+###############################################################################
+@pytest.mark.parametrize(("profile", "model_calls"), [("simple", 10), ("complex", 7)])
+def test_tool_correction_lifts_a_simple_run_to_the_complex_budget(
+    profile: str, model_calls: int
+) -> None:
+    request = AgentLoopRequest(
+        provider="fake",
+        model="fake-model",
+        state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=300),
+        max_model_calls=10,
+        max_tool_calls=20,
+        max_state_transitions=64,
+    )
+    request.budget.promote(profile)
+    request.budget.configure_limits(max_model_calls=4 if profile == "simple" else 7)
+
+    AgentLoop._grant_recovery_budget(request)  # pyright: ignore[reportPrivateUsage]
+
+    assert request.budget.max_model_calls == model_calls
+    if profile == "simple":
+        assert request.budget.run_profile == "complex"
+        assert request.budget.max_tool_calls == 20

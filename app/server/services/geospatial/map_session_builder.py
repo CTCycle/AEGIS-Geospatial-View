@@ -282,10 +282,7 @@ class MapSessionBuilder:
         if isinstance(action, RemoveLayerAction):
             instances = session.overlay_collection.instances
             if not any(item.instance_id == action.instance_id for item in instances):
-                raise MapPlanBuildError(
-                    "unknown_layer",
-                    f"Layer '{action.instance_id}' is not in the active map.",
-                )
+                raise _unknown_layer(session, action.instance_id)
             collection = session.overlay_collection.model_copy(
                 update={
                     "instances": [
@@ -302,10 +299,7 @@ class MapSessionBuilder:
             current_ids = {item.instance_id for item in session.overlay_collection.instances}
             missing = sorted(set(action.instance_ids) - current_ids)
             if missing:
-                raise MapPlanBuildError(
-                    "unknown_layer",
-                    f"Layer '{missing[0]}' is not in the active map.",
-                )
+                raise _unknown_layer(session, missing[0])
             kept = [
                 item
                 for item in session.overlay_collection.instances
@@ -385,10 +379,7 @@ class MapSessionBuilder:
                 return OverlayCollectionService.merge_into_map_session(
                     session, collection
                 )
-        raise MapPlanBuildError(
-            "unknown_layer",
-            f"Layer '{instance_id}' is not in the active map.",
-        )
+        raise _unknown_layer(session, instance_id)
 
     # -------------------------------------------------------------------------
     def _capability_descriptor(self, capability_id: str) -> dict[str, Any]:
@@ -933,3 +924,18 @@ def _geojson_render_data(value: object) -> dict[str, Any] | None:
 
 
 __all__ = ["MapPlanBuildError", "MapSessionBuilder"]
+
+###############################################################################
+def _unknown_layer(session: MapSession, instance_id: str) -> MapPlanBuildError:
+    """Name the layers that exist so the model can retry with a real id."""
+
+    layers = [
+        f"{item.instance_id} ({item.label})" if item.label else item.instance_id
+        for item in session.overlay_collection.instances
+    ]
+    available = (
+        f" Layers on the map: {', '.join(layers)}." if layers else " The map has no layers."
+    )
+    return MapPlanBuildError(
+        "unknown_layer", f"Layer '{instance_id}' is not in the active map.{available}"
+    )

@@ -106,6 +106,20 @@ _EVIDENCE_TOOLS = frozenset(
     }
 )
 
+# Tool errors the model can fix on its next call.
+_CORRECTABLE_ERRORS = frozenset(
+    {
+        "malformed_call",
+        "tool_not_exposed",
+        "unknown_tool",
+        "schema_validation",
+        "semantic_validation",
+    }
+)
+
+# DeepSeek tool-call markup; models emit single or doubled full-width or ASCII bars.
+_DSML_MARKUP = re.compile(r"<\s*/?\s*[｜|]{1,2}\s*dsml\s*[｜|]{1,2}", re.IGNORECASE)
+
 _LIMIT_LABELS = {
     "iteration_budget_exhausted": "iteration limit",
     "model_budget_exhausted": "model-call limit",
@@ -811,8 +825,7 @@ class AgentLoop:
         """Suppress raw DSML protocol text returned as ordinary content."""
 
         candidate = (content or "").strip()
-        folded = candidate.casefold()
-        if "<｜｜dsml｜｜" in folded or "<|dsml|>" in folded:
+        if _DSML_MARKUP.search(candidate):
             return "", True
         return candidate, False
 
@@ -2434,6 +2447,8 @@ class AgentLoop:
                     "policy_rejection",
                 }:
                     state.validation_corrections += 1
+                if result.error and result.error.error_type in _CORRECTABLE_ERRORS:
+                    self._grant_recovery_budget(request)
             elif result.tool_name != "apply_map_plan":
                 # Only idempotent observations are replayable; live or
                 # state-dependent tools must be re-executed for fresh results.
@@ -2994,6 +3009,25 @@ class AgentLoop:
             location = find_macro_region(ref)
             if location is not None:
                 state.location_refs[ref] = location
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _grant_recovery_budget(request: AgentLoopRequest) -> None:
+        """Give a simple run the complex budget once it must correct a tool call.
+
+        The simple caps fit a clean trajectory; one invalid call would
+        otherwise exhaust them before the model can apply the correction.
+        """
+
+        budget = request.budget
+        if budget.run_profile != "simple":
+            return
+        budget.promote("complex")
+        budget.configure_limits(
+            max_model_calls=request.max_model_calls,
+            max_tool_calls=request.max_tool_calls,
+            max_state_transitions=request.max_state_transitions,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

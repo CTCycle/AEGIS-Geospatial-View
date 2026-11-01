@@ -250,7 +250,27 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
     assert result.error is not None
     assert result.error.error_type == "tool_not_exposed"
     assert result.error.code == "tool_not_exposed"
+    # The model is told what it can call instead.
+    assert result.error.message.endswith("Tools available now: another_tool.")
+    assert "already succeeded" not in result.error.message
     assert calls == []
+
+    state = _state()
+    state.tool_results.append(
+        ToolResult(call_id="earlier", tool_name="test_tool", status="success",
+                   summary="ok", metadata=ToolExecutionMetadata(duration_ms=0))
+    )
+    repeated = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            LLMToolCall(id="again", name="test_tool", arguments={"value": 1}),
+            state,
+            _budget(),
+            exposed_tool_names={"another_tool"},
+        )
+    )
+
+    assert repeated.error is not None
+    assert "It already succeeded in this run" in repeated.error.message
 
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:

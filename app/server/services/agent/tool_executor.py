@@ -319,7 +319,19 @@ class ToolExecutor:
                 error=ToolExecutionError(
                     error_type="tool_not_exposed",
                     code="tool_not_exposed",
-                    message=f"Tool '{tool_call.name}' was not exposed for this model step.",
+                    message=(
+                        f"Tool '{tool_call.name}' was not exposed for this model step."
+                        + (
+                            " It already succeeded in this run; continue from its result."
+                            if any(
+                                result.tool_name == tool_call.name
+                                and result.status == "success"
+                                for result in state.tool_results
+                            )
+                            else ""
+                        )
+                        + _available_tools_hint(exposed_tool_names)
+                    ),
                     retryable=False,
                     recovery="choose_alternate_tool",
                 ),
@@ -352,7 +364,10 @@ class ToolExecutor:
                 error=ToolExecutionError(
                     error_type="unknown_tool",
                     code="unknown_tool",
-                    message=f"No tool named '{tool_call.name}' is exposed.",
+                    message=(
+                        f"No tool named '{tool_call.name}' is exposed."
+                        + _available_tools_hint(exposed_tool_names)
+                    ),
                     retryable=False,
                     recovery="choose_alternate_tool",
                 ),
@@ -690,3 +705,10 @@ def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> 
             for child in items[:32]
         ]
     return str(value)[:500]
+
+###############################################################################
+def _available_tools_hint(exposed_tool_names: Collection[str] | None) -> str:
+    """Name the callable tools so a model can recover from a wrong tool name."""
+
+    names = sorted(set(exposed_tool_names or ()))
+    return f" Tools available now: {', '.join(names)}." if names else ""

@@ -1090,7 +1090,10 @@ class NominatimService:
                 address=address,
                 query=query,
             )
-            score = confidence + text_bonus + location_type_bonus
+            # Confidence rewards tight bounding boxes, so a same-name hamlet
+            # can outscore a major city; the provider's prominence breaks it.
+            importance_bonus = 0.3 * float(formatted.get("geocoder_importance") or 0.0)
+            score = confidence + text_bonus + location_type_bonus + importance_bonus
             scored.append((location_type_bonus, score, formatted))
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return [item[2] for item in scored]

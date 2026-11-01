@@ -1,6 +1,27 @@
 # Project Status Ledger
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
+
+The [2026-11-01 E2E model validation](../QA/e2e-model-validation-20261101/validation_report.md) ran 23 real-UI scenarios on OpenCode Go `deepseek-v4.1-flash` (13 pass / 4 partial / 6 fail) and `beam-free` (12 / 1 / 10), analysed 156 historical runs, and recorded 19 findings (F1–F19). Fixes 1–5 of its remediation plan are applied:
+- **F2:** DeepSeek tool-call markup in final text is now detected in its real `<｜DSML｜` single-bar form (the old check only matched doubled bars), so it is no longer shown as the answer.
+- **F1:** Nominatim ranking adds provider importance, so "Turin" and "Madrid" pick Italy and Spain without a needless clarification instead of same-name hamlets in Iowa.
+- **F3:** `location_ref_matches` accepts a differently qualified reference ("Springfield, Illinois" vs "springfield, illinois, united states") when the leading place name matches. Before, the map tool was never exposed after such a resolution. A parent such as "Illinois" or "France" still does not match.
+- **F4:** a viewport change on the active map that names a new place ("zoom to Potsdam") now exposes the resolver. Fitting the map to a named but unresolved place returns a resolve-first correction instead of the user-facing "A validated location is required".
+- **F5:** viewport-scoped discovery lowers `viewport` to `bbox`, so "earthquakes in the visible area" finds the earthquake layers.
+
+A [real-UI re-run](../QA/e2e-model-validation-20261101/e2e_rerun_results.md) confirmed F1–F4 on both models and F5 on DeepSeek. Beam Free S08 still failed, which exposed four more gaps, now fixed:
+- **G1:** an untyped place query that finds no city match now retries as a region, then a landmark, so "Italy" or "United Kingdom" without `expected_location_type` resolves. Genuine ambiguities still ask.
+- **G2:** `tool_not_exposed` and `unknown_tool` errors list the tools available now, so a model that calls a finished or invented tool can recover.
+- **G3:** a simple-profile run that hits a correctable tool error (malformed, schema or semantic validation, unknown or unexposed tool) moves up to the configured complex budget instead of stopping at the 4-call simple cap.
+- **G4:** a layer edit with no map ("Hide the earthquake layer") is no longer searched as a place; it gets "There is no map yet, so there is no layer to change".
+
+A second real-UI re-run confirmed G1, G2 and G4 on both models, and G3 lifting simple runs to 10 model calls. Beam Free S08 now passes intermittently (1 of 2 attempts). Two follow-ups from it are fixed:
+- **G5:** `unknown_layer` errors name the layers on the map. Beam Free had guessed an `instance_id` and repeated it.
+- **G6:** a call to a tool hidden because it already succeeded says so. Beam Free re-called a finished execute instead of `apply_map_plan`.
+
+G5 and G6 are covered by unit tests only. Beam Free render verdicts for S21, S07 turn 2 and S08 turn 3 are unverified because the window was hidden during the run (rendering throttled, as in H1). One DeepSeek S08 turn-3 run reported `render_validation_failed` with a ~12 km viewport while the screen showed Italy (1 in 4, open, part of F8).
+
+Results: 1,296 backend unit tests, Ruff and strict Pyright pass. Open: F6–F19 in the report, including the 30 s render watchdog `render_timeout` (hidden page and one visible raster run), multi-target abort, previous-place parent contamination, honest answers stored as `failed`, Beam Free empty finalizations and the Overpass timeout.
 
 The 2026-10-31 second agent-loop remediation wave adds a performance gate and applies AG-05, AG-04, AG-08, AG-13 and the remaining AG-03 and AG-09 items (local notes: `assets/QA/agent-loop-remediation-wave2-20261031/report.md`, untracked).
 - **AG-11:** `app/tests/agent_benchmark/trajectories.py` replays six scripted trajectories through the real loop. `test_trajectory_gate.py` fails if a termination reason changes, model calls rise, or estimated input tokens grow more than 5% over `trajectory_baseline.v1.json`. `scripts/benchmarks/agent_loop_trajectories.py` reports per-call numbers and refreshes the baseline.

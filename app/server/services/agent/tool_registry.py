@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
+from server.services.agent.basemap_intent import names_centre, refers_to_layer
 from server.services.agent.completion import uncovered_data_obligations, uncovered_route_targets
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -14,6 +15,7 @@ from server.services.llm.types import LLMToolDefinition
 
 if TYPE_CHECKING:
     from server.domain.agent.capability_route import AgentRunState, CapabilityRoute
+    from server.contracts.geospatial import MapSession
 
 ###############################################################################
 class ToolRegistry:
@@ -144,7 +146,8 @@ class ToolRegistry:
             if prerequisite == "location" and not has_location:
                 return False
             if prerequisite == "location_required" and (
-                state.route is None or state.route.location_mode == "none"
+                state.route is None
+                or (state.route.location_mode == "none" and not _names_unresolved_place(state))
             ):
                 return False
             if (
@@ -239,6 +242,8 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
         "recenter",
     }
 )
+# Active-map operations whose targets are layers or styles, never places.
+_LAYER_OPERATIONS = _ACTIVE_MAP_UPDATE_OPERATIONS - {"zoom_in", "zoom_out", "pan", "recenter"}
 
 ###############################################################################
 def route_target_location_available(state: "AgentRunState") -> bool:
@@ -246,7 +251,7 @@ def route_target_location_available(state: "AgentRunState") -> bool:
 
     route = state.route
     if _is_active_map_update(state):
-        return state.active_map_session is not None
+        return state.active_map_session is not None and not _names_unresolved_place(state)
     target_refs = (
         list(route.spatial_scope.target_refs)
         if route is not None
@@ -288,20 +293,56 @@ def is_active_map_update(route: "CapabilityRoute", state: "AgentRunState") -> bo
         return False
     if str(route.operation or "").strip().casefold() in _ACTIVE_MAP_UPDATE_OPERATIONS:
         return True
-    layer_names = [
-        name.casefold()
-        for instance in session.overlay_collection.instances
-        for name in (instance.instance_id, instance.capability_id, instance.label)
-        if name
-    ]
     return all(
-        any(
-            target.casefold() in name or name in target.casefold()
-            for name in layer_names
-        )
+        _names_layer(target, session)
         for target in (str(ref).strip() for ref in route.target_refs)
         if target
     )
+
+###############################################################################
+def _names_layer(target: str, session: "MapSession") -> bool:
+    folded = target.casefold()
+    return any(
+        folded in name.casefold() or name.casefold() in folded
+        for instance in session.overlay_collection.instances
+        for name in (instance.instance_id, instance.capability_id, instance.label)
+        if name
+    )
+
+###############################################################################
+def _names_unresolved_place(state: "AgentRunState") -> bool:
+    """Whether a change to the active map ("zoom to Potsdam") names a new place.
+
+    Viewport operations count as active-map updates, which would otherwise
+    treat the shown place as the target and hide the location resolver.
+    """
+
+    route = state.route
+    session = state.active_map_session
+    if (
+        route is None
+        or route.primary_domain is not CapabilityDomain.MAP_STATE
+        or session is None
+        or str(route.operation or "").strip().casefold() in _LAYER_OPERATIONS
+    ):
+        return False
+    for target in (str(ref).strip() for ref in route.target_refs):
+        if (
+            not target
+            or names_centre(target)
+            or refers_to_layer(target)
+            or _names_layer(target, session)
+            or any(
+                location_ref_matches(target, str(key), location.label)
+                for key, location in state.location_refs.items()
+            )
+            or location_ref_matches(
+                target, session.resolved_location.label, session.resolved_location.label
+            )
+        ):
+            continue
+        return True
+    return False
 
 ###############################################################################
 def _evidence_available_for_route(state: "AgentRunState") -> bool:
@@ -358,7 +399,7 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
     route = state.route
     route_domains = _route_domains(state)
     if registered.definition.name == "resolve_geospatial_location":
-        return route.location_mode != "none" and (
+        return (route.location_mode != "none" or _names_unresolved_place(state)) and (
             not route_target_location_available(state)
             or follow_up_investigation_open(state)
         )

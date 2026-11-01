@@ -7,6 +7,7 @@ import logging
 import time
 from typing import Any, Protocol, cast
 
+from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession, OverlayInstance
@@ -90,6 +91,21 @@ class MapPlanService:
 
         location = self._location_for_plan(plan, state, active_session)
         if location is None:
+            named = self._explicit_location_refs(plan)
+            if named:
+                # The model named a place it has not resolved yet; that is a
+                # tool-order correction, not a question for the user.
+                return self._failure(
+                    context=context,
+                    started=started,
+                    error_type="state_conflict",
+                    code="missing_location",
+                    message=(
+                        f"Resolve '{named[0]}' with resolve_geospatial_location "
+                        "before fitting the map to it."
+                    ),
+                    recovery="choose_alternate_tool",
+                )
             return self._failure(
                 context=context,
                 started=started,
@@ -480,19 +496,14 @@ class MapPlanService:
         state: AgentRunState,
         active_session: MapSession | None,
     ) -> Any | None:
-        explicit_refs = [
-            str(action.location_ref).strip()
-            for action in plan.actions
-            if isinstance(action, SetViewportAction)
-            and action.location_ref
-            and action.location_ref.strip()
-        ]
+        explicit_refs = MapPlanService._explicit_location_refs(plan)
         if explicit_refs:
-            target = " ".join(explicit_refs[0].casefold().split())
-            for key, location in state.location_refs.items():
-                if " ".join(str(key).casefold().split()) == target:
-                    return location
-            return None
+            location = MapPlanService._resolved_ref(explicit_refs[0], state)
+            if location is None and active_session is not None:
+                shown = active_session.resolved_location
+                if location_ref_matches(explicit_refs[0], shown.label, shown.label):
+                    return shown
+            return location
 
         route = state.route
         if (
@@ -510,14 +521,47 @@ class MapPlanService:
         )
         if route_target_refs:
             for target_ref in route_target_refs:
-                target = " ".join(str(target_ref).casefold().split())
-                for key, location in state.location_refs.items():
-                    if " ".join(str(key).casefold().split()) == target:
-                        return location
+                location = MapPlanService._resolved_ref(str(target_ref), state)
+                if location is not None:
+                    return location
             return None
         if active_session is not None:
             return active_session.resolved_location
         return next(iter(state.location_refs.values()), None)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _explicit_location_refs(plan: MapPlan) -> list[str]:
+        return [
+            str(action.location_ref).strip()
+            for action in plan.actions
+            if isinstance(action, SetViewportAction)
+            and action.location_ref
+            and action.location_ref.strip()
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolved_ref(ref: str, state: AgentRunState) -> Any | None:
+        """Prefer the exactly keyed location, then a differently qualified one."""
+
+        target = normalize_target_key(ref)
+        exact = next(
+            (
+                location
+                for key, location in state.location_refs.items()
+                if normalize_target_key(str(key)) == target
+            ),
+            None,
+        )
+        return exact or next(
+            (
+                location
+                for key, location in state.location_refs.items()
+                if location_ref_matches(ref, str(key), location.label)
+            ),
+            None,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

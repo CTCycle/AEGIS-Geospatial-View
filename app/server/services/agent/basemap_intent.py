@@ -23,6 +23,8 @@ _GENERIC_TERMS = frozenset(
 )
 # Words that point at the centre of the place already on the map.
 CENTRE_TERMS = frozenset({"center", "centre", "downtown", "centro", "middle"})
+# Words that make a map-state target a layer rather than a place.
+_LAYER_TERMS = frozenset({"layer", "layers", "overlay", "overlays"})
 # Commercial styles users name that no catalog basemap provides.
 _UNSUPPORTED_STYLE_TERMS = frozenset({"google", "bing", "mapbox", "apple", "yandex", "hybrid"})
 
@@ -82,6 +84,12 @@ def match_requested_basemap(
 
     matched = match_requested_basemaps(user_message, basemaps)
     return matched[0] if len(matched) == 1 else None
+
+###############################################################################
+def refers_to_layer(text: str) -> bool:
+    """Return whether a target names a map layer ("the earthquake layer"), not a place."""
+
+    return bool(set(re.findall(r"\w+", text.casefold())) & _LAYER_TERMS)
 
 ###############################################################################
 def names_centre(text: str) -> bool:

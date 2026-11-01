@@ -297,6 +297,74 @@ def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     ) == []
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("query", "major", "minor"),
+    [
+        (
+            "Turin",
+            ("Turin, Piedmont, Italy", "Italy", 0.77, ["44.99", "45.14", "7.58", "7.77"]),
+            (
+                "Turin, Belvidere Township, Monona County, Iowa, United States",
+                "United States",
+                0.459,
+                ["42.0187", "42.0230", "-95.9692", "-95.9631"],
+            ),
+        ),
+        (
+            "Madrid",
+            ("Madrid, Community of Madrid, Spain", "Spain", 0.819, ["40.31", "40.64", "-3.89", "-3.52"]),
+            (
+                "Madrid, Boone County, Iowa, United States",
+                "United States",
+                0.463,
+                ["41.8668", "41.8854", "-93.8326", "-93.8132"],
+            ),
+        ),
+    ],
+)
+def test_nominatim_prefers_prominent_city_over_same_name_small_place(
+    query: str,
+    major: tuple[str, str, float, list[str]],
+    minor: tuple[str, str, float, list[str]],
+) -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    candidates = [
+        {
+            "lat": bbox[0],
+            "lon": bbox[2],
+            "display_name": display_name,
+            "class": "boundary",
+            "type": "administrative",
+            "addresstype": address_type,
+            "importance": importance,
+            "boundingbox": bbox,
+            "address": {address_type: query, "country": country},
+        }
+        for (display_name, country, importance, bbox), address_type in (
+            (major, "city"),
+            (minor, "hamlet"),
+        )
+    ]
+
+    ranked = service.rank_candidates(
+        candidates,
+        address=query,
+        city=None,
+        country_name=None,
+        country_code=None,
+        query=query,
+        expected_location_type="city",
+    )
+
+    assert ranked[0]["display_name"] == major[0]
+    assert service._find_ambiguous_candidates(
+        ranked,
+        expected_location_type="city",
+        query=query,
+        has_parent_context=False,
+    ) == []
+
+###############################################################################
 def test_nominatim_uses_exact_parent_for_qualified_city_ambiguity() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     ranked = [

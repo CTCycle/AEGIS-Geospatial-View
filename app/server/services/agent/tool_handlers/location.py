@@ -19,7 +19,7 @@ from server.domain.agent.tool_result import (
     ToolExecutionMetadata,
     ToolResult,
 )
-from server.services.agent.location_resolver import LocationResolver
+from server.services.agent.location_resolver import NO_CANDIDATE_REASON, LocationResolver
 from server.services.agent.tool_definitions import ResolveLocationInput
 
 
@@ -200,14 +200,22 @@ class LocationToolHandler:
         result = await self.resolver.resolve_location_signals(
             [signal], memory_snapshot
         )
-        if (
-            request.expected_location_type is None
-            and coordinates is None
-            and isinstance(result, ResolvedLocation)
-        ):
-            result = await self._prefer_prominent_landmark(
-                query, result, memory_snapshot, state
-            )
+        if request.expected_location_type is None and coordinates is None:
+            if isinstance(result, ResolvedLocation):
+                result = await self._prefer_prominent_landmark(
+                    query, result, memory_snapshot, state
+                )
+            elif result.reason == NO_CANDIDATE_REASON:
+                # The untyped default is "city"; a country or region ("Italy")
+                # or a named site never matches it. Ambiguities still ask.
+                for fallback_type in ("administrative_geometry", "landmark"):
+                    retry = await self.resolver.resolve_location_signals(
+                        [signal.model_copy(update={"signal_type": fallback_type})],
+                        memory_snapshot,
+                    )
+                    if isinstance(retry, ResolvedLocation):
+                        result = retry
+                        break
         if isinstance(result, ClarificationRequest):
             return _failure(
                 code="clarification_required",

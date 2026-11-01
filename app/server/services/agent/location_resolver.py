@@ -22,6 +22,12 @@ from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 from server.services.catalog.loader import find_macro_region_entry
 
+# Reason for a target the geocoder never matched, as opposed to an ambiguity.
+NO_CANDIDATE_REASON = (
+    "The geocoder returned no candidate matching the most specific target "
+    "and its parent context."
+)
+
 _ORDINAL_SUFFIX = re.compile(r"\b(\d+)(?:st|nd|rd|th|e|er|re|eme|ere|o|a)\b")
 
 
@@ -278,10 +284,7 @@ class LocationResolver:
                 f"I could not safely resolve {target.normalized_value or target.raw_value}. "
                 "Can you provide a city, country, or coordinates?"
             ),
-            reason=(
-                "The geocoder returned no candidate matching the most specific target "
-                "and its parent context."
-            ),
+            reason=NO_CANDIDATE_REASON,
             missing_fields=["location"],
         )
 

@@ -8,7 +8,7 @@ from server.domain.agent.decision import ResolvedLocation, ClarificationRequest
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput, ResolveLocationInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
 from pydantic import ValidationError
-from server.services.agent.location_resolver import LocationResolver
+from server.services.agent.location_resolver import NO_CANDIDATE_REASON, LocationResolver
 from server.services.agent.tool_handlers.location import LocationToolHandler
 
 # --- test_catalog_tool_handler.py ---
@@ -163,7 +163,16 @@ def test_catalog_inventory_page_matches_model_observation_limit() -> None:
     assert result.data["total"] == 15  # type: ignore[index]
 
 ###############################################################################
-def test_point_location_is_lowered_to_provider_bbox_for_execution_discovery() -> None:
+@pytest.mark.parametrize(
+    ("kind", "target", "key", "label"),
+    [
+        ("point", "Rome, Italy", "rome, italy", "Rome, Italy"),
+        ("viewport", "current map view", "current_map_view", "Current map view"),
+    ],
+)
+def test_point_location_is_lowered_to_provider_bbox_for_execution_discovery(
+    kind: str, target: str, key: str, label: str
+) -> None:
     registry = _CapabilityRegistry()
     handler = CatalogToolHandler(
         capability_registry=registry,  # type: ignore[arg-type]
@@ -182,12 +191,12 @@ def test_point_location_is_lowered_to_provider_bbox_for_execution_discovery() ->
             location_mode="target",
             capability_queries=["aerosol"],
             operation="render_layer",
-            target_refs=["Rome, Italy"],
-            spatial_scope={"kind": "point", "target_refs": ["Rome, Italy"]},
+            target_refs=[target],
+            spatial_scope={"kind": kind, "target_refs": [target]},
         ),
     )
-    state.location_refs["rome, italy"] = ResolvedLocation(
-        label="Rome, Italy",
+    state.location_refs[key] = ResolvedLocation(
+        label=label,
         latitude=41.89,
         longitude=12.48,
         bbox=[12.2, 41.6, 12.9, 42.2],
@@ -353,6 +362,37 @@ async def test_untyped_name_prefers_a_clearly_more_prominent_landmark(
 
     assert result.status == "success"
     assert state.location_refs["colosseum"].label == label
+    assert resolver.types == types
+
+###############################################################################
+_ITALY = ResolvedLocation(label="Italy", latitude=42.6, longitude=12.6, source="geocoder", confidence=0.9)
+_NO_CITY = ClarificationRequest(question="?", reason=NO_CANDIDATE_REASON, missing_fields=["location"])
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("city_outcome", "status", "types"),
+    [
+        # An untyped country never matches the "city" default; it resolves as a region.
+        (_NO_CITY, "success", ["city", "administrative_geometry"]),
+        # A genuine same-name ambiguity still asks instead of guessing another type.
+        (ClarificationRequest(question="Which?", reason="Multiple candidates.", missing_fields=["location"]),
+         "failed", ["city"]),
+    ],
+)
+async def test_untyped_name_without_a_city_match_tries_a_region(
+    city_outcome: ClarificationRequest, status: str, types: list[str]
+) -> None:
+    resolver = _TypedResolver({"city": city_outcome, "administrative_geometry": _ITALY})
+    state = AgentRunState(request_id="request-1", conversation_id="conversation-1",
+                          phase=AgentPhase.BUILD_TOOL_CONTEXT, user_message="Show earthquakes in Italy")
+
+    result = await LocationToolHandler(resolver=resolver).resolve(  # type: ignore[arg-type]
+        ResolveLocationInput(query="Italy", target_id="Italy"),
+        state,
+    )
+
+    assert result.status == status
     assert resolver.types == types
 
 ###############################################################################

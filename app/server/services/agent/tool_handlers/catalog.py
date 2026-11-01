@@ -259,7 +259,9 @@ def _resolved_scope_kind(route: Any, location: Any) -> str | None:
     if route is None or route.spatial_scope is None:
         return None
     kind = str(route.spatial_scope.kind)
-    if kind in {"administrative_geometry", "feature_geometry", "point"}:
+    # The visible map area executes as its bounding box; every catalog entry
+    # that accepts a viewport also accepts a bbox.
+    if kind in {"administrative_geometry", "feature_geometry", "point", "viewport"}:
         return "bbox" if location is not None and location.bbox else None
     return kind
 

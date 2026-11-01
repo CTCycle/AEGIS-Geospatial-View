@@ -20,6 +20,7 @@ from server.services.agent.basemap_intent import (
     match_requested_basemap,
     names_centre,
     refers_to_basemap,
+    refers_to_layer,
 )
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -376,7 +377,11 @@ class CapabilityRouter:
             if proposed.primary_domain is CapabilityDomain.MAP_STATE
             else []
         )
-        places = [ref for ref in proposed.target_refs if not refers_to_basemap(ref, basemaps)]
+        places = [
+            ref
+            for ref in proposed.target_refs
+            if not refers_to_basemap(ref, basemaps) and not refers_to_layer(ref)
+        ]
         if basemaps and active_state.active_map_session is None and places:
             # With no map yet, a named place makes this a new map (for example
             # the answer to "Which place should I show?"); the requested style
@@ -407,7 +412,11 @@ class CapabilityRouter:
                     rejected_capability_ids=rejected,
                     reason_codes=[*dict.fromkeys([*reasons, "active_map_required"])],
                     clarification_question=(
-                        f"There is no map yet. Which place should I show with {style}?"
+                        "There is no map yet, so there is no layer to change. "
+                        "Which place or data should I show first?"
+                        if proposed.target_refs
+                        and all(refers_to_layer(ref) for ref in proposed.target_refs)
+                        else f"There is no map yet. Which place should I show with {style}?"
                         if style
                         else "There is no map yet. Which place should I show first?"
                     ),
