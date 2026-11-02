@@ -4652,6 +4652,13 @@
             "title": "Max No Progress Corrections",
             "default": 2
           },
+          "max_unproductive_steps": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Unproductive Steps",
+            "default": 3
+          },
           "simple_max_model_calls": {
             "type": "integer",
             "maximum": 100.0,

@@ -13,7 +13,12 @@ from pydantic import BaseModel
 from server.common.typing import is_json_array, json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentPhase, AgentRunState
-from server.domain.agent.map_plan import AddEvidenceLayerAction, MapPlan
+from server.domain.agent.map_plan import (
+    AddEvidenceLayerAction,
+    KeepOnlyLayersAction,
+    MapPlan,
+    RemoveLayerAction,
+)
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -28,7 +33,11 @@ from server.services.agent.capability_execution import (
     CapabilityExecutionService,
     ToolExecutionContext,
 )
-from server.services.agent.completion import follow_up_location_keys, uncovered_route_targets
+from server.services.agent.completion import (
+    follow_up_location_keys,
+    uncovered_map_targets,
+    uncovered_route_targets,
+)
 from server.services.agent.map_plan_service import MapPlanService
 from server.services.agent.tool_definitions import (
     ApplyMapPlanInput,
@@ -512,7 +521,14 @@ def _bind_execute_request(
         if temporal_mode == "current" and temporal.get("granularity") == "day":
             days = None
         if days and not any(temporal.get(key) for key in ("start_time_iso", "end_time_iso", "reference_time_iso")):
-            updates["start_time_iso"] = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+            now = datetime.now(UTC)
+            if temporal_mode == "forecast":
+                # A forecast looks ahead; a now-minus-N start silently turned
+                # "tomorrow" or "next 24 hours" into the past day.
+                updates["start_time_iso"] = now.isoformat()
+                updates["end_time_iso"] = (now + timedelta(days=days)).isoformat()
+            else:
+                updates["start_time_iso"] = (now - timedelta(days=days)).isoformat()
         reference_time = _optional_string(temporal.get("reference_time_iso"))
         if reference_time:
             updates["arguments"] = {
@@ -637,6 +653,13 @@ def _lower_execution_extent(
         semantic_kind in {"administrative_geometry", "feature_geometry", "bbox", "viewport"}
         # The visible map is an area by definition, whatever scope was routed.
         or location.source == CURRENT_VIEW_SOURCE
+        # A country or region target without a routed scope is still an area;
+        # a bare point would let feeds fall back to a worldwide query.
+        or (
+            semantic_kind is None
+            and str(location.location_type or "").casefold()
+            in {"country", "region", "state", "province", "administrative", "continent"}
+        )
     ):
         return ExecutionExtent(
             kind="bbox" if semantic_kind not in {"viewport"} else "viewport",
@@ -738,6 +761,31 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
     return apply
 
 ###############################################################################
+def _plan_layer_refs(request: ApplyMapPlanInput, state: AgentRunState) -> set[str]:
+    """Evidence refs visible after the plan: kept layers plus added ones."""
+
+    removed = {
+        action.instance_id for action in request.actions if isinstance(action, RemoveLayerAction)
+    }
+    kept_only = next(
+        (set(action.instance_ids) for action in request.actions if isinstance(action, KeepOnlyLayersAction)),
+        None,
+    )
+    refs = {
+        str(action.evidence_ref)
+        for action in request.actions
+        if isinstance(action, AddEvidenceLayerAction) and action.visible
+    }
+    if state.active_map_session is not None:
+        for instance in state.active_map_session.overlay_collection.instances:
+            if not instance.visible or instance.instance_id in removed:
+                continue
+            if kept_only is not None and instance.instance_id not in kept_only:
+                continue
+            refs.add(str(instance.descriptor.get("evidence_ref") or ""))
+    return refs
+
+###############################################################################
 def _map_plan_semantic_validator(
     request: ApplyMapPlanInput, state: AgentRunState
 ) -> list[str]:
@@ -783,8 +831,18 @@ def _map_plan_semantic_validator(
             "Retrieve data with execute_geospatial_capability for every requested target "
             "before preparing the map. Targets still missing data: "
             + ", ".join(uncovered_route_targets(state))
-            + ". Prior conversation evidence alone does not verify current target coverage."
+            + ". Earlier evidence for a target counts once inspect_evidence "
+            "(view=metadata) confirms it; otherwise execute the capability for it."
         )
+    if contract is not None and contract.evidence_required and evidence_actions:
+        missing = uncovered_map_targets(state, _plan_layer_refs(request, state))
+        if missing:
+            errors.append(
+                "The map must show a layer for every compared target. Missing: "
+                + ", ".join(missing)
+                + ". Add add_evidence_layer with that target's evidence_ref, or "
+                "keep its existing layer."
+            )
     if (
         contract is not None
         and contract.evidence_required
@@ -853,7 +911,11 @@ def _capability_semantic_validator(
     ):
         errors.append("This capability already executed successfully; choose a distinct capability or transform its evidence.")
     if state.capability_ids and request.capability_id not in state.capability_ids:
-        errors.append("capability_id is outside the validated route shortlist.")
+        errors.append(
+            "capability_id is outside the validated route shortlist; use one of: "
+            + ", ".join(state.capability_ids[:12])
+            + "."
+        )
     goal_targets = {
         normalize_target_key(str(item))
         for item in (state.goal.target_ids if state.goal is not None else [])
@@ -1083,9 +1145,15 @@ def _describe_semantic_validator(
     request: DescribeCapabilityInput, state: AgentRunState
 ) -> list[str]:
     if not state.capability_ids:
-        return ["capability_id must be selected by the validated route first."]
+        return [
+            "No capability shortlist exists yet; call discover_geospatial_capabilities first."
+        ]
     if request.capability_id not in state.capability_ids:
-        return ["capability_id is outside the validated route shortlist."]
+        return [
+            "capability_id is outside the validated route shortlist; use one of: "
+            + ", ".join(state.capability_ids[:12])
+            + "."
+        ]
     return []
 
 

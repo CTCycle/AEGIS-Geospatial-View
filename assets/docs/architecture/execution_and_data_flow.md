@@ -269,6 +269,22 @@ Terminal reasons remain distinct: `model_budget_exhausted`,
 `tool_budget_exhausted`, `transition_budget_exhausted`,
 `run_deadline_exhausted`, `no_progress`, `context_limit`, `provider_failure`,
 `cancelled`, `superseded`, and `render_recovery_exhausted`.
+`insufficient_evidence` is an honest answer, not a crash: it is stored as a
+partial direct answer whose text names the unmet obligations in plain
+language (for example after the model keeps answering in text because no tool
+can provide the data, or when discovery finds no eligible source).
+
+Progress is tracked as a ledger of what the run has established: resolved
+places, usable evidence, inspected evidence, described and discovered
+capabilities, the shortlist, satisfied obligations and the map state. A tool
+step that adds no never-seen state is unproductive, which also catches
+alternating cycles; see `max_unproductive_steps` in the runtime configuration.
+An empty discovery reports why, by re-running the same registry policy with
+one constraint relaxed (operation, scope, time, rendering, coverage) and by
+naming matching sources that are disabled or missing a credential. Derived
+and inspected evidence inherits its parents' capability and scope facts, so a
+follow-up turn can complete from earlier evidence without refetching it, while
+evidence derived from another place never covers the current goal.
 
 ## Async and threaded behavior
 

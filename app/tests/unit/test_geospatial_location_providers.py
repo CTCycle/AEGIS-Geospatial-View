@@ -696,6 +696,67 @@ def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     assert ranked == []
 
 ###############################################################################
+def test_nominatim_keeps_station_candidate_for_transport_qualified_query() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+
+    ranked = service.rank_candidates(
+        [
+            {
+                "lat": "46.0049",
+                "lon": "8.9468",
+                "display_name": "Lugano, Via Paolo Regazzoni, Lugano, Ticino, Switzerland",
+                "class": "railway",
+                "type": "station",
+                "importance": 0.4,
+                "address": {"city": "Lugano", "country": "Switzerland"},
+                "namedetails": {"name": "Lugano"},
+            }
+        ],
+        address="Lugano railway station",
+        city=None,
+        country_name=None,
+        country_code=None,
+        query="Lugano railway station",
+        expected_location_type="station",
+    )
+
+    assert len(ranked) == 1
+
+###############################################################################
+def test_nominatim_asks_for_context_when_query_is_only_a_generic_descriptor() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Amsterdam Centraal, Amsterdam, Netherlands",
+            "lat": 52.378,
+            "lon": 4.9,
+            "confidence": 0.9,
+            "geocoder_importance": 0.8,
+            "selected_result_type": "train_station",
+            "selected_result_class": "railway",
+        },
+        {
+            "display_name": "Zurich Hauptbahnhof, Zurich, Switzerland",
+            "lat": 47.378,
+            "lon": 8.54,
+            "confidence": 0.5,
+            "geocoder_importance": 0.2,
+            "selected_result_type": "station",
+            "selected_result_class": "railway",
+        },
+    ]
+
+    result = service._find_ambiguous_candidates(
+        ranked, expected_location_type=None, query="central station", has_parent_context=False
+    )
+    named = service._find_ambiguous_candidates(
+        ranked, expected_location_type=None, query="Amsterdam Centraal", has_parent_context=False
+    )
+
+    assert len(result) == 2
+    assert named == []
+
+###############################################################################
 def test_nominatim_district_ranking_rejects_nearby_child_features() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     ranked = service.rank_candidates(

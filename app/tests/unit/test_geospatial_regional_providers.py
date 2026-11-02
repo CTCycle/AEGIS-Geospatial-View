@@ -475,6 +475,19 @@ async def test_usgs_magnitude_filter_feed_and_dated_query():
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_usgs_honours_magnitude_min_alias():
+    async def fetcher(url, headers=None):
+        return {"type": "FeatureCollection", "features": [
+            {"id": str(mag), "properties": {"mag": mag}, "geometry": {"type": "Point", "coordinates": [8, 45]}}
+            for mag in [1, 3, 5]]}
+    feed = await USGSProvider(fetcher=fetcher).fetch(ProviderRequest(
+        capability_id="usgs_earthquakes", params={"live": True, "filters": {"magnitude_min": 5}}))
+    assert [item["magnitude"] for item in feed.payload["features"]] == [5]
+    assert feed.coverage["min_magnitude"] == 5
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_emsc_queries_seismicportal_and_normalizes_events():
     urls = []
     async def fetcher(url, headers=None):

@@ -1071,6 +1071,7 @@ export interface RuntimeAgentExecutionSettings {
   max_render_attempts: number;
   max_discovery_attempts: number;
   max_no_progress_corrections: number;
+  max_unproductive_steps: number;
   simple_max_model_calls: number;
   complex_max_model_calls: number;
   simple_max_tool_calls: number;

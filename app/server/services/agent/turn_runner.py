@@ -196,6 +196,9 @@ class AgentTurnRunner:
                     max_no_progress_corrections=_setting(
                         configured, "max_no_progress_corrections", 2
                     ),
+                    max_unproductive_steps=_setting(
+                        configured, "max_unproductive_steps", 3
+                    ),
                     max_render_attempts=_setting(
                         configured, "max_render_attempts", 3
                     ),
@@ -346,6 +349,18 @@ def _operation(
     if outcome.stopped_reason == "clarification_required":
         return ChatOperationResult(
             kind="clarification",
+            status="partial",
+            message=message,
+        )
+    if (
+        outcome.stopped_reason == "insufficient_evidence"
+        and outcome.failure_category is None
+        and message.strip()
+    ):
+        # The agent worked correctly but the evidence does not exist or is
+        # unavailable; the answer discloses the gap, so it is not a failure.
+        return ChatOperationResult(
+            kind="direct_answer",
             status="partial",
             message=message,
         )

@@ -6,7 +6,7 @@ from typing import Any
 from datetime import UTC, datetime, time, timedelta
 
 from server.common.identifiers import location_ref_matches, normalize_target_key
-from server.common.typing import json_object
+from server.common.typing import json_array, json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import (
     AgentGoal,
@@ -66,6 +66,17 @@ class CompletionEvaluator:
             spatial = coverage.get("spatial_scope_satisfied")
             if not isinstance(spatial, bool):
                 spatial = None
+        sources = [str(item) for item in json_array(coverage.get("source_location_refs"))]
+        if sources and state.goal is not None and state.goal.target_ids and not any(
+            location_ref_matches(str(target), source, source)
+            for target in state.goal.target_ids
+            for source in sources
+        ) and not {normalize_target_key(source) for source in sources}.intersection(
+            normalize_target_key(key) for key in follow_up_location_keys(state)
+        ):
+            # Evidence derived from another place never covers this goal.
+            relevant = False
+            spatial = False
         if contract and contract.temporal_scope_required:
             temporal = coverage.get("temporal_scope_satisfied")
             if not isinstance(temporal, bool):
@@ -78,7 +89,15 @@ class CompletionEvaluator:
                     start = _parse_scope_time(str(expected))
                     actual = _parse_scope_time(observed)
                     end_value = scope.get("end_time_iso")
-                    end = _parse_scope_time(str(end_value), inclusive_end=True) if end_value else start
+                    # An open-ended window ("since Monday") runs until now;
+                    # only a reference instant must match exactly.
+                    end = (
+                        _parse_scope_time(str(end_value), inclusive_end=True)
+                        if end_value
+                        else start
+                        if scope.get("reference_time_iso")
+                        else max(start, datetime.now(UTC))
+                    )
                     temporal = start <= actual <= end
                 except (ValueError, TypeError):
                     temporal = None
@@ -100,8 +119,12 @@ class CompletionEvaluator:
         }]
         analysis = state.route is not None and state.route.analysis is not None
         if analysis:
-            results = [result for result in results if result.tool_name == "execute_geospatial_capability"
-                       and result.metadata.result_type != "raster"]
+            # Derived evidence inherits its parents' source; raster parents
+            # cannot be transformed, so only located numeric records remain.
+            results = [result for result in results if (
+                result.tool_name == "execute_geospatial_capability"
+                and result.metadata.result_type != "raster"
+            ) or (result.tool_name == "transform_evidence" and result.metadata.capability_id)]
         assessments = [(result, CompletionEvaluator.assess_evidence(state, result)) for result in results]
         eligible = [(result, assessment) for result, assessment in assessments
                     if _is_eligible_evidence(result, assessment, analysis)]
@@ -356,6 +379,33 @@ def _native_spatial_scope_applied(
     return not expected_kinds or bool(expected_kinds.intersection(declared))
 
 
+_REQUIREMENT_DESCRIPTIONS = {
+    "location_resolved": "the requested place was not confirmed",
+    "search_area_bound": "the search area was not confirmed",
+    "result_locations_derived": "no result locations were derived from the data",
+    "measurement_computed": "no measurement was computed",
+    "required_data_retrieved": "the requested data was not retrieved for every target",
+    "evidence_inspected": "the existing evidence was not inspected",
+    "capabilities_discovered": "the available data sources were not listed",
+    "temporal_scope_applied": "the requested time window was not verified in the data",
+    "spatial_scope_applied": "the requested area was not verified in the data",
+    "map_candidate_prepared": "no map was prepared",
+    "map_state_committed": "the map was not committed",
+    "viewport_contains_results": "the map view did not contain the results",
+    "final_response_ready": "the map was not confirmed",
+    "render_verified": "the map was not confirmed in the browser",
+}
+
+###############################################################################
+def describe_requirements(names: list[str]) -> str:
+    """Name unmet completion obligations in plain language for users."""
+
+    described = [
+        _REQUIREMENT_DESCRIPTIONS.get(name, name.replace("_", " "))
+        for name in dict.fromkeys(names)
+    ]
+    return "; ".join(described)
+
 ###############################################################################
 def uncovered_data_obligations(state: AgentRunState) -> list[str]:
     """Return requested analytical components without validated evidence yet.
@@ -398,12 +448,19 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
         return []
     # Executions name a target by any spelling the model chose; stored refs
     # are normalized keys, so compare both sides normalized.
-    covered_keys = {
-        normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or ""))
-        for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability"
-        and _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), False)
-    }
+    covered_keys: set[str] = set()
+    for result in state.tool_results:
+        if result.tool_name not in {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}:
+            continue
+        if not _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), False):
+            continue
+        # Executions name their target in the query; inspected or derived
+        # evidence (possibly from an earlier turn) carries its source targets.
+        covered_keys.add(normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")))
+        covered_keys.update(
+            normalize_target_key(str(ref))
+            for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+        )
     uncovered: list[str] = []
     for target in route.target_refs:
         matches = [
@@ -412,6 +469,44 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
             if location_ref_matches(str(target), str(key), location.label)
         ]
         if matches and not covered_keys.intersection(normalize_target_key(key) for key in matches):
+            uncovered.append(str(target))
+    return uncovered
+
+
+###############################################################################
+def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[str]:
+    """Return compared targets whose evidence is not among the map's layers.
+
+    Data for every target can be retrieved and still be missing from the
+    map; a comparison map must show a layer for each requested place.
+    """
+
+    route = state.route
+    if (
+        route is None
+        or route.analysis is not None
+        or route.location_mode != "target"
+        or route.presentation not in {"map", "both"}
+        or len(route.target_refs) < 2
+    ):
+        return []
+    shown: set[str] = set()
+    for result in state.tool_results:
+        if not set(result.evidence_refs).intersection(layer_refs):
+            continue
+        shown.add(normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")))
+        shown.update(
+            normalize_target_key(str(ref))
+            for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+        )
+    uncovered: list[str] = []
+    for target in route.target_refs:
+        matches = [
+            key
+            for key, location in state.location_refs.items()
+            if location_ref_matches(str(target), str(key), location.label)
+        ]
+        if matches and not shown.intersection(normalize_target_key(key) for key in matches):
             uncovered.append(str(target))
     return uncovered
 
@@ -456,7 +551,9 @@ def follow_up_location_keys(state: AgentRunState) -> set[str]:
 
 __all__ = [
     "CompletionEvaluator",
+    "describe_requirements",
     "follow_up_location_keys",
+    "uncovered_map_targets",
     "uncovered_data_obligations",
     "uncovered_route_targets",
 ]

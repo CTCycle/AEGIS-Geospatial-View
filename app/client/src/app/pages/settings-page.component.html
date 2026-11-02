@@ -588,6 +588,7 @@
             <label>Maximum render attempts <input class="settings-control" type="number" max="32" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_render_attempts" /></label>
             <label>Maximum discovery attempts <input class="settings-control" type="number" min="1" max="100" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_discovery_attempts" /></label>
             <label>No-progress corrections <input class="settings-control" type="number" max="8" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_no_progress_corrections" /></label>
+            <label>Unproductive steps before correction <input class="settings-control" type="number" max="10" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_unproductive_steps" /></label>
             <label>Consecutive tool failures <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_consecutive_tool_failures" /></label>
             <label>Same failed fingerprint limit <input class="settings-control" type="number" max="20" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_same_failed_fingerprint" /></label>
             <label>Route corrections <input class="settings-control" type="number" max="10" min="0" [(ngModel)]="runtimeSettingsDraft.agent_execution.max_route_corrections" /></label>

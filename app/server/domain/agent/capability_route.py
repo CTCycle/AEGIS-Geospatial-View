@@ -509,6 +509,20 @@ class AgentRunState(BaseModel):
         default_factory=lambda: list[dict[str, Any]]()
     )
     discovery_attempts: int = Field(default=0, ge=0)
+    # Server discovery refreshes already run for a location set; an
+    # unchanged set would return the same shortlist.
+    discovery_refresh_keys: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=16
+    )
+    # Progress ledger: a digest of what the run has established, and how
+    # many consecutive tool steps left it unchanged.
+    progress_signatures: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=64
+    )
+    unproductive_steps: int = Field(default=0, ge=0)
+    stuck_notices: int = Field(default=0, ge=0)
+    # The server mapped the run's evidence once after the model stalled.
+    evidence_map_recovered: bool = False
     budget_snapshot: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
     )

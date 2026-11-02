@@ -444,8 +444,10 @@ def _measurement_relevant(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
         return False
+    # A compiled measurement obligation must always have its tool exposed.
     return (
-        CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
+        "measurement_computed" in state.completion_requirements
+        or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
         or len(state.location_refs) >= 2
     )
 

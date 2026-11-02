@@ -473,7 +473,16 @@ async def _filter_features_to_region(
 ###############################################################################
 def _min_magnitude(request: ProviderRequest) -> float | None:
     filters = request.params.get("filters")
-    value = filters.get("min_magnitude") if is_json_object(filters) else None
+    # Models spell the same threshold several ways; an unread spelling would
+    # silently drop the user's magnitude constraint.
+    value = next(
+        (
+            filters[key]
+            for key in ("min_magnitude", "magnitude_min", "minmagnitude", "min_mag", "magnitude")
+            if key in filters and filters[key] is not None
+        ),
+        None,
+    ) if is_json_object(filters) else None
     if value is None:
         return None
     try:

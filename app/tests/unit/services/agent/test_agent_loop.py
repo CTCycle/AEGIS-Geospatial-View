@@ -543,6 +543,35 @@ def test_verified_render_closes_map_completion_contract() -> None:
     assert stop == ("goal_satisfied", "The map is ready.")
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("failure_codes", "blocked"),
+    [
+        (["render_timeout"], False),
+        (["render_timeout", "render_timeout"], True),
+        (["render_failed"], True),
+        (["render_timeout", "render_failed"], True),
+    ],
+)
+def test_identical_map_plan_is_retried_once_only_after_a_render_timeout(
+    failure_codes: list[str], blocked: bool
+) -> None:
+    state = _state()
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=attempt,
+            status="failed",
+            failure_code=code,
+            action_fingerprint="plan-a",
+        )
+        for attempt, code in enumerate(failure_codes, start=1)
+    ]
+
+    assert AgentLoop._render_retry_blocked(state, "plan-a") is blocked  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop._render_retry_blocked(state, "plan-b") is False  # pyright: ignore[reportPrivateUsage]
+
+###############################################################################
 def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     state = _state()
     state.render_attempts = 2
@@ -584,9 +613,8 @@ def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
         ),
     )
 
-    assert "missing_source" in outcome.final_text
     assert "The selected source was not registered." in outcome.final_text
-    assert "generic_validation" not in outcome.final_text
+    assert "A later generic validation check failed." not in outcome.final_text
 
 ###############################################################################
 def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
@@ -793,7 +821,7 @@ async def test_verified_render_suppresses_raw_dsml_finalization_content(bar: str
         [],
     )
 
-    assert answer == "The map is ready and the rendering was verified."
+    assert answer == "The map was updated and confirmed in the browser."
     assert "DSML" not in answer
     completed = [event for event in events if event.kind == "finalization_completed"]
     assert len(completed) == 1

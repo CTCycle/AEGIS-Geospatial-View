@@ -75,6 +75,15 @@ class OpenMeteoProvider(GeospatialProvider):
         payload = dict(payload)
         if not json_object(payload.get("request_parameters")):
             payload["request_parameters"] = safe_request_params(request.params)
+        window = _forecast_window(request, datetime.now(UTC))
+        if window is not None:
+            # Point forecasts carry three days of hours from local midnight.
+            coverage = dict(json_object(payload.get("coverage")))
+            coverage.setdefault(
+                "temporal_scope_satisfied",
+                window[1] <= datetime.now(UTC) + timedelta(days=2, hours=12),
+            )
+            payload["coverage"] = coverage
         rendering_mode = "clustered-points"
         normalized = self._payload(payload, rendering_mode=rendering_mode)
         partial = bool(payload.get("partial"))
@@ -121,19 +130,42 @@ class OpenMeteoProvider(GeospatialProvider):
         bbox = request.bbox
         region = find_macro_region_entry(str(request.params.get("macro_region") or ""))
         # Building a mask unions many polygons; keep it off the event loop.
-        mask = await asyncio.to_thread(land_mask, bbox, region.countries if region is not None else ())
+        raw_mask_countries = request.params.get("mask_countries")
+        mask_countries = (
+            tuple(str(code).upper() for code in cast(list[object], raw_mask_countries))
+            if isinstance(raw_mask_countries, list)
+            else ()
+        )
+        mask = await asyncio.to_thread(
+            land_mask, bbox, region.countries if region is not None else mask_countries
+        )
         points, spacing, excluded = await asyncio.to_thread(grid_points, bbox, WEATHER_GRID_POINT_BUDGET, mask)
         if not points:
             raise ProviderUnavailableError("The search area contains no sampled land inside the region.")
         now = datetime.now(UTC)
-        past_days = min(14, max(0, math.ceil(max(0.0, (now - request.time).total_seconds() - 60) / 86400))) if request.time else 0
+        window = _forecast_window(request, now)
+        past_days = 0 if window is not None else (
+            min(14, max(0, math.ceil(max(0.0, (now - request.time).total_seconds() - 60) / 86400))) if request.time else 0
+        )
+        # A future window ("tomorrow") needs forecast hours, not past ones.
+        forecast_days = (
+            max(1, min(16, math.ceil((window[1] - now).total_seconds() / 86400) + 1))
+            if window is not None
+            else 1
+        )
+
+        async def fetch_grid(grid: list[tuple[float, float]]) -> list[dict[str, Any] | None]:
+            if window is None:
+                return await self.service.get_weather_grid(grid, past_days)
+            return await self.service.get_weather_grid(grid, 0, forecast_days=forecast_days)
+
         try:
-            samples = await self.service.get_weather_grid(points, past_days)
+            samples = await fetch_grid(points)
         except OpenMeteoRateLimitError as exc:
             raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
         except (OpenMeteoServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        features = _grid_features(points, samples, past_days, "coarse")
+        features = _grid_features(points, samples, past_days, "coarse", window)
         if not features:
             # Land points always have model weather; no usable sample is a
             # failed retrieval, not a legitimately empty area.
@@ -144,12 +176,12 @@ class OpenMeteoProvider(GeospatialProvider):
         refined: list[dict[str, Any]] = []
         if refined_points:
             try:
-                refined_samples = await self.service.get_weather_grid(refined_points, past_days)
+                refined_samples = await fetch_grid(refined_points)
             except OpenMeteoRateLimitError as exc:
                 raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
             except (OpenMeteoServiceError, ValueError):
                 refined_samples = []
-            refined = _grid_features(refined_points, refined_samples, past_days, "refined")
+            refined = _grid_features(refined_points, refined_samples, past_days, "refined", window)
         # Every requested coarse and refined point is either a feature or
         # missing: point_count + missing_point_count == all requested points.
         missing = len(points) + len(refined_points) - len(features) - len(refined)
@@ -160,12 +192,21 @@ class OpenMeteoProvider(GeospatialProvider):
                     "requested_point_count": len(points), "spacing_deg": spacing,
                     "excluded_outside_region_points": excluded, "mask_source": MASK_SOURCE,
                     "region": region.name if region is not None else None,
+                    "mask_countries": list(region.countries if region is not None else mask_countries),
                     "refined_point_count": len(refined), "refinement_requested_point_count": len(refined_points),
                     "refinement_spacing_deg": spacing / 3,
-                    "temporal_scope_satisfied": request.time is None or now - request.time <= timedelta(days=14),
+                    "temporal_scope_satisfied": (
+                        _window_covered(features, window)
+                        if window is not None
+                        else request.time is None or now - request.time <= timedelta(days=14)
+                    ),
+                    "requested_window_utc": (
+                        [window[0].isoformat(), window[1].isoformat()] if window is not None else None
+                    ),
                     "missing_point_count": missing,
                     "window_start": min((f["window_start"] for f in features), default=None),
                     "window_end": max((f["window_end"] for f in features), default=None),
+                    "window_end_utc": max((f["window_end_utc"] for f in features), default=None),
                     "value_kind": "model_estimate", "location_labels": "coordinates"}
         return ProviderResponse(
             capability_id=request.capability_id, provider_id=self.provider_id,
@@ -173,7 +214,8 @@ class OpenMeteoProvider(GeospatialProvider):
             attribution=["Open-Meteo"], coverage=coverage, units=units,
             result_type="features", result_status="partial" if partial else "ok",
             partial=partial, source_url=self.service.weather_base_url,
-            observation_time=coverage["window_end"], spatial_resolution=f"{spacing:.2f} degree grid",
+            observation_time=coverage["window_end_utc"] or coverage["window_end"],
+            spatial_resolution=f"{spacing:.2f} degree grid",
         )
 
     # -------------------------------------------------------------------------
@@ -357,8 +399,54 @@ class OpenMeteoProvider(GeospatialProvider):
         return datetime.now(UTC)
 
 ###############################################################################
+def _forecast_window(request: ProviderRequest, now: datetime) -> tuple[datetime, datetime] | None:
+    """Return the requested UTC window when it lies in the future."""
+
+    start = request.time
+    if start is None:
+        return None
+    raw_end = request.params.get("end_time_iso")
+    end: datetime | None = None
+    if isinstance(raw_end, str) and raw_end.strip():
+        try:
+            parsed = datetime.fromisoformat(raw_end.replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            parsed = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+            # A date-only end ("2026-11-03") covers its whole day.
+            end = parsed + timedelta(days=1) if len(raw_end.strip()) == 10 else parsed
+    if end is None:
+        if start <= now + timedelta(minutes=1):
+            return None
+        end = start + timedelta(days=1)
+    # "Next 24 hours" starts about now; a window ending in the future is a
+    # forecast window, while one ending before now stays a past window.
+    if end <= now + timedelta(hours=1) or start < now - timedelta(hours=2):
+        return None
+    return (start, end) if end > start else None
+
+###############################################################################
+def _window_covered(features: list[dict[str, Any]], window: tuple[datetime, datetime]) -> bool:
+    """Whether every sampled point spans the requested forecast hours."""
+
+    if not features:
+        return False
+    tolerance = timedelta(hours=1, minutes=1)
+    for feature in features:
+        try:
+            first = datetime.fromisoformat(str(feature.get("window_start_utc")))
+            last = datetime.fromisoformat(str(feature.get("window_end_utc")))
+        except ValueError:
+            return False
+        if first > window[0] + tolerance or last < window[1] - tolerance:
+            return False
+    return True
+
+###############################################################################
 def _grid_features(
-    points: list[tuple[float, float]], samples: list[dict[str, Any] | None], past_days: int, stage: str
+    points: list[tuple[float, float]], samples: list[dict[str, Any] | None], past_days: int, stage: str,
+    window: tuple[datetime, datetime] | None = None,
 ) -> list[dict[str, Any]]:
     # Samples join their points by position only; an unaligned list cannot
     # be trusted at any index, so every point of the stage counts as missing.
@@ -367,7 +455,7 @@ def _grid_features(
     prefix = "r" if stage == "refined" else ""
     features: list[dict[str, Any]] = []
     for index, (point, sample) in enumerate(zip(points, samples)):
-        feature = _grid_feature(f"openmeteo:grid:{prefix}{index}", point, sample, past_days, stage) if sample is not None else None
+        feature = _grid_feature(f"openmeteo:grid:{prefix}{index}", point, sample, past_days, stage, window) if sample is not None else None
         if feature is not None:
             features.append(feature)
     return features
@@ -375,7 +463,8 @@ def _grid_features(
 
 ###############################################################################
 def _grid_feature(
-    feature_id: str, point: tuple[float, float], payload: dict[str, Any], past_days: int, stage: str
+    feature_id: str, point: tuple[float, float], payload: dict[str, Any], past_days: int, stage: str,
+    window: tuple[datetime, datetime] | None = None,
 ) -> dict[str, Any] | None:
     current = json_object(payload.get("current"))
     hourly = json_object(payload.get("hourly"))
@@ -397,8 +486,22 @@ def _grid_feature(
     # Aware and naive stamps cannot be ordered against each other.
     if any(stamp is None or (stamp.tzinfo is None) != (local_end.tzinfo is None) for stamp in stamps):
         return None
-    local_start = local_end - timedelta(days=past_days) if past_days else local_end.replace(hour=0, minute=0, second=0)
-    selected = [i for i, stamp in enumerate(stamps) if stamp is not None and local_start <= stamp <= local_end]
+    offset = payload.get("utc_offset_seconds")
+    utc_offset = timedelta(seconds=float(offset)) if isinstance(offset, (int, float)) and not isinstance(offset, bool) else timedelta(0)
+
+    def as_utc(stamp: datetime) -> datetime:
+        return stamp.astimezone(UTC) if stamp.tzinfo is not None else (stamp - utc_offset).replace(tzinfo=UTC)
+
+    if window is not None:
+        # Forecast hours are hour-ending accumulations: an hour belongs to the
+        # window when it ends after the window start and by the window end.
+        selected = [
+            i for i, stamp in enumerate(stamps)
+            if stamp is not None and window[0] < as_utc(stamp) <= window[1]
+        ]
+    else:
+        local_start = local_end - timedelta(days=past_days) if past_days else local_end.replace(hour=0, minute=0, second=0)
+        selected = [i for i, stamp in enumerate(stamps) if stamp is not None and local_start <= stamp <= local_end]
     rain = [precipitation[i] if i < len(precipitation) else None for i in selected]
     heat = [temperatures[i] if i < len(temperatures) else None for i in selected]
     def numeric(value: Any) -> bool:
@@ -412,6 +515,8 @@ def _grid_feature(
         "precipitation_sum_mm": sum(float(value) for value in rain if value is not None), "temperature_2m_max_c": max(float(value) for value in heat if value is not None),
         "temperature_2m_current_c": current["temperature_2m"], "elevation": payload.get("elevation"),
         "window_start": times[selected[0]], "window_end": times[selected[-1]], "timezone": payload.get("timezone"),
+        "window_start_utc": as_utc(cast(datetime, stamps[selected[0]])).isoformat(),
+        "window_end_utc": as_utc(cast(datetime, stamps[selected[-1]])).isoformat(),
         "value_kind": "model_estimate", "sample_stage": stage,
     }
 

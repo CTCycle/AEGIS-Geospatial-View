@@ -340,7 +340,15 @@ def _project_result_data(
         }
         if data_object is not None and "items" in data_object:
             projected["items"] = items
-        return _fit_projection(projected, max_chars=max_chars, preserve_keys=("capabilities", "items"))
+        if data_object is not None and is_json_object(data_object.get("diagnostics")):
+            projected["diagnostics"] = _bounded_json_value(
+                data_object["diagnostics"], depth=0, max_depth=4
+            )
+        return _fit_projection(
+            projected,
+            max_chars=max_chars,
+            preserve_keys=("capabilities", "items", "diagnostics"),
+        )
 
     if tool_name == "inspect_evidence" and is_json_object(data):
         raw_result = data.get("result")
@@ -459,7 +467,17 @@ def _fit_projection(
                     truncated = True
             elif is_json_object(candidate):
                 while len(serialized) > max_chars and candidate:
-                    candidate.pop(next(reversed(candidate)))
+                    # Trim record lists ({records, pagination}) before dropping
+                    # keys; popping "records" left the model an empty result.
+                    longest = max(
+                        (child for child in candidate.values() if is_json_array(child)),
+                        key=len,
+                        default=None,
+                    )
+                    if longest is not None and len(longest) > 1:
+                        longest.pop()
+                    else:
+                        candidate.pop(next(reversed(candidate)))
                     serialized = json.dumps(
                         bounded, ensure_ascii=True, separators=(",", ":"), default=str
                     )

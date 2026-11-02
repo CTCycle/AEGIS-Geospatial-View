@@ -323,7 +323,7 @@ class MapSessionBuilder:
             )
         evidence = [
             evidence_by_ref[ref]
-            for ref in action.evidence_refs
+            for ref in (action.evidence_refs or list(evidence_by_ref))
             if ref in evidence_by_ref
         ]
         if action.strategy == "fit_evidence":
@@ -681,6 +681,49 @@ def _valid_geojson_sequence(
         return False
     items = cast(list[object], value)
     return len(items) >= minimum and all(validator(item) for item in items)
+
+###############################################################################
+def viewport_covering_evidence(
+    session: MapSession, evidence: list[AgentEvidenceEnvelope]
+) -> MapSession:
+    """Widen the viewport until every evidence extent is inside it.
+
+    A comparison map fitted to one of its places hides the others, and the
+    browser then rightly reports the required features as not visible.
+    """
+
+    extent = _evidence_bbox(evidence)
+    viewport = session.viewport
+    lat_span = viewport.radius_m / 111_320
+    lon_span = viewport.radius_m / (
+        111_320 * max(abs(cos(radians(viewport.center_latitude))), 0.01)
+    )
+    current = (
+        _valid_bbox(viewport.bbox)
+        or _valid_bbox(session.bounds)
+        or [
+            viewport.center_longitude - lon_span,
+            viewport.center_latitude - lat_span,
+            viewport.center_longitude + lon_span,
+            viewport.center_latitude + lat_span,
+        ]
+    )
+    if extent is None:
+        return session
+    if (
+        current[0] <= extent[0]
+        and current[1] <= extent[1]
+        and current[2] >= extent[2]
+        and current[3] >= extent[3]
+    ):
+        return session
+    union = [
+        min(current[0], extent[0]),
+        min(current[1], extent[1]),
+        max(current[2], extent[2]),
+        max(current[3], extent[3]),
+    ]
+    return _with_viewport(session, _viewport_for_bbox(union, session.viewport))
 
 ###############################################################################
 def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:

@@ -12,10 +12,10 @@ from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
-from server.services.agent.agent_loop import AgentLoop
+from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.native_orchestrator import NativeAgentOrchestrator
-from server.services.agent.turn_runner import AgentTurnRequest, AgentTurnRunner
+from server.services.agent.turn_runner import AgentTurnRequest, AgentTurnRunner, _operation
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -252,6 +252,33 @@ async def test_native_runner_exposes_control_stops_as_failed_operations() -> Non
     assert response.operation.kind == "error"
     assert response.operation.status == "failed"
     assert response.operation.failure_category == "cancelled"
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("message", "kind", "status"),
+    [
+        ("No source provides this; here is what is known.", "direct_answer", "partial"),
+        ("", "error", "failed"),
+    ],
+)
+def test_disclosed_evidence_gap_is_a_partial_answer_not_a_failure(
+    message: str, kind: str, status: str
+) -> None:
+    outcome = AgentLoopOutcome(
+        final_text=message,
+        state=AgentRunState(
+            request_id="request-gap",
+            conversation_id="conversation-gap",
+            phase=AgentPhase.ROUTE_REQUEST,
+            user_message="find it",
+        ),
+        stopped_reason="insufficient_evidence",
+        model_calls=1,
+    )
+
+    operation = _operation(outcome, None, message)
+
+    assert (operation.kind, operation.status) == (kind, status)
 
 ###############################################################################
 @pytest.mark.asyncio

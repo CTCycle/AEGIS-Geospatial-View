@@ -61,7 +61,7 @@ When a database has no runtime-settings row, initialization seeds built-in
 defaults. Runtime settings are never imported from or read from a JSON fallback.
 
 The `agent_execution` runtime block owns the complete native-agent deadline
-policy and exposes 31 editable fields. Defaults are grouped as follows:
+policy and exposes 32 editable fields. Defaults are grouped as follows:
 
 - Execution budgets: `initial_run_seconds=90`, `simple_seconds=150`,
   `complex_seconds=300`, `simple_max_model_calls=4`,
@@ -69,9 +69,13 @@ policy and exposes 31 editable fields. Defaults are grouped as follows:
   `complex_max_tool_calls=20`, `simple_max_state_transitions=32`,
   `complex_max_state_transitions=64`, and `max_iterations=12`.
 - Failure recovery: `max_render_attempts=3`, `max_discovery_attempts=2`,
-  `max_no_progress_corrections=2`, `max_consecutive_tool_failures=3`,
-  `max_same_failed_fingerprint=2`, `max_route_corrections=1`, and
-  `max_validation_corrections=2`.
+  `max_no_progress_corrections=2`, `max_unproductive_steps=3`,
+  `max_consecutive_tool_failures=3`, `max_same_failed_fingerprint=2`,
+  `max_route_corrections=1`, and `max_validation_corrections=2` (counted once
+  per model step, not per call in a parallel batch). After
+  `max_unproductive_steps` consecutive tool steps that establish nothing new
+  the model receives a corrective observation; two more end the run as
+  `no_progress` with the gathered evidence summarized.
 - Timeouts and retries, in seconds unless noted: `context_assembly_seconds=5`,
   `native_model_call_seconds=60`, `tool_execution_seconds=45`,
   `tool_absolute_seconds=90`, `map_assembly_seconds=20`,

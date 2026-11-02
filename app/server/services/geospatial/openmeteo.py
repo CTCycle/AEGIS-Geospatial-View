@@ -117,7 +117,7 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def get_weather_grid(
-        self, points: list[tuple[float, float]], past_days: int
+        self, points: list[tuple[float, float]], past_days: int, *, forecast_days: int = 1
     ) -> list[dict[str, Any] | None]:
         """Fetch a grid in cached multi-location calls of at most 100 points.
 
@@ -139,7 +139,7 @@ class OpenMeteoService:
         ) -> tuple[list[dict[str, Any] | None], OpenMeteoServiceError | None]:
             async with semaphore:
                 try:
-                    return await self._weather_grid_batch(batch, past_days), None
+                    return await self._weather_grid_batch(batch, past_days, forecast_days), None
                 except OpenMeteoRateLimitError:
                     raise
                 except OpenMeteoServiceError as exc:
@@ -166,7 +166,7 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def _weather_grid_batch(
-        self, batch: list[tuple[float, float]], past_days: int
+        self, batch: list[tuple[float, float]], past_days: int, forecast_days: int = 1
     ) -> list[dict[str, Any] | None]:
         params = {
             "latitude": ",".join(f"{lat:.5f}" for lat, _ in batch),
@@ -174,7 +174,7 @@ class OpenMeteoService:
             "current": "temperature_2m,precipitation",
             "hourly": "temperature_2m,precipitation",
             "past_days": str(max(0, min(14, past_days))),
-            "forecast_days": "1", "timezone": "auto",
+            "forecast_days": str(max(1, min(16, forecast_days))), "timezone": "auto",
         }
         payload = await self._fetch_json(endpoint=self.weather_base_url,
                                          params=params, provider_key="openmeteo_weather_grid")

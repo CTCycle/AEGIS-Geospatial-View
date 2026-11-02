@@ -1669,3 +1669,45 @@ def test_fast_route_accepts_single_place_display(message: str, target: str) -> N
 )
 def test_fast_route_defers_everything_else_to_the_model(message: str) -> None:
     assert _catalog_router().fast_route(message) is None
+
+###############################################################################
+def test_plural_catalog_entity_place_route_keeps_data_retrieval() -> None:
+    message = "Locate the major airports in Switzerland and display them on the map."
+    router = CapabilityRouter(
+        capability_registry=CapabilityRegistry(),
+        runtime_registry=RuntimeRegistry(),
+    )
+
+    decision = router.validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            secondary_domains=[CapabilityDomain.MAP_RENDERING],
+            operation="locate",
+            capability_queries=["place search", "airports"],
+        ),
+        user_message=message,
+        active_state=AgentRunState(
+            request_id="airports",
+            conversation_id="airports",
+            phase=AgentPhase.ROUTE_REQUEST,
+            user_message=message,
+        ),
+    )
+
+    assert decision.route.operation != "show_location_on_map"
+    assert CapabilityDomain.DATA_RETRIEVAL in {
+        decision.route.primary_domain,
+        *decision.route.secondary_domains,
+    }
+
+###############################################################################
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Show the Swiss Alps on the map.",
+        "Show Madrid on a satellite map",
+        "Show the Rocky Mountains",
+    ],
+)
+def test_viewport_requests_are_not_catalog_entity_requests(message: str) -> None:
+    assert not CapabilityRegistry().requests_catalog_entities(message)

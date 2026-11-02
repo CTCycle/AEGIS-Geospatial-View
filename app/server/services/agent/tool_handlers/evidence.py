@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from server.common.identifiers import location_ref_matches
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -88,6 +88,10 @@ class EvidenceToolHandler:
             cursor=request.cursor,
             limit=request.limit,
         )
+        capability_id, coverage = _inherited_assessment([{
+            **summary.provenance,
+            **{key: summary.summary[key] for key in ("coverage", "query") if key in summary.summary},
+        }])
         return ToolResult(
             call_id="handler-call",
             tool_name="inspect_evidence",
@@ -101,8 +105,10 @@ class EvidenceToolHandler:
             },
             evidence_refs=[request.evidence_ref],
             metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=[request.evidence_ref],
+                coverage=coverage,
             ),
         )
 
@@ -154,7 +160,7 @@ class EvidenceToolHandler:
                 )
             parents.append({"provider": summary.provenance.get("provider_id") or summary.provenance.get("provider"),
                             **summary.provenance,
-                            **{key: summary.summary[key] for key in ("coverage", "units", "observation_time", "value_kind") if key in summary.summary}})
+                            **{key: summary.summary[key] for key in ("coverage", "units", "observation_time", "value_kind", "query") if key in summary.summary}})
             parent_records = _records_from_payload(_decode_json(raw))
             if len(refs) > 1:
                 # Keep each record's origin so combined sets stay comparable.
@@ -198,10 +204,11 @@ class EvidenceToolHandler:
         bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None
         value_fields = sorted({key for item in transformed for key, value in _properties(item).items() if _numeric(value) is not None})
         unlocated = sum(_record_point(item) is None for item in records)
+        capability_id, coverage = _inherited_assessment(parents)
         provenance = {"operation_count": len(request.operations), "parents": parents,
-                      "coverage": [parent.get("coverage") for parent in parents]}
+                      "coverage": coverage, "capability_id": capability_id}
         if len(parents) == 1:
-            provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "coverage", "units", "observation_time", "value_kind") if key in parents[0]})
+            provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "units", "observation_time", "value_kind") if key in parents[0]})
         evidence = self.repository.create(
             conversation_id=state.conversation_id,
             run_id=state.request_id,
@@ -231,11 +238,13 @@ class EvidenceToolHandler:
             data={"record_count": len(transformed), "parent_refs": refs,
                   "preview": transformed[:5], "located_record_count": len(points),
                   "unlocated_record_count": unlocated, "place_labelled_count": labelled,
-                  "parent_coverage": provenance["coverage"]},
+                  "parent_coverage": [parent.get("coverage") for parent in parents]},
             evidence_refs=[evidence_ref],
             metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=[evidence_ref],
+                coverage=coverage,
             ),
         )
 
@@ -524,10 +533,6 @@ def _failure(
         ),
     )
 
-
-__all__ = ["EvidenceToolHandler"]
-
-
 ###############################################################################
 def _properties(item: dict[str, Any]) -> dict[str, Any]:
     properties = item.get("properties")
@@ -619,3 +624,43 @@ def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) ->
     order_by = str(operation.get("order_by") or "count")
     # Cells without the ordering value sort last instead of as zero.
     return sorted(cells, key=lambda item: (item.get(order_by) is not None, item.get(order_by) or 0), reverse=True)
+
+###############################################################################
+def _inherited_assessment(
+    parents: list[dict[str, Any]],
+) -> tuple[str | None, dict[str, Any]]:
+    """Carry the parents' source and scope facts onto derived evidence.
+
+    A ranking of earlier evidence is exactly as relevant and as well scoped as
+    the evidence it was derived from, so later turns can complete from it
+    without fetching the same data again.  A missing parent fact stays unknown.
+    """
+
+    capability_ids = {
+        str(parent.get("capability_id"))
+        for parent in parents
+        if parent.get("capability_id")
+    }
+    coverages = [json_object(parent.get("coverage")) for parent in parents]
+    sources = {
+        str(json_object(parent.get("query")).get("location_ref") or "")
+        for parent in parents
+    } | {
+        str(ref)
+        for item in coverages
+        for ref in json_array(item.get("source_location_refs"))
+    }
+    coverage: dict[str, Any] = {
+        "derived": True,
+        "source_location_refs": sorted(source for source in sources if source),
+    }
+    for flag in ("spatial_scope_satisfied", "temporal_scope_satisfied"):
+        values: list[object] = [item.get(flag) for item in coverages]
+        if values and all(value is True for value in values):
+            coverage[flag] = True
+        elif any(value is False for value in values):
+            coverage[flag] = False
+    return (next(iter(capability_ids)) if len(capability_ids) == 1 else None), coverage
+
+
+__all__ = ["EvidenceToolHandler"]

@@ -26,6 +26,7 @@ from server.domain.geospatial.providers import ProviderRequest, ProviderResponse
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.land_mask import country_at
 from server.services.geospatial.provider_registry import (
     ProviderNotRegisteredError,
     ProviderRegistry,
@@ -562,6 +563,12 @@ def _provider_params(
             params["wikidata_id"] = location.wikidata_id
         if location.source == "aegis_macro_regions":
             params["macro_region"] = location.label
+        elif location.location_type == "country":
+            # A country-wide grid must not sample neighbouring land inside the
+            # country's bounding box.
+            country_code = country_at(location.longitude, location.latitude)
+            if country_code:
+                params["mask_countries"] = [country_code]
     if request.operation is not None:
         params.setdefault("operation", request.operation)
     if request.location_ref is not None:

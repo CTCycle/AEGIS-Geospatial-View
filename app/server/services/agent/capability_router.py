@@ -167,6 +167,32 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
     return build_location_map_route()
 
 ###############################################################################
+def is_location_only_map_request(
+    user_message: str,
+    route: CapabilityRoute,
+    *,
+    requests_entities: bool = False,
+) -> bool:
+    """Keep named-place display separate from provider-data retrieval."""
+
+    if (
+        requests_entities
+        or route.presentation not in {"map", "both"}
+        or route.primary_domain is not CapabilityDomain.PLACE_SEARCH
+    ):
+        return False
+    terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
+    if not terms.intersection({"show", "display", "view", "locate", "map", "landmark"}):
+        return False
+    return not terms.intersection(
+        {
+            "find", "search", "near", "nearby", "within", "around", "poi",
+            "amenity", "amenities", "cafe", "cafes", "hospital", "hospitals",
+            "station", "stations", "data", "points",
+        }
+    )
+
+###############################################################################
 def _fast_route_target(user_message: str) -> str | None:
     match = _FAST_ROUTE_PATTERN.match(" ".join(user_message.split()))
     if match is None:
@@ -231,6 +257,17 @@ class CapabilityRouter:
         return build_location_map_route([target])
 
     # -------------------------------------------------------------------------
+    def requests_catalog_entities(self, user_message: str) -> bool:
+        """Whether the message asks for provider records, not only a viewport.
+
+        This one predicate keeps routing, location-only map recovery and the
+        completion contract consistent instead of each keeping a vocabulary.
+        """
+
+        requests = getattr(self.capability_registry, "requests_catalog_entities", None)
+        return bool(callable(requests) and requests(user_message))
+
+    # -------------------------------------------------------------------------
     def validate_route(
         self,
         proposed: CapabilityRoute,
@@ -261,8 +298,9 @@ class CapabilityRouter:
         )
         if coordinate_reason is not None:
             reasons.append(coordinate_reason)
+        requests_entities = self.requests_catalog_entities(user_message)
         proposed, map_data_reason = _normalize_data_bearing_map_route(
-            proposed, user_message=user_message
+            proposed, user_message=user_message, requests_entities=requests_entities
         )
         if map_data_reason is not None:
             reasons.append(map_data_reason)
@@ -275,7 +313,7 @@ class CapabilityRouter:
         if temporal_reason is not None:
             reasons.append(temporal_reason)
         proposed, location_map_reason = _normalize_location_map_route(
-            proposed, user_message=user_message
+            proposed, user_message=user_message, requests_entities=requests_entities
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
@@ -1015,12 +1053,42 @@ def _normalize_data_bearing_map_route(
     route: CapabilityRoute,
     *,
     user_message: str = "",
+    requests_entities: bool = False,
 ) -> tuple[CapabilityRoute, str | None]:
     """Keep data-bearing requests on a route eligible for data tools."""
 
     operation = str(route.operation or "").strip().casefold()
     if route.task_mode != "execute":
         return route, None
+
+    route_domains = {route.primary_domain, *route.secondary_domains}
+    if (
+        requests_entities
+        and route.primary_domain
+        in {CapabilityDomain.PLACE_SEARCH, CapabilityDomain.MAP_RENDERING}
+        and not route_domains.intersection(
+            {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANALYSIS}
+        )
+    ):
+        # "Locate the airports in Switzerland" names provider records; a
+        # place or viewport route would never expose a data tool for them.
+        secondary_domains = [
+            *(
+                [CapabilityDomain.MAP_RENDERING]
+                if route.presentation in {"map", "both"}
+                else []
+            ),
+            CapabilityDomain.DATA_RETRIEVAL,
+        ]
+        return (
+            route.model_copy(
+                update={
+                    "primary_domain": CapabilityDomain.PLACE_SEARCH,
+                    "secondary_domains": secondary_domains,
+                }
+            ),
+            "catalog_entity_route_normalized",
+        )
 
     if route.primary_domain is CapabilityDomain.PLACE_SEARCH:
         message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
@@ -1158,6 +1226,7 @@ def _normalize_location_map_route(
     route: CapabilityRoute,
     *,
     user_message: str = "",
+    requests_entities: bool = False,
 ) -> tuple[CapabilityRoute, str | None]:
     """Keep location-only map requests on the map-planning route.
 
@@ -1170,7 +1239,8 @@ def _normalize_location_map_route(
     """
 
     if (
-        route.task_mode != "execute"
+        requests_entities
+        or route.task_mode != "execute"
         or route.presentation not in {"map", "both"}
         or route.primary_domain is not CapabilityDomain.PLACE_SEARCH
         or any(

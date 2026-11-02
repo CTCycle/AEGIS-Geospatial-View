@@ -1531,3 +1531,12 @@ def test_native_tool_maps_provider_failures_to_canonical_codes(
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == expected_code
+
+###############################################################################
+def test_ourairports_live_request_reports_no_records_instead_of_a_descriptor() -> None:
+    with pytest.raises(ProviderUnavailableError, match="no live airport records"):
+        run_async_in_thread(
+            OurAirportsProvider().fetch(
+                ProviderRequest(capability_id="ourairports_airports", params={"live": True})
+            )
+        )

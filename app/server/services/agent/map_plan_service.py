@@ -32,6 +32,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.map_session_builder import (
     MapPlanBuildError,
     MapSessionBuilder,
+    viewport_covering_evidence,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -154,6 +155,8 @@ class MapPlanService:
                 state=state,
                 actions=effective_actions,
             )
+            if state.route is not None and len(state.route.target_refs) > 1 and evidence:
+                candidate = viewport_covering_evidence(candidate, evidence)
             if self._valid_empty_data_only(state):
                 payload = dict(candidate.payload)
                 payload["result_status"] = "valid_empty"

@@ -31,6 +31,7 @@ from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.map_plan_service import MapPlanService
 from server.services.geospatial.map_session_builder import (
+    viewport_covering_evidence,
     MapPlanBuildError,
     MapSessionBuilder,
 )
@@ -1116,3 +1117,21 @@ async def test_remove_layer_mutation_removes_instance_and_increments_revision() 
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances == []
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_comparison_viewport_is_widened_to_every_evidence_extent() -> None:
+    builder = MapSessionBuilder(capability_registry=FakeCapabilityRegistry())  # type: ignore[arg-type]
+    evidence = [
+        AgentEvidenceEnvelope(ok=True, status="available", evidence_ref=ref, summary={"bbox": bbox})
+        for ref, bbox in (("paris", [2.35, 48.85, 2.35, 48.85]), ("berlin", [13.4, 52.52, 13.4, 52.52]))
+    ]
+    candidate = await builder.build(
+        location=ResolvedLocation(label="Paris", latitude=48.85, longitude=2.35),
+        active_session=_active_session(),
+        evidence=evidence,
+        actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
+    )
+    west, south, east, north = viewport_covering_evidence(candidate, evidence).viewport.bbox or []
+
+    assert west <= 2.35 and east >= 13.4 and south <= 48.85 and north >= 52.52

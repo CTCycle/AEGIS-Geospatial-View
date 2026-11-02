@@ -1,6 +1,13 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
+
+## 2026-11-02 agentic reliability slice (`develop@c2b10b8f` + working tree)
+
+The [reliability report](../../QA/e2e-agent-reliability-20261102/report.md) adds progress-aware stuck detection, honest partial outcomes, explainable discovery, evidence-inheriting completion, catalog-entity routing (AG-10 root cause), forward forecast windows, country masks and area lowering, per-target map coverage, render-timeout retry and server evidence-map recovery.
+- Local gates **PASS**: 1,330 backend tests, strict Pyright, Ruff, 309 Karma specs, production build, and 10 trajectory scenarios (four replay browser failures and fail on `HEAD`).
+- Live UI **PARTIAL**: DeepSeek 20 PASS / 3 PARTIAL / 3 FAIL / 1 BLOCKED of 27 turns, with runs stored `failed` down from 37 % to 11 %. Beam round 2: 7 / 7 / 5 / 0 of 19 re-run turns, with `failed` down from 59 % to 11 %.
+- Not re-run live: the unscoped-country bbox fix (Beam E-t1/S08-t1).
 
 ## October 23–24 agentic-loop continuation (`loop-dev`)
 

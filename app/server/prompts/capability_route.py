@@ -38,6 +38,9 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "Every search_area discovery route must include analysis, including seismic hotspots. "
     "For today / past day, past week, or past month without explicit dates, set "
     "temporal_scope.granularity to day, week, or month respectively; do not leave it none. "
+    "For any other relative time (tomorrow, tonight, next 48 hours, last 400 days, since "
+    "Monday) compute temporal_scope.start_time_iso and end_time_iso as UTC ISO instants "
+    "from the supplied current time; future windows use mode forecast. "
     "Analysis is separate from provider operations: use operation show for maps or inspect for text, "
     "and choose bbox spatial scope for a macro-region. For active-map updates use none.\n"
     "7. Use secondary_domains for at most three genuinely related domains.\n"
@@ -53,7 +56,10 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "10. Data requested for the area the user is looking at ('here', 'in this "
     "view', 'the visible map') uses location_mode target with target_refs "
     "['current map view'].\n"
-    "11. Return the tool call immediately without explanations or deliberation."
+    "11. Several things a data source lists (airports, schools, earthquakes, "
+    "stations) are provider data: include data_retrieval even when the user only "
+    "asks to locate or display them.\n"
+    "12. Return the tool call immediately without explanations or deliberation."
 )
 
 ###############################################################################

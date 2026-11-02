@@ -100,6 +100,13 @@ class ExecuteCapabilityInput(StrictToolInput):
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
 
+_SERVER_OWNED_EXECUTE_FIELDS = (
+    "temporal_mode", "start_time_iso", "end_time_iso", "bbox", "radius_m",
+    "latitude", "longitude",
+)
+# Record listings are pages; "records" is the most common model spelling.
+_INSPECT_VIEW_ALIASES = {"records": "page", "rows": "page", "data": "sample", "summary": "statistics"}
+
 ###############################################################################
 class ExecuteCapabilityToolInput(StrictToolInput):
     """Model intent for execution; geography and time remain server-owned."""
@@ -111,10 +118,50 @@ class ExecuteCapabilityToolInput(StrictToolInput):
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
+    @model_validator(mode="before")
+    @classmethod
+    def _hoist_top_level_fields(cls, value: Any) -> Any:
+        """Lift tool-level fields a model nested inside provider arguments.
+
+        Weaker models write ``arguments: {location_ref: ...}``; the field is
+        unambiguous, so normalize it instead of failing every call in a batch.
+        """
+
+        if not isinstance(value, dict):
+            return value
+        data: dict[str, Any] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
+        # Time and geography are bound from the validated route; a model
+        # repeating them here would only fail validation for every call.
+        for key in _SERVER_OWNED_EXECUTE_FIELDS:
+            data.pop(key, None)
+        nested = data.get("arguments")
+        if not isinstance(nested, dict):
+            return data
+        remaining: dict[str, Any] = dict(nested)  # pyright: ignore[reportUnknownArgumentType]
+        for key in ("location_ref", "operation", "evidence_refs", "filters"):
+            if key in remaining and data.get(key) in (None, [], {}):
+                data[key] = remaining.pop(key)
+        data["arguments"] = remaining
+        return data
+
 ###############################################################################
 class InspectEvidenceInput(StrictToolInput):
     evidence_ref: str = Field(min_length=1, max_length=200)
     view: str = Field(pattern="^(metadata|schema|sample|statistics|page)$")
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="before")
+    @classmethod
+    def _alias_view(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        data: dict[str, Any] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
+        view = data.get("view")
+        if isinstance(view, str):
+            normalized = view.strip().casefold()
+            data["view"] = _INSPECT_VIEW_ALIASES.get(normalized, normalized)
+        return data
     fields: list[str] = Field(default_factory=list, max_length=32)
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)

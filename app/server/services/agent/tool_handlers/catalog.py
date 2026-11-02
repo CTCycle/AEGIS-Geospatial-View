@@ -45,6 +45,7 @@ class CatalogToolHandler:
         state: AgentRunState,
     ) -> ToolResult:
         started = time.perf_counter()
+        diagnostics: dict[str, Any] | None = None
         route_domains = {CapabilityDomain.MIXED}
         route = state.route
         catalog_discovery = (
@@ -95,33 +96,33 @@ class CatalogToolHandler:
                 if self.runtime_registry.is_enabled(str(item.get("id") or ""))
             ]
         else:
-            candidates = self.capability_registry.shortlist(
-                domains=route_domains,
-                queries=query_values,
-                explicit_ids=request.capability_ids,
-                runtime_registry=self.runtime_registry,
+            constraints: dict[str, Any] = {
+                "domains": route_domains,
+                "queries": query_values,
+                "explicit_ids": request.capability_ids,
+                "runtime_registry": self.runtime_registry,
                 # Pagination is applied after deterministic ranking so a cursor
                 # always addresses the same catalog snapshot.
-                limit=None if catalog_discovery else 50,
-                operation=(
+                "limit": None if catalog_discovery else 50,
+                "operation": (
                     None
                     if catalog_discovery or route_filters is None
                     else route_filters.operation
                 ),
-                scope_kind=(
+                "scope_kind": (
                     None
                     if catalog_discovery or follow_up
                     else _resolved_scope_kind(route, location)
                 ),
-                temporal_mode=(
+                "temporal_mode": (
                     route_filters.temporal_scope.mode
                     if route_filters is not None and route_filters.temporal_scope.mode != "none"
                     else None
                 ),
-                temporal_granularity=(
+                "temporal_granularity": (
                     route_filters.temporal_scope.granularity if route_filters is not None else None
                 ),
-                has_explicit_time_range=(
+                "has_explicit_time_range": (
                     route_filters is not None
                     and any(
                         value is not None
@@ -132,11 +133,14 @@ class CatalogToolHandler:
                         )
                     )
                 ),
-                requires_render=(
+                "requires_render": (
                     route_filters is not None and route_filters.presentation in {"map", "both"}
                 ),
-                location=location,
-            )
+                "location": location,
+            }
+            candidates = self.capability_registry.shortlist(**constraints)
+            if not candidates and not catalog_discovery:
+                diagnostics = self._empty_diagnostics(constraints, state)
         if state.excluded_capability_ids:
             excluded = set(state.excluded_capability_ids)
             candidates = [
@@ -182,10 +186,11 @@ class CatalogToolHandler:
             summary=(
                 f"Found {len(descriptors)} eligible capabilities."
                 if descriptors
-                else "No eligible capabilities matched the request."
+                else str((diagnostics or {}).get("summary") or "No eligible capabilities matched the request.")
             ),
             data={
                 "capabilities": descriptors,
+                **({"diagnostics": diagnostics} if diagnostics and not descriptors else {}),
                 "provider_id": request.provider_id,
                 "next_cursor": (
                     str(offset + len(descriptors))
@@ -198,6 +203,81 @@ class CatalogToolHandler:
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000))
             ),
         )
+
+    # -------------------------------------------------------------------------
+    def _empty_diagnostics(
+        self,
+        constraints: dict[str, Any],
+        state: AgentRunState,
+    ) -> dict[str, Any]:
+        """Explain an empty shortlist by relaxing one canonical constraint.
+
+        The same registry policy is re-run with a single filter removed, so
+        the explanation can never disagree with eligibility itself.
+        """
+
+        relaxations: list[tuple[str, str, dict[str, Any]]] = []
+        if constraints["operation"]:
+            relaxations.append(("operation", f"operation '{constraints['operation']}'", {"operation": None}))
+        if constraints["scope_kind"]:
+            relaxations.append(("spatial_scope", f"{constraints['scope_kind']} scope", {"scope_kind": None}))
+        if constraints["temporal_mode"] or constraints["has_explicit_time_range"]:
+            relaxations.append(("time", "requested time window", {
+                "temporal_mode": None, "temporal_granularity": None, "has_explicit_time_range": False,
+            }))
+        if constraints["requires_render"]:
+            relaxations.append(("map_rendering", "map rendering", {"requires_render": False}))
+        if constraints["location"] is not None:
+            relaxations.append(("coverage", "geographic coverage of the place", {"location": None}))
+        unmet: list[dict[str, Any]] = []
+        for kind, label, override in relaxations:
+            relaxed: dict[str, Any] = {**constraints, **override, "limit": 3}
+            alternatives = self.capability_registry.shortlist(**relaxed)
+            excluded = set(state.excluded_capability_ids)
+            alternatives = [item for item in alternatives if str(item.get("id") or "") not in excluded]
+            if alternatives:
+                unmet.append({
+                    "constraint": kind,
+                    "description": label,
+                    "alternatives": [
+                        _descriptor(self.capability_registry, self.runtime_registry, item)
+                        for item in alternatives
+                    ],
+                })
+        # The subject itself is never relaxed: a source for another subject is
+        # not an alternative, and offering one invites irrelevant evidence.
+        unavailable = self.capability_registry.unavailable_matches(
+            constraints, self.runtime_registry
+        )
+        parts: list[str] = []
+        if unmet:
+            first = unmet[0]
+            names = ", ".join(str(item["id"]) for item in first["alternatives"])
+            parts.append(
+                f"No enabled capability satisfies the {first['description']}; "
+                f"without it these match: {names}."
+            )
+        if unavailable:
+            parts.append("Matching but unavailable: " + ", ".join(
+                f"{item['capability_id']} ({item['reason']})" for item in unavailable
+            ) + ".")
+        if state.excluded_capability_ids:
+            parts.append(
+                "Excluded after failing in this run: "
+                + ", ".join(state.excluded_capability_ids[:4]) + "."
+            )
+        if not parts:
+            parts.append("No enabled catalog capability covers this subject.")
+        return {
+            "summary": " ".join(parts),
+            "unmet_constraints": unmet[:3],
+            "unavailable": unavailable,
+            "hint": (
+                "Repeating the same discovery will return the same result. Use a listed "
+                "alternative with arguments it supports, or answer with what is known "
+                "and state what no available source provides."
+            ),
+        }
 
     # -------------------------------------------------------------------------
     async def describe(

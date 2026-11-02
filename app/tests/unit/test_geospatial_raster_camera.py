@@ -17,6 +17,7 @@ import asyncio
 import httpx
 import json
 import time
+from datetime import UTC, datetime, timedelta
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 from server.services.geospatial.cache import GeospatialCache
@@ -159,6 +160,30 @@ async def test_weather_grid_region_refinement_future_hours_and_provenance():
     assert result.coverage["value_kind"] == "model_estimate"
     assert result.result_status == "partial"
     assert result.units["precipitation_sum_mm"] == "mm"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_country_mask_excludes_neighbouring_countries():
+    requested: list[tuple[float, float]] = []
+
+    ###############################################################################
+    class Service:
+        weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+        # -------------------------------------------------------------------------
+        async def get_weather_grid(self, points, past_days):
+            requested.extend(points)
+            row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
+                   "hourly": {"time": ["2026-10-20T12:00"], "temperature_2m": [10], "precipitation": [0]}}
+            return [row for _ in points]
+    result = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
+        capability_id="openmeteo_weather_forecast", bbox=(5.96, 45.82, 10.49, 47.81),
+        params={"sampling": "area", "mask_countries": ["CH"]}))
+    mask = land_mask((5.96, 45.82, 10.49, 47.81), ("CH",))
+    assert requested and all(mask.contains(Point(lon, lat)) for lat, lon in requested)
+    assert result.coverage["mask_countries"] == ["CH"]
+    assert result.coverage["excluded_outside_region_points"] > 0
 
 
 ###############################################################################
@@ -422,6 +447,41 @@ async def test_weather_grid_counts_malformed_measurements_as_missing():
         return [_grid_sample(lat) for lat, _ in points]
     result = await OpenMeteoProvider(service=_GridService(coarse, refined)).fetch(_grid_request())
     assert result.partial and result.coverage["missing_point_count"] == 2
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("available_hours", "covered"), [(72, True), (36, False)])
+async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(available_hours, covered):
+    midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    start, end = midnight + timedelta(days=1), midnight + timedelta(days=2)
+    # Open-Meteo times are local to the point (UTC+1) and hour-ending.
+    local_hours = [(midnight + timedelta(hours=hour + 1)).replace(tzinfo=None) for hour in range(available_hours)]
+    requested: list[int | None] = []
+
+    ###############################################################################
+    class Service:
+        weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+        # -------------------------------------------------------------------------
+        async def get_weather_grid(self, points, past_days, forecast_days=None):
+            requested.append(forecast_days)
+            sample = {"utc_offset_seconds": 3600, "current": {"time": local_hours[0].isoformat(timespec="minutes"), "temperature_2m": 10},
+                      "hourly": {"time": [stamp.isoformat(timespec="minutes") for stamp in local_hours],
+                                 "temperature_2m": [10] * available_hours, "precipitation": [1] * available_hours}}
+            return [sample for _ in points]
+
+    request = ProviderRequest(capability_id="openmeteo_weather_forecast", bbox=(8.0, 45.0, 10.0, 47.0), time=start,
+                              params={"sampling": "area", "end_time_iso": end.isoformat()})
+    result = await OpenMeteoProvider(service=Service()).fetch(request)
+
+    assert requested and all(days is not None and days >= 2 for days in requested)
+    feature = result.payload["features"][0]
+    selected_hours = min(available_hours, 49) - 25
+    assert feature["precipitation_sum_mm"] == selected_hours
+    assert feature["window_start_utc"] == (start + timedelta(hours=1)).isoformat()
+    assert datetime.fromisoformat(feature["window_end_utc"]) <= end
+    assert result.coverage["temporal_scope_satisfied"] is covered
+
 
 # --- test_geospatial_webcam_provider.py ---
 

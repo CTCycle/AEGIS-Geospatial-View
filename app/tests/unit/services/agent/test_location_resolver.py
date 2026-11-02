@@ -1264,3 +1264,55 @@ def test_country_rejects_mismatched_country_code() -> None:
 
     assert not isinstance(result, ResolvedLocation)
     assert result.missing_fields == ["location"]
+###############################################################################
+@pytest.mark.parametrize(
+    ("raw_value", "signal_type", "display", "address", "resolved"),
+    [
+        ("Greece", "country", "Greece", {"country": "Greece", "country_code": "gr"}, True),
+        ("Greece", "country", "Greece", {"country": "Greece", "country_code": "tr"}, False),
+        (
+            "Rome, Georgia",
+            "city",
+            "Rome, Floyd County, Georgia, United States",
+            {"city": "Rome", "county": "Floyd County", "state": "Georgia", "country": "United States", "country_code": "us"},
+            True,
+        ),
+        (
+            "Rome, Georgia",
+            "city",
+            "Rome, Lazio, Italy",
+            {"city": "Rome", "state": "Lazio", "country": "Italy", "country_code": "it"},
+            False,
+        ),
+    ],
+)
+def test_location_resolver_country_matching_uses_reference_catalog_and_parent_states(
+    raw_value: str,
+    signal_type: str,
+    display: str,
+    address: dict[str, str],
+    resolved: bool,
+) -> None:
+
+    ###############################################################################
+    class _Geocoder:
+
+        # -------------------------------------------------------------------------
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            return {
+                "display_name": display,
+                "lat": 38.0,
+                "lon": 23.0,
+                "selected_result_type": "administrative" if signal_type == "country" else "city",
+                "selected_address_type": "country" if signal_type == "country" else "city",
+                "address": address,
+                "namedetails": {"name:en": raw_value.split(",")[0]},
+            }
+
+    async def _run() -> None:
+        result = await LocationResolver(nominatim_service=_Geocoder()).resolve_location_signals(
+            [LocationSignal(signal_type=signal_type, raw_value=raw_value)], {}
+        )
+        assert isinstance(result, ResolvedLocation) is resolved
+
+    run_async_in_thread(_run())

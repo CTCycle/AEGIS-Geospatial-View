@@ -4,6 +4,7 @@ from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
     ProviderResponse,
+    ProviderUnavailableError,
 )
 
 ###############################################################################
@@ -12,6 +13,13 @@ class OurAirportsProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
+        if request.params.get("live"):
+            # The source is a CSV for the ingestion pipeline; at query time it
+            # has no airport records, and a descriptor is not evidence.
+            raise ProviderUnavailableError(
+                "OurAirports provides no live airport records; its CSV is only "
+                "available through dataset ingestion."
+            )
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,

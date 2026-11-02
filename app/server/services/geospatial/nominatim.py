@@ -27,6 +27,7 @@ from server.configurations.settings import JsonNominatimSettings, NominatimSetti
 
 ###############################################################################
 class NominatimService:
+    GENERIC_QUERY_FILLERS = frozenset({"the", "central", "main", "centre", "center"})
     GENERIC_QUERY_DESCRIPTORS = frozenset(
         {
             "site",
@@ -49,6 +50,13 @@ class NominatimService:
             "river",
             "road",
             "station",
+            "railway",
+            "rail",
+            "train",
+            "bus",
+            "metro",
+            "subway",
+            "tram",
             "area",
             "zona",
             "quartiere",
@@ -300,6 +308,16 @@ class NominatimService:
         if len(ranked) < 2:
             return []
         expected = str(expected_location_type or "").strip().lower()
+        query_tokens = self.tokenize(query)
+        generic_only_query = (
+            not has_parent_context
+            and any(token in self.GENERIC_QUERY_DESCRIPTORS for token in query_tokens)
+            and all(
+                token in self.GENERIC_QUERY_DESCRIPTORS
+                or token in self.GENERIC_QUERY_FILLERS
+                for token in query_tokens
+            )
+        )
         city_types = {"city", "town", "village", "municipality", "hamlet"}
         administrative_types = {
             "country",
@@ -350,6 +368,10 @@ class NominatimService:
             ]
             if qualified_candidates:
                 same_level_candidates = qualified_candidates
+        elif generic_only_query:
+            # "the central station" names no place: every station worldwide
+            # fits, whatever result type the geocoder happens to return.
+            same_level_candidates = list(ranked)
         elif expected in {"region", "state", "province", "county"}:
             same_level_candidates = [
                 candidate
@@ -427,7 +449,11 @@ class NominatimService:
         # candidate; this avoids stopping on well-ranked global places while
         # preserving clarification for close candidates such as Cambridge.
         if not has_parent_context:
-            if first_confidence >= 0.8 and provider_importance_gap >= 0.25:
+            if (
+                not generic_only_query
+                and first_confidence >= 0.8
+                and provider_importance_gap >= 0.25
+            ):
                 return []
             confidence_gap = 0.0
         if has_parent_context and confidence_gap >= 0.08:

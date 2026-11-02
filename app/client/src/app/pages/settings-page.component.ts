@@ -171,6 +171,7 @@ const createDefaultRuntimeSettings = (): RuntimeSettingsResponse => ({
     max_render_attempts: 3,
     max_discovery_attempts: 2,
     max_no_progress_corrections: 2,
+    max_unproductive_steps: 3,
     simple_max_model_calls: 4,
     complex_max_model_calls: 10,
     simple_max_tool_calls: 6,

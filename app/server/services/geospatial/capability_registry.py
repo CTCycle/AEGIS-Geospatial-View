@@ -407,6 +407,56 @@ class CapabilityRegistry:
         return bool(_raw_query_tokens([text]).intersection(self._capability_terms))
 
     # -------------------------------------------------------------------------
+    def unavailable_matches(
+        self,
+        constraints: dict[str, Any],
+        runtime_registry: RuntimeEligibility,
+        *,
+        limit: int = 3,
+    ) -> list[dict[str, str]]:
+        """Name entries the same shortlist would return but runtime gating hides."""
+
+        ungated_constraints: dict[str, Any] = {
+            **constraints,
+            "runtime_registry": _UngatedRuntime(runtime_registry),
+            "limit": 12,
+        }
+        ungated = self.shortlist(**ungated_constraints)
+        matches: list[dict[str, str]] = []
+        for item in ungated:
+            capability_id = str(item.get("id") or "").strip()
+            if not runtime_registry.is_enabled(capability_id):
+                reason = "disabled in Settings"
+            elif not runtime_registry.access_available(capability_id):
+                reason = "missing a required credential"
+            else:
+                continue
+            matches.append({"capability_id": capability_id, "reason": reason})
+            if len(matches) >= limit:
+                break
+        return matches
+
+    # -------------------------------------------------------------------------
+    def requests_catalog_entities(self, text: str) -> bool:
+        """Return whether the text asks for several things a data source provides.
+
+        A plural catalog noun ("airports", "schools", "earthquakes") asks for
+        provider records, never only for a viewport.  Basemap vocabulary and
+        multi-word proper names ("the Rocky Mountains") are not entity requests.
+        """
+
+        words = re.findall(r"[^\W\d_]+", text)
+        for index, word in enumerate(words):
+            token = word.casefold()
+            if len(token) <= 3 or not token.endswith("s"):
+                continue
+            if index > 1 and word[:1].isupper() and words[index - 1][:1].isupper():
+                continue
+            if _raw_query_tokens([token]).intersection(self._data_capability_terms):
+                return True
+        return False
+
+    # -------------------------------------------------------------------------
     @cached_property
     def _capability_terms(self) -> frozenset[str]:
         # Narrower than the full searchable text: descriptions and examples
@@ -414,14 +464,36 @@ class CapabilityRegistry:
         # a capability shows.
 
         snapshot = self._ensure_snapshot()
+        return frozenset(
+            self._entry_terms(
+                (
+                    *snapshot.basemaps,
+                    *snapshot.overlays,
+                    *snapshot.cameras,
+                    *snapshot.transit,
+                    *snapshot.tools,
+                )
+            ).difference(_ROUTING_CONTEXT_TOKENS)
+        )
+
+    # -------------------------------------------------------------------------
+    @cached_property
+    def _data_capability_terms(self) -> frozenset[str]:
+        snapshot = self._ensure_snapshot()
+        data_terms = self._entry_terms(
+            (*snapshot.overlays, *snapshot.cameras, *snapshot.transit, *snapshot.tools)
+        )
+        return frozenset(
+            data_terms.difference(
+                self._entry_terms(snapshot.basemaps), _ROUTING_CONTEXT_TOKENS
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _entry_terms(items: Sequence[dict[str, Any]]) -> set[str]:
         terms: set[str] = set()
-        for item in (
-            *snapshot.basemaps,
-            *snapshot.overlays,
-            *snapshot.cameras,
-            *snapshot.transit,
-            *snapshot.tools,
-        ):
+        for item in items:
             agentic_use = json_object(item.get("agenticUse"))
             metadata = json_object(item.get("metadata"))
             terms.update(
@@ -436,7 +508,7 @@ class CapabilityRegistry:
                     ]
                 )
             )
-        return frozenset(terms.difference(_ROUTING_CONTEXT_TOKENS))
+        return terms
 
     # -------------------------------------------------------------------------
     def _ensure_snapshot(self) -> CapabilityRegistrySnapshot:
@@ -792,6 +864,9 @@ def _operation_candidates(operation: str) -> set[str]:
         "retrieve": {"search", "show", "inspect", "overlay", "forecast"},
         # Comparing places is a retrieval per target; no manifest declares it.
         "compare": {"search", "show", "inspect", "overlay", "forecast"},
+        # Counting or listing records is a retrieval; the count is derived.
+        "count": {"search", "show", "inspect"},
+        "list": {"search", "show", "inspect"},
         "estimate": {"show", "inspect"},
         "visualize": {"show", "overlay"},
         "weather": {"forecast", "show", "inspect"},
@@ -829,6 +904,29 @@ def _operation_candidates(operation: str) -> set[str]:
     if "basemap" in tokens:
         candidates.add("show")
     return candidates
+
+###############################################################################
+class _UngatedRuntime:
+    """Runtime view that treats every entry as enabled and accessible."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self, runtime_registry: RuntimeEligibility) -> None:
+        self.runtime_registry = runtime_registry
+
+    # -------------------------------------------------------------------------
+    def is_enabled(self, capability_id: str) -> bool:
+        del capability_id
+        return True
+
+    # -------------------------------------------------------------------------
+    def access_available(self, capability_id: str) -> bool:
+        del capability_id
+        return True
+
+    # -------------------------------------------------------------------------
+    def supports_mode(self, capability_id: str, mode: str) -> bool:
+        supports_mode = getattr(self.runtime_registry, "supports_mode", None)
+        return not callable(supports_mode) or bool(supports_mode(capability_id, mode))
 
 ###############################################################################
 def _runtime_supports_render(

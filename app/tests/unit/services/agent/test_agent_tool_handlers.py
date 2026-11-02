@@ -7,6 +7,7 @@ from server.domain.agent.capability_route import CapabilityRoute, AgentPhase, Ag
 from server.domain.agent.decision import ResolvedLocation, ClarificationRequest
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput, ResolveLocationInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
+from server.services.geospatial.capability_registry import CapabilityRegistry
 from pydantic import ValidationError
 from server.services.agent.location_resolver import NO_CANDIDATE_REASON, LocationResolver
 from server.services.agent.tool_handlers.location import LocationToolHandler
@@ -604,3 +605,51 @@ def test_text_coordinates_ignore_calendar_dates(text: str, expected) -> None:
 
     assert _parse_coordinate_pair_from_text(text) == expected
     assert (_search_text_coordinates(text) is not None) is (expected is not None)
+###############################################################################
+class _KeylessRuntime(_RuntimeRegistry):
+
+    # -------------------------------------------------------------------------
+    def access_available(self, capability_id: str) -> bool:
+        return capability_id != "openchargemap_ev_charging"
+
+###############################################################################
+def test_empty_count_discovery_names_missing_credential_without_other_subjects() -> None:
+    zurich = ResolvedLocation(
+        label="Zurich, Switzerland",
+        latitude=47.3769,
+        longitude=8.5417,
+        bbox=[8.45, 47.32, 8.62, 47.43],
+        country="Switzerland",
+    )
+    state = AgentRunState(
+        request_id="request-ev",
+        conversation_id="conversation-ev",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="How many EV charging stations are near Zurich?",
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="execute",
+            presentation="text",
+            location_mode="target",
+            capability_queries=["ev charging stations"],
+            operation="count",
+            target_refs=["Zurich"],
+            spatial_scope={"kind": "point", "target_refs": ["Zurich"]},
+        ),
+        location_refs={"zurich": zurich},
+    )
+    handler = CatalogToolHandler(
+        capability_registry=CapabilityRegistry(),
+        runtime_registry=_KeylessRuntime(),  # type: ignore[arg-type]
+    )
+
+    result = asyncio.run(handler.discover(CapabilityDiscoveryInput(limit=12), state))
+
+    data = result.data or {}
+    assert result.status == "valid_empty"
+    assert data["capabilities"] == []
+    assert "openchargemap_ev_charging (missing a required credential)" in result.summary
+    for alternatives in (
+        item["alternatives"] for item in data["diagnostics"]["unmet_constraints"]
+    ):
+        assert all("charg" in str(item["id"]) for item in alternatives)

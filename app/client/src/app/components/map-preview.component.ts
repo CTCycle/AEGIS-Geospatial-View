@@ -68,6 +68,17 @@ export interface MapRenderIdentity {
 
 const OVERLAY_SOURCE_PREFIX = 'overlay-source-';
 
+// `idle` needs every tile settled and can stay silent on slow tiles, so a
+// candidate that is applied and verifiable is acknowledged after this grace.
+const RENDER_WATCHDOG_MS = 30_000;
+const IDLE_FALLBACK_GRACE_MS = 3_000;
+const IDLE_FALLBACK_POLL_MS = 1_000;
+
+const isMetadataOnlyOverlay = (overlay: OverlayEntry): boolean => (
+  String(overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '')
+    .toLowerCase() === 'metadata-only' || overlay.type === 'metadata-only'
+);
+
 const stringArrayEqual = (left: readonly string[], right: readonly string[]): boolean => (
   left.length === right.length && left.every((value, index) => value === right[index])
 );
@@ -165,6 +176,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private candidateGeneration = 0;
   private renderWatchdog?: number;
   private rasterEvidenceMap: Map | null = null;
+  private loadedSourceIds = new Set<string>();
   private rasterVisibilityEvidence: Record<string, RasterVisibilityObservation> = {};
   private pendingCandidate?: {
     map: Map;
@@ -613,6 +625,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       // Overlay and metadata updates are applied to the known-good map in place.
       this.unbindInspectionListeners();
       removeOverlayLayers(this.mapRef, this.mapSession);
+      this.loadedSourceIds.clear();
       this.overlayRenderStatuses = addOverlayLayers(this.mapRef, this.mapSession);
       this.bindInspectionListeners(this.mapRef);
       this.applyOverlayStateToMap();
@@ -692,22 +705,62 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.clearRenderWatchdog();
     };
 
-    this.clearRenderWatchdog();
-    this.renderWatchdog = window.setTimeout(() => {
-      if (!isCurrentCandidate()) {
-        return;
+    const loadedSources = new Set<string>();
+    this.loadedSourceIds = loadedSources;
+    let styleLoaded = false;
+    let committing = false;
+    let watchdogExtended = false;
+    let fallbackTimer: number | undefined;
+    const stopFallback = (): void => {
+      if (fallbackTimer !== undefined) {
+        window.clearInterval(fallbackTimer);
+        fallbackTimer = undefined;
       }
-      candidateSettled = true;
-      this.mapPreparing = false;
-      clearCandidate();
-      this.unbindInspectionListenersForMap(candidate);
-      candidate.remove();
-      this.removeCandidateContainer(candidateContainer, originalContainer);
-      if (!this.destroyed) {
-        this.emitRenderState('failed', 'render_timeout', candidateIdentity);
-        this.changeDetector.detectChanges();
+    };
+    const armWatchdog = (): void => {
+      this.clearRenderWatchdog();
+      this.renderWatchdog = window.setTimeout(() => {
+        if (!isCurrentCandidate()) {
+          return;
+        }
+        const checks = this.candidateChecks(candidate, styleLoaded);
+        const onlyTilesPending = checks['style_loaded'] && checks['sources_present']
+          && checks['layers_present'] && checks['viewport_valid'] && !checks['tiles_settled'];
+        if (onlyTilesPending && !watchdogExtended) {
+          // Tiles are still in flight but the candidate is otherwise intact:
+          // extend once, within the backend render-ack budget.
+          watchdogExtended = true;
+          armWatchdog();
+          return;
+        }
+        candidateSettled = true;
+        this.mapPreparing = false;
+        stopFallback();
+        clearCandidate();
+        if (!this.destroyed) {
+          // Report the candidate's real per-check state before tearing it down.
+          this.emitRenderState('failed', 'render_timeout', candidateIdentity, { map: candidate, checks });
+        }
+        this.unbindInspectionListenersForMap(candidate);
+        candidate.remove();
+        this.removeCandidateContainer(candidateContainer, originalContainer);
+        if (!this.destroyed) {
+          this.changeDetector.detectChanges();
+        }
+      }, RENDER_WATCHDOG_MS);
+    };
+    armWatchdog();
+
+    candidate.on('sourcedata', (event: unknown) => {
+      const { sourceId, isSourceLoaded, tile } = (event ?? {}) as {
+        sourceId?: string;
+        isSourceLoaded?: boolean;
+        tile?: unknown;
+      };
+      if (sourceId?.startsWith(OVERLAY_SOURCE_PREFIX) && (isSourceLoaded || tile)) {
+        loadedSources.add(sourceId);
       }
-    }, 30_000);
+    });
 
     candidate.on('error', (event: unknown) => {
       if (!isCurrentCandidate()) {
@@ -719,6 +772,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       if (error && (!sourceId || sourceId.startsWith(OVERLAY_SOURCE_PREFIX))) {
         candidateSettled = true;
         this.mapPreparing = false;
+        stopFallback();
         clearCandidate();
         this.unbindInspectionListenersForMap(candidate);
         candidate.remove();
@@ -759,6 +813,7 @@ candidate.on('load', () => {
       if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
         candidateSettled = true;
         this.mapPreparing = false;
+        stopFallback();
         clearCandidate();
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
@@ -771,41 +826,15 @@ candidate.on('load', () => {
         }
         return;
       }
+      styleLoaded = true;
       // `load` precedes the requests initiated by addOverlayLayers. Keep the
       // candidate and its error handler alive until those sources settle.
-      candidate.on('idle', () => {
-        if (!this.hasRasterVisibilityProbe()) {
-          if (!isCurrentCandidate()) {
-            return;
-          }
-          candidateSettled = true;
-          clearCandidate();
-          this.mapPreparing = false;
-          this.mapRef = candidate;
-          this.activeMapContainer = candidateContainer;
-          this.activeBasemapId = nextBasemapId;
-          this.activeCenterKey = nextCenterKey;
-          this.activeSessionKey = nextSessionKey;
-          this.awaitingBackendAcknowledgment = Boolean(candidateIdentity);
-          this.awaitingCandidateMap = candidateIdentity ? candidate : null;
-          this.applyOverlayStateToMap();
-          if (previousMap && previousMap !== candidate) {
-            this.retainedPrevious = {
-              map: previousMap,
-              container: previousContainer,
-              basemapId: previousBasemapId,
-              centerKey: previousCenterKey,
-              sessionKey: previousSessionKey,
-            };
-          }
-          this.emitRenderState('ready', undefined, candidateIdentity);
-          this.changeDetector.detectChanges();
-          this.scheduleMapResize();
+      const commitCandidate = (): void => {
+        if (!isCurrentCandidate() || committing) {
           return;
         }
-        if (!isCurrentCandidate()) {
-          return;
-        }
+        committing = true;
+        stopFallback();
         this.mapPreparing = false;
         this.mapRef = candidate;
         this.activeMapContainer = candidateContainer;
@@ -839,7 +868,24 @@ candidate.on('load', () => {
         } else {
           finishCandidate();
         }
-      });
+      };
+      candidate.on('idle', commitCandidate);
+      // Fallback when `idle` never fires: acknowledge once the applied
+      // candidate verifies; a missing source or layer never qualifies.
+      let fallbackTicks = 0;
+      fallbackTimer = window.setInterval(() => {
+        if (!isCurrentCandidate() || committing) {
+          stopFallback();
+          return;
+        }
+        fallbackTicks += 1;
+        if (fallbackTicks * IDLE_FALLBACK_POLL_MS < IDLE_FALLBACK_GRACE_MS) {
+          return;
+        }
+        if (Object.values(this.candidateChecks(candidate, styleLoaded)).every(Boolean)) {
+          commitCandidate();
+        }
+      }, IDLE_FALLBACK_POLL_MS);
     });
   }
 
@@ -1012,10 +1058,13 @@ candidate.on('load', () => {
     state: MapRenderState,
     message?: string,
     identity: MapRenderIdentity | undefined = this.renderIdentity,
+    candidateEvidence?: { map: Map; checks: Record<string, boolean> },
   ): void {
     const sessionId = this.mapSession?.session_id;
     if (sessionId) {
-      const evidence = this.renderEvidence(state);
+      const evidence = candidateEvidence
+        ? this.renderEvidence(state, candidateEvidence.map, candidateEvidence.checks)
+        : this.renderEvidence(state);
       this.renderStateChange.emit({
         sessionId,
         state,
@@ -1037,28 +1086,20 @@ candidate.on('load', () => {
     }
   }
 
-  private renderEvidence(state: MapRenderState): {
+  private renderEvidence(
+    state: MapRenderState,
+    evidenceMap: Map | null = this.mapRef,
+    checkOverrides: Record<string, boolean> = {},
+  ): {
     viewportBounds?: [number, number, number, number];
     checks: Record<string, boolean>;
     overlayResults: Array<Record<string, string | number | boolean | null>>;
   } {
-    const session = this.mapSession;
-    const map = this.mapRef;
-    const rawBounds = this.readMapBounds(map) ?? session?.bounds ?? session?.viewport?.bbox;
-    const viewportBounds: [number, number, number, number] | undefined = Array.isArray(rawBounds)
-      && rawBounds.length === 4
-      && rawBounds.every(isFiniteNumber)
-      && rawBounds[0] >= -180 && rawBounds[0] <= 180
-      && rawBounds[1] >= -90 && rawBounds[1] <= 90
-      && rawBounds[2] >= -180 && rawBounds[2] <= 180
-      && rawBounds[3] >= -90 && rawBounds[3] <= 90
-      && rawBounds[1] <= rawBounds[3]
-      ? [rawBounds[0], rawBounds[1], rawBounds[2], rawBounds[3]]
-      : undefined;
+    const map = evidenceMap;
+    const viewportBounds = this.validViewportBounds(map);
     const overlayResults = this.overlays.map((overlay) => {
       const layerIds = getOverlayLayerIds(overlay);
-      const metadataOnly = String(overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '')
-        .toLowerCase() === 'metadata-only' || overlay.type === 'metadata-only';
+      const metadataOnly = isMetadataOnlyOverlay(overlay);
       const mapApi = map as unknown as {
         getLayer?: (id: string) => unknown;
         getSource?: (id: string) => unknown;
@@ -1174,8 +1215,58 @@ candidate.on('load', () => {
       required_sources_loaded: state === 'ready' && required.every((item) => item.loaded === true),
       required_layers_present: state === 'ready' && required.every((item) => item.layer_present === true),
       viewport_valid: state === 'ready' && Boolean(viewportBounds),
+      ...checkOverrides,
     };
     return { viewportBounds, checks, overlayResults };
+  }
+
+  private validViewportBounds(map: Map | null): [number, number, number, number] | undefined {
+    const session = this.mapSession;
+    const rawBounds = this.readMapBounds(map) ?? session?.bounds ?? session?.viewport?.bbox;
+    return Array.isArray(rawBounds)
+      && rawBounds.length === 4
+      && rawBounds.every(isFiniteNumber)
+      && rawBounds[0] >= -180 && rawBounds[0] <= 180
+      && rawBounds[1] >= -90 && rawBounds[1] <= 90
+      && rawBounds[2] >= -180 && rawBounds[2] <= 180
+      && rawBounds[3] >= -90 && rawBounds[3] <= 90
+      && rawBounds[1] <= rawBounds[3]
+      ? [rawBounds[0], rawBounds[1], rawBounds[2], rawBounds[3]]
+      : undefined;
+  }
+
+  /**
+   * Verifies an applied candidate without relying on MapLibre's `idle`, which
+   * never fires while a tile stays in flight. `tiles_settled` is true (not
+   * "pending") so that a false value reads as a failed check in the backend.
+   */
+  private candidateChecks(map: Map, styleLoaded: boolean): Record<string, boolean> {
+    const mapApi = map as unknown as {
+      getLayer?: (id: string) => unknown;
+      getSource?: (id: string) => unknown;
+      isSourceLoaded?: (id: string) => boolean;
+    };
+    const required = this.overlays.filter((overlay) => !isMetadataOnlyOverlay(overlay));
+    const sourceIdOf = (overlay: OverlayEntry): string => `${OVERLAY_SOURCE_PREFIX}${overlay.id}`;
+    const sourceDelivered = (sourceId: string): boolean => {
+      if (this.loadedSourceIds.has(sourceId)) {
+        return true;
+      }
+      try {
+        return Boolean(mapApi.isSourceLoaded?.call(map, sourceId));
+      } catch {
+        return false;
+      }
+    };
+    return {
+      style_loaded: styleLoaded,
+      sources_present: required.every((overlay) => Boolean(mapApi.getSource?.call(map, sourceIdOf(overlay)))),
+      layers_present: required.every((overlay) => (
+        getOverlayLayerIds(overlay).some((id) => Boolean(mapApi.getLayer?.call(map, id)))
+      )),
+      viewport_valid: Boolean(this.validViewportBounds(map)),
+      tiles_settled: required.filter(isRasterOverlay).every((overlay) => sourceDelivered(sourceIdOf(overlay))),
+    };
   }
 
   private readMapBounds(map: Map | null): [number, number, number, number] | undefined {
@@ -1248,6 +1339,11 @@ candidate.on('load', () => {
         } catch {
           sourceLoaded = null;
         }
+      }
+      if (sourcePresent && sourceLoaded !== true && this.loadedSourceIds.has(sourceId)) {
+        // A tile or source data event proves the source delivered data even
+        // while unrelated tiles keep ``isSourceLoaded`` false.
+        sourceLoaded = true;
       }
       let visibility: unknown;
       try {

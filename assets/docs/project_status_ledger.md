@@ -1,6 +1,17 @@
 # Project Status Ledger
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
+
+The [2026-11-02 agentic reliability slice](../QA/e2e-agent-reliability-20261102/report.md) improves the native loop's decisions and recovery without new orchestration layers. Each change below has a regression test that fails on `HEAD`.
+- **Stuck detection:** a progress ledger over places, evidence, capabilities, obligations and map state. A step that adds nothing new is unproductive; three trigger a corrective notice and five end the run with gathered evidence (`max_unproductive_steps`).
+- **Recovery:** correction and failure counters run per model step, not per parallel call. Unambiguous model mistakes (nested `location_ref`, server-owned time or bbox fields, `view=records`) are normalized. One identical retry is allowed after `render_timeout`. When only the map is missing, the server maps the run's evidence once.
+- **Honest outcomes:** `insufficient_evidence` with an answer is stored as a partial answer with unmet obligations in plain language (F9). Fallbacks name the actual findings (F10/F17). Empty discovery explains which constraint or credential excluded sources.
+- **Task contract:** derived and inspected evidence inherits parent capability and scope, so follow-ups complete from earlier turns. Evidence from another place never counts. Comparison maps need a layer per target, with a viewport covering all of them. Measurement obligations always expose `measure_geospatial`.
+- **AG-10:** confirmed as a routing-normalizer defect ("airports", "schools" rewritten to location-only maps) and fixed with one catalog-entity predicate shared by routing and goal compile. A mid-run route revision was not needed and is deferred.
+- **Time and space:** routing receives the current UTC time, forecasts bind forward windows (including Open-Meteo grids), country grids are masked, every catalog country resolves, and unscoped countries are queried as areas.
+- **Render (F8):** the frontend acknowledges a verified candidate when MapLibre `idle` never fires, and reports real per-check state on timeout.
+- **Results:** 1,330 backend tests, Pyright, Ruff, 309 Karma specs and the build pass. Live: DeepSeek 20 / 3 / 3 / 1 of 27; Beam 7 / 7 / 5 / 0 of 19 re-run turns. Runs stored `failed` fell from 37 % to 11 % (DeepSeek) and from 59 % to 11 % (Beam).
+- **Open:** narration not checked against render state (DeepSeek H1 first attempt), multi-point viewport padding, the cloud-cover capability gap, Beam invented tool names, Overpass capacity, and the unscoped-country fix not re-run live.
 
 The [2026-11-01 E2E model validation](../QA/e2e-model-validation-20261101/validation_report.md) ran 23 real-UI scenarios on OpenCode Go `deepseek-v4.1-flash` (13 pass / 4 partial / 6 fail) and `beam-free` (12 / 1 / 10), analysed 156 historical runs, and recorded 19 findings (F1–F19). Fixes 1–5 of its remediation plan are applied:
 - **F2:** DeepSeek tool-call markup in final text is now detected in its real `<｜DSML｜` single-bar form (the old check only matched doubled bars), so it is no longer shown as the answer.
@@ -33,7 +44,7 @@ The 2026-10-31 second agent-loop remediation wave adds a performance gate and ap
 - **AG-03:** Open-Meteo uses the shared pooled `httpx.AsyncClient`, so in-flight requests are cancelled with their task.
 - **AG-09:** the remaining silent catch sites in the orchestrator, capability execution and map-plan service now log through `log_unexpected_failure`.
 - **AG-12, measured:** one synchronous evidence write takes 188 ms at 1 MiB, 742 ms at 4 MiB and 2.2 s at 15.5 MiB, inside async capability execution. Offloading is justified but not yet implemented.
-- **AG-10:** remains deferred; no wrong-route failure has been reproduced.
+- **AG-10:** reproduced and fixed on 2026-11-02 (see the reliability slice above).
 - **Live smoke (opencode-go `beam-free`):** fast routing held, with Colosseum using 2 model calls (was 3), Springfield clarifying, and Paris/Berlin completing. It also exposed a resolver default: when a model omits `expected_location_type`, the handler assumed `city`, so "Colosseum" mapped to Queensland. Untyped names now also try `landmark` and use it when it is a different and clearly more confident place. Rome and the Springfield clarification are unchanged.
 
 Results: 1,277 backend unit tests, Ruff and strict Pyright pass; OpenAPI is unchanged. Not revalidated: a full app smoke after the resolver fix, which was checked at the handler level against the live geocoder, live 429s and the 1013 reconnection journey.

@@ -20,7 +20,7 @@ from server.domain.agent.decision import (
 from server.common.identifiers import normalize_target_key
 from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
-from server.services.catalog.loader import find_macro_region_entry
+from server.services.catalog.loader import find_macro_region_entry, load_reference_catalog
 
 # Reason for a target the geocoder never matched, as opposed to an ambiguity.
 NO_CANDIDATE_REASON = (
@@ -167,6 +167,7 @@ class LocationResolver:
     # -------------------------------------------------------------------------
     def __init__(self, *, nominatim_service: NominatimService | None = None) -> None:
         self.nominatim_service = nominatim_service or NominatimService()
+        self._catalog_codes: dict[str, str] | None = None
 
     # -------------------------------------------------------------------------
     async def resolve_location_signals(
@@ -1095,7 +1096,16 @@ class LocationResolver:
 
         if len(target_components) > 1:
             explicit_country = self._known_country_aliases(target_components[-1])
-            if explicit_country:
+            country_key = self._normalize_text(candidate_country)
+            # "Rome, Georgia" names a US state when the candidate sits inside
+            # one; only a trailing component that is not a sub-national parent
+            # of the candidate is read as an explicit country.
+            names_candidate_parent = any(
+                self._normalize_text(value) == target_components[-1]
+                for value in candidate_parent_values
+                if self._normalize_text(value) != country_key
+            )
+            if explicit_country and not names_candidate_parent:
                 actual_country = self._known_country_aliases(candidate_country)
                 expected_codes = self._country_codes(target_components[-1])
                 actual_code = self._normalize_text(candidate_country_code)
@@ -1381,7 +1391,27 @@ class LocationResolver:
             "georgia": "ge",
         }
         values = self._country_aliases(normalized) or {normalized}
-        return {codes.get(item, item) for item in values if item}
+        catalog = self._catalog_country_codes()
+        return {codes.get(item) or catalog.get(item, item) for item in values if item}
+
+    # -------------------------------------------------------------------------
+    def _catalog_country_codes(self) -> dict[str, str]:
+        """Normalized country name/alias to lowercase ISO2 from the reference catalog."""
+
+        if self._catalog_codes is None:
+            reference = load_reference_catalog()
+            lookup = {
+                self._normalize_text(entry.name): entry.iso2.lower()
+                for entry in reference.countries
+            }
+            lookup.update(
+                {
+                    self._normalize_text(entry.alias): entry.iso2.lower()
+                    for entry in reference.country_aliases
+                }
+            )
+            self._catalog_codes = lookup
+        return self._catalog_codes
 
     # -------------------------------------------------------------------------
     def _hierarchy_entry(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import hashlib
 import inspect
 import json
@@ -17,7 +18,7 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from server.common.logging_handlers import log_unexpected_failure
-from server.common.typing import is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
@@ -60,10 +61,11 @@ from server.services.agent.capability_router import (
     CapabilityRouter,
     build_conversation_fallback_route,
     build_location_map_fallback_route,
+    is_location_only_map_request,
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.tool_executor import ToolExecutor
-from server.services.agent.completion import CompletionEvaluator
+from server.services.agent.completion import CompletionEvaluator, describe_requirements
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.agent.tool_registry import analysis_complete, route_target_location_available, ToolRegistry
 from server.services.agent.vision_policy import (
@@ -125,6 +127,7 @@ _LIMIT_LABELS = {
     "model_budget_exhausted": "model-call limit",
     "tool_budget_exhausted": "tool-call limit",
     "transition_budget_exhausted": "state-transition limit",
+    "no_progress": "repetition guard",
 }
 
 ###############################################################################
@@ -188,6 +191,7 @@ class AgentLoopRequest:
     max_discovery_attempts: int = 2
     max_tool_result_chars: int = 4096
     max_no_progress_corrections: int = 2
+    max_unproductive_steps: int = 3
     max_render_attempts: int = 3
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
@@ -311,7 +315,13 @@ class AgentLoop:
                     else request.max_state_transitions
                 ),
             )
-            self._compile_native_goal(state, route)
+            self._compile_native_goal(
+                state,
+                route,
+                requests_entities=self.capability_router.requests_catalog_entities(
+                    state.user_message
+                ),
+            )
             await self._refresh_capabilities_after_location(request, state, [])
             self._sync_task_state(state)
             await self._checkpoint(request)
@@ -566,6 +576,13 @@ class AgentLoop:
                 route,
                 state,
             )
+            if not location_map_recovery and tool_results and all(
+                item.status == "failed"
+                and item.error is not None
+                and item.error.error_type in {"tool_not_exposed", "unknown_tool"}
+                for item in tool_results
+            ):
+                location_map_recovery = await self._recover_evidence_map(request, route, state)
             if location_map_recovery:
                 # A successful location lookup is enough to complete a
                 # location-only map contract.  Providers can otherwise keep
@@ -620,6 +637,15 @@ class AgentLoop:
                 )
                 state.termination_reason = stop[0]
                 return self._outcome(state, stop[1], stop[0], request)
+            if await self._unproductive_step_detected(request, messages):
+                final_text = await self._finalize_iteration_exhaustion(
+                    request, provider, messages, stop_reason="no_progress"
+                )
+                await self._emit_completion_decision(
+                    request, reason="no_progress", status="terminal"
+                )
+                state.termination_reason = "no_progress"
+                return self._outcome(state, final_text, "no_progress", request)
             await self._emit_iteration_completed(request, "continue")
             if iteration + 1 >= state.max_iterations:
                 final_text = await self._finalize_iteration_exhaustion(
@@ -642,7 +668,9 @@ class AgentLoop:
                 category="model_capability",
             )
         final_text = result.content.strip()
-        recovery_results = await self._recover_location_only_map(request, route, state)
+        recovery_results = await self._recover_location_only_map(
+            request, route, state
+        ) or await self._recover_evidence_map(request, route, state)
         self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
         stop = (
             self._evaluate_stop(
@@ -671,6 +699,12 @@ class AgentLoop:
         if stop is not None:
             if await self._continue_after_no_progress(request, messages, stop):
                 return None
+            if stop[0] == "no_progress" and final_text and not recovery_results:
+                # The model keeps answering in text after every correction:
+                # it has concluded no tool can close the gap.  Keep its
+                # answer, disclose what is unmet, and do not call it a crash.
+                stop = ("insufficient_evidence", self._limitation_disclosure(state, final_text))
+                final_text = stop[1]
             await self._emit_completion_decision(
                 request, reason=stop[0], status="terminal"
             )
@@ -716,6 +750,148 @@ class AgentLoop:
         )
         await self._emit_iteration_completed(request, "continue")
         return True
+
+    # -------------------------------------------------------------------------
+    async def _unproductive_step_detected(
+        self,
+        request: AgentLoopRequest,
+        messages: list[dict[str, Any]],
+    ) -> bool:
+        """Track progress after a tool step; return True when the run is stuck.
+
+        A step is productive when it establishes something the run has never
+        held before.  Counting model or tool calls would treat busy loops as
+        work, and comparing only with the previous step would miss cycles.
+        """
+
+        state = request.state
+        signature = self._progress_signature(state)
+        if signature not in state.progress_signatures:
+            state.progress_signatures = [*state.progress_signatures, signature][-48:]
+            state.unproductive_steps = 0
+            return False
+        state.unproductive_steps += 1
+        limit = max(1, request.max_unproductive_steps)
+        if state.unproductive_steps >= limit + 2:
+            return True
+        if state.unproductive_steps != limit:
+            return False
+        state.stuck_notices += 1
+        notice = self._unproductive_notice(state, limit)
+        state.relevant_tool_outcomes.append(notice)
+        messages.append(
+            {"role": "system", "content": json.dumps(notice, separators=(",", ":"))}
+        )
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="stage",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload={
+                    "stage": "no_progress_detected",
+                    "unproductive_steps": state.unproductive_steps,
+                    "recent_actions": notice["recent_actions"],
+                },
+            ),
+        )
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _progress_signature(state: AgentRunState) -> str:
+        checks = AgentLoop._completion_checks(state)
+        usable = [
+            result
+            for result in state.tool_results
+            if result.status in {"success", "partial"}
+        ]
+        payload = {
+            "locations": sorted(state.location_refs),
+            "evidence": sorted(
+                {
+                    ref
+                    for result in usable
+                    if result.tool_name != "inspect_evidence"
+                    for ref in result.evidence_refs
+                }
+            ),
+            "inspected": sorted(
+                {
+                    ref
+                    for result in usable
+                    if result.tool_name == "inspect_evidence"
+                    for ref in result.evidence_refs
+                }
+            ),
+            "described": sorted(
+                {
+                    str(result.metadata.capability_id)
+                    for result in usable
+                    if result.tool_name == "describe_geospatial_capability"
+                }
+            ),
+            "discovered": sorted(AgentLoop._discovered_entries(usable)),
+            "capabilities": sorted(state.capability_ids),
+            "excluded": sorted(state.excluded_capability_ids),
+            "satisfied": sorted(name for name, value in checks.items() if value),
+            "map": [
+                state.prepared_map_session.session_id
+                if state.prepared_map_session is not None
+                else None,
+                state.render_verified,
+            ],
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _discovered_entries(results: list[ToolResult]) -> set[str]:
+        entries: set[str] = set()
+        for result in results:
+            if result.tool_name != "discover_geospatial_capabilities":
+                continue
+            data = json_object(result.data)
+            entries.add(f"cursor:{data.get('next_cursor')}")
+            for key in ("capabilities", "items"):
+                for item in json_array(data.get(key)):
+                    record = json_object(item)
+                    entries.add(str(record.get("id") or record.get("capability_id") or item))
+        return entries
+
+    # -------------------------------------------------------------------------
+    def _unproductive_notice(self, state: AgentRunState, steps: int) -> dict[str, Any]:
+        recent = state.tool_results[-6:]
+        counts: dict[str, int] = {}
+        for result in recent:
+            counts[result.tool_name] = counts.get(result.tool_name, 0) + 1
+        pending = self._pending_native_requirements(state)
+        return {
+            "observation_type": "no_progress_detected",
+            "status": "action_required",
+            "unproductive_steps": steps,
+            "recent_actions": [
+                {
+                    "tool": result.tool_name,
+                    "status": result.status,
+                    "error_code": result.error.code if result.error else None,
+                    "times_in_recent_steps": counts[result.tool_name],
+                }
+                for result in recent
+            ],
+            "still_missing": describe_requirements(pending) if pending else None,
+            "tools_available": [tool.name for tool in self.tool_registry.expose(state)],
+            "message": (
+                f"The last {steps} tool steps established nothing new (no new "
+                "place, usable data, capability, satisfied requirement or map). "
+                "Do not repeat them. Use a different tool or different arguments; "
+                "if no available tool can provide what is missing, answer now "
+                "with what is known and say what is missing."
+            ),
+        }
 
     # -------------------------------------------------------------------------
     async def _emit_trace(
@@ -852,7 +1028,9 @@ class AgentLoop:
             request, provider, messages, reason="iteration_exhaustion"
         )
         if not candidate:
-            candidate = self._evidence_summary(state)
+            findings = self._evidence_findings(state)
+            summary = self._evidence_summary(state)
+            candidate = "\n\n".join(item for item in (findings, summary) if item)
         limit_label = _LIMIT_LABELS.get(stop_reason, "execution limit")
         pending = self._pending_requirements_for_task_state(state)
         if state.render_retry_exhausted:
@@ -863,9 +1041,8 @@ class AgentLoop:
             )
         elif pending:
             suffix = (
-                f"The {limit_label} was reached before these requirements were "
-                "satisfied: "
-                + ", ".join(item.replace("_", " ") for item in pending)
+                f"The {limit_label} was reached before the request was complete: "
+                + describe_requirements(pending)
                 + "."
             )
         else:
@@ -897,7 +1074,7 @@ class AgentLoop:
         final = (
             self._verified_map_state_summary(state)
             or candidate
-            or "The map is ready and the rendering was verified."
+            or self._verified_map_fallback(state)
         )
         note = self._basemap_mismatch_note(state)
         return f"{final}\n\n{note}" if note else final
@@ -972,6 +1149,66 @@ class AgentLoop:
         return summary
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _verified_map_fallback(state: AgentRunState) -> str:
+        """Name what the verified map shows when the model returned no text."""
+
+        session = state.active_map_session
+        if session is None:
+            return "The map was updated and confirmed in the browser."
+        place = session.resolved_location.label
+        basemap = session.basemap or {}
+        basemap_label = str(
+            basemap.get("label") or basemap.get("name") or session.basemap_id
+        ).strip()
+        layers = [
+            str(instance.label or instance.capability_id).strip()
+            for instance in session.overlay_collection.instances
+            if instance.visible
+        ]
+        text = "The map now shows " + (place or "the requested area")
+        text += f" on the {basemap_label} basemap" if basemap_label else ""
+        text += f" with {', '.join(layers)}." if layers else "."
+        findings = AgentLoop._evidence_findings(state)
+        return f"{text}\n\n{findings}" if findings else text
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _evidence_findings(state: AgentRunState) -> str:
+        """List the leading derived records (name and values) of the run."""
+
+        result = next(
+            (
+                item
+                for item in reversed(state.tool_results)
+                if item.tool_name == "transform_evidence"
+                and item.status == "success"
+                and isinstance(item.data, dict)
+                and item.data.get("preview")
+            ),
+            None,
+        )
+        if result is None:
+            return ""
+        lines: list[str] = []
+        for item in json_array(json_object(result.data).get("preview"))[:5]:
+            record = json_object(item)
+            values = json_object(record.get("properties")) or record
+            label = str(
+                values.get("place_label") or values.get("name") or values.get("label") or ""
+            ).strip()
+            measures = [
+                f"{key.replace('_', ' ')} {value:g}"
+                for key, value in values.items()
+                if isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and key not in {"latitude", "longitude", "id", "time", "elevation"}
+            ][:2]
+            if label or measures:
+                lines.append(f"- {label or 'record'}: {', '.join(measures)}".rstrip(": "))
+        return "Top results:\n" + "\n".join(lines) if lines else ""
+
+    # -------------------------------------------------------------------------
     async def _finalize_completed_request(
         self,
         request: AgentLoopRequest,
@@ -985,8 +1222,9 @@ class AgentLoop:
         )
         return (
             candidate
+            or self._evidence_findings(request.state)
             or self._evidence_summary(request.state)
-            or "The requested information is ready."
+            or "The requested work finished, but the model returned no answer text."
         )
 
     # -------------------------------------------------------------------------
@@ -1256,6 +1494,14 @@ class AgentLoop:
             for result in state.tool_results
         )
         data_completed = completed_data or geocode_location_resolved
+        # Without required evidence there is no provider request a scope could
+        # be applied to; the map candidate's own layers carry the scope check.
+        map_scope_applied = not (
+            state.completion_contract and state.completion_contract.evidence_required
+        ) and (
+            state.prepared_map_session is not None
+            or (state.active_map_session is not None and state.render_verified)
+        )
         return {
             "location_resolved": bool(state.location_refs)
             or state.active_map_session is not None,
@@ -1268,7 +1514,8 @@ class AgentLoop:
             "required_data_retrieved": data_completed,
             "evidence_inspected": evidence_inspected,
             "capabilities_discovered": capabilities_discovered,
-            "temporal_scope_applied": evidence_checks["temporal_scope_applied"],
+            "temporal_scope_applied": evidence_checks["temporal_scope_applied"]
+            or map_scope_applied,
             # A successful map-plan observation is the server-owned proof
             # that the requested spatial scope was applied.  Location-only
             # map requests have no data tool result, so using ``completed_data``
@@ -1276,9 +1523,7 @@ class AgentLoop:
             # candidate had been prepared.
             "spatial_scope_applied": evidence_checks["spatial_scope_applied"]
             or geocode_location_resolved
-            or (not (state.completion_contract and state.completion_contract.evidence_required)
-                and (state.prepared_map_session is not None
-                     or (state.active_map_session is not None and state.render_verified))),
+            or map_scope_applied,
             "map_candidate_prepared": state.prepared_map_session is not None
             or (state.active_map_session is not None and state.render_verified),
             "render_verified": bool(state.render_verified),
@@ -1508,6 +1753,12 @@ class AgentLoop:
         native_prompt = build_native_agent_system_prompt()
         correction_messages = [
             {"role": "system", "content": build_capability_route_prompt()},
+            {
+                "role": "system",
+                "content": "Current time: "
+                + datetime.now(UTC).replace(microsecond=0).isoformat()
+                + " (UTC).",
+            },
             *(message for message in messages if message.get("content") != native_prompt),
         ]
         result: LLMResult | None = None
@@ -2359,21 +2610,14 @@ class AgentLoop:
                     update={"call_id": call.id or cached.call_id}, deep=True
                 )
             failed_count = state.failed_fingerprints.get(fingerprint, 0)
-            render_failed_count = state.failed_render_fingerprints.get(fingerprint, 0)
-            if call.name == "apply_map_plan" and render_failed_count == 0:
-                render_failed_count = sum(
-                    1
-                    for observation in state.render_observations
-                    if observation.status == "failed"
-                    and observation.action_fingerprint == fingerprint
-                )
             if (
                 call.name == "apply_map_plan"
                 # A failed browser render is already proof that this exact
-                # semantic map action made no progress.  Reject its first
-                # repeat even though ordinary provider-call retries retain
-                # the more permissive shared fingerprint limit.
-                and render_failed_count >= 1
+                # semantic map action made no progress, so its repeat is
+                # rejected.  A watchdog timeout is the exception: the browser
+                # did not answer in time, which says nothing about the plan,
+                # so one identical retry is allowed.
+                and self._render_retry_blocked(state, fingerprint)
             ):
                 return self._failure_result(
                     call,
@@ -2428,6 +2672,10 @@ class AgentLoop:
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
         self._transition(state, AgentPhase.NORMALIZE_RESULT, request.budget)
+        # A batch is one model decision: several calls sharing a mistake
+        # receive one correction before the model has seen any feedback.
+        batch_needs_correction = False
+        failures_before_batch = state.consecutive_tool_failures
         for call, result in zip(bounded_calls, results, strict=False):
             self._ensure_run_control(request)
             fingerprint = self._fingerprint(call)
@@ -2446,7 +2694,7 @@ class AgentLoop:
                     "semantic_validation",
                     "policy_rejection",
                 }:
-                    state.validation_corrections += 1
+                    batch_needs_correction = True
                 if result.error and result.error.error_type in _CORRECTABLE_ERRORS:
                     self._grant_recovery_budget(request)
             elif result.tool_name != "apply_map_plan":
@@ -2467,6 +2715,11 @@ class AgentLoop:
                 state.prepared_map_action_fingerprint = None
             self._ensure_run_control(request)
             self._apply_result(state, result)
+        if batch_needs_correction and all(result.status == "failed" for result in results):
+            state.validation_corrections += 1
+        if results and all(result.status == "failed" for result in results):
+            # One decision failed, however many parallel calls it contained.
+            state.consecutive_tool_failures = failures_before_batch + 1
         refreshed = await self._refresh_capabilities_after_location(
             request, state, results
         )
@@ -2506,6 +2759,14 @@ class AgentLoop:
         tool_limit = request.budget.max_tool_calls or request.max_tool_calls
         if state.tool_calls >= tool_limit:
             return None
+        refresh_key = json.dumps(
+            [sorted(state.location_refs), sorted(state.excluded_capability_ids)],
+            separators=(",", ":"),
+        )
+        if refresh_key in state.discovery_refresh_keys:
+            # The same places and exclusions yield the same shortlist.
+            return None
+        state.discovery_refresh_keys = [*state.discovery_refresh_keys, refresh_key][-16:]
         call = LLMToolCall(
             id=f"server-discovery-refresh-{state.request_id}-{state.discovery_attempts + 1}",
             name="discover_geospatial_capabilities",
@@ -2620,6 +2881,21 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _render_retry_blocked(state: AgentRunState, fingerprint: str) -> bool:
+        failures = [
+            observation
+            for observation in state.render_observations
+            if observation.status == "failed"
+            and observation.action_fingerprint == fingerprint
+        ]
+        recorded = state.failed_render_fingerprints.get(fingerprint, 0)
+        timeouts = sum(1 for item in failures if item.failure_code == "render_timeout")
+        if failures and timeouts == len(failures):
+            return timeouts >= 2
+        return bool(failures) or recorded >= 1
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _no_progress_correction(state: AgentRunState) -> dict[str, Any]:
         pending = AgentLoop._pending_native_requirements(state)
         render_failure = AgentLoop._first_render_failure(state)
@@ -2633,7 +2909,14 @@ class AgentLoop:
                 "failure_summary": render_failure.failure_summary,
                 "failed_action_fingerprint": render_failure.action_fingerprint,
                 "message": (
-                    "The previous map action failed browser rendering. Do not "
+                    "The browser did not confirm the previous map in time. Re-issue "
+                    "the same map plan once, keeping every requested layer; if it "
+                    "times out again, simplify the plan."
+                    if render_failure.failure_code == "render_timeout"
+                    and not AgentLoop._render_retry_blocked(
+                        state, str(render_failure.action_fingerprint or "")
+                    )
+                    else "The previous map action failed browser rendering. Do not "
                     "repeat its action fingerprint; issue a materially revised "
                     "map plan or choose a supported renderable source."
                 ),
@@ -2735,9 +3018,20 @@ class AgentLoop:
                         f"{AgentLoop._provider_failure_clause(failure.error.message)}, "
                         "and no alternative capability matched the request after discovery.",
                     )
+                explanation = next(
+                    (
+                        str(result.summary)
+                        for result in reversed(state.tool_results)
+                        if result.tool_name == "discover_geospatial_capabilities"
+                        and isinstance(result.data, dict)
+                        and result.data.get("diagnostics")
+                    ),
+                    None,
+                )
                 return (
                     "insufficient_evidence",
-                    "No supported capability matched the request after discovery.",
+                    "No supported capability matched the request after discovery."
+                    + (f" {explanation}" if explanation else ""),
                 )
             return None
         if results and all(result.status == "failed" for result in results):
@@ -2866,6 +3160,107 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    async def _recover_evidence_map(
+        self,
+        request: AgentLoopRequest,
+        route: CapabilityRoute,
+        state: AgentRunState,
+    ) -> list[ToolResult]:
+        """Map retrieved evidence when the model stalls with only the map left.
+
+        Weaker models re-call a finished retrieval or run out of calls after
+        the data is complete.  The next action is then unambiguous: show the
+        run's evidence.  It runs once per run through the normal typed map
+        boundary, so every map-plan validation still applies.
+        """
+
+        if (
+            state.evidence_map_recovered
+            or route.task_mode != "execute"
+            or route.presentation not in {"map", "both"}
+            or state.prepared_map_session is not None
+            or self.tool_registry.get("apply_map_plan") is None
+        ):
+            return []
+        pending = set(self._pending_native_requirements(state))
+        if not pending or not pending <= {"map_candidate_prepared", "render_verified"}:
+            return []
+        layers = self._recoverable_evidence_layers(state, route)
+        if not layers:
+            return []
+        state.evidence_map_recovered = True
+        expected_revision = (
+            state.active_map_session.overlay_collection.revision
+            if state.active_map_session is not None
+            else 0
+        )
+        recovery_call = LLMToolCall(
+            id=f"server-evidence-map-recovery-{state.request_id}",
+            name="apply_map_plan",
+            arguments={
+                "expected_collection_revision": expected_revision,
+                "actions": [
+                    *(
+                        {
+                            "action": "add_evidence_layer",
+                            "evidence_ref": evidence_ref,
+                            "capability_id": capability_id,
+                        }
+                        for evidence_ref, capability_id in layers
+                    ),
+                    {
+                        "action": "set_viewport",
+                        "strategy": "fit_evidence",
+                        "evidence_refs": [evidence_ref for evidence_ref, _ in layers],
+                    },
+                ],
+            },
+        )
+        return await self._execute_calls(
+            request, [recovery_call], state, exposed_tool_names={"apply_map_plan"}
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _recoverable_evidence_layers(
+        state: AgentRunState, route: CapabilityRoute
+    ) -> list[tuple[str, str]]:
+        """Evidence the run itself produced that a map should show."""
+
+        if route.analysis is not None:
+            # A ranking is shown through its derived, located result set.
+            derived = next(
+                (
+                    result
+                    for result in reversed(state.tool_results)
+                    if result.tool_name == "transform_evidence"
+                    and result.status == "success"
+                    and result.metadata.capability_id
+                    and result.evidence_refs
+                    and int(json_object(result.data).get("located_record_count") or 0) > 0
+                ),
+                None,
+            )
+            return (
+                [(derived.evidence_refs[0], str(derived.metadata.capability_id))]
+                if derived is not None
+                else []
+            )
+        layers: list[tuple[str, str]] = []
+        for result in state.tool_results:
+            if (
+                result.tool_name == "execute_geospatial_capability"
+                and result.status in {"success", "partial"}
+                and result.metadata.capability_id
+                and result.metadata.result_type in {"features", "raster"}
+            ):
+                layers.extend(
+                    (evidence_ref, str(result.metadata.capability_id))
+                    for evidence_ref in result.evidence_refs
+                )
+        return list(dict.fromkeys(layers))[:8]
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _location_only_map_recovery_ref(
         state: AgentRunState,
@@ -2896,6 +3291,10 @@ class AgentLoop:
             for location_ref in state.location_refs:
                 if location_ref.casefold() == normalized_target_id:
                     return location_ref
+            return None
+        if route is not None and len(route.target_refs) > 1:
+            # One viewport fit cannot present several named targets; leave
+            # the obligation to the model instead of claiming them covered.
             return None
         if not location_results and len(state.location_refs) == 1:
             return next(iter(state.location_refs))
@@ -3045,7 +3444,12 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _compile_native_goal(state: AgentRunState, route: CapabilityRoute) -> None:
+    def _compile_native_goal(
+        state: AgentRunState,
+        route: CapabilityRoute,
+        *,
+        requests_entities: bool = False,
+    ) -> None:
         route_temporal_scope = route.temporal_scope.model_dump(mode="json")
         route_has_temporal_scope = any(
             route_temporal_scope.get(key)
@@ -3113,7 +3517,9 @@ class AgentLoop:
             and not text_location_resolution_only
             and not text_evidence_inspection_only
             and not capability_discovery_only
-            and not _is_location_only_map_request(state.user_message, route)
+            and not is_location_only_map_request(
+                state.user_message, route, requests_entities=requests_entities
+            )
         )
         if measurement_route:
             requirements.append("measurement_computed")
@@ -3579,6 +3985,25 @@ class AgentLoop:
 
         state = request.state
         text: str | None = None
+        try:
+            recovered = state.route is not None and bool(
+                await self._recover_evidence_map(request, state.route, state)
+            )
+        except (ExecutionBudgetExceeded, TimeoutError):
+            recovered = False
+        if recovered and state.prepared_map_session is not None:
+            # The data was complete and only the map was missing; the server
+            # prepared it, and the render acknowledgement finalizes the run.
+            await self._emit_completion_decision(
+                request, reason="awaiting_render", status="terminal"
+            )
+            state.termination_reason = "awaiting_render"
+            return self._outcome(
+                state,
+                "The map is being prepared from the evidence already retrieved.",
+                "awaiting_render",
+                request,
+            )
         if state.route is not None and state.route.task_mode == "answer" and not state.tool_results:
             # Reasoning models can end a plain-answer turn with reasoning only
             # and no content; the reserved slot gives a conversation one more
@@ -3632,6 +4057,15 @@ class AgentLoop:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _limitation_disclosure(state: AgentRunState, text: str) -> str:
+        pending = AgentLoop._pending_native_requirements(state)
+        if not pending:
+            return text
+        note = f"Not completed: {describe_requirements(pending)}."
+        return f"{text.rstrip()}\n\n{note}" if note not in text else text
+
+    # -------------------------------------------------------------------------
     @classmethod
     def _preserve_render_failure_cause(
         cls, state: AgentRunState, text: str, reason: str
@@ -3641,61 +4075,22 @@ class AgentLoop:
         observation = cls._first_render_failure(state)
         if observation is None:
             return text
-        code = observation.failure_code or "render_failed"
-        marker = f"Previous map render failed ({code})"
+        marker = "The map was not updated"
         if marker in text:
             return text
-        stage = (
-            f" during {observation.failure_stage}"
-            if observation.failure_stage
-            else ""
-        )
         summary = (
             observation.failure_summary
             or "The renderer did not verify the prepared map."
         )
-        suffix = (
-            f"{marker}{stage}: {summary} "
-            "The last-known-good map was left unchanged."
-        )
+        failed_checks = "Required map completion checks failed: "
+        if summary.startswith(failed_checks):
+            # Backend validation names internal obligations; users need the
+            # meaning, while the run trace keeps the exact codes.
+            names = [item.strip() for item in summary[len(failed_checks):].split(",")]
+            summary = describe_requirements([item for item in names if item]) + "."
+            summary = summary[:1].upper() + summary[1:]
+        suffix = f"{marker}: {summary} The previous map is still shown."
         return f"{text.rstrip()}\n\n{suffix}" if text.strip() else suffix
-
-###############################################################################
-def _is_location_only_map_request(
-    user_message: str, route: CapabilityRoute
-) -> bool:
-    """Keep named-place display separate from provider-data retrieval."""
-
-    if route.presentation not in {"map", "both"}:
-        return False
-    if route.primary_domain is not CapabilityDomain.PLACE_SEARCH:
-        return False
-    terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
-    if not terms.intersection(
-        {"show", "display", "view", "locate", "map", "landmark"}
-    ):
-        return False
-    return not terms.intersection(
-        {
-            "find",
-            "search",
-            "near",
-            "nearby",
-            "within",
-            "around",
-            "poi",
-            "amenity",
-            "amenities",
-            "cafe",
-            "cafes",
-            "hospital",
-            "hospitals",
-            "station",
-            "stations",
-            "data",
-            "points",
-        }
-    )
 
 
 __all__ = [

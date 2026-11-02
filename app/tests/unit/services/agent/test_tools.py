@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -34,6 +35,8 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_definitions import (
     ApplyMapPlanInput,
     ExecuteCapabilityInput,
+    ExecuteCapabilityToolInput,
+    InspectEvidenceInput,
 )
 from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
@@ -462,6 +465,104 @@ def test_current_calendar_day_does_not_become_a_rolling_previous_day() -> None:
         "temporal_scope": {"mode": "historical", "granularity": "day"},
     })
     assert _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state).start_time_iso is not None
+
+###############################################################################
+def test_forecast_day_binding_looks_ahead_instead_of_back() -> None:
+    state = _state()
+    state.goal = AgentGoal(
+        goal="Rainfall tomorrow", task_mode="execute", presentation="text",
+        operation="inspect", location_mode="none",
+        temporal_scope={"mode": "forecast", "granularity": "day"},
+    )
+    before = datetime.now(UTC)
+
+    bound = _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state)
+
+    assert bound.start_time_iso is not None and bound.end_time_iso is not None
+    start = datetime.fromisoformat(bound.start_time_iso)
+    end = datetime.fromisoformat(bound.end_time_iso)
+    assert start >= before
+    assert end - start == timedelta(days=1)
+
+###############################################################################
+def test_comparison_map_must_show_a_layer_for_every_target() -> None:
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        capability_queries=["current temperature"],
+        target_refs=["Paris", "Berlin"],
+    )
+    state.completion_contract = CompletionContract(
+        operation="compare",
+        data_requirement="provider_data",
+        requirements=["required_data_retrieved", "map_candidate_prepared"],
+        evidence_required=True,
+        map_preparation_required=True,
+    )
+    state.capability_ids = ["places:hospitals"]
+    state.location_refs = {
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+    }
+    for key in ("paris", "berlin"):
+        state.evidence_refs.append(f"evidence-{key}")
+        state.tool_results.append(
+            ToolResult(
+                call_id=f"execute-{key}",
+                tool_name="execute_geospatial_capability",
+                status="success",
+                summary="ok",
+                data={"query": {"location_ref": key}},
+                evidence_refs=[f"evidence-{key}"],
+                metadata=ToolExecutionMetadata(
+                    duration_ms=0,
+                    capability_id="places:hospitals",
+                    coverage={"data_valid": True},
+                ),
+            )
+        )
+
+    def plan(*keys: str) -> ApplyMapPlanInput:
+        return ApplyMapPlanInput.model_validate({
+            "expected_collection_revision": 0,
+            "actions": [
+                {
+                    "action": "add_evidence_layer",
+                    "evidence_ref": f"evidence-{key}",
+                    "capability_id": "places:hospitals",
+                }
+                for key in keys
+            ],
+        })
+
+    errors = _map_plan_semantic_validator(plan("berlin"), state)
+    assert any("Missing: Paris" in error for error in errors)
+    assert _map_plan_semantic_validator(plan("paris", "berlin"), state) == []
+
+###############################################################################
+def test_compiled_measurement_requirement_exposes_measure_tool_with_one_location() -> None:
+    registry = _registry()
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="target",
+        capability_queries=["distance"],
+        target_refs=["Paris"],
+    )
+    state.phase = AgentPhase.BUILD_TOOL_CONTEXT
+    state.location_refs = {
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+    }
+    assert "measure_geospatial" not in {tool.name for tool in registry.expose(state)}
+
+    state.completion_requirements = ["measurement_computed"]
+
+    assert "measure_geospatial" in {tool.name for tool in registry.expose(state)}
 
 ###############################################################################
 def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() -> None:
@@ -1323,3 +1424,28 @@ async def test_provider_layer_discovery_uses_bounded_pagination_and_evidence() -
     assert state.evidence_refs == ["evidence-provider-layers"]
     assert provider_service.limit == 250
     assert evidence_store.payload["run_id"] == "run-1"
+
+###############################################################################
+def test_tool_inputs_normalize_unambiguous_model_spellings() -> None:
+    execute = ExecuteCapabilityToolInput.model_validate({
+        "capability_id": "openmeteo_weather_forecast",
+        "temporal_mode": "current",
+        "bbox": "[5.9, 45.8, 10.5, 47.8]",
+        "arguments": {"location_ref": "lugano"},
+    })
+    inspect = InspectEvidenceInput.model_validate({"evidence_ref": "evidence-1", "view": "records"})
+
+    assert execute.location_ref == "lugano" and execute.arguments == {}
+    assert inspect.view == "page"
+
+###############################################################################
+@pytest.mark.parametrize("location_type,expected", [("country", "bbox"), ("city", None)])
+def test_unscoped_country_target_is_queried_as_its_area(location_type: str, expected: str | None) -> None:
+    location = ResolvedLocation(
+        label="Japan", latitude=36.2, longitude=138.25,
+        bbox=[122.9, 20.2, 154.2, 45.7], location_type=location_type,
+    )
+    extent = _lower_execution_extent({}, location, radius_m=None)
+
+    assert (extent.kind if extent is not None and extent.bbox else None) == expected
+

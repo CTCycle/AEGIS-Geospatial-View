@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import pytest
 from pydantic import ValidationError
 from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute
@@ -332,3 +333,32 @@ def test_model_observation_keeps_semantic_outcome_and_caps_raw_features() -> Non
     assert isinstance(observation.result, dict)
     assert len(observation.result["features"]) <= 24
     assert len(str(observation.model_dump_json())) <= 3000
+
+###############################################################################
+def test_oversized_inspect_evidence_records_are_trimmed_not_dropped() -> None:
+    result = ToolResult(
+        call_id="call-2",
+        tool_name="inspect_evidence",
+        status="success",
+        summary="Inspected records.",
+        data={
+            "evidence_ref": "evidence-1",
+            "view": "records",
+            "result": {
+                "records": [
+                    {"name": f"Station {index}", "address": "Bahnhofstrasse " * 6}
+                    for index in range(40)
+                ],
+                "pagination": {"offset": 0, "limit": 40, "total": 400},
+            },
+        },
+        evidence_refs=["evidence-1"],
+        metadata=ToolExecutionMetadata(duration_ms=3),
+    )
+
+    observation = ModelObservation.from_tool_result(result, max_chars=1200)
+
+    assert isinstance(observation.result, dict)
+    records = observation.result["result"]["records"]
+    assert 0 < len(records) < 40
+    assert len(json.dumps(observation.result, separators=(",", ":"))) <= 1200

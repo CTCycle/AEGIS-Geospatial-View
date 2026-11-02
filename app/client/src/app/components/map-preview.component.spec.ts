@@ -1072,4 +1072,80 @@ describe('components/map-preview.component', () => {
     fixture.destroy();
     expect(fakeMap.remove).toHaveBeenCalled();
   });
+
+  describe('when idle never fires', () => {
+    const sources = new Set<string>();
+    const layers = new Set<string>();
+    const loads: Array<() => void> = [];
+    const markerSession = () => makeMapSession({
+      bounds: [12.4, 41.8, 12.6, 42.0],
+      overlay_collection: makeOverlayCollection([{
+        id: 'markers', label: 'Markers', type: 'geojson', rendering_mode: 'geojson', provider: 'fixture',
+        data: { type: 'FeatureCollection', features: [] },
+      }]),
+    });
+    const startCandidate = (registerLayers: boolean) => {
+      sources.clear();
+      layers.clear();
+      loads.length = 0;
+      fakeMap.on.and.callFake((event: string, layerOrListener: unknown, listener?: () => void) => {
+        if (event === 'load') {
+          loads.push((typeof layerOrListener === 'function' ? layerOrListener : listener) as () => void);
+        }
+      });
+      fakeMap.addSource.and.callFake((id: string) => sources.add(id));
+      fakeMap.addLayer.and.callFake((layer: { id: string }) => {
+        if (registerLayers) {
+          layers.add(layer.id);
+        }
+      });
+      Object.assign(fakeMap, {
+        getSource: jasmine.createSpy('getSource').and.callFake((id: string) => (sources.has(id) ? {} : undefined)),
+      });
+      fakeMap.getLayer.and.callFake((id: string) => (layers.has(id) ? { type: 'circle' } : undefined));
+      const changes: Array<{ state: string; failureCode?: string; checks?: Record<string, boolean> }> = [];
+      component.renderStateChange.subscribe((change) => changes.push(change));
+      component.payload = { map_session: markerSession() as never };
+      fixture.detectChanges();
+      loads.forEach((callback) => callback());
+      return changes;
+    };
+
+    beforeEach(() => jasmine.clock().install());
+    afterEach(() => jasmine.clock().uninstall());
+
+    it('acknowledges a verified candidate ready without waiting for idle', () => {
+      const changes = startCandidate(true);
+      expect(changes.map((change) => change.state)).not.toContain('ready');
+
+      jasmine.clock().tick(4_000);
+
+      const ready = changes.find((change) => change.state === 'ready');
+      expect(ready?.checks).toEqual(jasmine.objectContaining({
+        required_sources_loaded: true,
+        required_layers_present: true,
+        viewport_valid: true,
+      }));
+      jasmine.clock().tick(60_000);
+      expect(changes.map((change) => change.state)).not.toContain('failed');
+    });
+
+    it('never acknowledges a candidate with a missing layer and reports the failed check', () => {
+      const changes = startCandidate(false);
+
+      jasmine.clock().tick(31_000);
+
+      expect(changes.map((change) => change.state)).not.toContain('ready');
+      const failed = changes.find((change) => change.state === 'failed');
+      expect(failed?.failureCode).toBe('render_timeout');
+      expect(failed?.checks).toEqual(jasmine.objectContaining({
+        style_loaded: true,
+        sources_present: true,
+        layers_present: false,
+        viewport_valid: true,
+        tiles_settled: true,
+      }));
+      expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+    });
+  });
 });
