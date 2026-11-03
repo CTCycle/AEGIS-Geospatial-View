@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from playwright.sync_api import Page
+
+DEFAULT_LANE_PROVIDER = "opencode-go"
+DEFAULT_LANE_MODEL = "deepseek-v4.1-flash"
 
 
 ###############################################################################
@@ -83,11 +87,10 @@ def selected_model_tool_support_metadata(
 def exact_lane_tool_support_metadata(
     page: Page, api_base_url: str
 ) -> tuple[bool, str, dict[str, Any]]:
-    """Require the exact opencode-go / deepseek-v4.1-flash validation lane."""
+    """Require the configured validation lane, ``APP_TEST_LANE_PROVIDER`` / ``APP_TEST_LANE_MODEL``."""
+    provider = os.environ.get("APP_TEST_LANE_PROVIDER", DEFAULT_LANE_PROVIDER).strip()
+    model = os.environ.get("APP_TEST_LANE_MODEL", DEFAULT_LANE_MODEL).strip()
     ready, reason, evidence = selected_model_tool_support_metadata(page, api_base_url)
-    if ready and (
-        evidence["provider"] != "opencode-go"
-        or evidence["model"] != "deepseek-v4.1-flash"
-    ):
-        return False, "Live validation requires opencode-go / deepseek-v4.1-flash.", evidence
+    if ready and (evidence["provider"] != provider or evidence["model"] != model):
+        return False, f"Live validation requires {provider} / {model}.", evidence
     return ready, reason, evidence

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import re
 
+from server.common.identifiers import normalize_target_key
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
     AgentRunState,
     AgentSpatialScope,
+    AgentTemporalScope,
     CapabilityRoute,
     CapabilityRouteDecision,
 )
@@ -476,6 +478,7 @@ class CapabilityRouter:
                     }
                 )
 
+        proposed = _prune_target_requirements(proposed)
         if proposed.task_mode == "clarify":
             if not proposed.clarification_question:
                 return CapabilityRouteDecision(
@@ -1166,7 +1169,29 @@ def _normalize_recent_scope(
 ) -> tuple[CapabilityRoute, str | None]:
     """Treat undated recent-feed intent as current, not historical."""
 
-    temporal = route.temporal_scope
+    update: dict[str, object] = {}
+    reason: str | None = None
+    temporal = _recent_scope_as_current(route.temporal_scope)
+    if temporal is not None:
+        update["temporal_scope"] = temporal
+        reason = "recent_scope_normalized_to_current"
+    requirements = [
+        requirement.model_copy(update={"temporal_scope": scope})
+        if requirement.temporal_scope is not None
+        and (scope := _recent_scope_as_current(requirement.temporal_scope)) is not None
+        else requirement
+        for requirement in route.target_requirements
+    ]
+    if requirements != route.target_requirements:
+        update["target_requirements"] = requirements
+        reason = "recent_scope_normalized_to_current"
+    return (route.model_copy(update=update), reason) if update else (route, None)
+
+
+###############################################################################
+def _recent_scope_as_current(temporal: AgentTemporalScope) -> AgentTemporalScope | None:
+    """Return the current-mode repair of an undated recent scope, if it needs one."""
+
     granularity = temporal.granularity.strip().casefold()
     aggregation = temporal.aggregation.strip().casefold()
     has_explicit_time = any(
@@ -1183,15 +1208,24 @@ def _normalize_recent_scope(
         and not has_explicit_time
         and (granularity in recent_markers or aggregation in recent_markers)
     ):
-        return (
-            route.model_copy(
-                update={
-                    "temporal_scope": temporal.model_copy(update={"mode": "current"})
-                }
-            ),
-            "recent_scope_normalized_to_current",
-        )
-    return route, None
+        return temporal.model_copy(update={"mode": "current"})
+    return None
+
+###############################################################################
+def _prune_target_requirements(
+    route: CapabilityRoute,
+) -> CapabilityRoute:
+    """Drop per-target scopes whose target a later normalization removed."""
+
+    known = {normalize_target_key(ref) for ref in route.target_refs}
+    kept = [
+        requirement
+        for requirement in route.target_requirements
+        if normalize_target_key(requirement.target_ref) in known
+    ]
+    if len(kept) == len(route.target_requirements):
+        return route
+    return route.model_copy(update={"target_requirements": kept})
 
 ###############################################################################
 def _normalize_metadata_only_analysis_route(

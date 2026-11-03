@@ -1652,6 +1652,14 @@
             "maxItems": 16,
             "title": "Spatial Scope"
           },
+          "target_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRequirement"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Requirements"
+          },
           "filters": {
             "additionalProperties": true,
             "type": "object",
@@ -2412,6 +2420,14 @@
                 "type": "null"
               }
             ]
+          },
+          "target_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRequirement"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Requirements"
           },
           "filters": {
             "additionalProperties": true,
@@ -6974,6 +6990,43 @@
           "model"
         ],
         "title": "SelectedModelContextResponse"
+      },
+      "TargetRequirement": {
+        "properties": {
+          "target_ref": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Target Ref"
+          },
+          "temporal_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTemporalScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spatial_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSpatialScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_ref"
+        ],
+        "title": "TargetRequirement",
+        "description": "Scope that applies to one target only; unset fields use the route's."
       },
       "ToolExecutionError": {
         "properties": {

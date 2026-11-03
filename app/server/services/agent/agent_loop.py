@@ -25,6 +25,7 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     AgentTask,
     AgentTaskState,
+    AgentTemporalScope,
     CapabilityRoute,
     CompletionStatus,
     CompletionContract,
@@ -3570,6 +3571,27 @@ class AgentLoop:
             )
         )
         temporal_scope = route_temporal_scope if route_has_temporal_scope else {}
+        target_requirements = [
+            requirement.model_copy(
+                update={
+                    "temporal_scope": (
+                        requirement.temporal_scope
+                        if requirement.temporal_scope is not None
+                        and requirement.temporal_scope != AgentTemporalScope()
+                        else route.temporal_scope
+                        if route_has_temporal_scope
+                        else None
+                    ),
+                    "spatial_scope": requirement.spatial_scope or route.spatial_scope,
+                }
+            )
+            for requirement in route.target_requirements
+        ]
+        per_target_temporal = any(
+            requirement.temporal_scope is not None
+            and requirement.temporal_scope != AgentTemporalScope()
+            for requirement in target_requirements
+        )
         spatial_scope = (
             [route.spatial_scope.model_dump(mode="json")]
             if route.spatial_scope is not None
@@ -3625,12 +3647,17 @@ class AgentLoop:
             requirements.append("capabilities_discovered")
         elif text_evidence_inspection_only:
             requirements.append("evidence_inspected")
-        if route.task_mode == "execute" and route_has_temporal_scope and temporal_scope and (
-            temporal_scope.get("mode") != "none"
-            or temporal_scope.get("start_time_iso") is not None
-            or temporal_scope.get("end_time_iso") is not None
-            or temporal_scope.get("reference_time_iso") is not None
-        ):
+        temporal_scope_needed = per_target_temporal or bool(
+            route_has_temporal_scope
+            and temporal_scope
+            and (
+                temporal_scope.get("mode") != "none"
+                or temporal_scope.get("start_time_iso") is not None
+                or temporal_scope.get("end_time_iso") is not None
+                or temporal_scope.get("reference_time_iso") is not None
+            )
+        )
+        if route.task_mode == "execute" and temporal_scope_needed:
             requirements.append("temporal_scope_applied")
         if (
             route.task_mode == "execute"
@@ -3651,6 +3678,7 @@ class AgentLoop:
             target_ids=target_ids,
             temporal_scope=temporal_scope,
             spatial_scope=spatial_scope,
+            target_requirements=target_requirements,
             filters=filters,
         )
         state.completion_contract = CompletionContract(
@@ -3666,15 +3694,7 @@ class AgentLoop:
             ),
             map_preparation_required="map_candidate_prepared"
             in state.completion_requirements,
-            temporal_scope_required=bool(
-                temporal_scope
-                and (
-                    temporal_scope.get("mode") != "none"
-                    or temporal_scope.get("start_time_iso") is not None
-                    or temporal_scope.get("end_time_iso") is not None
-                    or temporal_scope.get("reference_time_iso") is not None
-                )
-            ),
+            temporal_scope_required=temporal_scope_needed,
             spatial_scope_required=bool(spatial_scope) and not capability_discovery_only,
             render_verification_required=route.presentation in {"map", "both"},
             render_verified=state.render_verified,

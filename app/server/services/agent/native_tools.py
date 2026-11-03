@@ -35,6 +35,7 @@ from server.services.agent.capability_execution import (
 )
 from server.services.agent.completion import (
     follow_up_location_keys,
+    requirement_for_location,
     uncovered_map_targets,
     uncovered_route_targets,
 )
@@ -140,7 +141,11 @@ def _map_plan_schema(
 
 ###############################################################################
 def _inline_schema_refs(schema: JsonSchema) -> JsonSchema:
-    """Resolve local ``$defs`` references so weaker models see enums inline."""
+    """Resolve local ``$defs`` references so weaker models see enums inline.
+
+    Generated ``title`` strings only repeat the property name, so they are
+    dropped to keep the inlined tool schemas small.
+    """
 
     raw_definitions = schema.get("$defs")
     definitions = raw_definitions if isinstance(raw_definitions, dict) else {}
@@ -161,7 +166,7 @@ def _inline_schema_refs(schema: JsonSchema) -> JsonSchema:
         return {
             key: resolve(item, active)
             for key, item in value.items()
-            if key != "$defs"
+            if key != "$defs" and not (key == "title" and isinstance(item, str))
         }
 
     try:
@@ -509,6 +514,10 @@ def _bind_execute_request(
     if goal.location_mode == "search_area" and not follow_up:
         updates["arguments"]["sampling"] = "area"
     temporal = goal.temporal_scope
+    requirement = requirement_for_location(state, str(request.location_ref or ""))
+    if requirement is not None and requirement.temporal_scope is not None:
+        # A compound request binds each target to its own window.
+        temporal = requirement.temporal_scope.model_dump(mode="json")
     if temporal:
         temporal_mode = _optional_string(temporal.get("mode"))
         if temporal_mode and temporal_mode != "none":
@@ -542,6 +551,8 @@ def _bind_execute_request(
     bound = request.model_copy(update=updates)
     location = _location_for_request(bound, state)
     spatial = goal.spatial_scope[0] if goal.spatial_scope and not follow_up else {}
+    if requirement is not None and requirement.spatial_scope is not None and not follow_up:
+        spatial = requirement.spatial_scope.model_dump(mode="json")
     distance_m = _positive_float(spatial.get("distance_m"))
     if distance_m is not None:
         bound = bound.model_copy(update={"radius_m": distance_m})

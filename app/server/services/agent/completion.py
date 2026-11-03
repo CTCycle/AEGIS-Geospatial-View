@@ -13,6 +13,7 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     CompletionContract,
     CompletionRequirement,
+    TargetRequirement,
 )
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
 
@@ -26,6 +27,37 @@ def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
     if inclusive_end and len(value.strip()) == 10:
         parsed = datetime.combine(parsed.date(), time.min, tzinfo=UTC) + timedelta(days=1)
     return parsed
+
+###############################################################################
+def _result_location_ref(result: ToolResult) -> str:
+    """Name the target a result belongs to: its query, else its first source."""
+
+    query_ref = json_object(json_object(result.data).get("query")).get("location_ref")
+    if query_ref:
+        return str(query_ref)
+    sources = json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+    return str(sources[0]) if sources else ""
+
+###############################################################################
+def requirement_for_location(state: AgentRunState, location_ref: str) -> TargetRequirement | None:
+    """Return the goal's per-target scope for a location reference, if any."""
+
+    goal = state.goal
+    if goal is None or not goal.target_requirements or not location_ref:
+        return None
+    names = [
+        (str(key), location.label)
+        for key, location in state.location_refs.items()
+        if location_ref_matches(location_ref, str(key), location.label)
+    ] or [(location_ref, None)]
+    return next(
+        (
+            requirement
+            for requirement in goal.target_requirements
+            if any(location_ref_matches(requirement.target_ref, key, label) for key, label in names)
+        ),
+        None,
+    )
 
 ###############################################################################
 def _is_eligible_evidence(result: ToolResult, assessment: EvidenceAssessment, analysis: bool) -> bool:
@@ -82,6 +114,10 @@ class CompletionEvaluator:
             if not isinstance(temporal, bool):
                 temporal = None
             scope = state.goal.temporal_scope if state.goal else {}
+            requirement = requirement_for_location(state, _result_location_ref(result))
+            if requirement is not None and requirement.temporal_scope is not None:
+                # A compound request judges each target against its own window.
+                scope = requirement.temporal_scope.model_dump(mode="json")
             expected = scope.get("reference_time_iso") or scope.get("start_time_iso")
             observed = result.metadata.observation_time
             if expected and observed:
@@ -331,11 +367,18 @@ def _native_temporal_scope_applied(
     *,
     evidence_required: bool = True,
 ) -> bool:
-    if goal is None or not goal.temporal_scope:
+    per_target_modes = {
+        requirement.temporal_scope.mode
+        for requirement in (goal.target_requirements if goal else [])
+        if requirement.temporal_scope is not None and requirement.temporal_scope.mode != "none"
+    }
+    if goal is None or not (goal.temporal_scope or per_target_modes):
         return True
     expected_mode = str(goal.temporal_scope.get("mode") or "none")
-    if expected_mode == "none":
+    if expected_mode == "none" and not per_target_modes:
         return True
+    # Each target's layer may carry its own mode (current vs forecast).
+    expected_modes = {*per_target_modes, expected_mode} - {"none"}
     instances = map_session.overlay_collection.instances
     if not instances:
         # Without required evidence (for example a basemap-only imagery view)
@@ -363,7 +406,7 @@ def _native_temporal_scope_applied(
             or instance.descriptor.get("time_mode")
             or ""
         ).strip()
-        == expected_mode
+        in expected_modes
         for instance in temporal_instances
     )
 

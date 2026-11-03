@@ -69,6 +69,27 @@ class LocationResolver:
         "country": 1,
         "deictic": 0,
     }
+    # Wording that points back at the conversation's active place.
+    REFERENCE_CUE_PATTERN = re.compile(
+        r"\b(?:there|here|nearby|(?:this|that|same) (?:city|town|area|place|district))\b"
+    )
+    # A parent named in the same phrase ("the Colosseum in Rome").
+    EXPLICIT_PARENT_PATTERN = re.compile(r"\b(?:in|at|near|within)\b")
+    REFERENCE_FILLER_WORDS = frozenset(
+        {"the", "a", "an", "main", "local", "nearest", "closest", "of", "city", "town"}
+    )
+    # Common nouns that name no specific place on their own.
+    GENERIC_FEATURE_WORDS = frozenset(
+        {
+            "centre", "center", "downtown", "station", "airport", "port", "harbor",
+            "harbour", "square", "hospital", "stadium", "park", "university",
+            "museum", "market", "cathedral", "church", "bridge", "hall", "old", "historic", "train", "bus", "railway",
+        }
+    )
+    AMBIGUOUS_SIGNAL_TYPES = frozenset({"street", "road", "address", "feature"})
+    # Two readings of an ambiguous signal that land farther apart than this
+    # (degrees) are a genuine ambiguity worth asking about.
+    AMBIGUOUS_PARENT_MAX_SEPARATION_DEGREES = 0.25
     MAX_RELATIONSHIP_PROBES = 3
     DEICTIC_SIGNAL_TYPES = frozenset({"deictic"})
     DISTRICT_RESULT_TYPES = frozenset(
@@ -244,10 +265,60 @@ class LocationResolver:
             if macro is not None:
                 return macro
 
-        context_signals = [
-            *explicit_signals,
-            *self._memory_parent_signals(memory_snapshot, explicit_signals),
-        ]
+        has_deictic = self._has_deictic_signal(location_signals)
+        parents = self._memory_parent_signals(
+            memory_snapshot, explicit_signals, has_deictic_signal=has_deictic
+        )
+        ambiguous_parents = self._memory_parent_signals(
+            memory_snapshot,
+            explicit_signals,
+            has_deictic_signal=has_deictic,
+            include_ambiguous=True,
+        )
+        if len(ambiguous_parents) == len(parents):
+            return await self._resolve_explicit_signals(explicit_signals, parents)
+
+        # Ambiguous names (a street, an address) are geocoded without the
+        # remembered parent first; the parent is only a fallback, and a
+        # materially different second reading is put to the user.
+        bare = await self._resolve_explicit_signals(explicit_signals, parents)
+        with_parent = await self._resolve_explicit_signals(
+            explicit_signals, ambiguous_parents
+        )
+        if not isinstance(bare, ResolvedLocation):
+            return with_parent if isinstance(with_parent, ResolvedLocation) else bare
+        if isinstance(with_parent, ResolvedLocation) and not self._within_degrees(
+            bare, with_parent, self.AMBIGUOUS_PARENT_MAX_SEPARATION_DEGREES
+        ):
+            return ClarificationRequest(
+                question=(
+                    f"Do you mean {bare.label} or {with_parent.label}?"
+                ),
+                reason="The name resolves to different places with and without the previous location.",
+                missing_fields=["location"],
+            )
+        return bare
+
+    # -------------------------------------------------------------------------
+    def _has_deictic_signal(self, signals: Sequence[LocationSignal]) -> bool:
+        return any(signal.signal_type in self.DEICTIC_SIGNAL_TYPES for signal in signals)
+
+    # -------------------------------------------------------------------------
+    def _within_degrees(
+        self, left: ResolvedLocation, right: ResolvedLocation, limit: float
+    ) -> bool:
+        return (
+            abs(float(left.latitude) - float(right.latitude)) <= limit
+            and abs(float(left.longitude) - float(right.longitude)) <= limit
+        )
+
+    # -------------------------------------------------------------------------
+    async def _resolve_explicit_signals(
+        self,
+        explicit_signals: list[LocationSignal],
+        memory_parents: Sequence[LocationSignal],
+    ) -> ResolvedLocation | ClarificationRequest:
+        context_signals = [*explicit_signals, *memory_parents]
         highest_specificity = max(
             self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
             for signal in context_signals
@@ -323,7 +394,11 @@ class LocationResolver:
 
         context_signals = [
             *explicit,
-            *self._memory_parent_signals(memory_snapshot, explicit),
+            *self._memory_parent_signals(
+                memory_snapshot,
+                explicit,
+                has_deictic_signal=self._has_deictic_signal(location_signals),
+            ),
         ]
         highest = max(
             self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
@@ -445,12 +520,66 @@ class LocationResolver:
         return result
 
     # -------------------------------------------------------------------------
+    def _classify_place_reference(
+        self,
+        signal: LocationSignal,
+        explicit_signals: Sequence[LocationSignal],
+        active: dict[str, Any],
+        has_deictic_signal: bool,
+    ) -> str:
+        """Classify a finer place signal against the conversation's active place.
+
+        previous-reference: deictic wording ("there", "in this city") or a
+            generic feature noun without a proper name ("the city centre").
+        explicit-parent: the user named the parent ("the Colosseum in Rome").
+        independent: a proper-named place with no reference to earlier context.
+            This includes districts, so "Shibuya" never inherits the previous
+            city even when the active place is Tokyo.
+        ambiguous: street-like or address-like names that exist in many cities.
+        """
+
+        text = self._normalize_text(f"{signal.raw_value} {signal.normalized_value or ''}")
+        if has_deictic_signal or self.REFERENCE_CUE_PATTERN.search(text):
+            return "previous-reference"
+        active_names = [
+            self._normalize_text(str(active.get(key) or ""))
+            for key in ("city", "country")
+        ]
+        names_active_parent = any(
+            name and self._contains_location_text(text, name) for name in active_names
+        )
+        coarser_signal = any(
+            0 < self.SPECIFICITY_BY_SIGNAL_TYPE.get(item.signal_type, 0) < 4
+            for item in explicit_signals
+        )
+        if (
+            "," in signal.raw_value
+            or self.EXPLICIT_PARENT_PATTERN.search(text)
+            or names_active_parent
+            or coarser_signal
+        ):
+            return "explicit-parent"
+        words = [word for word in text.split() if word not in self.REFERENCE_FILLER_WORDS]
+        if words and all(word in self.GENERIC_FEATURE_WORDS for word in words):
+            return "previous-reference"
+        if signal.signal_type in self.AMBIGUOUS_SIGNAL_TYPES:
+            return "ambiguous"
+        return "independent"
+
+    # -------------------------------------------------------------------------
     def _memory_parent_signals(
         self,
         memory_snapshot: dict[str, Any],
         explicit_signals: Sequence[LocationSignal],
+        *,
+        has_deictic_signal: bool = False,
+        include_ambiguous: bool = False,
     ) -> list[LocationSignal]:
-        """Use the active resolved place only as context for a finer target."""
+        """Use the active resolved place only as context for a finer target.
+
+        Parents are inherited only when every finest-level signal is a
+        previous-reference (or, with ``include_ambiguous``, an ambiguous one).
+        """
 
         active = json_object(memory_snapshot.get("active_location"))
         if not active:
@@ -462,6 +591,19 @@ class LocationResolver:
             for signal in explicit_signals
         )
         if target_specificity <= active_specificity:
+            return []
+        allowed = {"previous-reference"}
+        if include_ambiguous:
+            allowed.add("ambiguous")
+        if any(
+            self._classify_place_reference(
+                signal, explicit_signals, active, has_deictic_signal
+            )
+            not in allowed
+            for signal in explicit_signals
+            if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
+            == target_specificity
+        ):
             return []
 
         explicit_types = {signal.signal_type for signal in explicit_signals}

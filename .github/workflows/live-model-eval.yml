@@ -1,0 +1,118 @@
+name: Live Model Evaluation
+
+# Grades real model behaviour on the scenario matrix and holdout set. CI proves
+# deterministic behaviour only; this workflow needs provider credentials and is
+# therefore weekly / manual. A model whose secret is missing is skipped, not failed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: Comma-separated scenario ids (empty runs every model_in_loop scenario)
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-model-eval
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: app
+  AEGIS_CACHE_ROOT: ${{ github.workspace }}/runtimes/cache
+  UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/runtimes/cache/python
+
+jobs:
+  evaluate:
+    name: ${{ matrix.provider }} / ${{ matrix.model }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Add a model by adding an entry; api_key_secret names the repository secret holding its key.
+          - provider: opencode-go
+            model: deepseek-v4.1-flash
+            api_key_secret: OPENCODE_GO_API_KEY
+          - provider: opencode-go
+            model: beam-free
+            api_key_secret: OPENCODE_GO_API_KEY
+    env:
+      AEGIS_EVAL_API_KEY: ${{ secrets[matrix.api_key_secret] }}
+      FASTAPI_PORT: "5013"
+    steps:
+      - name: Report missing credentials
+        if: env.AEGIS_EVAL_API_KEY == ''
+        run: echo "::notice::Skipping ${{ matrix.provider }} / ${{ matrix.model }}; secret ${{ matrix.api_key_secret }} is not configured."
+
+      - name: Checkout
+        if: env.AEGIS_EVAL_API_KEY != ''
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: env.AEGIS_EVAL_API_KEY != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.7"
+
+      - name: Setup UV
+        if: env.AEGIS_EVAL_API_KEY != ''
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.30"
+
+      - name: Install locked backend dependencies
+        if: env.AEGIS_EVAL_API_KEY != ''
+        run: uv sync --locked --project app/server
+
+      - name: Start backend
+        if: env.AEGIS_EVAL_API_KEY != ''
+        run: |
+          mkdir -p assets/QA
+          cd app
+          nohup uv run --project server python -m uvicorn server.app:app --host 127.0.0.1 --port "$FASTAPI_PORT" \
+            --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10 > ../assets/QA/backend.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fsS "http://127.0.0.1:$FASTAPI_PORT/api/chat/settings" > /dev/null && exit 0
+            sleep 2
+          done
+          cat ../assets/QA/backend.log
+          exit 1
+
+      - name: Run live evaluation
+        if: env.AEGIS_EVAL_API_KEY != ''
+        env:
+          SCENARIOS: ${{ github.event.inputs.scenarios }}
+        run: |
+          set +e
+          uv run --project app/server python scripts/benchmarks/live_model_eval.py \
+            --provider "${{ matrix.provider }}" --model "${{ matrix.model }}" \
+            --base-url "http://127.0.0.1:$FASTAPI_PORT" --no-render \
+            --scenario "$SCENARIOS" \
+            --output-dir assets/QA/live-model-eval
+          code=$?
+          if [ "$code" -eq 3 ]; then
+            echo "::notice::Skipped: credentials were rejected or missing."
+            exit 0
+          fi
+          exit "$code"
+
+      - name: Add summary
+        if: always() && env.AEGIS_EVAL_API_KEY != ''
+        run: cat assets/QA/live-model-eval/*/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload evaluation report
+        if: always() && env.AEGIS_EVAL_API_KEY != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-model-eval-${{ matrix.provider }}-${{ matrix.model }}
+          path: |
+            assets/QA/live-model-eval
+            assets/QA/backend.log
+          if-no-files-found: warn

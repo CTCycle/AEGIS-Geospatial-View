@@ -1120,7 +1120,9 @@ def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> N
                     normalized_value="EUR district",
                     confidence=0.9,
                     source="model",
-                )
+                ),
+                # The user said "there": the district refers to the active city.
+                LocationSignal(signal_type="deictic", raw_value="there"),
             ],
             {
                 "active_location": {
@@ -1144,6 +1146,175 @@ def test_location_resolver_uses_active_city_as_parent_for_finer_follow_up() -> N
             "city",
             "country",
         ]
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+_PREVIOUS_PLACE_RESULTS = {
+    "Colosseum": ("Colosseum, Rome, Italy", 41.8902, 12.4922, "attraction", "Rome", "Italy"),
+    "Brandenburg Gate": ("Brandenburg Gate, Berlin, Germany", 52.5163, 13.3777, "attraction", "Berlin", "Germany"),
+    "Shibuya": ("Shibuya, Tokyo, Japan", 35.6595, 139.7005, "suburb", "Tokyo", "Japan"),
+    "city centre": ("City Centre, Rome, Italy", 41.8993, 12.4731, "suburb", "Rome", "Italy"),
+}
+
+
+def _previous_place_case(
+    value: str,
+    signal_type: str,
+    active_city: str,
+    active_country: str,
+):
+    calls: list[dict[str, object]] = []
+    key = next(name for name in _PREVIOUS_PLACE_RESULTS if name.lower() in value.lower())
+    display, lat, lon, result_type, city, country = _PREVIOUS_PLACE_RESULTS[key]
+
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": display,
+                "lat": lat,
+                "lon": lon,
+                "selected_result_type": result_type,
+                "selected_address_type": result_type,
+                "address": {"city": city, "country": country},
+            }
+
+    signal = LocationSignal(
+        signal_type=signal_type,  # type: ignore[arg-type]
+        raw_value=value,
+        normalized_value=key,
+        confidence=0.9,
+        source="model",
+    )
+    memory = {
+        "active_location": {
+            "label": f"{active_city}, {active_country}",
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "city": active_city,
+            "country": active_country,
+            "location_type": "city",
+            "confidence": 0.9,
+        }
+    }
+    return LocationResolver(nominatim_service=Geocoder()), signal, memory, calls
+
+
+@pytest.mark.parametrize(
+    ("value", "signal_type", "active", "expected_city"),
+    [
+        # Independent proper names never inherit the previous city.
+        ("Colosseum", "landmark", ("Paris", "France"), None),
+        ("Brandenburg Gate", "landmark", ("Berlin", "Germany"), None),
+        # Districts are independent unless the wording points back at context.
+        ("Shibuya", "district", ("Tokyo", "Japan"), None),
+        # A generic feature noun refers to the active place.
+        ("city centre", "district", ("Rome", "Italy"), "Rome"),
+    ],
+)
+@pytest.mark.parametrize("entry_point", ["signals", "targets"])
+def test_location_resolver_inherits_previous_place_only_for_references(
+    value: str,
+    signal_type: str,
+    active: tuple[str, str],
+    expected_city: str | None,
+    entry_point: str,
+) -> None:
+    resolver, signal, memory, calls = _previous_place_case(value, signal_type, *active)
+
+    async def _run() -> None:
+        if entry_point == "signals":
+            result = await resolver.resolve_location_signals([signal], memory)
+        else:
+            targets = await resolver.resolve_location_targets([signal], memory)
+            assert isinstance(targets, dict) and len(targets) == 1
+            result = next(iter(targets.values()))
+        assert isinstance(result, ResolvedLocation)
+        assert len(calls) == 1
+        assert calls[0]["city"] == expected_city
+        if expected_city is None:
+            assert calls[0]["country_name"] is None
+
+    run_async_in_thread(_run())
+
+
+@pytest.mark.parametrize("entry_point", ["signals", "targets"])
+def test_location_resolver_deictic_signal_makes_landmark_inherit_active_city(
+    entry_point: str,
+) -> None:
+    resolver, signal, memory, calls = _previous_place_case(
+        "Colosseum", "landmark", "Rome", "Italy"
+    )
+    signals = [signal, LocationSignal(signal_type="deictic", raw_value="there")]
+
+    async def _run() -> None:
+        if entry_point == "signals":
+            result = await resolver.resolve_location_signals(signals, memory)
+        else:
+            result = await resolver.resolve_location_targets(signals, memory)
+        assert not isinstance(result, ClarificationRequest)
+        assert calls[0]["city"] == "Rome"
+
+    run_async_in_thread(_run())
+
+
+@pytest.mark.parametrize("entry_point", ["signals", "targets"])
+def test_location_resolver_explicit_parent_is_not_duplicated(entry_point: str) -> None:
+    resolver, signal, memory, calls = _previous_place_case(
+        "Colosseum", "landmark", "Rome", "Italy"
+    )
+    signals = [
+        signal,
+        LocationSignal(
+            signal_type="city", raw_value="Rome", normalized_value="Rome",
+            confidence=0.9, source="model",
+        ),
+    ]
+
+    async def _run() -> None:
+        if entry_point == "signals":
+            result = await resolver.resolve_location_signals(signals, memory)
+        else:
+            result = await resolver.resolve_location_targets(signals, memory)
+        assert not isinstance(result, ClarificationRequest)
+        assert len(calls) == 1
+        assert calls[0]["city"] == "Rome"
+        assert str(calls[0]["address"]).count("Rome") <= 1
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+def test_location_resolver_ambiguous_street_retries_with_parent_only_after_miss() -> None:
+    calls: list[dict[str, object]] = []
+
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            if kwargs["city"] is None:
+                return None
+            return {
+                "display_name": "Via Appia, Rome, Italy",
+                "lat": 41.86,
+                "lon": 12.51,
+                "selected_result_type": "road",
+                "selected_address_type": "road",
+                "address": {"road": "Via Appia", "city": "Rome", "country": "Italy"},
+            }
+
+    resolver = LocationResolver(nominatim_service=Geocoder())
+    signal = LocationSignal(
+        signal_type="street", raw_value="Via Appia", normalized_value="Via Appia",
+        confidence=0.9, source="model",
+    )
+    memory = {"active_location": {"city": "Rome", "country": "Italy", "location_type": "city"}}
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals([signal], memory)
+        assert isinstance(result, ResolvedLocation)
+        assert [call["city"] for call in calls] == [None, "Rome"]
 
     run_async_in_thread(_run())
 

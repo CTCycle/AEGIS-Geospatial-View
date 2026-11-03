@@ -5,8 +5,9 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from server.common.identifiers import normalize_target_key
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -53,7 +54,38 @@ class CapabilityRoute(BaseModel):
     target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
     spatial_scope: "AgentSpatialScope | None" = None
+    # Compound requests ("Rome today vs Milan tomorrow") give a target its own
+    # scope; an unset field falls back to the route-level scope above.
+    target_requirements: list["TargetRequirement"] = Field(
+        default_factory=lambda: list[TargetRequirement](), max_length=16
+    )
     filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _requirements_name_route_targets(self) -> "CapabilityRoute":
+        known = {normalize_target_key(ref) for ref in self.target_refs}
+        seen: set[str] = set()
+        for requirement in self.target_requirements:
+            key = normalize_target_key(requirement.target_ref)
+            if key not in known:
+                raise ValueError(
+                    f"target_requirements names '{requirement.target_ref}', which is not in target_refs"
+                )
+            if key in seen:
+                raise ValueError(f"target_requirements repeats '{requirement.target_ref}'")
+            seen.add(key)
+        return self
+
+###############################################################################
+class TargetRequirement(BaseModel):
+    """Scope that applies to one target only; unset fields use the route's."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_ref: str = Field(min_length=1, max_length=160)
+    temporal_scope: "AgentTemporalScope | None" = None
+    spatial_scope: "AgentSpatialScope | None" = None
 
 ###############################################################################
 class AgentTemporalScope(BaseModel):
@@ -116,6 +148,11 @@ class AgentGoal(BaseModel):
     )
     spatial_scope: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]](), max_length=16
+    )
+    # Per-target scopes with the route-level fallback already applied; empty
+    # for single-scope requests.
+    target_requirements: list[TargetRequirement] = Field(
+        default_factory=lambda: list[TargetRequirement](), max_length=16
     )
     filters: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
