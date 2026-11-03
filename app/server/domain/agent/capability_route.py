@@ -285,7 +285,7 @@ class AgentTaskState(BaseModel):
     active_task_id: str | None = Field(default=None, max_length=160)
     status: TaskStatus = "pending"
     current_iteration: int = Field(default=0, ge=0)
-    max_iterations: int = Field(default=1, ge=1, le=100)
+    max_iterations: int = Field(default=1, ge=1, le=1000)
     tasks: list[AgentTask] = Field(
         default_factory=lambda: list[AgentTask](), max_length=32
     )
@@ -340,7 +340,7 @@ class AgentTaskState(BaseModel):
             active_task_id=root_task_id,
             status="in_progress",
             current_iteration=0,
-            max_iterations=max(1, min(100, int(max_iterations))),
+            max_iterations=max(1, min(1000, int(max_iterations))),
             tasks=[root, *children][:32],
             completion_requirements=[CompletionRequirement(name=name) for name in names],
         )
@@ -536,7 +536,7 @@ class AgentRunState(BaseModel):
     validation_corrections: int = Field(default=0, ge=0)
     # Iterations are one-based once the first model decision starts.
     current_iteration: int = Field(default=0, ge=0)
-    max_iterations: int = Field(default=12, ge=1, le=100)
+    max_iterations: int = Field(default=40, ge=1, le=1000)
     finalization_attempted: bool = False
     iteration_trace: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]]()

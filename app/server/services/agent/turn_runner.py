@@ -148,68 +148,32 @@ class AgentTurnRunner:
                         if request.context_package is not None
                         else {}
                     ),
-                    max_model_call_seconds=_setting(
-                        configured, "native_model_call_seconds", 60.0
-                    ),
-                    max_iterations=_setting(
-                        configured, "max_iterations", 12
-                    ),
-                    max_model_calls=_setting(
-                        configured, "complex_max_model_calls", 10
-                    ),
-                    max_tool_calls=_setting(
-                        configured, "complex_max_tool_calls", 20
-                    ),
-                    max_state_transitions=_setting(
-                        configured, "complex_max_state_transitions", 64
-                    ),
-                    simple_max_model_calls=_setting(
-                        configured, "simple_max_model_calls", 4
-                    ),
-                    simple_max_tool_calls=_setting(
-                        configured, "simple_max_tool_calls", 6
-                    ),
-                    simple_max_state_transitions=_setting(
-                        configured, "simple_max_state_transitions", 32
-                    ),
-                    max_parallel_tool_calls=_setting(
-                        configured, "max_parallel_tool_calls", 8
-                    ),
-                    max_consecutive_tool_failures=_setting(
-                        configured, "max_consecutive_tool_failures", 3
-                    ),
-                    max_same_failed_fingerprint=_setting(
-                        configured, "max_same_failed_fingerprint", 2
-                    ),
-                    max_route_corrections=_setting(
-                        configured, "max_route_corrections", 1
-                    ),
-                    max_validation_corrections=_setting(
-                        configured, "max_validation_corrections", 2
-                    ),
-                    max_discovery_attempts=_setting(
-                        configured, "max_discovery_attempts", 2
-                    ),
-                    max_tool_result_chars=_setting(
-                        configured, "max_tool_result_chars", 4096
-                    ),
-                    max_no_progress_corrections=_setting(
-                        configured, "max_no_progress_corrections", 2
-                    ),
-                    max_unproductive_steps=_setting(
-                        configured, "max_unproductive_steps", 3
-                    ),
-                    max_render_attempts=_setting(
-                        configured, "max_render_attempts", 3
-                    ),
+                    max_model_call_seconds=_setting(configured, "native_model_call_seconds"),
+                    max_iterations=_setting(configured, "max_iterations"),
+                    max_model_calls=_setting(configured, "complex_max_model_calls"),
+                    max_tool_calls=_setting(configured, "complex_max_tool_calls"),
+                    max_state_transitions=_setting(configured, "complex_max_state_transitions"),
+                    simple_max_model_calls=_setting(configured, "simple_max_model_calls"),
+                    simple_max_tool_calls=_setting(configured, "simple_max_tool_calls"),
+                    simple_max_state_transitions=_setting(configured, "simple_max_state_transitions"),
+                    max_parallel_tool_calls=_setting(configured, "max_parallel_tool_calls"),
+                    max_consecutive_tool_failures=_setting(configured, "max_consecutive_tool_failures"),
+                    max_same_failed_fingerprint=_setting(configured, "max_same_failed_fingerprint"),
+                    max_route_corrections=_setting(configured, "max_route_corrections"),
+                    max_validation_corrections=_setting(configured, "max_validation_corrections"),
+                    max_discovery_attempts=_setting(configured, "max_discovery_attempts"),
+                    max_tool_result_chars=_setting(configured, "max_tool_result_chars"),
+                    max_no_progress_corrections=_setting(configured, "max_no_progress_corrections"),
+                    max_unproductive_steps=_setting(configured, "max_unproductive_steps"),
+                    max_render_attempts=_setting(configured, "max_render_attempts"),
                     vision_policy=str(
                         getattr(configured, "vision_policy", None) or "disabled"
                     ),
                     vision_max_calls=int(
-                        _setting(configured, "vision_max_calls", 2)
+                        _setting(configured, "vision_max_calls")
                     ),
                     max_output_tokens=int(
-                        _setting(configured, "max_output_tokens", 16384)
+                        _setting(configured, "max_output_tokens")
                     ),
                     context_usage_callback=request.context_usage_callback,
                     trace_callback=request.trace_callback,
@@ -446,7 +410,8 @@ def _response_failure_category(value: str | None) -> FailureCategory | None:
     return None
 
 ###############################################################################
-def _setting(settings: Any, name: str, default: int | float) -> Any:
+def _setting(settings: Any, name: str) -> Any:
+    default = getattr(AgentExecutionSettings(), name)
     value = getattr(settings, name, default) if settings is not None else default
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
 

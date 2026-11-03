@@ -1135,6 +1135,6 @@ describe('pages/settings-page.component', () => {
     await fixture.componentInstance.saveRuntimeSettings();
     expect(updateRuntimeSettingsMock).toHaveBeenCalledWith({agent_execution: {max_discovery_attempts: 5}});
     fixture.componentInstance.restoreAgentExecutionDefaults();
-    expect(fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts).toBe(2);
+    expect(fixture.componentInstance.runtimeSettingsDraft.agent_execution.max_discovery_attempts).toBe(4);
   });
 });

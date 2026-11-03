@@ -53,41 +53,41 @@ class ChatRuntimeSettings:
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionSettings:
-    initial_run_seconds: float = 90.0
-    simple_seconds: float = 150.0
-    complex_seconds: float = 300.0
+    initial_run_seconds: float = 300.0
+    simple_seconds: float = 450.0
+    complex_seconds: float = 600.0
     context_assembly_seconds: float = 5.0
-    native_model_call_seconds: float = 60.0
-    tool_execution_seconds: float = 45.0
-    tool_absolute_seconds: float = 90.0
+    native_model_call_seconds: float = 120.0
+    tool_execution_seconds: float = 90.0
+    tool_absolute_seconds: float = 120.0
     map_assembly_seconds: float = 20.0
     persistence_seconds: float = 5.0
-    render_ack_seconds: float = 90.0
-    max_tool_result_chars: int = 4096
-    max_iterations: int = 12
-    max_render_attempts: int = 3
-    max_discovery_attempts: int = 2
-    max_no_progress_corrections: int = 2
-    max_unproductive_steps: int = 3
-    simple_max_model_calls: int = 4
-    complex_max_model_calls: int = 10
-    simple_max_tool_calls: int = 6
-    complex_max_tool_calls: int = 20
-    simple_max_state_transitions: int = 32
-    complex_max_state_transitions: int = 64
+    render_ack_seconds: float = 120.0
+    max_tool_result_chars: int = 16384
+    max_iterations: int = 40
+    max_render_attempts: int = 5
+    max_discovery_attempts: int = 4
+    max_no_progress_corrections: int = 3
+    max_unproductive_steps: int = 5
+    simple_max_model_calls: int = 12
+    complex_max_model_calls: int = 30
+    simple_max_tool_calls: int = 20
+    complex_max_tool_calls: int = 60
+    simple_max_state_transitions: int = 100
+    complex_max_state_transitions: int = 200
     max_parallel_tool_calls: int = 8
-    max_consecutive_tool_failures: int = 3
-    max_same_failed_fingerprint: int = 2
-    max_route_corrections: int = 1
-    max_validation_corrections: int = 2
-    model_max_attempts: int = 2
-    provider_max_attempts: int = 2
+    max_consecutive_tool_failures: int = 5
+    max_same_failed_fingerprint: int = 3
+    max_route_corrections: int = 2
+    max_validation_corrections: int = 4
+    model_max_attempts: int = 3
+    provider_max_attempts: int = 3
     retry_backoff_base_seconds: float = 0.25
     retry_backoff_max_seconds: float = 2.0
-    provider_request_seconds: float = 10.0
+    provider_request_seconds: float = 30.0
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
-    max_output_tokens: int = 16384
+    max_output_tokens: int = 32768
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -192,48 +192,48 @@ class JsonMapSettings(StrictJsonSettings):
 
 ###############################################################################
 class JsonChatRuntimeSettings(StrictJsonSettings):
-    max_history_messages: int = Field(default=12, ge=1, le=100)
+    max_history_messages: int = Field(default=24, ge=1, le=500)
     application_timezone: str = "UTC"
 
 ###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):
-    initial_run_seconds: float = Field(default=90.0, ge=1.0, le=300.0)
-    simple_seconds: float = Field(default=150.0, ge=1.0, le=300.0)
-    complex_seconds: float = Field(default=300.0, ge=1.0, le=300.0)
+    initial_run_seconds: float = Field(default=300.0, ge=1.0, le=3600.0)
+    simple_seconds: float = Field(default=450.0, ge=1.0, le=3600.0)
+    complex_seconds: float = Field(default=600.0, ge=1.0, le=3600.0)
     context_assembly_seconds: float = Field(default=5.0, ge=0.1)
-    native_model_call_seconds: float = Field(default=60.0, ge=0.1)
-    tool_execution_seconds: float = Field(default=45.0, ge=0.1, le=90.0)
-    tool_absolute_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
+    native_model_call_seconds: float = Field(default=120.0, ge=0.1, le=600.0)
+    tool_execution_seconds: float = Field(default=90.0, ge=0.1, le=600.0)
+    tool_absolute_seconds: float = Field(default=120.0, ge=0.1, le=600.0)
     map_assembly_seconds: float = Field(default=20.0, ge=0.1)
     persistence_seconds: float = Field(default=5.0, ge=0.1)
-    render_ack_seconds: float = Field(default=90.0, ge=0.1, le=90.0)
-    max_tool_result_chars: int = Field(default=4096, ge=128, le=100000)
-    max_iterations: int = Field(default=12, ge=1, le=100)
-    max_render_attempts: int = Field(default=3, ge=1, le=32)
-    max_discovery_attempts: int = Field(default=2, ge=1, le=100)
-    max_no_progress_corrections: int = Field(default=2, ge=0, le=8)
-    max_unproductive_steps: int = Field(default=3, ge=1, le=10)
-    simple_max_model_calls: int = Field(default=4, ge=1, le=100)
-    complex_max_model_calls: int = Field(default=10, ge=1, le=100)
-    simple_max_tool_calls: int = Field(default=6, ge=1, le=200)
-    complex_max_tool_calls: int = Field(default=20, ge=1, le=500)
-    simple_max_state_transitions: int = Field(default=32, ge=1, le=500)
-    complex_max_state_transitions: int = Field(default=64, ge=1, le=1000)
-    max_parallel_tool_calls: int = Field(default=8, ge=1, le=32)
-    max_consecutive_tool_failures: int = Field(default=3, ge=1, le=20)
-    max_same_failed_fingerprint: int = Field(default=2, ge=1, le=20)
-    max_route_corrections: int = Field(default=1, ge=0, le=10)
-    max_validation_corrections: int = Field(default=2, ge=0, le=20)
-    model_max_attempts: int = Field(default=2, ge=1, le=10)
-    provider_max_attempts: int = Field(default=2, ge=1, le=10)
+    render_ack_seconds: float = Field(default=120.0, ge=0.1, le=600.0)
+    max_tool_result_chars: int = Field(default=16384, ge=128, le=500000)
+    max_iterations: int = Field(default=40, ge=1, le=1000)
+    max_render_attempts: int = Field(default=5, ge=1, le=100)
+    max_discovery_attempts: int = Field(default=4, ge=1, le=100)
+    max_no_progress_corrections: int = Field(default=3, ge=0, le=20)
+    max_unproductive_steps: int = Field(default=5, ge=1, le=50)
+    simple_max_model_calls: int = Field(default=12, ge=1, le=1000)
+    complex_max_model_calls: int = Field(default=30, ge=1, le=1000)
+    simple_max_tool_calls: int = Field(default=20, ge=1, le=2000)
+    complex_max_tool_calls: int = Field(default=60, ge=1, le=2000)
+    simple_max_state_transitions: int = Field(default=100, ge=1, le=5000)
+    complex_max_state_transitions: int = Field(default=200, ge=1, le=5000)
+    max_parallel_tool_calls: int = Field(default=8, ge=1, le=64)
+    max_consecutive_tool_failures: int = Field(default=5, ge=1, le=50)
+    max_same_failed_fingerprint: int = Field(default=3, ge=1, le=50)
+    max_route_corrections: int = Field(default=2, ge=0, le=20)
+    max_validation_corrections: int = Field(default=4, ge=0, le=50)
+    model_max_attempts: int = Field(default=3, ge=1, le=20)
+    provider_max_attempts: int = Field(default=3, ge=1, le=20)
     retry_backoff_base_seconds: float = Field(default=0.25, ge=0.0, le=60.0)
     retry_backoff_max_seconds: float = Field(default=2.0, ge=0.0, le=120.0)
-    provider_request_seconds: float = Field(default=10.0, ge=0.1, le=120.0)
+    provider_request_seconds: float = Field(default=30.0, ge=0.1, le=300.0)
     vision_policy: Literal["disabled", "always", "on_failure", "final_check"] = (
         "disabled"
     )
     vision_max_calls: int = Field(default=2, ge=1, le=8)
-    max_output_tokens: int = Field(default=16384, ge=1024, le=262144)
+    max_output_tokens: int = Field(default=32768, ge=1024, le=262144)
 
 ###############################################################################
 class JsonOpenMeteoSettings(StrictJsonSettings):

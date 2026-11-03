@@ -732,19 +732,19 @@ def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path
     assert response.status_code == 200
     payload = response.json()
     assert payload["schema_version"] == 1
-    assert payload["chat"]["max_history_messages"] == 12
-    assert payload["agent_execution"]["max_iterations"] == 12
-    assert payload["agent_execution"]["max_discovery_attempts"] == 2
+    assert payload["chat"]["max_history_messages"] == 24
+    assert payload["agent_execution"]["max_iterations"] == 40
+    assert payload["agent_execution"]["max_discovery_attempts"] == 4
     assert payload["restart_required"] is False
     assert "credentials" not in payload
-    assert payload["agent_execution"]["max_output_tokens"] == 16384
+    assert payload["agent_execution"]["max_output_tokens"] == 32768
     # ``max_output_tokens`` is a model output cap, not a credential.
     serialized = json.dumps(payload).casefold().replace("max_output_tokens", "")
     assert not any(
         secret_field in serialized
         for secret_field in ("api_key", "password", "secret", "token")
     )
-    assert repository.get_required().chat.max_history_messages == 12
+    assert repository.get_required().chat.max_history_messages == 24
 
 
 ###############################################################################
@@ -753,13 +753,13 @@ def test_runtime_settings_api_merges_partial_blocks_atomically(tmp_path: Path) -
 
     response = client.patch(
         "/api/settings/runtime",
-        json={"chat": {"max_history_messages": 24}},
+        json={"chat": {"max_history_messages": 12}},
     )
 
     assert response.status_code == 200
-    assert response.json()["chat"]["max_history_messages"] == 24
+    assert response.json()["chat"]["max_history_messages"] == 12
     assert response.json()["restart_required"] is True
-    assert repository.get_required().chat.max_history_messages == 24
+    assert repository.get_required().chat.max_history_messages == 12
 
 
 ###############################################################################
@@ -770,7 +770,7 @@ def test_restart_requirement_survives_get_and_clears_when_values_return_to_start
 
     changed = client.patch(
         "/api/settings/runtime",
-        json={"chat": {"max_history_messages": 24}},
+        json={"chat": {"max_history_messages": 12}},
     )
     assert changed.status_code == 200
     assert changed.json()["restart_required"] is True
@@ -782,7 +782,7 @@ def test_restart_requirement_survives_get_and_clears_when_values_return_to_start
 
     reverted = client.patch(
         "/api/settings/runtime",
-        json={"chat": {"max_history_messages": 12}},
+        json={"chat": {"max_history_messages": 24}},
     )
     assert reverted.status_code == 200
     assert reverted.json()["restart_required"] is False
@@ -832,6 +832,23 @@ def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomi
     assert response.status_code == 400
     assert repository.get_required().agent_execution.max_iterations == 7
 
+
+###############################################################################
+def test_agent_policy_accepts_limits_above_former_ceilings(tmp_path: Path) -> None:
+    client, repository = _client(tmp_path)
+    limits = {
+        "max_iterations": 500,
+        "complex_max_tool_calls": 1500,
+        "complex_seconds": 1800,
+        "tool_absolute_seconds": 300,
+        "render_ack_seconds": 300,
+    }
+
+    response = client.patch("/api/settings/runtime", json={"agent_execution": limits})
+
+    assert response.status_code == 200
+    stored = repository.get_required().agent_execution
+    assert {name: getattr(stored, name) for name in limits} == limits
 
 ###############################################################################
 def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> None:

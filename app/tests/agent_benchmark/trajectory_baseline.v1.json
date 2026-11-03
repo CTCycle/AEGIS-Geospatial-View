@@ -4,52 +4,52 @@
     "show_colosseum": {
       "termination_reason": "awaiting_render",
       "model_calls": 1,
-      "total_estimated_input_tokens": 2642
+      "total_estimated_input_tokens": 2655
     },
     "show_coordinates": {
       "termination_reason": "awaiting_render",
       "model_calls": 1,
-      "total_estimated_input_tokens": 2657
+      "total_estimated_input_tokens": 2670
     },
     "springfield_clarification": {
       "termination_reason": "clarification_required",
       "model_calls": 1,
-      "total_estimated_input_tokens": 2668
+      "total_estimated_input_tokens": 2680
     },
     "paris_berlin_weather": {
       "termination_reason": "goal_satisfied",
       "model_calls": 4,
-      "total_estimated_input_tokens": 12171
+      "total_estimated_input_tokens": 12589
     },
     "europe_rainfall_rank": {
       "termination_reason": "awaiting_render",
       "model_calls": 4,
-      "total_estimated_input_tokens": 17135
+      "total_estimated_input_tokens": 17556
     },
     "follow_up_weather": {
       "termination_reason": "goal_satisfied",
       "model_calls": 4,
-      "total_estimated_input_tokens": 10932
+      "total_estimated_input_tokens": 11351
     },
     "entity_request_regression": {
       "termination_reason": "insufficient_evidence",
-      "model_calls": 5,
-      "total_estimated_input_tokens": 19717
+      "model_calls": 6,
+      "total_estimated_input_tokens": 25214
     },
     "inspect_loop_regression": {
       "termination_reason": "no_progress",
-      "model_calls": 9,
-      "total_estimated_input_tokens": 49571
+      "model_calls": 11,
+      "total_estimated_input_tokens": 66958
     },
     "nested_arguments_regression": {
       "termination_reason": "goal_satisfied",
       "model_calls": 4,
-      "total_estimated_input_tokens": 13251
+      "total_estimated_input_tokens": 13669
     },
     "follow_up_prior_evidence_regression": {
       "termination_reason": "goal_satisfied",
       "model_calls": 3,
-      "total_estimated_input_tokens": 10172
+      "total_estimated_input_tokens": 10578
     }
   }
 }

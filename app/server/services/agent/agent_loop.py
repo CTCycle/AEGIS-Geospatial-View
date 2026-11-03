@@ -203,27 +203,27 @@ class AgentLoopRequest:
         default_factory=lambda: dict[str, Any]()
     )
     temperature: float = 0.2
-    max_model_call_seconds: float = 60.0
-    max_iterations: int = 12
-    max_model_calls: int = 10
-    max_tool_calls: int = 20
-    max_state_transitions: int = 64
-    simple_max_model_calls: int = 4
-    simple_max_tool_calls: int = 6
-    simple_max_state_transitions: int = 32
+    max_model_call_seconds: float = 120.0
+    max_iterations: int = 40
+    max_model_calls: int = 30
+    max_tool_calls: int = 60
+    max_state_transitions: int = 200
+    simple_max_model_calls: int = 12
+    simple_max_tool_calls: int = 20
+    simple_max_state_transitions: int = 100
     max_parallel_tool_calls: int = 8
-    max_consecutive_tool_failures: int = 3
-    max_same_failed_fingerprint: int = 2
-    max_route_corrections: int = 1
-    max_validation_corrections: int = 2
-    max_discovery_attempts: int = 2
-    max_tool_result_chars: int = 4096
-    max_no_progress_corrections: int = 2
-    max_unproductive_steps: int = 3
-    max_render_attempts: int = 3
+    max_consecutive_tool_failures: int = 5
+    max_same_failed_fingerprint: int = 3
+    max_route_corrections: int = 2
+    max_validation_corrections: int = 4
+    max_discovery_attempts: int = 4
+    max_tool_result_chars: int = 16384
+    max_no_progress_corrections: int = 3
+    max_unproductive_steps: int = 5
+    max_render_attempts: int = 5
     vision_policy: str = "disabled"
     vision_max_calls: int = 2
-    max_output_tokens: int = 16384
+    max_output_tokens: int = 32768
     context_usage_callback: Callable[[dict[str, Any]], None] | None = None
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     trace_callback: Callable[
@@ -290,7 +290,7 @@ class AgentLoop:
         provider = self.provider_factory.get_provider(request.provider)
         messages = self._initial_messages(request)
         final_text = ""
-        state.max_iterations = max(1, min(100, int(request.max_iterations)))
+        state.max_iterations = max(1, int(request.max_iterations))
         self._ensure_task_state(state, request.max_iterations)
         self._attach_client_map_view(state)
         request.budget.configure_limits(
@@ -1541,7 +1541,7 @@ class AgentLoop:
         typed = typed.model_copy(
             update={
                 "current_iteration": max(0, state.current_iteration),
-                "max_iterations": max(1, min(100, int(max_iterations))),
+                "max_iterations": max(1, int(max_iterations)),
             }
         )
         raw.update(typed.to_payload())

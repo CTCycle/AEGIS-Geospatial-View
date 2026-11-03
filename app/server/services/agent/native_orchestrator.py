@@ -25,6 +25,7 @@ from server.domain.agent.reliability import (
     COMPLEX_RUN_SECONDS,
     DEFAULT_STAGE_LIMITS,
     INITIAL_RUN_SECONDS,
+    SIMPLE_RUN_SECONDS,
     AgentExecutionBudget,
 )
 from server.repositories.conversations import ConversationRepository
@@ -458,24 +459,54 @@ class NativeAgentOrchestrator:
             stage_limits.update(
                 {
                     "context_assembly": float(
-                        getattr(configured, "context_assembly_seconds", 5.0)
+                        getattr(
+                            configured,
+                            "context_assembly_seconds",
+                            stage_limits["context_assembly"],
+                        )
                     ),
                     "route_request": float(
-                        getattr(configured, "native_model_call_seconds", 60.0)
+                        getattr(
+                            configured,
+                            "native_model_call_seconds",
+                            stage_limits["route_request"],
+                        )
                     ),
                     "model_step": float(
-                        getattr(configured, "native_model_call_seconds", 60.0)
+                        getattr(
+                            configured,
+                            "native_model_call_seconds",
+                            stage_limits["model_step"],
+                        )
                     ),
                     "tool_execution": float(
-                        getattr(configured, "tool_absolute_seconds", 90.0)
+                        getattr(
+                            configured,
+                            "tool_absolute_seconds",
+                            stage_limits["tool_execution"],
+                        )
                     ),
                     "map_assembly": float(
-                        getattr(configured, "map_assembly_seconds", 20.0)
+                        getattr(
+                            configured,
+                            "map_assembly_seconds",
+                            stage_limits["map_assembly"],
+                        )
                     ),
                     "persistence": float(
-                        getattr(configured, "persistence_seconds", 5.0)
+                        getattr(
+                            configured,
+                            "persistence_seconds",
+                            stage_limits["persistence"],
+                        )
                     ),
-                    "render_ack": float(getattr(configured, "render_ack_seconds", 90.0)),
+                    "render_ack": float(
+                        getattr(
+                            configured,
+                            "render_ack_seconds",
+                            stage_limits["render_ack"],
+                        )
+                    ),
                 }
             )
         return AgentExecutionBudget(
@@ -490,9 +521,9 @@ class NativeAgentOrchestrator:
                 else COMPLEX_RUN_SECONDS
             ),
             simple_run_seconds=float(
-                getattr(configured, "simple_seconds", 150.0)
+                getattr(configured, "simple_seconds", SIMPLE_RUN_SECONDS)
                 if configured is not None
-                else 150.0
+                else SIMPLE_RUN_SECONDS
             ),
             stage_limits=stage_limits,
         )

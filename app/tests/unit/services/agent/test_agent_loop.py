@@ -311,6 +311,7 @@ async def _run_route(provider: FakeProvider) -> AgentLoopOutcome:
             model="fake-model",
             state=_state(),
             budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_route_corrections=1,
         )
     )
 
@@ -1812,6 +1813,24 @@ async def test_run_control_stops_cancelled_request_before_provider_call() -> Non
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_iteration_limit_above_former_ceiling_is_not_clamped() -> None:
+    state = _state()
+    await _loop(FakeProvider([_route_call()])).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_iterations=150,
+            run_state_check=lambda: "cancelled",
+        )
+    )
+
+    assert state.max_iterations == 150
+    assert state.task_state["max_iterations"] == 150
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
     provider = FakeProvider(
         [
@@ -2840,6 +2859,7 @@ async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_inc
             state=state,
             budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
             max_validation_corrections=2,
+            max_same_failed_fingerprint=2,
         )
     )
 

@@ -10,17 +10,17 @@ from typing import Any, Generator
 
 from server.common.typing import is_json_array, is_json_object
 
-INITIAL_RUN_SECONDS = 90.0
-SIMPLE_RUN_SECONDS = 150.0
-COMPLEX_RUN_SECONDS = 300.0
+INITIAL_RUN_SECONDS = 300.0
+SIMPLE_RUN_SECONDS = 450.0
+COMPLEX_RUN_SECONDS = 600.0
 DEFAULT_RUN_SECONDS = INITIAL_RUN_SECONDS
 DEFAULT_STAGE_LIMITS: dict[str, float] = {
     "context_assembly": 5.0,
-    "route_request": 60.0,
-    "model_step": 60.0,
-    "tool_execution": 90.0,
+    "route_request": 120.0,
+    "model_step": 120.0,
+    "tool_execution": 120.0,
     "map_assembly": 20.0,
-    "render_ack": 90.0,
+    "render_ack": 120.0,
     "persistence": 5.0,
 }
 
@@ -362,7 +362,7 @@ class AgentExecutionBudget:
                 setattr(self, name, value)
         for name in ("hard_max_seconds", "simple_run_seconds"):
             value = snapshot.get(name)
-            if isinstance(value, (int, float)) and 0 < value <= COMPLEX_RUN_SECONDS:
+            if isinstance(value, (int, float)) and value > 0:
                 setattr(self, name, float(value))
         limits = snapshot.get("stage_limits")
         if is_json_object(limits):

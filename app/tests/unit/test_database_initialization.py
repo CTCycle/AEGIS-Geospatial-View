@@ -479,7 +479,7 @@ def test_database_switch_keeps_each_database_settings_independent_and_survives_r
                 client.get("/api/settings/runtime").json()["chat"][
                     "max_history_messages"
                 ]
-                == 12
+                == 24
             )
             assert (
                 client.patch(
