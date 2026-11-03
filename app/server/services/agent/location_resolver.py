@@ -86,6 +86,17 @@ class LocationResolver:
             "museum", "market", "cathedral", "church", "bridge", "hall", "old", "historic", "train", "bus", "railway",
         }
     )
+    # A city's centre is the city itself: these phrases are never geocoded
+    # literally, and a city name before or after them selects that city.
+    CENTRE_PHRASES = tuple(
+        tuple(phrase.split())
+        for phrase in (
+            "city centre", "city center", "town centre", "town center",
+            "historic centre", "historic center", "old town", "centre",
+            "center", "downtown",
+        )
+    )
+    CENTRE_FILLER_WORDS = frozenset({"the", "a", "an", "of", "in", "at"})
     AMBIGUOUS_SIGNAL_TYPES = frozenset({"street", "road", "address", "feature"})
     # Two readings of an ambiguous signal that land farther apart than this
     # (degrees) are a genuine ambiguity worth asking about.
@@ -265,6 +276,11 @@ class LocationResolver:
             if macro is not None:
                 return macro
 
+        centre_city = await self._resolve_centre_phrase(
+            explicit_signals, memory_snapshot
+        )
+        if centre_city is not None:
+            return centre_city
         has_deictic = self._has_deictic_signal(location_signals)
         parents = self._memory_parent_signals(
             memory_snapshot, explicit_signals, has_deictic_signal=has_deictic
@@ -298,6 +314,73 @@ class LocationResolver:
                 missing_fields=["location"],
             )
         return bare
+
+    # -------------------------------------------------------------------------
+    def _centre_phrase_city(self, signal: LocationSignal) -> str | None:
+        """Return the city named around a centre phrase ("" if none), else None."""
+
+        if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0) < 4:
+            return None
+        # Tool queries arrive as "<place>, <city>, <country>": only the first
+        # component carries the centre phrase; a later one names the city.
+        components = [
+            part.strip()
+            for part in (signal.normalized_value or signal.raw_value).split(",")
+        ]
+        tokens = components[0].split()
+        words = [token.casefold() for token in tokens]
+        for phrase in self.CENTRE_PHRASES:
+            width = len(phrase)
+            for start in range(len(words) - width + 1):
+                if tuple(words[start : start + width]) != phrase:
+                    continue
+                rest = [
+                    token
+                    for token in (*tokens[:start], *tokens[start + width :])
+                    if token.casefold() not in self.CENTRE_FILLER_WORDS
+                ]
+                if not rest and len(components) > 1:
+                    return components[1]
+                return " ".join(rest)
+        return None
+
+    # -------------------------------------------------------------------------
+    async def _resolve_centre_phrase(
+        self,
+        explicit_signals: Sequence[LocationSignal],
+        memory_snapshot: dict[str, Any],
+    ) -> ResolvedLocation | ClarificationRequest | None:
+        """Resolve a lone "city centre" target to the city itself."""
+
+        if len(explicit_signals) != 1:
+            return None
+        signal = explicit_signals[0]
+        city_name = self._centre_phrase_city(signal)
+        if city_name is None:
+            return None
+        active = json_object(memory_snapshot.get("active_location"))
+        if not city_name:
+            city_name = str(active.get("city") or "").strip()
+            if not city_name and self._normalize_text(
+                str(active.get("location_type") or "")
+            ) in {"city", "municipality"}:
+                city_name = str(active.get("label") or "").split(",")[0].strip()
+            if not city_name:
+                return None
+            if self._normalize_text(
+                str(active.get("location_type") or "")
+            ) in {"city", "municipality"}:
+                remembered = self._location_from_memory(active)
+                if remembered is not None:
+                    return remembered
+        city_signal = LocationSignal(
+            signal_type="city",
+            raw_value=city_name,
+            normalized_value=city_name,
+            confidence=signal.confidence,
+            source=signal.source,
+        )
+        return await self._resolve_explicit_signals([city_signal], [])
 
     # -------------------------------------------------------------------------
     def _has_deictic_signal(self, signals: Sequence[LocationSignal]) -> bool:

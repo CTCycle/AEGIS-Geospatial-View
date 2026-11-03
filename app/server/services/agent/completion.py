@@ -435,6 +435,7 @@ def _native_spatial_scope_applied(
 
 
 _REQUIREMENT_DESCRIPTIONS = {
+    "requested_transform_applied": "the requested filter or data operation could not be applied",
     "location_resolved": "the requested place was not confirmed",
     "search_area_bound": "the search area was not confirmed",
     "result_locations_derived": "no result locations were derived from the data",
@@ -460,6 +461,20 @@ def describe_requirements(names: list[str]) -> str:
         for name in dict.fromkeys(names)
     ]
     return "; ".join(described)
+
+###############################################################################
+def requested_transform_unmet(state: AgentRunState) -> bool:
+    """Whether the latest requested filter or transform failed.
+
+    A later successful transform supersedes the failure; until then the
+    operation the user asked for has not been applied to the evidence.
+    """
+
+    latest = next(
+        (result for result in reversed(state.tool_results) if result.tool_name == "transform_evidence"),
+        None,
+    )
+    return latest is not None and latest.status == "failed"
 
 ###############################################################################
 def uncovered_data_obligations(state: AgentRunState) -> list[str]:
@@ -635,6 +650,7 @@ def follow_up_location_keys(state: AgentRunState) -> set[str]:
 __all__ = [
     "CompletionEvaluator",
     "describe_requirements",
+    "requested_transform_unmet",
     "follow_up_location_keys",
     "uncovered_map_targets",
     "uncovered_data_obligations",

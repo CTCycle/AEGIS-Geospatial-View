@@ -1155,7 +1155,7 @@ _PREVIOUS_PLACE_RESULTS = {
     "Colosseum": ("Colosseum, Rome, Italy", 41.8902, 12.4922, "attraction", "Rome", "Italy"),
     "Brandenburg Gate": ("Brandenburg Gate, Berlin, Germany", 52.5163, 13.3777, "attraction", "Berlin", "Germany"),
     "Shibuya": ("Shibuya, Tokyo, Japan", 35.6595, 139.7005, "suburb", "Tokyo", "Japan"),
-    "city centre": ("City Centre, Rome, Italy", 41.8993, 12.4731, "suburb", "Rome", "Italy"),
+    "main station": ("Main Station, Rome, Italy", 41.9009, 12.5016, "station", "Rome", "Italy"),
 }
 
 
@@ -1210,8 +1210,9 @@ def _previous_place_case(
         ("Brandenburg Gate", "landmark", ("Berlin", "Germany"), None),
         # Districts are independent unless the wording points back at context.
         ("Shibuya", "district", ("Tokyo", "Japan"), None),
-        # A generic feature noun refers to the active place.
-        ("city centre", "district", ("Rome", "Italy"), "Rome"),
+        # A generic feature noun refers to the active place (centre phrases are
+        # covered by the centre-phrase test).
+        ("main station", "station", ("Rome", "Italy"), "Rome"),
     ],
 )
 @pytest.mark.parametrize("entry_point", ["signals", "targets"])
@@ -1282,6 +1283,51 @@ def test_location_resolver_explicit_parent_is_not_duplicated(entry_point: str) -
         assert len(calls) == 1
         assert calls[0]["city"] == "Rome"
         assert str(calls[0]["address"]).count("Rome") <= 1
+
+    run_async_in_thread(_run())
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("raw", "active_city", "expected_city"),
+    [
+        ("the city centre", "Rome", "Rome"),
+        ("Rome city centre", "Rome", "Rome"),
+        ("Berlin city centre", "Paris", "Berlin"),
+        ("Rome city centre, Rome, Italy", "Rome", "Rome"),
+        ("city centre, Berlin, Germany", "Paris", "Berlin"),
+    ],
+)
+def test_location_resolver_centre_phrase_resolves_to_the_city_itself(
+    raw: str, active_city: str, expected_city: str
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    class Geocoder:
+        async def extract_coordinates(self, **kwargs):  # noqa: ANN003, ANN201
+            calls.append(kwargs)
+            return {
+                "display_name": f"{kwargs['address']}, Country",
+                "lat": 41.9,
+                "lon": 12.5,
+                "selected_result_type": "city",
+                "selected_address_type": "city",
+                "address": {"city": kwargs["address"], "country": "Country"},
+            }
+
+    resolver = LocationResolver(nominatim_service=Geocoder())
+    signal = LocationSignal(
+        signal_type="district", raw_value=raw, normalized_value=raw,
+        confidence=0.9, source="model",
+    )
+    memory = {"active_location": {"city": active_city, "country": "Country", "location_type": "city"}}
+
+    async def _run() -> None:
+        result = await resolver.resolve_location_signals([signal], memory)
+        assert isinstance(result, ResolvedLocation)
+        assert result.location_type == "city"
+        assert [call["address"] for call in calls] == [expected_city]
+        assert calls[0]["city"] is None
 
     run_async_in_thread(_run())
 

@@ -67,7 +67,11 @@ from server.services.agent.capability_router import (
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.final_answer_check import check_final_answer
 from server.services.agent.tool_executor import ToolExecutor
-from server.services.agent.completion import CompletionEvaluator, describe_requirements
+from server.services.agent.completion import (
+    CompletionEvaluator,
+    describe_requirements,
+    requested_transform_unmet,
+)
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.agent.tool_registry import analysis_complete, route_target_location_available, ToolRegistry
 from server.services.agent.vision_policy import (
@@ -107,6 +111,16 @@ _EVIDENCE_TOOLS = frozenset(
         "execute_geospatial_capability",
         "transform_evidence",
         "measure_geospatial",
+    }
+)
+
+# Tools whose unavailability shows the route misread the request.
+_ROUTE_DATA_TOOLS = frozenset(
+    {
+        "execute_geospatial_capability",
+        "discover_geospatial_capabilities",
+        "inspect_evidence",
+        "transform_evidence",
     }
 )
 
@@ -475,7 +489,7 @@ class AgentLoop:
                 request,
                 provider,
                 messages,
-                route,
+                state.route or route,
                 iteration,
             )
             if outcome is not None:
@@ -573,6 +587,29 @@ class AgentLoop:
                 state,
                 exposed_tool_names=exposed_tool_names,
             )
+            if await self._revise_route(request, provider, messages, route, tool_results):
+                if catalog_cursor is None:
+                    messages.extend(
+                        self._tool_result_messages(
+                            result.tool_calls,
+                            tool_results,
+                            max_chars=request.max_tool_result_chars,
+                        )
+                    )
+                state.provider_continuation = [
+                    dict(item) for item in self._protocol_messages(messages)
+                ]
+                self._sync_task_state(state)
+                await self._checkpoint(request)
+                await self._emit_iteration_completed(request, "continue")
+                if iteration + 1 >= state.max_iterations:
+                    final_text = await self._finalize_iteration_exhaustion(
+                        request, provider, messages
+                    )
+                    return self._outcome(
+                        state, final_text, "iteration_budget_exhausted", request
+                    )
+                return None
             location_map_recovery = await self._recover_location_only_map(
                 request,
                 route,
@@ -1536,6 +1573,8 @@ class AgentLoop:
             required.append("temporal_scope_applied")
         if contract.spatial_scope_required and "spatial_scope_applied" not in required:
             required.append("spatial_scope_applied")
+        if requested_transform_unmet(state):
+            required.append("requested_transform_applied")
         return [name for name in required if not checks.get(name, False)]
 
     # -------------------------------------------------------------------------
@@ -1624,6 +1663,7 @@ class AgentLoop:
             "map_candidate_prepared": state.prepared_map_session is not None
             or (state.active_map_session is not None and state.render_verified),
             "render_verified": bool(state.render_verified),
+            "requested_transform_applied": not requested_transform_unmet(state),
         }
 
     # -------------------------------------------------------------------------
@@ -1840,6 +1880,7 @@ class AgentLoop:
         request: AgentLoopRequest,
         provider: AgentProvider,
         messages: list[dict[str, Any]],
+        revision: dict[str, object] | None = None,
     ) -> tuple[str | None, str, CapabilityRoute | None]:
         registered_route_tool = self.tool_registry.get("route_request")
         if registered_route_tool is None:
@@ -1858,6 +1899,26 @@ class AgentLoop:
             },
             *(message for message in messages if message.get("content") != native_prompt),
         ]
+        if revision is not None:
+            correction_messages.append(
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "route_revision": True,
+                            **revision,
+                            "instruction": (
+                                "The previous route could not run the requested "
+                                "operation. Return one route_request call for the "
+                                "latest user request whose domain exposes the tools "
+                                "that operation needs; filtering or transforming data "
+                                "is not a map-state change."
+                            ),
+                        },
+                        separators=(",", ":"),
+                    ),
+                }
+            )
         result: LLMResult | None = None
         for attempt in range(request.max_route_corrections + 1):
             result = await self._model_call(
@@ -1975,6 +2036,85 @@ class AgentLoop:
                 request.state.route_source = "fallback"
                 return None, "", decision.route
         return None, "", None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _route_mismatch(
+        route: CapabilityRoute, results: list[ToolResult]
+    ) -> str | None:
+        """Name concrete evidence that the route cannot express the request.
+
+        A data tool the route's domain does not expose shows a wrong
+        interpretation; argument errors and capability replans are the
+        model's and the recovery loop's to handle and never revise the route.
+        """
+
+        for result in results:
+            if (
+                result.status == "failed"
+                and result.error is not None
+                and result.tool_name in _ROUTE_DATA_TOOLS
+                and result.error.error_type == "tool_not_exposed"
+            ):
+                return f"{result.tool_name}_unavailable_for_{route.primary_domain.value}_route"
+        return None
+
+    # -------------------------------------------------------------------------
+    async def _revise_route(
+        self,
+        request: AgentLoopRequest,
+        provider: AgentProvider,
+        messages: list[dict[str, Any]],
+        route: CapabilityRoute,
+        results: list[ToolResult],
+    ) -> bool:
+        """Revise the route once per run when a tool result shows it was wrong.
+
+        Completed evidence stays in the run state; only the route, goal and
+        contract are recompiled, and the revision is traced old to new.
+        """
+
+        state = request.state
+        reason = self._route_mismatch(route, results)
+        if reason is None or state.route_revisions:
+            return False
+        previous = route.model_dump(mode="json", exclude_defaults=True)
+        # Recorded before the call so a failed attempt is never retried.
+        record: dict[str, object] = {"reason": reason, "previous_route": previous}
+        state.route_revisions.append(record)
+        _, _, revised = await self._route(
+            request,
+            provider,
+            messages,
+            revision={"reason": reason, "previous_route": previous},
+        )
+        if revised is None:
+            record["outcome"] = "unchanged"
+            return False
+        state.route = revised
+        self._bind_search_area(state, revised)
+        self._compile_native_goal(
+            state,
+            revised,
+            requests_entities=self.capability_router.requests_catalog_entities(
+                state.user_message
+            ),
+        )
+        record["outcome"] = "revised"
+        record["revised_route"] = revised.model_dump(mode="json", exclude_defaults=True)
+        await self._refresh_capabilities_after_location(request, state, [])
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="plan_revised",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload=dict(record),
+            ),
+        )
+        return True
 
     # -------------------------------------------------------------------------
     def _fast_route(
@@ -3722,6 +3862,8 @@ class AgentLoop:
             and "spatial_scope_applied" not in required_names
         ):
             required_names.append("spatial_scope_applied")
+        if requested_transform_unmet(state):
+            required_names.append("requested_transform_applied")
         if (
             state.completion_contract.render_verification_required
             and "render_verified" not in required_names

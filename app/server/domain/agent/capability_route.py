@@ -525,6 +525,11 @@ class AgentRunState(BaseModel):
     )
     consecutive_tool_failures: int = Field(default=0, ge=0)
     route_corrections: int = Field(default=0, ge=0)
+    # At most one revision per run: old route, new route and the evidence that
+    # showed the first interpretation could not be executed.
+    route_revisions: list[dict[str, object]] = Field(
+        default_factory=lambda: list[dict[str, object]](), max_length=1
+    )
     # How the route was chosen: the routing model, the deterministic fast
     # path, or the deterministic fallback after routing failed.
     route_source: Literal["model", "fast", "fallback"] = "model"

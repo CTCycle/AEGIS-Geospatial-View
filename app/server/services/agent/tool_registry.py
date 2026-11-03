@@ -8,7 +8,11 @@ from server.common.identifiers import location_ref_matches
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
 from server.services.agent.basemap_intent import names_centre, refers_to_layer
-from server.services.agent.completion import uncovered_data_obligations, uncovered_route_targets
+from server.services.agent.completion import (
+    requested_transform_unmet,
+    uncovered_data_obligations,
+    uncovered_route_targets,
+)
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
@@ -404,7 +408,8 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
             or follow_up_investigation_open(state)
         )
     if registered.definition.name == "apply_map_plan":
-        return route.presentation in {"map", "both"}
+        # A map must not present evidence whose requested filter failed.
+        return route.presentation in {"map", "both"} and not requested_transform_unmet(state)
     if (
         registered.definition.name == "execute_geospatial_capability"
         and not route_allows_capability_execution(route)
