@@ -129,7 +129,19 @@ class CompletionEvaluator:
         eligible = [(result, assessment) for result, assessment in assessments
                     if _is_eligible_evidence(result, assessment, analysis)]
         required = set(state.route.explicit_capability_ids if state.route else [])
+        route = state.route
+        per_target = (
+            not required and route is not None and not analysis
+            and route.location_mode == "target" and len(route.target_refs) >= 2
+        )
         def covered(field: str) -> bool:
+            if per_target and route is not None:
+                # Each requested place needs its own in-scope evidence; one
+                # matching place must not vouch for the others.
+                return all(
+                    _target_has_scoped_evidence(state, str(target), eligible, field)
+                    for target in route.target_refs
+                )
             matched = {result.metadata.capability_id for result, assessment in eligible
                        if getattr(assessment, field) is True}
             # One numeric source may cover several queried metrics; the
@@ -468,9 +480,37 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
             for key, location in state.location_refs.items()
             if location_ref_matches(str(target), str(key), location.label)
         ]
-        if matches and not covered_keys.intersection(normalize_target_key(key) for key in matches):
+        # A target that never resolved cannot have been covered.
+        if not matches or not covered_keys.intersection(normalize_target_key(key) for key in matches):
             uncovered.append(str(target))
     return uncovered
+
+
+###############################################################################
+def _target_has_scoped_evidence(
+    state: AgentRunState,
+    target: str,
+    eligible: list[tuple[ToolResult, EvidenceAssessment]],
+    field: str,
+) -> bool:
+    """Whether eligible evidence for this target satisfies the named scope."""
+
+    keys = {
+        normalize_target_key(key)
+        for key, location in state.location_refs.items()
+        if location_ref_matches(target, str(key), location.label)
+    }
+    for result, assessment in eligible:
+        named = {
+            normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")),
+            *(
+                normalize_target_key(str(ref))
+                for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+            ),
+        }
+        if keys.intersection(named) and getattr(assessment, field) is True:
+            return True
+    return False
 
 
 ###############################################################################

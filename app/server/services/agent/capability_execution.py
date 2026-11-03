@@ -23,7 +23,10 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.domain.geospatial.providers import ProviderRequest, ProviderResponse
-from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.repositories.agent_evidence import (
+    AgentEvidenceRepository,
+    create_evidence_async,
+)
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.land_mask import country_at
@@ -295,7 +298,7 @@ class CapabilityExecutionService:
         summary["coverage"] = coverage
         summary["value_kind"] = response.payload.get("value_kind") or coverage.get("value_kind")
         try:
-            evidence_ref = self._persist_evidence(
+            evidence_ref = await self._persist_evidence(
                 context=context,
                 request=request,
                 response=response,
@@ -338,7 +341,7 @@ class CapabilityExecutionService:
         )
 
     # -------------------------------------------------------------------------
-    def _persist_evidence(
+    async def _persist_evidence(
         self,
         *,
         context: ToolExecutionContext,
@@ -350,7 +353,8 @@ class CapabilityExecutionService:
         if repository is None:
             return None
         try:
-            record = repository.create(
+            record = await create_evidence_async(
+                repository,
                 conversation_id=context.conversation_id,
                 run_id=context.run_id,
                 kind=_evidence_kind(response.result_type),

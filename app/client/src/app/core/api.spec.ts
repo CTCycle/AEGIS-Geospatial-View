@@ -98,8 +98,10 @@ const nativeConversationState = (conversationId: string) => ({
 });
 
 describe('core/api', () => {
+  const originalFetch = window.fetch;
+
   afterEach(() => {
-    (window.fetch as unknown) = undefined;
+    window.fetch = originalFetch;
   });
 
   it('parseCatalogResponse normalizes entries', () => {

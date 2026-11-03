@@ -1,6 +1,14 @@
 from __future__ import annotations
+import asyncio
+import threading
+
+import pytest
+
 from server.configurations import DatabaseSettings
-from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.repositories.agent_evidence import (
+    AgentEvidenceRepository,
+    create_evidence_async,
+)
 from server.repositories.conversations import ConversationRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
@@ -84,6 +92,74 @@ def test_evidence_metadata_cascade_deletes_with_conversation(tmp_path) -> None: 
         session.delete(record)
         session.commit()
     assert repository.get_summary(item.evidence_id) is None
+
+###############################################################################
+class _SlowRepository:
+    def __init__(self, release: threading.Event) -> None:
+        self.release = release
+        self.started = threading.Event()
+        self.completed = 0
+
+    def create(self, **fields):  # noqa: ANN003, ANN201
+        self.started.set()
+        self.release.wait(timeout=5)
+        self.completed += 1
+        return fields
+
+###############################################################################
+async def test_evidence_write_does_not_block_event_loop() -> None:
+    release = threading.Event()
+    repository = _SlowRepository(release)
+    ticks = 0
+
+    async def ticker() -> None:
+        nonlocal ticks
+        while not release.is_set():
+            ticks += 1
+            await asyncio.sleep(0.005)
+
+    write = asyncio.create_task(create_evidence_async(repository, kind="x"))
+    watcher = asyncio.create_task(ticker())
+    await asyncio.sleep(0.1)
+    release.set()
+    assert (await write) == {"kind": "x"}
+    await watcher
+    assert ticks >= 5
+
+###############################################################################
+async def test_cancelled_evidence_write_returns_no_reference(tmp_path) -> None:  # noqa: ANN001
+    database = _database(tmp_path)
+    conversation = ConversationRepository(database).create_conversation("Cancel")
+    real = AgentEvidenceRepository(database)
+    release = threading.Event()
+    slow = _SlowRepository(release)
+    slow.create = lambda **fields: (  # type: ignore[method-assign]
+        slow.started.set(), release.wait(timeout=5), real.create(**fields)
+    )[-1]
+
+    write = asyncio.create_task(
+        create_evidence_async(
+            slow,
+            conversation_id=conversation.id,
+            run_id=None,
+            kind="tabular",
+            media_type="application/json",
+            status="available",
+            payload={"records": [1]},
+        )
+    )
+    await asyncio.sleep(0.05)
+    write.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await write
+    release.set()
+    await asyncio.sleep(0.2)
+
+    # The caller never received a ref; any record that landed is complete and valid.
+    for summary in real.list_summaries(conversation.id):
+        loaded = real.get_payload(summary.evidence_id)
+        assert loaded is not None
+        assert loaded[1] == b'{"records":[1]}'
 
 # --- test_credential_crypto.py ---
 

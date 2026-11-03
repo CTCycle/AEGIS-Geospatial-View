@@ -1077,6 +1077,7 @@ describe('components/map-preview.component', () => {
     const sources = new Set<string>();
     const layers = new Set<string>();
     const loads: Array<() => void> = [];
+    const sourceDataListeners: Array<(event: unknown) => void> = [];
     const markerSession = () => makeMapSession({
       bounds: [12.4, 41.8, 12.6, 42.0],
       overlay_collection: makeOverlayCollection([{
@@ -1084,13 +1085,24 @@ describe('components/map-preview.component', () => {
         data: { type: 'FeatureCollection', features: [] },
       }]),
     });
-    const startCandidate = (registerLayers: boolean) => {
+    const rasterSession = () => makeMapSession({
+      bounds: [12.4, 41.8, 12.6, 42.0],
+      overlay_collection: makeOverlayCollection([{
+        id: 'modis', label: 'MODIS', type: 'raster-overlay', rendering_mode: 'raster-tile', provider: 'fixture',
+        tile_url_template: 'https://tiles.example/{z}/{x}/{y}.png',
+      }]),
+    });
+    const startCandidate = (registerLayers: boolean, session: () => unknown = markerSession) => {
       sources.clear();
       layers.clear();
       loads.length = 0;
+      sourceDataListeners.length = 0;
       fakeMap.on.and.callFake((event: string, layerOrListener: unknown, listener?: () => void) => {
         if (event === 'load') {
           loads.push((typeof layerOrListener === 'function' ? layerOrListener : listener) as () => void);
+        }
+        if (event === 'sourcedata') {
+          sourceDataListeners.push(layerOrListener as (event: unknown) => void);
         }
       });
       fakeMap.addSource.and.callFake((id: string) => sources.add(id));
@@ -1105,7 +1117,7 @@ describe('components/map-preview.component', () => {
       fakeMap.getLayer.and.callFake((id: string) => (layers.has(id) ? { type: 'circle' } : undefined));
       const changes: Array<{ state: string; failureCode?: string; checks?: Record<string, boolean> }> = [];
       component.renderStateChange.subscribe((change) => changes.push(change));
-      component.payload = { map_session: markerSession() as never };
+      component.payload = { map_session: session() as never };
       fixture.detectChanges();
       loads.forEach((callback) => callback());
       return changes;
@@ -1146,6 +1158,37 @@ describe('components/map-preview.component', () => {
         tiles_settled: true,
       }));
       expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for every raster tile instead of acknowledging on the first delivered tile', async () => {
+      spyOn(window, 'fetch').and.returnValue(Promise.reject(new Error('probe offline')));
+      let sourceLoaded = false;
+      Object.assign(fakeMap, { isSourceLoaded: jasmine.createSpy('isSourceLoaded').and.callFake(() => sourceLoaded) });
+      const changes = startCandidate(true, rasterSession);
+
+      sourceDataListeners.forEach((listener) => listener({ sourceId: 'overlay-source-modis', isSourceLoaded: false, tile: {} }));
+      jasmine.clock().tick(5_000);
+      expect(changes.map((change) => change.state)).not.toContain('ready');
+
+      sourceLoaded = true;
+      jasmine.clock().tick(2_000);
+      for (let i = 0; i < 10; i += 1) {
+        await Promise.resolve();
+      }
+      expect(changes.map((change) => change.state)).toContain('ready');
+    });
+
+    it('fails with render_timeout when raster tiles never settle', () => {
+      Object.assign(fakeMap, { isSourceLoaded: jasmine.createSpy('isSourceLoaded').and.returnValue(false) });
+      const changes = startCandidate(true, rasterSession);
+
+      sourceDataListeners.forEach((listener) => listener({ sourceId: 'overlay-source-modis', isSourceLoaded: false, tile: {} }));
+      jasmine.clock().tick(61_000);
+
+      expect(changes.map((change) => change.state)).not.toContain('ready');
+      const failed = changes.find((change) => change.state === 'failed');
+      expect(failed?.failureCode).toBe('render_timeout');
+      expect(failed?.checks).toEqual(jasmine.objectContaining({ tiles_settled: false }));
     });
   });
 });

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import replace
 import json
 from typing import Any
 
@@ -1947,6 +1948,36 @@ async def test_completed_request_uses_the_reserved_terminal_call_at_the_model_ca
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_completed_request_stores_the_deterministic_text_when_the_answer_overclaims(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider([LLMResult(content="Everything was fully completed for Rome.")])
+    request = _exhausted_weather_request(provider)
+    monkeypatch.setattr(
+        AgentLoop,
+        "_pending_native_requirements",
+        staticmethod(lambda state: ["required_data_retrieved"]),
+    )
+    events = []
+
+    async def trace(event) -> None:  # noqa: ANN001
+        events.append(event)
+
+    request = replace(request, trace_callback=trace)
+
+    answer = await _loop(provider)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
+        request,
+        provider,
+        [],
+    )
+
+    assert answer.startswith("Results gathered so far:")
+    assert "fully completed" not in answer
+    replaced = [e for e in events if e.payload.get("outcome") == "answer_replaced"]
+    assert replaced and replaced[0].payload["final_answer_violations"]
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_completed_request_lists_gathered_evidence_when_synthesis_fails() -> None:
     provider = FakeProvider([])
     request = _exhausted_weather_request(provider)
@@ -2410,6 +2441,34 @@ def test_completion_requires_verified_scope_for_every_requested_source(coverage,
     assert assessment.data_relevant is False
     if not expected:
         assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
+
+###############################################################################
+@pytest.mark.parametrize('second_time,second_spatial,resolved,expected', [
+    ('2026-08-01T00:00:00Z', True, ('paris', 'berlin'), False),
+    ('2026-09-01T00:00:00Z', False, ('paris', 'berlin'), False),
+    ('2026-09-01T00:00:00Z', True, ('paris',), False),
+    ('2026-09-01T00:00:00Z', True, ('paris', 'berlin'), True),
+])
+def test_completion_requires_scope_for_every_route_target(second_time, second_spatial, resolved, expected) -> None:
+    from server.services.agent.completion import CompletionEvaluator
+    state = _state()
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
+        presentation='text', location_mode="target", target_refs=['paris', 'berlin'])
+    state.goal = AgentGoal(goal='Weather in Paris and Berlin', task_mode='execute', presentation='text',
+        operation='compare', location_mode="target", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
+    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
+        temporal_scope_required=True, spatial_scope_required=True)
+    for name in resolved:
+        state.location_refs[name] = ResolvedLocation(label=name.title(), latitude=48.0, longitude=2.0)
+    def result(target, observed, spatial):
+        return ToolResult(call_id=target, tool_name='execute_geospatial_capability', status='success',
+            summary='ok', data={'feature_count': 1, 'query': {'location_ref': target}}, evidence_refs=[target],
+            metadata=ToolExecutionMetadata(duration_ms=0, capability_id='weather',
+                coverage={'spatial_scope_satisfied': spatial, 'temporal_scope_satisfied': True},
+                observation_time=observed))
+    state.tool_results = [result('paris', '2026-09-01T00:00:00Z', True), result('berlin', second_time, second_spatial)]
+    checks = CompletionEvaluator.data_checks(state)
+    assert all(checks.values()) is expected
 
 ###############################################################################
 @pytest.mark.parametrize('observed,expected', [

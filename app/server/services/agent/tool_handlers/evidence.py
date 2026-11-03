@@ -17,7 +17,10 @@ from server.domain.agent.tool_result import (
     ToolExecutionMetadata,
     ToolResult,
 )
-from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.repositories.agent_evidence import (
+    AgentEvidenceRepository,
+    create_evidence_async,
+)
 from server.services.agent.tool_definitions import (
     InspectEvidenceInput,
     TransformEvidenceInput,
@@ -209,7 +212,8 @@ class EvidenceToolHandler:
                       "coverage": coverage, "capability_id": capability_id}
         if len(parents) == 1:
             provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "units", "observation_time", "value_kind") if key in parents[0]})
-        evidence = self.repository.create(
+        evidence = await create_evidence_async(
+            self.repository,
             conversation_id=state.conversation_id,
             run_id=state.request_id,
             kind="derived",

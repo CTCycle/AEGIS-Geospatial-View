@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import zlib
@@ -15,6 +16,24 @@ from sqlalchemy import select
 from server.domain.agent.evidence import AgentEvidenceSummary, EvidenceStatus
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import AgentEvidenceRecord, ConversationRecord
+
+_WRITE_SLOTS = asyncio.Semaphore(2)
+
+
+###############################################################################
+async def create_evidence_async(
+    repository: Any, **fields: Any
+) -> AgentEvidenceSummary:
+    """Run ``repository.create`` off the event loop with bounded concurrency.
+
+    ``create`` opens its own session and commits atomically, so a cancelled
+    caller never receives a reference; an already-started write still finishes
+    as a complete, unreferenced record rather than a partial one.
+    """
+
+    async with _WRITE_SLOTS:
+        return await asyncio.to_thread(repository.create, **fields)
+
 
 ###############################################################################
 class AgentEvidenceRepository:

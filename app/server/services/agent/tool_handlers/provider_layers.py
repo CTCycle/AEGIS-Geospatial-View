@@ -12,7 +12,10 @@ from server.domain.agent.tool_result import (
     ToolExecutionMetadata,
     ToolResult,
 )
-from server.repositories.agent_evidence import AgentEvidenceRepository
+from server.repositories.agent_evidence import (
+    AgentEvidenceRepository,
+    create_evidence_async,
+)
 from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
 from server.services.geospatial.api_service import (
     GeospatialApiService,
@@ -81,7 +84,8 @@ class ProviderLayerToolHandler:
             "total": len(all_layers),
             "warnings": payload.get("warnings", list[str]()),
         }
-        evidence = self.evidence_repository.create(
+        evidence = await create_evidence_async(
+            self.evidence_repository,
             conversation_id=state.conversation_id,
             run_id=state.run_id,
             kind="provider_layer_descriptor",

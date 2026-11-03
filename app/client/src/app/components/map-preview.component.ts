@@ -757,6 +757,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         isSourceLoaded?: boolean;
         tile?: unknown;
       };
+      // Delivery evidence only; readiness comes from `map.isSourceLoaded`.
       if (sourceId?.startsWith(OVERLAY_SOURCE_PREFIX) && (isSourceLoaded || tile)) {
         loadedSources.add(sourceId);
       }
@@ -1248,10 +1249,9 @@ candidate.on('load', () => {
     };
     const required = this.overlays.filter((overlay) => !isMetadataOnlyOverlay(overlay));
     const sourceIdOf = (overlay: OverlayEntry): string => `${OVERLAY_SOURCE_PREFIX}${overlay.id}`;
+    // A delivered first tile (`loadedSourceIds`) is not enough: every tile the
+    // source requires must have loaded.
     const sourceDelivered = (sourceId: string): boolean => {
-      if (this.loadedSourceIds.has(sourceId)) {
-        return true;
-      }
       try {
         return Boolean(mapApi.isSourceLoaded?.call(map, sourceId));
       } catch {
@@ -1339,11 +1339,6 @@ candidate.on('load', () => {
         } catch {
           sourceLoaded = null;
         }
-      }
-      if (sourcePresent && sourceLoaded !== true && this.loadedSourceIds.has(sourceId)) {
-        // A tile or source data event proves the source delivered data even
-        // while unrelated tiles keep ``isSourceLoaded`` false.
-        sourceLoaded = true;
       }
       let visibility: unknown;
       try {

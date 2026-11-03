@@ -64,6 +64,7 @@ from server.services.agent.capability_router import (
     is_location_only_map_request,
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
+from server.services.agent.final_answer_check import check_final_answer
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.completion import CompletionEvaluator, describe_requirements
 from server.services.agent.policy_engine import route_allows_capability_execution
@@ -699,6 +700,22 @@ class AgentLoop:
         if stop is not None:
             if await self._continue_after_no_progress(request, messages, stop):
                 return None
+            if final_text and stop[0] not in {"awaiting_render", "clarification_required"}:
+                checked = await self._verified_answer_text(
+                    request, final_text, reason=stop[0]
+                )
+                if not checked:
+                    final_text = (
+                        self._evidence_findings(state)
+                        or self._evidence_summary(state)
+                        or (
+                            self._verified_map_fallback(state)
+                            if state.active_map_session is not None
+                            else ""
+                        )
+                        or "The model's answer did not match the verified results."
+                    )
+                    stop = (stop[0], final_text)
             if stop[0] == "no_progress" and final_text and not recovery_results:
                 # The model keeps answering in text after every correction:
                 # it has concluded no tool can close the gap.  Keep its
@@ -1024,8 +1041,12 @@ class AgentLoop:
         """
 
         state = request.state
-        candidate = await self._terminal_synthesis(
-            request, provider, messages, reason="iteration_exhaustion"
+        candidate = await self._verified_answer_text(
+            request,
+            await self._terminal_synthesis(
+                request, provider, messages, reason="iteration_exhaustion"
+            ),
+            reason="iteration_exhaustion",
         )
         if not candidate:
             findings = self._evidence_findings(state)
@@ -1068,8 +1089,12 @@ class AgentLoop:
         """Synthesize the final answer after a verified browser render."""
 
         state = request.state
-        candidate = await self._terminal_synthesis(
-            request, provider, messages, reason="verified_render"
+        candidate = await self._verified_answer_text(
+            request,
+            await self._terminal_synthesis(
+                request, provider, messages, reason="verified_render"
+            ),
+            reason="verified_render",
         )
         final = (
             self._verified_map_state_summary(state)
@@ -1217,8 +1242,12 @@ class AgentLoop:
     ) -> str:
         """Synthesize a completed non-render request with tools disabled."""
 
-        candidate = await self._terminal_synthesis(
-            request, provider, messages, reason="goal_satisfied"
+        candidate = await self._verified_answer_text(
+            request,
+            await self._terminal_synthesis(
+                request, provider, messages, reason="goal_satisfied"
+            ),
+            reason="goal_satisfied",
         )
         return (
             candidate
@@ -1305,6 +1334,70 @@ class AgentLoop:
         return candidate
 
     # -------------------------------------------------------------------------
+    async def _verified_answer_text(
+        self,
+        request: AgentLoopRequest,
+        candidate: str,
+        *,
+        reason: str,
+    ) -> str:
+        """Return ``candidate`` unless it contradicts the verified results.
+
+        A contradicted answer is dropped (empty string) so the caller falls
+        back to its deterministic text, and the violations are traced.
+        """
+
+        state = request.state
+        if not candidate.strip():
+            return candidate
+        session = state.active_map_session
+        route = state.route
+        visible = (
+            [item for item in session.overlay_collection.instances if item.visible]
+            if session is not None
+            else []
+        )
+        targets = [loc.label for loc in state.location_refs.values() if loc.label]
+        others = [
+            item.resolved_location.label
+            for item in visible
+            if item.resolved_location is not None and item.resolved_location.label
+        ]
+        if session is not None and session.resolved_location.label:
+            others.append(session.resolved_location.label)
+        on_map = session is not None or (
+            route is not None and route.presentation in {"map", "both"}
+        )
+        layers = len(visible) if on_map else None
+        features: int | None = None
+        if on_map:
+            observation = state.render_observations[-1] if state.render_observations else None
+            counts = [
+                value
+                for item in (observation.overlay_results if observation else [])
+                if isinstance(value := item.get("rendered_feature_count"), int)
+            ]
+            features = sum(counts) if counts else (0 if not visible else None)
+        violations = check_final_answer(
+            candidate,
+            target_names=targets,
+            other_places=others,
+            layer_count=layers,
+            feature_count=features,
+            unmet=self._pending_native_requirements(state),
+        )
+        if not violations:
+            return candidate
+        await self._emit_finalization_trace(
+            request,
+            reason=reason,
+            kind="finalization_completed",
+            outcome="answer_replaced",
+            violations=violations,
+        )
+        return ""
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _evidence_summary(state: AgentRunState) -> str:
         """List what the run established when no model synthesis is available."""
@@ -1333,6 +1426,7 @@ class AgentLoop:
         reason: str,
         kind: Literal["finalization_started", "finalization_completed"],
         outcome: str | None = None,
+        violations: list[str] | None = None,
     ) -> None:
         """Expose the tools-disabled finalization boundary without content."""
 
@@ -1345,6 +1439,8 @@ class AgentLoop:
         }
         if outcome is not None:
             payload["outcome"] = outcome
+        if violations:
+            payload["final_answer_violations"] = violations
         await self._emit_trace(
             request,
             AgentTraceEvent(
