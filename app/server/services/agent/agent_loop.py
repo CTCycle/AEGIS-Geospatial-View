@@ -1897,7 +1897,18 @@ class AgentLoop:
                 + datetime.now(UTC).replace(microsecond=0).isoformat()
                 + " (UTC).",
             },
-            *(message for message in messages if message.get("content") != native_prompt),
+            *(
+                message
+                for message in messages
+                if message.get("content") != native_prompt
+                # The routing call exposes only route_request: tool-call
+                # history (and an assistant call whose results are not yet
+                # appended) is a malformed request for chat-completion APIs.
+                and not (
+                    revision is not None
+                    and (message.get("role") == "tool" or message.get("tool_calls"))
+                )
+            ),
         ]
         if revision is not None:
             correction_messages.append(
@@ -2082,12 +2093,24 @@ class AgentLoop:
         # Recorded before the call so a failed attempt is never retried.
         record: dict[str, object] = {"reason": reason, "previous_route": previous}
         state.route_revisions.append(record)
-        _, _, revised = await self._route(
-            request,
-            provider,
-            messages,
-            revision={"reason": reason, "previous_route": previous},
-        )
+        try:
+            _, _, revised = await self._route(
+                request,
+                provider,
+                messages,
+                revision={"reason": reason, "previous_route": previous},
+            )
+        except (AgentRunControlSignal, asyncio.CancelledError, ExecutionBudgetExceeded):
+            raise
+        except LLMProviderRequestError as exc:
+            if exc.timeout_origin == "application_deadline":
+                raise
+            return await self._revision_failed(request, record, exc.code or type(exc).__name__)
+        except Exception as exc:
+            # The revision is an optional repair; the original route stands.
+            return await self._revision_failed(
+                request, record, f"{type(exc).__name__}: {str(exc)[:160]}"
+            )
         if revised is None:
             record["outcome"] = "unchanged"
             return False
@@ -2115,6 +2138,28 @@ class AgentLoop:
             ),
         )
         return True
+
+    # -------------------------------------------------------------------------
+    async def _revision_failed(
+        self, request: AgentLoopRequest, record: dict[str, object], reason: str
+    ) -> bool:
+        """Record a failed revision call and let the run continue on its route."""
+
+        state = request.state
+        record["outcome"] = "failed"
+        record["failure_reason"] = redact_trace_value(reason[:200])[0]
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="plan_revised",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload=dict(record),
+            ),
+        )
+        return False
 
     # -------------------------------------------------------------------------
     def _fast_route(

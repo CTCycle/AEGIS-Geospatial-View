@@ -15,6 +15,7 @@ from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.llm.types import LLMResult, LLMToolCall
 from server.contracts.geospatial import MapSession, OverlayCollectionState, ViewportPolicy
+from server.services.llm.errors import LLMProviderRequestError
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.completion import describe_requirements
@@ -43,9 +44,9 @@ FILTER = {"evidence_refs": ["evidence-1"], "operations": [
 class _Model:
 
     # -------------------------------------------------------------------------
-    def __init__(self, results: list[LLMResult]) -> None:
+    def __init__(self, results: list[LLMResult | Exception]) -> None:
         self._results = deque(results)
-        self.route_revision_prompts = 0
+        self.requests: list[Any] = []
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> "_Model":
@@ -55,9 +56,11 @@ class _Model:
     # -------------------------------------------------------------------------
     async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
         del kwargs
-        if any("route_revision" in str(getattr(m, "content", m)) for m in getattr(request, "messages", [])):
-            self.route_revision_prompts += 1
-        return self._results.popleft()
+        self.requests.append(request)
+        item = self._results.popleft()
+        if isinstance(item, Exception):
+            raise item
+        return item
 
 
 ###############################################################################
@@ -214,3 +217,53 @@ async def test_unfixable_filter_ends_unmet_and_revises_only_once() -> None:
     assert "could not be applied" in result.final_text
     assert "requested_transform_applied" in AgentLoop._pending_native_requirements(state)  # pyright: ignore[reportPrivateUsage]
     assert "filter or data operation" in describe_requirements(["requested_transform_applied"])
+
+
+###############################################################################
+def _revision_messages(model: _Model) -> list[dict[str, Any]]:
+    request = next(
+        item for item in model.requests
+        if any("route_revision" in str(message.get("content")) for message in item.messages)
+    )
+    return [dict(message) for message in request.messages]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_revision_request_is_a_well_formed_chat_completion_history() -> None:
+    state, _, evidence = _follow_up_state()
+    model = _Model([
+        _call("route-1", "route_request", MAP_STATE_ROUTE),
+        _call("filter-1", "transform_evidence", FILTER),
+        _call("route-2", "route_request", DATA_ROUTE),
+        LLMResult(content="done"),
+    ])
+    await _run(model, state, evidence)
+
+    messages = _revision_messages(model)
+    # No tool-call history: the call exposes only route_request, and the
+    # failed batch has no matching tool results yet (a 400 on OpenAI-style APIs).
+    assert not [m for m in messages if m.get("role") == "tool" or m.get("tool_calls")]
+    assert {m["role"] for m in messages} <= {"system", "user", "assistant"}
+    assert messages[-1]["role"] == "user" and "route_revision" in messages[-1]["content"]
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [RuntimeError("provider rejected the request"), LLMProviderRequestError(
+    provider="scripted", model="scripted", stage="route_request", code="provider_bad_request", http_status=400)])
+async def test_failed_revision_call_keeps_the_original_route_and_records_why(error: Exception) -> None:
+    state, _, evidence = _follow_up_state()
+    model = _Model([
+        _call("route-1", "route_request", MAP_STATE_ROUTE),
+        _call("filter-1", "transform_evidence", FILTER),
+        error,
+        LLMResult(content="I applied the magnitude filter to the map."),
+    ])
+    result = await _run(model, state, evidence)
+
+    assert [r["outcome"] for r in state.route_revisions] == ["failed"]
+    assert state.route_revisions[0]["failure_reason"]
+    assert state.route is not None and state.route.primary_domain is CapabilityDomain.MAP_STATE
+    assert result.stopped_reason not in {"failed", "goal_satisfied"}
+    assert "could not be applied" in result.final_text

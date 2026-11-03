@@ -2,6 +2,12 @@
 
 Last updated: 2026-11-03
 
+The [2026-11-03 Wave 2 live validation](validation/live_eval_20261103_wave2.md) ran the Wave 1 non-PASS turns and the Wave 2 scenarios on the live UI against `develop@740792f4`, plus the graded runner (38 scenarios per model).
+- **Counts:** DeepSeek 7 PASS / 6 PARTIAL / 3 FAIL / 2 BLOCKED of 18 turns; Beam Free 8 / 5 / 11 / 0 of 24. Re-run sets differ from Wave 1, so the counts are indicative only. Runner: DeepSeek 25 of 38 scenarios pass, Beam 22 of 38, no false-success flag.
+- **Wave 2 effect:** false successes 0 (Beam's magnitude filter now fails honestly); worldwide earthquake maps reach ack `ready` on both models; "Show the Colosseum" after Paris resolves to Rome and incorrect geographic reuse is 0; per-target route windows are correct, but the forecast tool only returns a rolling 24 h window.
+- **New open issue:** every run that recorded a route revision (13 of 13) failed, 12 with `provider_api`, because the revision routing call raises (suspect `_revise_route` in `agent_loop.py`). Beam is hit on its filter, discovery and airport requests.
+- **Still open:** marker framing and "map shows both" claims, Beam model behaviour, "no capability" wording gaps, ourairports and Overpass availability.
+
 The [2026-11-03 Wave 1 live validation](validation/live_eval_20261103_wave1.md) ran the 2026-11-02 replay set and four Wave 1 regressions on the live UI against `develop@6880a510`.
 - **Counts:** DeepSeek 18 PASS / 4 PARTIAL / 4 FAIL / 2 BLOCKED of 28 turns; Beam Free 4 / 5 / 10 / 1 of 20. The turn sets differ from the 2026-11-02 baseline, so the counts are indicative only.
 - **Wave 1 effect:** the H1 replay passes on both models with no unrendered-marker claim, and large-area raster acks are `ready` only after the source loads.

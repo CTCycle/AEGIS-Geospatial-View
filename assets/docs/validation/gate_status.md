@@ -2,6 +2,15 @@
 
 Last updated: 2026-11-03
 
+## 2026-11-03 Wave 2 live validation (`develop@740792f4`)
+
+The [live evaluation summary](live_eval_20261103_wave2.md) (full evidence: untracked `assets/QA/w2-validation-20261103/report.md`) re-runs the Wave 1 non-PASS turns and the Wave 2 scenarios on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
+- Live UI **PARTIAL**: DeepSeek 7 PASS / 6 PARTIAL / 3 FAIL / 2 BLOCKED of 18 turns; Beam Free 8 / 5 / 11 / 0 of 24 (turn sets differ from Wave 1, see the summary).
+- False-success gate (target 0): **PASS**, 0 on both models; six borderline framing or window claims are listed in the report and not counted.
+- Graded runner (`--no-render`, 28 matrix plus 10 holdout scenarios): DeepSeek 25 pass / 13 fail, Beam 22 / 16; no false-success flag; no baseline recorded, so the gate checks false successes only.
+- Worldwide earthquake render: **PASS** on both models (ack `ready`). H-04 place resolution: **PASS** (incorrect reuse 0), one DeepSeek clarification and one Beam tool-failure turn. M-02 per-target windows: **PARTIAL** (route correct; provider returns one rolling 24 h window).
+- Route revision (M-01): **FAIL**, 13 of 13 revised runs ended failed (the revision routing call raises); Beam is the most exposed.
+
 ## 2026-11-03 Wave 1 live validation (`develop@6880a510`)
 
 The [live evaluation summary](live_eval_20261103_wave1.md) (full evidence: untracked `assets/QA/w1-validation-20261103/report.md`) re-runs the 2026-11-02 replay set plus four Wave 1 regressions on OpenCode Go `deepseek-v4.1-flash` and `beam-free`.
