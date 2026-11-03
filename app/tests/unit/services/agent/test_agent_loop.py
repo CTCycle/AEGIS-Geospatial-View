@@ -2471,6 +2471,42 @@ def test_completion_requires_scope_for_every_route_target(second_time, second_sp
     assert all(checks.values()) is expected
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_completion_accepts_each_city_point_forecast_for_tomorrow() -> None:
+    from datetime import UTC, datetime, timedelta
+    from server.services.agent.completion import CompletionEvaluator
+    from server.services.geospatial.providers.base import ProviderRequest
+    from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    class Service:
+        weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+        async def get_weather_forecast(self, *, latitude, longitude):
+            # Point forecasts stamp the current conditions with the sampling time.
+            return {"kind": "weather_forecast", "latitude": latitude, "longitude": longitude,
+                    "observation_time": datetime.now(UTC).isoformat(), "coverage": {}}
+
+    state = _state()
+    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
+        presentation='text', location_mode="target", target_refs=['zurich', 'geneva'])
+    state.goal = AgentGoal(goal='Temperature tomorrow', task_mode='execute', presentation='text',
+        operation='compare', location_mode="target",
+        temporal_scope={'reference_time_iso': tomorrow.isoformat()})
+    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
+        temporal_scope_required=True)
+    for name, lat in (('zurich', 47.4), ('geneva', 46.2)):
+        state.location_refs[name] = ResolvedLocation(label=name.title(), latitude=lat, longitude=8.0)
+        response = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
+            capability_id='openmeteo_weather_forecast', bbox=(7.9, lat - .1, 8.1, lat + .1), time=tomorrow))
+        state.tool_results.append(ToolResult(call_id=name, tool_name='execute_geospatial_capability',
+            status='success', summary='ok', data={'feature_count': 1, 'query': {'location_ref': name}},
+            evidence_refs=[name], metadata=ToolExecutionMetadata(duration_ms=0,
+                capability_id='openmeteo_weather_forecast', coverage=response.coverage,
+                observation_time=response.observation_time)))
+    assert CompletionEvaluator.data_checks(state)['temporal_scope_applied'] is True
+
+###############################################################################
 @pytest.mark.parametrize('observed,expected', [
     ('2024-03-27T20:30:45+00:00', True),
     ('2024-03-31T23:00:00+00:00', True),

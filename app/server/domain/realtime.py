@@ -137,11 +137,20 @@ class RealtimeRenderAckPayload(BaseModel):
         if any(not (-float("inf") < item < float("inf")) for item in normalized):
             raise ValueError("viewport_bounds must be finite")
         west, south, east, north = normalized
-        if not -180 <= west <= 180 or not -180 <= east <= 180 or not -90 <= south <= north <= 90:
-            raise ValueError("viewport_bounds are outside EPSG:4326 limits")
-        if west > east and (west < 150 or east > -150):
-            raise ValueError("viewport_bounds longitude order is invalid")
-        return normalized
+        if not -90 <= south <= north <= 90:
+            raise ValueError("viewport_bounds latitude is outside EPSG:4326 limits")
+        # MapLibre reports unwrapped longitudes for world-sized or panned-across
+        # views; a span of a full turn covers the world, otherwise wrap into
+        # [-180, 180] where west > east denotes an antimeridian crossing.
+        if west <= east and east - west >= 360:
+            return [-180.0, south, 180.0, north]
+
+        def wrap(longitude: float) -> float:
+            if -180 <= longitude <= 180:
+                return longitude
+            return (longitude + 180) % 360 - 180
+
+        return [wrap(west), south, wrap(east), north]
 
     # -------------------------------------------------------------------------
     @field_validator("checks")

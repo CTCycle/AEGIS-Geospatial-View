@@ -1,6 +1,15 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
+
+## 2026-11-03 Wave 1 live validation (`develop@6880a510`)
+
+The [live evaluation summary](live_eval_20261103_wave1.md) (full evidence: untracked `assets/QA/w1-validation-20261103/report.md`) re-runs the 2026-11-02 replay set plus four Wave 1 regressions on OpenCode Go `deepseek-v4.1-flash` and `beam-free`.
+- Live UI **PARTIAL**: DeepSeek 18 PASS / 4 PARTIAL / 4 FAIL / 2 BLOCKED of 28 turns; Beam Free 4 / 5 / 10 / 1 of 20 turns (baseline DeepSeek 20 / 3 / 3 / 1 of 27; Beam round 2 7 / 7 / 5 / 0 of 19; turn sets differ, see the summary).
+- False-success gate (target 0): **FAIL**, 2 on Beam Free (a filter follow-up reported as applied while the map still showed every event; one root cause). The H1 replay no longer claims unrendered markers on either model.
+- Worldwide earthquake evidence request: **FAIL** on both models. The server rejects `map.render_ack` and the run ends `render_timeout`; the UI stayed responsive.
+- Raster ack: **PASS** for large-area GIBS imagery (`ready` after the source loaded); the failing-tile branch is **UNRUN** live.
+- Two-city forecast scope: **FAIL**/honest gap on both models; no two-city map was produced.
 
 ## 2026-11-02 agentic reliability slice (`develop@c2b10b8f` + working tree)
 

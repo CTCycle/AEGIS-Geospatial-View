@@ -1115,7 +1115,7 @@ describe('components/map-preview.component', () => {
         getSource: jasmine.createSpy('getSource').and.callFake((id: string) => (sources.has(id) ? {} : undefined)),
       });
       fakeMap.getLayer.and.callFake((id: string) => (layers.has(id) ? { type: 'circle' } : undefined));
-      const changes: Array<{ state: string; failureCode?: string; checks?: Record<string, boolean> }> = [];
+      const changes: Array<{ state: string; failureCode?: string; checks?: Record<string, boolean>; viewportBounds?: number[] }> = [];
       component.renderStateChange.subscribe((change) => changes.push(change));
       component.payload = { map_session: session() as never };
       fixture.detectChanges();
@@ -1140,6 +1140,28 @@ describe('components/map-preview.component', () => {
       }));
       jasmine.clock().tick(60_000);
       expect(changes.map((change) => change.state)).not.toContain('failed');
+    });
+
+    const readyViewportBounds = (west: number, east: number) => {
+      Object.assign(fakeMap, {
+        getBounds: jasmine.createSpy('getBounds').and.returnValue({
+          getWest: () => west,
+          getSouth: () => -91,
+          getEast: () => east,
+          getNorth: () => 85,
+        }),
+      });
+      const changes = startCandidate(true);
+      jasmine.clock().tick(4_000);
+      return changes.find((change) => change.state === 'ready')?.viewportBounds;
+    };
+
+    it('acknowledges an unwrapped world-extent viewport as the whole world', () => {
+      expect(readyViewportBounds(-290, 290)).toEqual([-180, -90, 180, 85]);
+    });
+
+    it('wraps an unwrapped antimeridian viewport into EPSG:4326 longitudes', () => {
+      expect(readyViewportBounds(170, 190)).toEqual([170, -90, -170, 85]);
     });
 
     it('never acknowledges a candidate with a missing layer and reports the failed check', () => {

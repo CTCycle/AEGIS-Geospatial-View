@@ -84,6 +84,9 @@ class OpenMeteoProvider(GeospatialProvider):
                 window[1] <= datetime.now(UTC) + timedelta(days=2, hours=12),
             )
             payload["coverage"] = coverage
+            # The forecast addresses the requested window, not the moment the
+            # current conditions were sampled; completion checks this instant.
+            payload["observation_time"] = window[0].isoformat()
         rendering_mode = "clustered-points"
         normalized = self._payload(payload, rendering_mode=rendering_mode)
         partial = bool(payload.get("partial"))

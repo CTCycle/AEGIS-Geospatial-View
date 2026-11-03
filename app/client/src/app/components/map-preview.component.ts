@@ -1224,16 +1224,27 @@ candidate.on('load', () => {
   private validViewportBounds(map: Map | null): [number, number, number, number] | undefined {
     const session = this.mapSession;
     const rawBounds = this.readMapBounds(map) ?? session?.bounds ?? session?.viewport?.bbox;
-    return Array.isArray(rawBounds)
-      && rawBounds.length === 4
-      && rawBounds.every(isFiniteNumber)
-      && rawBounds[0] >= -180 && rawBounds[0] <= 180
-      && rawBounds[1] >= -90 && rawBounds[1] <= 90
-      && rawBounds[2] >= -180 && rawBounds[2] <= 180
-      && rawBounds[3] >= -90 && rawBounds[3] <= 90
-      && rawBounds[1] <= rawBounds[3]
-      ? [rawBounds[0], rawBounds[1], rawBounds[2], rawBounds[3]]
-      : undefined;
+    if (!Array.isArray(rawBounds)
+      || rawBounds.length !== 4
+      || !rawBounds.every(isFiniteNumber)) {
+      return undefined;
+    }
+    const [west, rawSouth, east, rawNorth] = rawBounds;
+    const south = Math.max(-90, rawSouth);
+    const north = Math.min(90, rawNorth);
+    if (south > north) {
+      return undefined;
+    }
+    // MapLibre reports unwrapped longitudes for world-sized or panned views:
+    // a full-turn span is the whole world, otherwise wrap into [-180, 180]
+    // where west > east denotes an antimeridian crossing.
+    if (west <= east && east - west >= 360) {
+      return [-180, south, 180, north];
+    }
+    const wrap = (longitude: number): number => (
+      longitude >= -180 && longitude <= 180 ? longitude : ((longitude + 180) % 360 + 360) % 360 - 180
+    );
+    return [wrap(west), south, wrap(east), north];
   }
 
   /**

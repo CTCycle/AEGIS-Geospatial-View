@@ -1615,10 +1615,6 @@ class AgentRunRepository:
         r_west, r_south, r_east, r_north = other
         if l_south > l_north or r_south > r_north:
             return False
-        if (l_west > l_east and (l_west < 150 or l_east > -150)) or (
-            r_west > r_east and (r_west < 150 or r_east > -150)
-        ):
-            return False
         if l_north < r_south or r_north < l_south:
             return False
 

@@ -453,6 +453,31 @@ def test_temporal_scope_is_vacuous_for_basemap_only_view_without_evidence() -> N
     assert next(i for i in strict if i.name == "temporal_scope_applied").status == "pending"
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ([-180.0, -85.0, 180.0, 85.0], [-180.0, -85.0, 180.0, 85.0]),
+        ([-290.0, -85.0, 290.0, 85.0], [-180.0, -85.0, 180.0, 85.0]),
+        ([-180.0, -85.0, 540.0, 85.0], [-180.0, -85.0, 180.0, 85.0]),
+        ([170.0, -10.0, 190.0, 10.0], [170.0, -10.0, -170.0, 10.0]),
+        ([100.0, -10.0, -100.0, 10.0], [100.0, -10.0, -100.0, 10.0]),
+        ([-200.0, -10.0, -150.0, 10.0], [160.0, -10.0, -150.0, 10.0]),
+    ],
+)
+def test_acknowledgment_normalizes_world_and_wrapped_viewport(
+    raw: list[float], expected: list[float]
+) -> None:
+    payload = RealtimeRenderAckPayload(
+        run_id="run-1",
+        run_version=1,
+        map_session_id="map-session-1",
+        collection_revision=0,
+        status="ready",
+        viewport_bounds=raw,
+    )
+    assert payload.viewport_bounds == expected
+
+###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
     payload = RealtimeRenderAckPayload(
         run_id="run-1",

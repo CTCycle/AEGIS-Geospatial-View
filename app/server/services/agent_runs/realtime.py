@@ -292,11 +292,15 @@ class RealtimeConnection:
                 fatal=False,
                 command=message.type,
             )
-        except ValidationError:
+        except ValidationError as exc:
             LOGGER.warning(
-                "realtime_command_payload_rejected conversation_id=%s type=%s",
+                "realtime_command_payload_rejected conversation_id=%s type=%s reasons=%s",
                 self.conversation_id,
                 message.type,
+                "; ".join(
+                    f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                    for error in exc.errors(include_input=False)[:5]
+                ),
             )
             await self._protocol_error(
                 message.message_id,

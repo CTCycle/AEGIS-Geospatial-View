@@ -1,6 +1,13 @@
 # Project Status Ledger
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
+
+The [2026-11-03 Wave 1 live validation](validation/live_eval_20261103_wave1.md) ran the 2026-11-02 replay set and four Wave 1 regressions on the live UI against `develop@6880a510`.
+- **Counts:** DeepSeek 18 PASS / 4 PARTIAL / 4 FAIL / 2 BLOCKED of 28 turns; Beam Free 4 / 5 / 10 / 1 of 20. The turn sets differ from the 2026-11-02 baseline, so the counts are indicative only.
+- **Wave 1 effect:** the H1 replay passes on both models with no unrendered-marker claim, and large-area raster acks are `ready` only after the source loads.
+- **False successes:** 2, both Beam (a magnitude filter follow-up routed as a restyle, completed despite a failed transform, then summarized as applied). The zero target is missed.
+- **New or confirmed open issues:** worldwide earthquake maps never render because the server rejects `map.render_ack` (`render_timeout`, both models); the two-city forecast never reaches a map; multi-point framing puts markers at viewport edges; Beam model-call exhaustion and invalid tool calls; routing gaps for forecast maximum-temperature and "NASA GIBS" wording.
+- **Not verified live:** the failing-tile raster branch.
 
 The [2026-11-02 agentic reliability slice](../QA/e2e-agent-reliability-20261102/report.md) improves the native loop's decisions and recovery without new orchestration layers. Each change below has a regression test that fails on `HEAD`.
 - **Stuck detection:** a progress ledger over places, evidence, capabilities, obligations and map state. A step that adds nothing new is unproductive; three trigger a corrective notice and five end the run with gathered evidence (`max_unproductive_steps`).
