@@ -14,6 +14,14 @@
   ],
   "coverage": "global",
   "metadata": {
+    "variables": [
+      "relative humidity",
+      "surface pressure",
+      "wind speed",
+      "wind direction",
+      "wind gusts",
+      "precipitation probability"
+    ],
     "label": "Open-Meteo Pressure Humidity Wind",
     "default_opacity": 0.72,
     "requires_key": false,

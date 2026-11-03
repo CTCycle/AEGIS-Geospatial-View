@@ -63,7 +63,12 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "11. Several things a data source lists (airports, schools, earthquakes, "
     "stations) are provider data: include data_retrieval even when the user only "
     "asks to locate or display them.\n"
-    "12. Return the tool call immediately without explanations or deliberation."
+    "12. Product, layer and dataset names are capabilities, not places: use "
+    "capability_queries, never target_refs.\n"
+    "13. Questions about results already retrieved or shown (which one, where "
+    "exactly, how many) are operation inspect_evidence, domain data_retrieval, "
+    "location_mode none, no queries or target_refs.\n"
+    "14. Return the tool call immediately without explanations or deliberation."
 )
 
 ###############################################################################

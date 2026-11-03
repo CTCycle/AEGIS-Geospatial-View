@@ -15,6 +15,20 @@
   ],
   "coverage": "global",
   "metadata": {
+    "variables": [
+      "temperature",
+      "maximum temperature",
+      "minimum temperature",
+      "precipitation",
+      "precipitation probability",
+      "weather code",
+      "relative humidity",
+      "surface pressure",
+      "wind speed",
+      "wind direction",
+      "wind gusts",
+      "cloud cover"
+    ],
     "action_tags": [
       "weather",
       "forecast",

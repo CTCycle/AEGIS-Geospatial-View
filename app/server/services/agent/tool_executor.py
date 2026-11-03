@@ -104,6 +104,9 @@ class ToolExecutor:
             call_id=call_id,
             exposed_tool_names=exposed_tool_names,
         )
+        result = self._with_rejection_feedback(
+            result, execution_tool_call, state, exposed_tool_names
+        )
         if result.tool_name in {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}:
             result.assessment = CompletionEvaluator.assess_evidence(state, result)
         if not any(item.call_id == result.call_id for item in state.tool_results):
@@ -330,10 +333,12 @@ class ToolExecutor:
                             )
                             else ""
                         )
-                        + _available_tools_hint(exposed_tool_names)
                     ),
                     retryable=False,
                     recovery="choose_alternate_tool",
+                ),
+                data=self._feedback_data(
+                    "tool_not_exposed", tool_call, state, exposed_tool_names
                 ),
             )
         if tool_call.parse_error is not None or tool_call.arguments is None:
@@ -348,12 +353,13 @@ class ToolExecutor:
                     retryable=False,
                     recovery="correct_arguments",
                 ),
-                data={
-                    "correction": self._correction_payload(
-                        tool_call,
-                        registered=None,
-                    )
-                },
+                data=self._feedback_data(
+                    "malformed_call",
+                    tool_call,
+                    state,
+                    exposed_tool_names,
+                    correction=self._correction_payload(tool_call, registered=None),
+                ),
             )
 
         if registered is None:
@@ -364,12 +370,12 @@ class ToolExecutor:
                 error=ToolExecutionError(
                     error_type="unknown_tool",
                     code="unknown_tool",
-                    message=(
-                        f"No tool named '{tool_call.name}' is exposed."
-                        + _available_tools_hint(exposed_tool_names)
-                    ),
+                    message=f"No tool named '{tool_call.name}' is exposed.",
                     retryable=False,
                     recovery="choose_alternate_tool",
+                ),
+                data=self._feedback_data(
+                    "unknown_tool", tool_call, state, exposed_tool_names
                 ),
             )
 
@@ -397,13 +403,18 @@ class ToolExecutor:
                     recovery="correct_arguments",
                     validation_errors=issues,
                 ),
-                data={
-                    "correction": self._correction_payload(
+                data=self._feedback_data(
+                    "schema_validation",
+                    tool_call,
+                    state,
+                    exposed_tool_names,
+                    issues=issues,
+                    correction=self._correction_payload(
                         tool_call,
                         registered=registered,
                         validation_errors=issues,
-                    )
-                },
+                    ),
+                ),
             )
 
         if registered.semantic_validator is not None:
@@ -411,8 +422,12 @@ class ToolExecutor:
             if semantic_errors:
                 issues = [
                     ValidationIssue(
-                        path="$",
-                        code="semantic_validation_failed",
+                        path=_issue_path(str(message)),
+                        code=(
+                            OUT_OF_RANGE_CODE
+                            if OUT_OF_RANGE_MARKER in str(message)
+                            else "semantic_validation_failed"
+                        ),
                         message=str(message),
                     )
                     for message in semantic_errors[:8]
@@ -456,15 +471,20 @@ class ToolExecutor:
                         recovery="correct_arguments",
                         validation_errors=issues,
                     ),
-                    data={
-                        "correction": self._correction_payload(
+                    data=self._feedback_data(
+                        "semantic_validation",
+                        tool_call,
+                        state,
+                        exposed_tool_names,
+                        issues=issues,
+                        correction=self._correction_payload(
                             tool_call,
                             registered=registered,
                             validation_errors=issues,
                             canonical_arguments=canonical_arguments,
                             applicable_schema=applicable_schema,
-                        )
-                    },
+                        ),
+                    ),
                 )
 
         authorization = self._authorize(registered, arguments, state)
@@ -485,6 +505,9 @@ class ToolExecutor:
                     message=authorization[1] or "Tool call was rejected by policy.",
                     retryable=False,
                     recovery=recovery,
+                ),
+                data=self._feedback_data(
+                    "policy_rejection", tool_call, state, exposed_tool_names
                 ),
             )
 
@@ -617,6 +640,69 @@ class ToolExecutor:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _with_rejection_feedback(
+        result: ToolResult,
+        tool_call: LLMToolCall,
+        state: AgentRunState,
+        exposed_tool_names: Collection[str] | None,
+    ) -> ToolResult:
+        """Give a handler-side rejection the same feedback block as the others.
+
+        Capability handlers can reject a call that passed schema validation
+        (for example a provider limit); the model must see the identical
+        contract, with the provider's own explanation as the issue.
+        """
+
+        error = result.error
+        if (
+            result.status != "failed"
+            or error is None
+            or error.recovery != "correct_arguments"
+            or (result.data is not None and "error_code" in result.data)
+        ):
+            return result
+        data = dict(result.data or {})
+        unsupported = data.get("failure_class") == "unsupported"
+        issues = error.validation_errors or [
+            ValidationIssue(
+                path="$",
+                code=UNSUPPORTED_CODE if unsupported else error.code,
+                message=error.message,
+            )
+        ]
+        data.update(
+            build_rejection_feedback(
+                error.code,
+                tool_call.name,
+                state,
+                exposed_tool_names,
+                issues=issues,
+            )
+        )
+        return result.model_copy(update={"data": data})
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _feedback_data(
+        error_code: str,
+        tool_call: LLMToolCall,
+        state: AgentRunState,
+        exposed_tool_names: Collection[str] | None,
+        *,
+        issues: list[ValidationIssue] | None = None,
+        correction: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return build_rejection_feedback(
+            error_code,
+            tool_call.name,
+            state,
+            exposed_tool_names,
+            issues=issues,
+            correction=correction,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _correction_payload(
         tool_call: LLMToolCall,
         *,
@@ -707,8 +793,70 @@ def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> 
     return str(value)[:500]
 
 ###############################################################################
-def _available_tools_hint(exposed_tool_names: Collection[str] | None) -> str:
-    """Name the callable tools so a model can recover from a wrong tool name."""
+def _issue_path(message: str) -> str:
+    """Return the argument path a validator message starts with, else ``$``."""
 
-    names = sorted(set(exposed_tool_names or ()))
-    return f" Tools available now: {', '.join(names)}." if names else ""
+    head, separator, _ = message.partition(": ")
+    return head if separator and " " not in head else "$"
+
+###############################################################################
+def build_rejection_feedback(
+    error_code: str,
+    tool_name: str,
+    state: AgentRunState,
+    exposed_tool_names: Collection[str] | None,
+    *,
+    issues: list[ValidationIssue] | None = None,
+    correction: dict[str, Any] | None = None,
+    repeated: bool = False,
+) -> dict[str, Any]:
+    """Return the one compact feedback block every rejected call receives.
+
+    The block is model-neutral: it names what was wrong, which tools are
+    callable now, and the next actions the loop state still allows.
+    """
+
+    bounded_issues = [
+        {"path": issue.path[:80], "code": issue.code, "message": issue.message[:240]}
+        for issue in (issues or [])[:8]
+    ]
+    unsupported = any(item["code"] in UNSUPPORTED_CODES for item in bounded_issues)
+    actions: list[str] = []
+    if repeated:
+        actions.append(
+            f"change the arguments of '{tool_name}' materially, "
+            "or call another tool from valid_tools"
+        )
+    elif error_code in {"tool_not_exposed", "unknown_tool", "policy_rejection"}:
+        actions.append("call one of valid_tools")
+    else:
+        actions.append(
+            f"retry '{tool_name}' with arguments inside the limit stated in issues"
+            if unsupported
+            else f"retry '{tool_name}' with corrected arguments"
+        )
+    if unsupported:
+        actions.append(
+            "otherwise finish with an answer that states the limit from issues "
+            "and explains the limitation"
+        )
+    elif repeated or state.validation_corrections >= 1:
+        actions.append("finish with an answer explaining the limitation")
+    feedback: dict[str, Any] = {
+        "error_code": error_code,
+        "issues": bounded_issues,
+        "valid_tools": sorted(set(exposed_tool_names or ()))[:16],
+        "allowed_next_actions": actions,
+    }
+    if correction is not None:
+        feedback["correction"] = correction
+    return feedback
+
+###############################################################################
+# Semantic validators mark a value outside its declared bounds with this
+# phrase; the loop then reports an impossible request, not a model error.
+OUT_OF_RANGE_MARKER = "outside the valid range"
+OUT_OF_RANGE_CODE = "out_of_range"
+# A handler rejection whose cause the provider reports as unsupported.
+UNSUPPORTED_CODE = "unsupported_by_provider"
+UNSUPPORTED_CODES = frozenset({OUT_OF_RANGE_CODE, UNSUPPORTED_CODE})

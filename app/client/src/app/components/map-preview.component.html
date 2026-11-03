@@ -23,6 +23,7 @@
         <button
           type="button"
           class="map-tools-toggle"
+          data-map-obstruction
           [class.map-tools-toggle--active]="isToolsOpen"
           aria-controls="map-tools"
           aria-label="Map tools"
@@ -71,7 +72,7 @@
           </div>
         }
 
-        <div class="map-zoom-controls" role="group" aria-label="Map zoom controls">
+        <div class="map-zoom-controls" data-map-obstruction role="group" aria-label="Map zoom controls">
           <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
           <button type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">&minus;</button>
         </div>
@@ -136,7 +137,7 @@
         </div>
 
         @if (complianceWarnings.length || restoreNotice || attributionEntries.length) {
-          <div class="map-bottom-bar">
+          <div class="map-bottom-bar" data-map-obstruction>
             @if (complianceWarnings.length || restoreNotice) {
               <div class="compliance-panel" role="status" aria-live="polite">
                 @for (warning of complianceWarnings; track warning) {

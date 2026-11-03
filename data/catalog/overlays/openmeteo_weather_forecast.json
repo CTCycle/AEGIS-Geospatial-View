@@ -11,6 +11,15 @@
   ],
   "coverage": "global",
   "metadata": {
+    "variables": [
+      "temperature",
+      "maximum temperature",
+      "minimum temperature",
+      "precipitation",
+      "precipitation probability",
+      "weather code",
+      "cloud cover"
+    ],
     "label": "Open-Meteo Weather Forecast",
     "default_opacity": 0.72,
     "requires_key": false,

@@ -5,7 +5,7 @@ from server.common.typing import is_json_array, is_json_object
 import hashlib
 import json
 from collections.abc import Mapping
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from server.contracts.geospatial import ProviderCredentialValidationResult
@@ -16,13 +16,26 @@ from server.domain.geospatial.providers import (
     ProviderResult,
 )
 
+ProviderFailureClass = Literal[
+    "transient", "capacity", "unsupported", "credential_missing", "malformed"
+]
+
 ###############################################################################
 class ProviderError(Exception):
-    """Base error for geospatial provider execution failures."""
+    """Base error for geospatial provider execution failures.
+
+    ``failure_class`` is the honest, provider-neutral reason a caller can act
+    on; ``attempts`` counts transport attempts made before the error surfaced.
+    """
+
+    failure_class: ProviderFailureClass = "transient"
+    attempts: int = 1
 
 ###############################################################################
 class ProviderAuthError(ProviderError):
     """Raised when a provider needs credentials that are unavailable or invalid."""
+
+    failure_class: ProviderFailureClass = "credential_missing"
 
 ###############################################################################
 class ProviderCircuitOpenError(ProviderError):
@@ -31,6 +44,8 @@ class ProviderCircuitOpenError(ProviderError):
 ###############################################################################
 class ProviderRateLimitError(ProviderError):
     """Raised when a provider rejects or cannot satisfy rate limits."""
+
+    failure_class: ProviderFailureClass = "capacity"
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -51,9 +66,43 @@ class ProviderUnavailableError(ProviderError):
 class ProviderMalformedPayloadError(ProviderError):
     """Raised when a provider returns a payload that cannot be normalized."""
 
+    failure_class: ProviderFailureClass = "malformed"
+
 ###############################################################################
 class ProviderInvalidQueryError(ProviderError):
     """Raised when a provider rejects a deterministic or invalid query."""
+
+    failure_class: ProviderFailureClass = "unsupported"
+
+###############################################################################
+class ProviderUnsupportedError(ProviderError):
+    """Raised when a provider cannot serve the capability at query time at all."""
+
+    failure_class: ProviderFailureClass = "unsupported"
+
+###############################################################################
+def provider_error_for_http_status(
+    status_code: int, message: str, *, retry_after_seconds: float | None = None
+) -> ProviderError:
+    """Map an upstream HTTP failure status to its classified provider error.
+
+    429 is provider capacity, 401/403 a missing or rejected credential, other
+    4xx a semantic rejection, and 5xx (or anything else) a transient outage.
+    """
+
+    if status_code == 429:
+        return ProviderRateLimitError(message, retry_after_seconds=retry_after_seconds)
+    if status_code in {401, 403}:
+        return ProviderAuthError(message)
+    if 400 <= status_code < 500 and status_code != 408:
+        return ProviderInvalidQueryError(message)
+    return ProviderUnavailableError(message)
+
+###############################################################################
+def classify_provider_error(error: BaseException) -> ProviderFailureClass | None:
+    """Return the failure class of a provider error, or None for foreign errors."""
+
+    return error.failure_class if isinstance(error, ProviderError) else None
 
 
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")

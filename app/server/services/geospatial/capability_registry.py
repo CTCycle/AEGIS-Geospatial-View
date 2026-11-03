@@ -72,6 +72,25 @@ _QUERY_ALIASES: dict[str, set[str]] = {
     "emsc": {"emsc", "earthquake", "seismic", "hazard"},
 }
 
+# Extremum, aggregation and spelling variants a query and a manifest may spell
+# differently ("max", "highest" and "peak" all mean "maximum").  Both sides are
+# canonicalised, so a manifest declaring "maximum temperature" matches any
+# spelling without enumerating phrases.
+_MODIFIER_SYNONYMS: dict[str, str] = {
+    "max": "maximum",
+    "highest": "maximum",
+    "peak": "maximum",
+    "min": "minimum",
+    "lowest": "minimum",
+    "avg": "average",
+    "mean": "average",
+    "colour": "color",
+}
+
+def _canonical_modifier(token: str) -> str:
+    return _MODIFIER_SYNONYMS.get(token) or token
+
+
 _GENERIC_QUERY_TOKENS = {
     "a",
     "an",
@@ -206,6 +225,14 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "search",
     "show",
     "today",
+    "tomorrow",
+    "yesterday",
+    "tonight",
+    "daily",
+    "hourly",
+    "weekly",
+    "monthly",
+    "upcoming",
     "vehicle",
     "vehicles",
     "visualize",
@@ -435,6 +462,61 @@ class CapabilityRegistry:
             if len(matches) >= limit:
                 break
         return matches
+
+    # -------------------------------------------------------------------------
+    def names_catalog_entry(self, text: str) -> bool:
+        """Return whether the text is a catalog layer, product or dataset name.
+
+        Names and ids are capability references.  A multi-word reference
+        qualifies when every word belongs to one entry's id, name or layer
+        title; a single word qualifies only as an exact entry id.
+        """
+
+        words = [
+            word
+            for word in re.findall(r"[a-z0-9]+", text.casefold())
+            if word not in _GENERIC_QUERY_TOKENS
+        ]
+        if not words:
+            return False
+        compact = "".join(words)
+        for identifiers, terms in self._catalog_identities:
+            if compact in identifiers:
+                return True
+            if len(words) >= 2 and set(words) <= terms:
+                return True
+        return False
+
+    # -------------------------------------------------------------------------
+    @cached_property
+    def _catalog_identities(self) -> tuple[tuple[frozenset[str], frozenset[str]], ...]:
+        snapshot = self._ensure_snapshot()
+        identities: list[tuple[frozenset[str], frozenset[str]]] = []
+        for item in (
+            *snapshot.overlays,
+            *snapshot.cameras,
+            *snapshot.transit,
+            *snapshot.tools,
+        ):
+            metadata = json_object(item.get("metadata"))
+            names = [
+                item.get("id"),
+                item.get("name"),
+                metadata.get("label"),
+                metadata.get("layer_id"),
+            ]
+            compacts = {
+                "".join(re.findall(r"[a-z0-9]+", str(name).casefold()))
+                for name in names
+                if name
+            }
+            terms = {
+                word
+                for name in names
+                for word in re.findall(r"[a-z0-9]+", str(name or "").casefold())
+            }
+            identities.append((frozenset(compacts), frozenset(terms)))
+        return tuple(identities)
 
     # -------------------------------------------------------------------------
     def requests_catalog_entities(self, text: str) -> bool:
@@ -723,6 +805,11 @@ class CapabilityRegistry:
             # a generic domain/hint match outrank a manifest whose declared
             # capability is the requested subject.
             score += float(len(identity_matches) * 120)
+            # A declared variable ("maximum temperature", "cloud cover") is a
+            # direct statement of what the capability measures.
+            score += float(
+                len(meaningful_queries.intersection(_variable_terms(item))) * 90
+            )
             score += float(len(semantic_matches) * 60)
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
@@ -868,6 +955,8 @@ def _operation_candidates(operation: str) -> set[str]:
         "count": {"search", "show", "inspect"},
         "list": {"search", "show", "inspect"},
         "estimate": {"show", "inspect"},
+        # Reading data as text is a retrieval; the prompt names it "inspect".
+        "inspect": {"search", "show"},
         "visualize": {"show", "overlay"},
         "weather": {"forecast", "show", "inspect"},
         "forecast": {"forecast", "show", "inspect"},
@@ -1106,12 +1195,22 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         metadata.get("primary_use_cases"),
         metadata.get("search_examples"),
         metadata.get("human_summary"),
+        metadata.get("variables"),
+        metadata.get("label"),
     ]
     return {
         token
         for value in values
         for token in _query_tokens(value if is_json_array(value) else [value])
     }
+
+###############################################################################
+def _variable_terms(capability: dict[str, Any]) -> set[str]:
+    """Return the terms of the variables a capability declares it provides."""
+
+    metadata = json_object(capability.get("metadata"))
+    variables = metadata.get("variables")
+    return _raw_query_tokens(variables if is_json_array(variables) else [variables])
 
 ###############################################################################
 def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
@@ -1201,6 +1300,8 @@ def _routing_searchable_text(
         metadata.get("semantic_aliases"),
         metadata.get("action_tags"),
         metadata.get("supported_categories"),
+        metadata.get("variables"),
+        metadata.get("label"),
     ]
     if include_hints:
         values.extend(
@@ -1246,6 +1347,7 @@ def _query_tokens(values: Sequence[object]) -> set[str]:
         for token in re.findall(r"[a-z0-9]+", str(value or "").casefold()):
             if len(token) <= 1:
                 continue
+            token = _canonical_modifier(token)
             tokens.add(token)
             if token.endswith("ies") and len(token) > 4:
                 tokens.add(token[:-3] + "y")
@@ -1263,6 +1365,7 @@ def _raw_query_tokens(values: Sequence[object]) -> set[str]:
         for token in re.findall(r"[a-z0-9]+", str(value or "").casefold()):
             if len(token) <= 1:
                 continue
+            token = _canonical_modifier(token)
             tokens.add(token)
             if token.endswith("ies") and len(token) > 4:
                 tokens.add(token[:-3] + "y")

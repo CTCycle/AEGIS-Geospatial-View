@@ -7,7 +7,7 @@ import logging
 import math
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -22,6 +22,11 @@ WEATHER_GRID_BATCH_SIZE = 100
 WEATHER_GRID_MAX_CONCURRENT_BATCHES = 3
 OPENMETEO_ELEVATION_BASE_URL = "https://api.open-meteo.com/v1/elevation"
 OPENMETEO_CACHE_MAX_ENTRIES = 512
+# Dated windows the forecast endpoints accept: days before today and days
+# from today inclusive (the ``past_days`` / ``forecast_days`` maxima).
+OPENMETEO_MAX_PAST_DAYS = 92
+OPENMETEO_WEATHER_MAX_FORECAST_DAYS = 16
+OPENMETEO_AIR_QUALITY_MAX_FORECAST_DAYS = 7
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +37,11 @@ class OpenMeteoServiceError(Exception):
 ###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
     """Raised when Open-Meteo cannot fulfill a request."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 ###############################################################################
 class OpenMeteoRateLimitError(OpenMeteoRequestError):
@@ -45,6 +55,38 @@ class OpenMeteoRateLimitError(OpenMeteoRequestError):
         self.retry_after_seconds = retry_after_seconds
 
 ###############################################################################
+def clip_window_to_forecast_range(
+    window: tuple[datetime, datetime], now: datetime, *, max_forecast_days: int
+) -> tuple[datetime, datetime] | None:
+    """Clip a UTC window to the dates the forecast endpoint can serve.
+
+    Returns None when no part of the window is servable.
+    """
+
+    today = now.astimezone(UTC).date()
+    earliest = datetime.combine(today - timedelta(days=OPENMETEO_MAX_PAST_DAYS), datetime.min.time(), UTC)
+    latest = datetime.combine(today + timedelta(days=max_forecast_days), datetime.min.time(), UTC)
+    start, end = max(window[0], earliest), min(window[1], latest)
+    return (start, end) if end > start else None
+
+###############################################################################
+def window_query_params(window: tuple[datetime, datetime]) -> dict[str, str]:
+    """Exact-date request parameters for a UTC window.
+
+    Hours are hour-ending, so the first covered stamp is one hour after the
+    window start and the last is the window end. UTC keeps the returned
+    stamps on the requested instants.
+    """
+
+    start_date: date = window[0].astimezone(UTC).date()
+    end_date: date = window[1].astimezone(UTC).date()
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "timezone": "UTC",
+    }
+
+###############################################################################
 class OpenMeteoService:
     WEATHER_VARIABLES = (
         "temperature_2m",
@@ -56,6 +98,7 @@ class OpenMeteoService:
         "wind_direction_10m",
         "wind_gusts_10m",
         "precipitation_probability",
+        "cloud_cover",
     )
     WEATHER_CURRENT_VARIABLES = (
         "temperature_2m",
@@ -117,7 +160,12 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def get_weather_grid(
-        self, points: list[tuple[float, float]], past_days: int, *, forecast_days: int = 1
+        self,
+        points: list[tuple[float, float]],
+        past_days: int,
+        *,
+        forecast_days: int = 1,
+        window: tuple[datetime, datetime] | None = None,
     ) -> list[dict[str, Any] | None]:
         """Fetch a grid in cached multi-location calls of at most 100 points.
 
@@ -139,7 +187,7 @@ class OpenMeteoService:
         ) -> tuple[list[dict[str, Any] | None], OpenMeteoServiceError | None]:
             async with semaphore:
                 try:
-                    return await self._weather_grid_batch(batch, past_days, forecast_days), None
+                    return await self._weather_grid_batch(batch, past_days, forecast_days, window), None
                 except OpenMeteoRateLimitError:
                     raise
                 except OpenMeteoServiceError as exc:
@@ -166,15 +214,26 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def _weather_grid_batch(
-        self, batch: list[tuple[float, float]], past_days: int, forecast_days: int = 1
+        self,
+        batch: list[tuple[float, float]],
+        past_days: int,
+        forecast_days: int = 1,
+        window: tuple[datetime, datetime] | None = None,
     ) -> list[dict[str, Any] | None]:
         params = {
             "latitude": ",".join(f"{lat:.5f}" for lat, _ in batch),
             "longitude": ",".join(f"{lon:.5f}" for _, lon in batch),
             "current": "temperature_2m,precipitation",
             "hourly": "temperature_2m,precipitation",
-            "past_days": str(max(0, min(14, past_days))),
-            "forecast_days": str(max(1, min(16, forecast_days))), "timezone": "auto",
+            **(
+                window_query_params(window)
+                if window is not None
+                else {
+                    "past_days": str(max(0, min(14, past_days))),
+                    "forecast_days": str(max(1, min(16, forecast_days))),
+                    "timezone": "auto",
+                }
+            ),
         }
         payload = await self._fetch_json(endpoint=self.weather_base_url,
                                          params=params, provider_key="openmeteo_weather_grid")
@@ -192,15 +251,22 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def get_weather_forecast(
-        self, *, latitude: float, longitude: float
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        window: tuple[datetime, datetime] | None = None,
     ) -> dict[str, Any]:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
             "hourly": ",".join(self.WEATHER_VARIABLES),
             "current": ",".join(self.WEATHER_CURRENT_VARIABLES),
-            "forecast_days": "3",
-            "timezone": "auto",
+            **(
+                window_query_params(window)
+                if window is not None
+                else {"forecast_days": "3", "timezone": "auto"}
+            ),
         }
         payload = await self._fetch_json(
             endpoint=self.weather_base_url,
@@ -215,7 +281,7 @@ class OpenMeteoService:
         }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
-        for index in range(min(72, len(timeline))):
+        for index in range(len(timeline) if window is not None else min(72, len(timeline))):
             row = {"time": timeline[index]}
             row.update(
                 {
@@ -270,14 +336,21 @@ class OpenMeteoService:
 
     # -------------------------------------------------------------------------
     async def get_air_quality_forecast(
-        self, *, latitude: float, longitude: float
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        window: tuple[datetime, datetime] | None = None,
     ) -> dict[str, Any]:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
             "hourly": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone,sulphur_dioxide",
-            "timezone": "auto",
-            "forecast_days": "3",
+            **(
+                window_query_params(window)
+                if window is not None
+                else {"timezone": "auto", "forecast_days": "3"}
+            ),
         }
         payload = await self._fetch_json(
             endpoint=self.air_quality_base_url,
@@ -292,7 +365,7 @@ class OpenMeteoService:
         }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
-        for index in range(min(72, len(timeline))):
+        for index in range(len(timeline) if window is not None else min(72, len(timeline))):
             row: dict[str, Any] = {"time": timeline[index]}
             for key, values in pollutants.items():
                 row[key] = values[index] if index < len(values) else None
@@ -481,7 +554,8 @@ class OpenMeteoService:
             )
         if not response.is_success:
             raise OpenMeteoRequestError(
-                f"Open-Meteo request failed: HTTP {response.status_code}"
+                f"Open-Meteo request failed: HTTP {response.status_code}{self._error_reason(response)}",
+                status_code=response.status_code,
             )
         try:
             data = response.json()
@@ -494,6 +568,18 @@ class OpenMeteoService:
         if not is_json_object(data):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
         return data
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _error_reason(response: httpx.Response) -> str:
+        """Open-Meteo explains rejected queries in a JSON ``reason`` field."""
+
+        try:
+            body = response.json()
+        except ValueError:
+            return ""
+        reason = body.get("reason") if is_json_object(body) else None
+        return f": {reason[:200]}" if isinstance(reason, str) and reason else ""
 
     # -------------------------------------------------------------------------
     def _cache_get(self, cache_key: str) -> dict[str, Any] | None:

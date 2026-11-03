@@ -199,10 +199,10 @@
     ></div>
 
     <section class="canvas-panel" aria-label="Map canvas">
-      <div class="canvas-panel__body">
-        <div class="canvas-chip" [attr.title]="canvasTitle">{{ canvasTitle }}</div>
+      <div class="canvas-panel__body" data-map-frame>
+        <div class="canvas-chip" data-map-obstruction [attr.title]="canvasTitle">{{ canvasTitle }}</div>
         @if (isLoading) {
-          <div class="activity-pill" role="status" aria-live="polite">
+          <div class="activity-pill" data-map-obstruction role="status" aria-live="polite">
             <span class="chat-progress-spinner" aria-hidden="true"></span>
             <span class="activity-pill__label">{{ activityLabel }}</span>
             <button
@@ -216,7 +216,7 @@
             </button>
           </div>
         }
-        <div class="canvas-actions">
+        <div class="canvas-actions" data-map-obstruction>
           <button
             type="button"
             class="panel-icon-button panel-icon-button--map"

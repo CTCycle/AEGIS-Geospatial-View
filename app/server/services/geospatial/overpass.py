@@ -5,6 +5,7 @@ from server.common.typing import is_json_object, json_array, json_object
 import asyncio
 import json
 import math
+import re
 import threading
 import time
 from datetime import UTC, datetime
@@ -19,6 +20,7 @@ from server.services.geospatial.providers.base import (
     ProviderInvalidQueryError,
     ProviderRateLimitError,
 )
+from server.services.geospatial.providers.http import parse_retry_after
 
 ###############################################################################
 class OverpassServiceError(ProviderError):
@@ -35,6 +37,23 @@ class OverpassInvalidQueryError(OverpassServiceError, ProviderInvalidQueryError)
 ###############################################################################
 class OverpassRateLimitError(OverpassServiceError, ProviderRateLimitError):
     """Raised when Overpass rejects a request due to rate limits."""
+
+# Overpass tag keys and values are interpolated into the query text.
+_OSM_TOKEN = re.compile(r"^[a-z][a-z0-9_:]*$")
+
+###############################################################################
+def _overpass_http_error(error: HTTPError) -> OverpassServiceError:
+    """Classify an Overpass HTTP failure: 429 is capacity, other 4xx (query
+    syntax) is unsupported, and 5xx (gateway, busy) is transient."""
+
+    if error.code == 429:
+        return OverpassRateLimitError(
+            "Overpass rate limit exceeded.",
+            retry_after_seconds=parse_retry_after(error.headers.get("Retry-After")),
+        )
+    if 400 <= error.code < 500 and error.code != 408:
+        return OverpassInvalidQueryError(f"Overpass rejected the query: HTTP {error.code}.")
+    return OverpassRequestError(f"Overpass request failed: HTTP {error.code}.")
 
 ###############################################################################
 class OverpassService:
@@ -183,12 +202,16 @@ class OverpassService:
             *[
                 selector
                 for category in (categories or [])
-                for selector in self.CATEGORY_SELECTORS.get(
-                    self._normalize_category(category), ()
-                )
+                for selector in self._category_selectors(category)
             ],
         ]
-        selectors = list(dict.fromkeys(selectors))
+        selectors = list(
+            dict.fromkeys(
+                selector
+                for selector in selectors
+                if _OSM_TOKEN.fullmatch(selector[0]) and _OSM_TOKEN.fullmatch(selector[1])
+            )
+        )
         if categories and not selectors:
             raise OverpassInvalidQueryError(
                 "No supported OpenStreetMap POI category was requested."
@@ -279,6 +302,25 @@ class OverpassService:
             "units": {"distance_m": "m", "radius_m": "m"},
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _category_selectors(cls, category: object) -> tuple[tuple[str, str], ...]:
+        """Resolve a category to OSM selectors.
+
+        Named groups win; otherwise an explicit ``key=value`` tag or a bare
+        OSM amenity value (``university``) is queried as written.
+        """
+
+        normalized = cls._normalize_category(category)
+        known = cls.CATEGORY_SELECTORS.get(normalized)
+        if known is not None:
+            return known
+        text = str(category or "").strip().casefold()
+        key, separator, value = text.partition("=")
+        if separator:
+            return ((key.strip(), value.strip()),)
+        return (("amenity", normalized),) if normalized else ()
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -408,9 +450,7 @@ class OverpassService:
             with urlopen(request, timeout=self.timeout_s) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
-            if exc.code == 429:
-                raise OverpassRateLimitError("Overpass rate limit exceeded.") from exc
-            raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
+            raise _overpass_http_error(exc) from exc
         except (URLError, TimeoutError) as exc:
             raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
         try:
@@ -454,9 +494,7 @@ class OverpassService:
             with urlopen(request, timeout=self.timeout_s) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
-            if exc.code == 429:
-                raise OverpassRateLimitError("Overpass rate limit exceeded.") from exc
-            raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
+            raise _overpass_http_error(exc) from exc
         except (URLError, TimeoutError) as exc:
             raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
         try:

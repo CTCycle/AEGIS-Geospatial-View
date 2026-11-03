@@ -270,6 +270,58 @@ class CapabilityRouter:
         return bool(callable(requests) and requests(user_message))
 
     # -------------------------------------------------------------------------
+    def _normalize_catalog_reference_targets(
+        self, route: CapabilityRoute
+    ) -> tuple[CapabilityRoute, str | None]:
+        """Move catalog layer, product and dataset names out of the place targets.
+
+        A name the catalog knows ("Surface Temperature Day", a layer id) is a
+        capability reference, never a place to geocode; it becomes a
+        capability query so discovery can match it.
+        """
+
+        names_entry = getattr(self.capability_registry, "names_catalog_entry", None)
+        if (
+            not callable(names_entry)
+            or route.task_mode != "execute"
+            or route.primary_domain is CapabilityDomain.MAP_STATE
+            or route.operation == "discover_available_map_data"
+        ):
+            return route, None
+        references = [ref for ref in route.target_refs if names_entry(ref)]
+        if not references:
+            return route, None
+        queries = list(route.capability_queries)
+        known = {query.casefold() for query in queries}
+        queries.extend(ref for ref in references if ref.casefold() not in known)
+        spatial = route.spatial_scope
+        if spatial is not None:
+            kept = [ref for ref in spatial.target_refs if ref not in references]
+            spatial = spatial.model_copy(update={"target_refs": kept}) if kept else None
+        secondary = list(route.secondary_domains)
+        primary = route.primary_domain
+        if primary is CapabilityDomain.PLACE_SEARCH:
+            primary = CapabilityDomain.DATA_RETRIEVAL
+            if route.presentation in {"map", "both"}:
+                secondary = [CapabilityDomain.MAP_RENDERING]
+        elif CapabilityDomain.PLACE_SEARCH in secondary:
+            secondary.remove(CapabilityDomain.PLACE_SEARCH)
+        if CapabilityDomain.DATA_RETRIEVAL in secondary and primary is CapabilityDomain.DATA_RETRIEVAL:
+            secondary.remove(CapabilityDomain.DATA_RETRIEVAL)
+        return (
+            route.model_copy(
+                update={
+                    "primary_domain": primary,
+                    "secondary_domains": secondary,
+                    "target_refs": [r for r in route.target_refs if r not in references],
+                    "spatial_scope": spatial,
+                    "capability_queries": queries,
+                }
+            ),
+            "catalog_reference_not_a_place",
+        )
+
+    # -------------------------------------------------------------------------
     def validate_route(
         self,
         proposed: CapabilityRoute,
@@ -285,6 +337,9 @@ class CapabilityRouter:
         proposed, semantic_reason = _normalize_route_semantics(proposed)
         if semantic_reason is not None:
             reasons.append(semantic_reason)
+        proposed, reference_reason = self._normalize_catalog_reference_targets(proposed)
+        if reference_reason is not None:
+            reasons.append(reference_reason)
         proposed, discovery_reason = _normalize_capability_inventory_route(
             proposed, user_message=user_message
         )
@@ -319,6 +374,21 @@ class CapabilityRouter:
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
+        if (
+            proposed.task_mode == "execute"
+            and proposed.operation == "inspect_evidence"
+            and not active_state.evidence_refs
+        ):
+            return CapabilityRouteDecision(
+                status="clarification",
+                route=proposed,
+                rejected_capability_ids=rejected,
+                reason_codes=[*dict.fromkeys([*reasons, "no_evidence_to_inspect"])],
+                clarification_question=(
+                    "There are no earlier results in this conversation to look at. "
+                    "Which data should I retrieve first?"
+                ),
+            )
         contract_reasons = _route_contract_reason_codes(proposed)
         if contract_reasons:
             return CapabilityRouteDecision(
@@ -1019,8 +1089,13 @@ def _normalize_text_evidence_inspection_route(
     if not active_state.evidence_refs:
         return route, None
 
+    # The route model declares evidence inspection with operation
+    # inspect_evidence; an explicit "inspect the evidence" request also counts.
     message_terms = set(re.findall(r"[a-z0-9]+", user_message.casefold()))
-    if not {"inspect", "evidence"}.issubset(message_terms):
+    if route.operation != "inspect_evidence" and not {
+        "inspect",
+        "evidence",
+    }.issubset(message_terms):
         return route, None
 
     return (

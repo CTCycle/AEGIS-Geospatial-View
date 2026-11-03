@@ -771,3 +771,136 @@ export const normalizeBounds = (bounds: unknown): LngLatBoundsLike | null => {
   const [minx, miny, maxx, maxy] = bounds;
   return [[minx, miny], [maxx, maxy]];
 };
+
+export interface FrameInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface FrameRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+// Half of the largest marker glyph plus a visual margin.
+export const MARKER_FIT_PADDING_PX = 30;
+const MAX_FRAME_INSET_FRACTION = 0.35;
+const MAX_TARGET_ANCHORS = 500;
+
+/**
+ * Derives fitBounds padding from the measured UI overlays covering the map.
+ * Each obstruction is attributed to the viewport edge it intrudes least from,
+ * and the marker radius is added on top so symbols stay clear of the chrome.
+ */
+export const computeFrameInsets = (
+  container: FrameRect,
+  obstructions: FrameRect[],
+  markerPx: number = MARKER_FIT_PADDING_PX,
+): FrameInsets => {
+  const insets: FrameInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  for (const rect of obstructions) {
+    const left = Math.max(rect.left, container.left);
+    const top = Math.max(rect.top, container.top);
+    const right = Math.min(rect.right, container.right);
+    const bottom = Math.min(rect.bottom, container.bottom);
+    if (right <= left || bottom <= top) {
+      continue;
+    }
+    const extents: Array<[keyof FrameInsets, number]> = [
+      ['top', bottom - container.top],
+      ['bottom', container.bottom - top],
+      ['left', right - container.left],
+      ['right', container.right - left],
+    ];
+    const [edge, extent] = extents.reduce((best, item) => (item[1] < best[1] ? item : best));
+    insets[edge] = Math.max(insets[edge], extent);
+  }
+  return insets.top + insets.right + insets.bottom + insets.left === 0
+    ? insets
+    : capInsets(insets, container);
+};
+
+const capInsets = (insets: FrameInsets, container: FrameRect): FrameInsets => {
+  const maxX = (container.right - container.left) * MAX_FRAME_INSET_FRACTION;
+  const maxY = (container.bottom - container.top) * MAX_FRAME_INSET_FRACTION;
+  return {
+    top: Math.min(insets.top, maxY),
+    bottom: Math.min(insets.bottom, maxY),
+    left: Math.min(insets.left, maxX),
+    right: Math.min(insets.right, maxX),
+  };
+};
+
+export const computeFitPadding = (
+  container: FrameRect,
+  obstructions: FrameRect[],
+  markerPx: number = MARKER_FIT_PADDING_PX,
+): FrameInsets => {
+  const insets = computeFrameInsets(container, obstructions, markerPx);
+  return {
+    top: insets.top + markerPx,
+    right: insets.right + markerPx,
+    bottom: insets.bottom + markerPx,
+    left: insets.left + markerPx,
+  };
+};
+
+/** Representative [lon, lat] anchors of a feature collection (one per feature part). */
+export const featureAnchors = (data: unknown): Array<[number, number]> => {
+  const anchors: Array<[number, number]> = [];
+  const features = (data as { features?: unknown } | null | undefined)?.features;
+  if (!Array.isArray(features)) {
+    return anchors;
+  }
+  const collect = (value: unknown, out: Array<[number, number]>): void => {
+    if (Array.isArray(value) && value.length >= 2 && isFiniteNumber(value[0]) && isFiniteNumber(value[1])) {
+      out.push([value[0], value[1]]);
+    } else if (Array.isArray(value)) {
+      value.forEach((item) => collect(item, out));
+    }
+  };
+  for (const feature of features) {
+    if (anchors.length >= MAX_TARGET_ANCHORS) {
+      break;
+    }
+    const geometry = (feature as { geometry?: { type?: string; coordinates?: unknown } } | null)?.geometry;
+    const vertices: Array<[number, number]> = [];
+    collect(geometry?.coordinates, vertices);
+    if (!vertices.length) {
+      continue;
+    }
+    if (geometry?.type === 'MultiPoint') {
+      anchors.push(...vertices);
+      continue;
+    }
+    const lons = vertices.map((item) => item[0]);
+    const lats = vertices.map((item) => item[1]);
+    anchors.push([
+      (Math.min(...lons) + Math.max(...lons)) / 2,
+      (Math.min(...lats) + Math.max(...lats)) / 2,
+    ]);
+  }
+  return anchors;
+};
+
+/** Whether every projected anchor lies in the container minus the overlay insets. */
+export const allTargetsInView = (
+  pixels: Array<{ x: number; y: number }>,
+  container: FrameRect,
+  insets: FrameInsets,
+  markerPx: number = MARKER_FIT_PADDING_PX,
+): boolean => {
+  const margin = markerPx / 2;
+  const minX = container.left + insets.left + margin;
+  const maxX = container.right - insets.right - margin;
+  const minY = container.top + insets.top + margin;
+  const maxY = container.bottom - insets.bottom - margin;
+  return pixels.every((p) => (
+    Number.isFinite(p.x) && Number.isFinite(p.y)
+    && p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
+  ));
+};

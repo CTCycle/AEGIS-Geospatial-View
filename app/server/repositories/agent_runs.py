@@ -52,6 +52,13 @@ def _json_list(value: object) -> list[Any]:
     return []
 
 ###############################################################################
+_RENDER_EXPIRY_MESSAGES = {
+    "render_timeout": "The browser did not acknowledge the prepared map before the render deadline.",
+    "render_client_disconnected": "The browser connection was lost before it acknowledged the prepared map.",
+    "render_client_hidden": "The browser page stayed hidden before it acknowledged the prepared map.",
+}
+
+###############################################################################
 def _finalize_pending_presentation(
     value: object,
     *,
@@ -1441,8 +1448,14 @@ class AgentRunRepository:
         run_id: str,
         run_version: int,
         timeout_seconds: float = 90.0,
+        failure_code: str = "render_timeout",
     ) -> AgentRunSnapshot | None:
-        """Fail a stale candidate while preserving the last committed map."""
+        """Fail a stale candidate while preserving the last committed map.
+
+        ``failure_code`` records why the browser never acknowledged the map
+        (timeout, lost connection, hidden page); the presentation status stays
+        ``render_timeout`` for every unacknowledged candidate.
+        """
 
         cutoff = datetime.now(UTC) - timedelta(seconds=max(0.1, timeout_seconds))
         with self._session_factory() as session:
@@ -1469,18 +1482,20 @@ class AgentRunRepository:
             run.state = AgentRunState.FAILED.value
             run.active_slot = None
             run.completed_at = datetime.now(UTC)
-            run.error_code = "render_timeout"
-            run.error_message = "The browser did not acknowledge the prepared map before the render deadline."
+            run.error_code = failure_code
+            run.error_message = _RENDER_EXPIRY_MESSAGES.get(
+                failure_code, _RENDER_EXPIRY_MESSAGES["render_timeout"]
+            )
             run.presentation_status = "render_timeout"
             presentation = _json_object(run.presentation_json)
             finalized_presentation = _finalize_pending_presentation(
                 presentation,
                 status="render_timeout",
-                error_code="render_timeout",
+                error_code=failure_code,
                 force=True,
             ) or {
                 "status": "render_timeout",
-                "error_code": "render_timeout",
+                "error_code": failure_code,
             }
             durable_event_ids = [
                 str(item)
@@ -1497,7 +1512,7 @@ class AgentRunRepository:
                         type=RunEventType.ERROR,
                         visibility=RunEventVisibility.USER,
                         payload={
-                            "code": "render_timeout",
+                            "code": failure_code,
                             "message": run.error_message,
                             "presentation_status": "render_timeout",
                             "state": AgentRunState.FAILED.value,
@@ -1511,6 +1526,53 @@ class AgentRunRepository:
             session.commit()
             session.refresh(run)
             return self._to_snapshot(run)
+
+    # -------------------------------------------------------------------------
+    def extend_pending_render(
+        self,
+        *,
+        conversation_id: str,
+        run_id: str,
+        run_version: int,
+        timeout_seconds: float = 90.0,
+        max_extensions: int = 1,
+    ) -> str:
+        """Grant a bounded deadline extension to a candidate that is overdue.
+
+        Returns ``extended``, ``exhausted`` (budget used), ``not_due`` (a newer
+        candidate moved the prepared time) or ``gone`` (no longer pending).
+        """
+
+        cutoff = datetime.now(UTC) - timedelta(seconds=max(0.1, timeout_seconds))
+        with self._session_factory() as session:
+            session.execute(text("BEGIN IMMEDIATE"))
+            run = session.scalar(
+                select(AgentRunRecord).where(
+                    AgentRunRecord.id == run_id,
+                    AgentRunRecord.conversation_id == conversation_id,
+                    AgentRunRecord.active_run_version == run_version,
+                    AgentRunRecord.state == AgentRunState.AWAITING_RENDER.value,
+                    AgentRunRecord.presentation_status == "pending",
+                )
+            )
+            if run is None:
+                return "gone"
+            prepared_at = run.render_prepared_at or run.started_at or run.created_at
+            prepared_at = (
+                prepared_at.replace(tzinfo=UTC)
+                if prepared_at.tzinfo is None
+                else prepared_at
+            )
+            if prepared_at > cutoff:
+                return "not_due"
+            presentation = _json_object(run.presentation_json)
+            used = int(presentation.get("deadline_extensions") or 0)
+            if used >= max_extensions:
+                return "exhausted"
+            run.render_prepared_at = datetime.now(UTC)
+            run.presentation_json = {**presentation, "deadline_extensions": used + 1}
+            session.commit()
+            return "extended"
 
     # -------------------------------------------------------------------------
     @staticmethod

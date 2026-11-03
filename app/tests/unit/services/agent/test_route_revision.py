@@ -11,7 +11,7 @@ from server.domain.agent.capability_route import AgentPhase, AgentRunState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.reliability import AgentExecutionBudget
-from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import ToolExecutionError, ToolExecutionMetadata, ToolResult
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.llm.types import LLMResult, LLMToolCall
 from server.contracts.geospatial import MapSession, OverlayCollectionState, ViewportPolicy
@@ -267,3 +267,26 @@ async def test_failed_revision_call_keeps_the_original_route_and_records_why(err
     assert state.route is not None and state.route.primary_domain is CapabilityDomain.MAP_STATE
     assert result.stopped_reason not in {"failed", "goal_satisfied"}
     assert "could not be applied" in result.final_text
+
+
+###############################################################################
+def test_route_revision_does_not_charge_the_revised_route_for_old_route_rejections() -> None:
+    state, _, evidence = _follow_up_state()
+    loop = _loop(_Model([]), evidence)
+    call = LLMToolCall(id="filter-1", name="transform_evidence", arguments=FILTER)
+    rejected = ToolResult(
+        call_id="filter-1", tool_name="transform_evidence", status="failed", summary="not exposed",
+        error=ToolExecutionError(error_type="tool_not_exposed", code="tool_not_exposed",
+                                 message="not exposed", retryable=False, recovery="choose_alternate_tool"),
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+    fingerprint = loop._fingerprint(call)  # pyright: ignore[reportPrivateUsage]
+    state.failed_fingerprints = {fingerprint: 1}
+    state.validation_corrections = 1
+    state.consecutive_tool_failures = 1
+
+    loop._forgive_route_rejections(state, [call], [rejected])  # pyright: ignore[reportPrivateUsage]
+
+    assert state.validation_corrections == 0
+    assert state.consecutive_tool_failures == 0
+    assert fingerprint not in state.failed_fingerprints

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
@@ -43,10 +43,15 @@ from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnavailableError,
+    ProviderUnsupportedError,
+    classify_provider_error,
 )
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 LOGGER = logging.getLogger(__name__)
+
+# Hourly rows kept in the model-facing summary of a dated window.
+WINDOW_HOURS_LIMIT = 72
 
 ###############################################################################
 class EvidenceStore(Protocol):
@@ -80,9 +85,11 @@ class CapabilityExecutionService:
     """Execute one manifest capability and normalize it to ``ToolResult``.
 
     Provider retries, rate limiting, and circuit breaking remain owned by
-    ``ProviderRegistry``.  This service only performs capability/runtime
-    checks, builds the provider-neutral request, persists complete evidence,
-    and returns a bounded model-facing summary.
+    ``ProviderRegistry``.  This service performs capability/runtime checks,
+    builds the provider-neutral request, serves a transient or capacity
+    failure from the capability's declared equivalent (``fallback_ids``),
+    persists complete evidence, and returns a bounded model-facing summary
+    that names the failure class.
     """
 
     TOOL_NAME = "execute_geospatial_capability"
@@ -211,20 +218,28 @@ class CapabilityExecutionService:
             time=request_time,
             params=provider_params,
         )
+        fallbacks_tried: list[str] = []
         try:
             response = await self.provider_registry.fetch(
                 provider_id,
                 provider_request,
             )
         except Exception as exc:
-            return self._provider_failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error=exc,
+            fallback = await self._fetch_declared_fallback(
+                manifest, provider_id, provider_request, exc, fallbacks_tried
             )
+            if fallback is None:
+                return self._provider_failure(
+                    context=context,
+                    capability_id=capability_id,
+                    provider_id=provider_id,
+                    started=started,
+                    error=exc,
+                    fallbacks_tried=fallbacks_tried,
+                )
+            response = fallback
 
+        response = _with_honest_partial(response)
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
         coverage = dict(response.coverage or {})
@@ -288,7 +303,8 @@ class CapabilityExecutionService:
             # RainViewer's provider coverage declaration). Explicit dated
             # ranges are verified by the observation-time boundary in the
             # completion assessment instead.
-            coverage["temporal_scope_satisfied"] = True
+            # A provider that declared its own window coverage keeps its verdict.
+            coverage.setdefault("temporal_scope_satisfied", True)
         if response.result_status == "valid_empty":
             # A completed empty query is a legitimate data outcome; it must not
             # be conflated with a failed/partial fetch. Mark the query as
@@ -379,6 +395,61 @@ class CapabilityExecutionService:
             ) from exc
 
     # -------------------------------------------------------------------------
+    async def _fetch_declared_fallback(
+        self,
+        manifest: dict[str, Any],
+        provider_id: str,
+        request: ProviderRequest,
+        error: Exception,
+        tried: list[str],
+    ) -> ProviderResponse | None:
+        """Serve a retried-out transient or capacity failure from a capability
+        the catalog declares equivalent (``executionContract.fallback_ids``).
+
+        Nothing is inferred: undeclared, disabled, or unavailable equivalents
+        are skipped, and an unsupported or credential failure is never
+        re-asked elsewhere.
+        """
+
+        if classify_provider_error(error) not in {"transient", "capacity"}:
+            return None
+        declared = json_object(manifest.get("executionContract")).get("fallback_ids", [])
+        for raw_id in declared if is_json_array(declared) else []:
+            fallback_id = str(raw_id).strip()
+            try:
+                equivalent = self.capability_registry.get_capability(fallback_id)
+                fallback_provider = _provider_id(equivalent) if equivalent else ""
+                if (
+                    equivalent is None
+                    or not fallback_provider
+                    or (fallback_id, fallback_provider) == (request.capability_id, provider_id)
+                    or not self.runtime_registry.is_enabled(fallback_id)
+                    or not self.runtime_registry.access_available(fallback_id)
+                ):
+                    continue
+                params = dict(request.params)
+                metadata = equivalent.get("metadata")
+                if is_json_object(metadata):
+                    params["metadata"] = dict(metadata)
+                tried.append(fallback_id)
+                response = await self.provider_registry.fetch(
+                    fallback_provider,
+                    replace(request, capability_id=fallback_id, params=params),
+                )
+            except Exception as exc:
+                LOGGER.info(
+                    "capability fallback failed capability=%s fallback=%s error=%s",
+                    request.capability_id, fallback_id, type(exc).__name__,
+                )
+                continue
+            note = (
+                f"Served by declared equivalent '{fallback_id}' after "
+                f"'{request.capability_id}' failed ({classify_provider_error(error)})."
+            )
+            return replace(response, warnings=[*response.warnings, note])
+        return None
+
+    # -------------------------------------------------------------------------
     def _provider_failure(
         self,
         *,
@@ -387,92 +458,35 @@ class CapabilityExecutionService:
         provider_id: str,
         started: float,
         error: Exception,
+        fallbacks_tried: list[str] | None = None,
     ) -> ToolResult:
-        if isinstance(error, ProviderInvalidQueryError):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="semantic_validation",
-                code="provider_invalid_query",
-                message="The provider rejected the validated query.",
-                recovery="correct_arguments",
-                retryable=True,
-            )
-        if isinstance(error, ProviderAuthError):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="authentication",
-                code="provider_authentication",
-                message="Provider authentication is unavailable.",
-                recovery="choose_alternate_tool",
-            )
-        if isinstance(error, ProviderRateLimitError):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="rate_limit",
-                code="provider_rate_limit",
-                message="The provider rate limit was reached.",
-                recovery="choose_alternate_tool",
-            )
-        if isinstance(error, ProviderTimeoutError):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="timeout",
-                code="provider_timeout",
-                message="The provider did not respond within its execution deadline.",
-                recovery="replan",
-                timeout_origin="provider_transport",
-            )
-        if isinstance(error, ProviderMalformedPayloadError):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="provider_malformed_response",
-                code="provider_malformed_response",
-                message="The provider response could not be normalized or stored.",
-                recovery="choose_alternate_tool",
-            )
-        if isinstance(
-            error,
-            (
-                ProviderCircuitOpenError,
-                ProviderUnavailableError,
-                ProviderNotRegisteredError,
-                ProviderError,
-            ),
-        ):
-            return self._failure(
-                context=context,
-                capability_id=capability_id,
-                provider_id=provider_id,
-                started=started,
-                error_type="provider_unavailable",
-                code="provider_unavailable",
-                message="The provider is temporarily unavailable.",
-                recovery="choose_alternate_tool",
-            )
+        error_type, code, message, recovery, retryable, timeout_origin = _failure_shape(error)
+        failure_class = classify_provider_error(error)
+        attempts = error.attempts if isinstance(error, ProviderError) else 1
+        data: dict[str, Any] | None = None
+        if failure_class is not None:
+            data = {
+                "failure_class": failure_class,
+                "attempts": attempts,
+                "fallbacks_tried": list(fallbacks_tried or []),
+            }
+            message = f"{message} (failure class: {failure_class}; {attempts} attempt(s))"
+            if isinstance(error, ProviderInvalidQueryError) and str(error).strip():
+                # Query rejections are deterministic and carry the provider's
+                # own explanation, which is what the next call must change.
+                message = f"{message}: {str(error).strip()[:240]}"
         return self._failure(
             context=context,
             capability_id=capability_id,
             provider_id=provider_id,
             started=started,
-            error_type="internal_error",
-            code="capability_execution_failed",
-            message="The capability failed during execution.",
-            recovery="terminal",
+            error_type=error_type,
+            code=code,
+            message=message,
+            recovery=recovery,
+            retryable=retryable,
+            timeout_origin=timeout_origin,
+            data=data,
         )
 
     # -------------------------------------------------------------------------
@@ -489,6 +503,7 @@ class CapabilityExecutionService:
         provider_id: str | None = None,
         retryable: bool = False,
         timeout_origin: str | None = None,
+        data: dict[str, Any] | None = None,
     ) -> ToolResult:
         error = ToolExecutionError(
             error_type=error_type,
@@ -503,6 +518,7 @@ class CapabilityExecutionService:
             tool_name=self.TOOL_NAME,
             status="failed",
             summary=message,
+            data=data,
             error=error,
             metadata=ToolExecutionMetadata(
                 capability_id=capability_id,
@@ -510,6 +526,81 @@ class CapabilityExecutionService:
                 duration_ms=_duration_ms(started),
             ),
         )
+
+###############################################################################
+def _failure_shape(error: Exception) -> tuple[Any, str, str, Any, bool, str | None]:
+    """(error_type, code, message, recovery, retryable, timeout_origin)."""
+
+    if isinstance(error, ProviderInvalidQueryError):
+        return (
+            "semantic_validation", "provider_invalid_query",
+            "The provider rejected the validated query.", "correct_arguments", True, None,
+        )
+    if isinstance(error, ProviderUnsupportedError):
+        return (
+            "provider_unavailable", "provider_unsupported",
+            "The provider cannot serve this capability at query time.",
+            "choose_alternate_tool", False, None,
+        )
+    if isinstance(error, ProviderAuthError):
+        return (
+            "authentication", "provider_authentication",
+            "Provider authentication is unavailable.", "choose_alternate_tool", False, None,
+        )
+    if isinstance(error, ProviderRateLimitError):
+        return (
+            "rate_limit", "provider_rate_limit",
+            "The provider rate limit was reached.", "choose_alternate_tool", False, None,
+        )
+    if isinstance(error, ProviderTimeoutError):
+        return (
+            "timeout", "provider_timeout",
+            "The provider did not respond within its execution deadline.",
+            "replan", False, "provider_transport",
+        )
+    if isinstance(error, ProviderMalformedPayloadError):
+        return (
+            "provider_malformed_response", "provider_malformed_response",
+            "The provider response could not be normalized or stored.",
+            "choose_alternate_tool", False, None,
+        )
+    if isinstance(
+        error,
+        (ProviderCircuitOpenError, ProviderUnavailableError, ProviderNotRegisteredError, ProviderError),
+    ):
+        return (
+            "provider_unavailable", "provider_unavailable",
+            "The provider is temporarily unavailable.", "choose_alternate_tool", False, None,
+        )
+    return (
+        "internal_error", "capability_execution_failed",
+        "The capability failed during execution.", "terminal", False, None,
+    )
+
+###############################################################################
+def _with_honest_partial(response: ProviderResponse) -> ProviderResponse:
+    """A dated request the returned hours do not fully cover is partial.
+
+    Providers declare the window they actually covered next to the requested
+    one; a result that misses part of it must never be presented as complete.
+    """
+
+    coverage = response.coverage or {}
+    if (
+        coverage.get("requested_window_utc")
+        and coverage.get("temporal_scope_satisfied") is False
+        and response.result_status == "ok"
+    ):
+        return replace(
+            response,
+            result_status="partial",
+            partial=True,
+            warnings=[
+                *response.warnings,
+                "The returned data does not cover the whole requested time window.",
+            ],
+        )
+    return response
 
 ###############################################################################
 def _provider_id(manifest: dict[str, Any]) -> str:
@@ -680,7 +771,10 @@ def _response_summary(
     facts = payload.get("facts")
     if payload.get("kind") == "place_facts" and is_json_object(facts):
         summary["facts"] = dict(list(facts.items())[:16])
-    if payload.get("kind") == "weather_forecast":
+    window_summary = payload.get("window_summary")
+    if is_json_object(window_summary):
+        summary["window_summary"] = window_summary
+    if payload.get("kind") == "weather_forecast" and payload.get("current_in_window") is not False:
         current = payload.get("current")
         if is_json_object(current):
             observations = {
@@ -737,7 +831,12 @@ def _response_summary(
             except (ZoneInfoNotFoundError, ValueError):
                 timezone_info = None
             selected_rows: list[dict[str, Any]] = []
-            if timezone_info is not None:
+            windowed = is_json_object(window_summary)
+            if windowed:
+                # The provider already restricted the hours to the requested
+                # window; a rolling window from now would answer another day.
+                selected_rows = [row for row in hourly if is_json_object(row)][:WINDOW_HOURS_LIMIT]
+            elif timezone_info is not None:
                 window_start = response.fetched_at.astimezone(timezone_info)
                 window_end = window_start + timedelta(hours=24)
                 for raw_row in hourly:
@@ -761,11 +860,14 @@ def _response_summary(
                 {key: row[key] for key in fields if key in row}
                 for row in selected_rows
             ]
-            summary["forecast_hours_requested"] = 24
+            window_hours = (
+                int(window_summary.get("hours") or 0) if is_json_object(window_summary) else 24
+            )
+            summary["forecast_hours_requested"] = window_hours
             summary["forecast_hours"] = len(rows)
-            summary["forecast_truncated"] = len(rows) < 24
+            summary["forecast_truncated"] = len(rows) < window_hours
             summary["forecast_window_status"] = (
-                "ok" if len(rows) == 24 else "partial"
+                "ok" if len(rows) == min(window_hours, WINDOW_HOURS_LIMIT) else "partial"
             )
             if rows:
                 summary["hourly_forecast"] = rows

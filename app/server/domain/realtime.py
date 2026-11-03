@@ -19,6 +19,7 @@ RealtimeClientMessageType = Literal[
     "heartbeat.pong",
     "heartbeat.ping",
     "map.render_ack",
+    "client.visibility",
 ]
 
 ###############################################################################
@@ -97,6 +98,14 @@ class RealtimeCancelPayload(BaseModel):
 
     run_id: str = Field(min_length=1, max_length=160)
     reason: str | None = Field(default=None, max_length=400)
+
+###############################################################################
+class RealtimeVisibilityPayload(BaseModel):
+    """Browser page visibility, used to classify unacknowledged renders."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    visibility: Literal["visible", "hidden"]
 
 ###############################################################################
 class RealtimeRenderAckPayload(BaseModel):

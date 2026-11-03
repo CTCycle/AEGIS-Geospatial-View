@@ -66,7 +66,11 @@ from server.services.agent.capability_router import (
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.final_answer_check import check_final_answer
-from server.services.agent.tool_executor import ToolExecutor
+from server.services.agent.tool_executor import (
+    UNSUPPORTED_CODES,
+    ToolExecutor,
+    build_rejection_feedback,
+)
 from server.services.agent.completion import (
     CompletionEvaluator,
     describe_requirements,
@@ -134,6 +138,14 @@ _CORRECTABLE_ERRORS = frozenset(
         "semantic_validation",
     }
 )
+
+# Terminal causes of a run that stopped on invalid tool calls, mapped to the
+# public stop reason and failure category: an unsupported request is a
+# disclosed limitation, an incapable model is a model-capability failure.
+_TERMINAL_CAUSES: dict[str, tuple[str, str | None]] = {
+    "unsupported_request": ("insufficient_evidence", None),
+    "model_incapable": ("failed", "model_capability"),
+}
 
 # DeepSeek tool-call markup; models emit single or doubled full-width or ASCII bars.
 _DSML_MARKUP = re.compile(r"<\s*/?\s*[｜|]{1,2}\s*dsml\s*[｜|]{1,2}", re.IGNORECASE)
@@ -587,7 +599,9 @@ class AgentLoop:
                 state,
                 exposed_tool_names=exposed_tool_names,
             )
-            if await self._revise_route(request, provider, messages, route, tool_results):
+            if await self._revise_route(
+                request, provider, messages, route, result.tool_calls, tool_results
+            ):
                 if catalog_cursor is None:
                     messages.extend(
                         self._tool_result_messages(
@@ -2077,6 +2091,7 @@ class AgentLoop:
         provider: AgentProvider,
         messages: list[dict[str, Any]],
         route: CapabilityRoute,
+        calls: list[LLMToolCall],
         results: list[ToolResult],
     ) -> bool:
         """Revise the route once per run when a tool result shows it was wrong.
@@ -2115,6 +2130,7 @@ class AgentLoop:
             record["outcome"] = "unchanged"
             return False
         state.route = revised
+        self._forgive_route_rejections(state, calls, results)
         self._bind_search_area(state, revised)
         self._compile_native_goal(
             state,
@@ -2138,6 +2154,41 @@ class AgentLoop:
             ),
         )
         return True
+
+    # -------------------------------------------------------------------------
+    def _forgive_route_rejections(
+        self,
+        state: AgentRunState,
+        calls: list[LLMToolCall],
+        results: list[ToolResult],
+    ) -> None:
+        """Do not charge the revised route for calls the old route rejected.
+
+        A tool the old route did not expose says the route was wrong, not the
+        model.  The batch that triggered the revision is removed from the
+        correction, consecutive-failure and repeat counters so the model
+        starts the revised route with its full budget.
+        """
+
+        rejected = [
+            call
+            for call, result in zip(calls, results, strict=False)
+            if result.status == "failed"
+            and result.error is not None
+            and result.error.error_type == "tool_not_exposed"
+        ]
+        for call in rejected:
+            fingerprint = self._fingerprint(call)
+            remaining = state.failed_fingerprints.get(fingerprint, 0) - 1
+            if remaining > 0:
+                state.failed_fingerprints[fingerprint] = remaining
+            else:
+                state.failed_fingerprints.pop(fingerprint, None)
+        if rejected and all(result.status == "failed" for result in results):
+            state.validation_corrections = max(0, state.validation_corrections - 1)
+            state.consecutive_tool_failures = max(
+                0, state.consecutive_tool_failures - 1
+            )
 
     # -------------------------------------------------------------------------
     async def _revision_failed(
@@ -2922,8 +2973,16 @@ class AgentLoop:
                 return self._failure_result(
                     call,
                     "repeated_failed_fingerprint",
-                    "The same failing tool call was not repeated.",
+                    f"The identical failing call to '{call.name}' was repeated "
+                    f"{failed_count} times and was not executed again.",
                     recovery="replan",
+                    data=build_rejection_feedback(
+                        "repeated_failed_fingerprint",
+                        call.name,
+                        state,
+                        exposed_tool_names,
+                        repeated=True,
+                    ),
                 )
             async with semaphore:
                 result = await self.tool_executor.execute_tool(
@@ -2969,13 +3028,17 @@ class AgentLoop:
                 state.failed_fingerprints[fingerprint] = (
                     state.failed_fingerprints.get(fingerprint, 0) + 1
                 )
-                if result.error and result.error.error_type in {
-                    "malformed_call",
-                    "tool_not_exposed",
-                    "schema_validation",
-                    "semantic_validation",
-                    "policy_rejection",
-                }:
+                if result.error and (
+                    result.error.error_type
+                    in {
+                        "malformed_call",
+                        "tool_not_exposed",
+                        "schema_validation",
+                        "semantic_validation",
+                        "policy_rejection",
+                    }
+                    or result.error.code == "repeated_failed_fingerprint"
+                ):
                     batch_needs_correction = True
                 if result.error and result.error.error_type in _CORRECTABLE_ERRORS:
                     self._grant_recovery_budget(request)
@@ -3248,7 +3311,7 @@ class AgentLoop:
         # Each invalid call returns a correction; stop only once the model has
         # used every allowed correction and is still calling tools invalidly.
         if state.validation_corrections > max_validation_corrections:
-            return "failed", "The agent stopped after repeated invalid tool calls."
+            return AgentLoop._invalid_call_stop(state)
         actionable_recovery = any(
             result.error is not None
             and result.error.recovery
@@ -3323,6 +3386,39 @@ class AgentLoop:
                 return None
             return "failed", "The requested tool could not complete successfully."
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _invalid_call_stop(state: AgentRunState) -> tuple[str, str]:
+        """Classify a stop on repeated invalid calls and say so honestly.
+
+        Values outside a declared range cannot be corrected into a valid call,
+        so the request is unsupported.  Any other repeated invalid call means
+        valid tools and arguments existed and the model did not produce them.
+        """
+
+        impossible: list[str] = []
+        for result in reversed(state.tool_results):
+            if result.status != "failed":
+                break
+            issues = result.data.get("issues") if is_json_object(result.data) else None
+            for issue in issues if is_json_array(issues) else []:
+                if is_json_object(issue) and issue.get("code") in UNSUPPORTED_CODES:
+                    message = str(issue.get("message") or "")
+                    if message and message not in impossible:
+                        impossible.append(message)
+        if impossible:
+            text = (
+                "That request cannot be satisfied as stated: "
+                + " ".join(impossible[:3])
+                + " Ask again with a value inside the valid range."
+            )
+            return "unsupported_request", AgentLoop._limitation_disclosure(state, text)
+        text = (
+            "The model repeatedly issued invalid tool calls even though valid "
+            "tools and arguments were available, so the request was not completed."
+        )
+        return "model_incapable", AgentLoop._limitation_disclosure(state, text)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -4164,12 +4260,14 @@ class AgentLoop:
             "request_user_input",
             "terminal",
         ],
+        data: dict[str, Any] | None = None,
     ) -> ToolResult:
         return ToolResult(
             call_id=call.id or "repeated-call",
             tool_name=call.name,
             status="failed",
             summary=message,
+            data=data,
             error=ToolExecutionError(
                 error_type="state_conflict",
                 code=code,
@@ -4188,6 +4286,12 @@ class AgentLoop:
         reason: str,
         request: AgentLoopRequest,
     ) -> AgentLoopOutcome:
+        # Terminal causes map onto the existing public stop reasons and
+        # failure categories; the cause itself stays in the trace.
+        stopped_reason, failure_category = _TERMINAL_CAUSES.get(reason, (reason, None))
+        if reason in _TERMINAL_CAUSES:
+            state.termination_reason = reason
+        reason = stopped_reason
         self._sync_task_state(state)
         self._set_terminal_task_state(state, reason)
         state.budget_snapshot = request.budget.snapshot()
@@ -4214,6 +4318,7 @@ class AgentLoop:
             stopped_reason=reason,  # type: ignore[arg-type]
             model_calls=state.model_calls,
             tool_results=list(state.tool_results),
+            failure_category=failure_category,
             vision_capture_requested=(
                 self._capture_requested_for_outcome(request)
                 if reason == "awaiting_render"

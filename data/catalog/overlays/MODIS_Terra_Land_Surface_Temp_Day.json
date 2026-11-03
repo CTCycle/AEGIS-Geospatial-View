@@ -133,10 +133,12 @@
       "viewport"
     ],
     "temporal_modes": [
-      "current"
+      "current",
+      "historical"
     ],
     "temporal_windows": [
-      "static_current_service"
+      "current_service",
+      "dated_daily_archive"
     ],
     "supported_aggregations": [],
     "required_inputs": [

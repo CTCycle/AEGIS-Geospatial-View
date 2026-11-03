@@ -8,7 +8,7 @@ from email.utils import format_datetime
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.overpass import OverpassInvalidQueryError, OverpassRateLimitError, OverpassRequestError
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderRateLimitError, ProviderRequest, ProviderUnavailableError, FeatureRequest, ProviderResponse, ProviderResult, provider_cache_key, response_without_credentials, safe_request_params, ProviderMalformedPayloadError
+from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderRateLimitError, ProviderRequest, ProviderUnavailableError, FeatureRequest, ProviderResponse, ProviderResult, provider_cache_key, response_without_credentials, safe_request_params, ProviderMalformedPayloadError, ProviderUnsupportedError
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
@@ -1534,7 +1534,7 @@ def test_native_tool_maps_provider_failures_to_canonical_codes(
 
 ###############################################################################
 def test_ourairports_live_request_reports_no_records_instead_of_a_descriptor() -> None:
-    with pytest.raises(ProviderUnavailableError, match="no live airport records"):
+    with pytest.raises(ProviderUnsupportedError, match="no live airport records"):
         run_async_in_thread(
             OurAirportsProvider().fetch(
                 ProviderRequest(capability_id="ourairports_airports", params={"live": True})

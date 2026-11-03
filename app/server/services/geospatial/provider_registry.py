@@ -240,6 +240,7 @@ class ProviderRegistry:
                 timeout_error = ProviderTimeoutError(
                     f"Provider '{normalized}' timed out."
                 )
+                timeout_error.attempts = max(1, attempt)
                 self._record_failure(normalized)
                 raise timeout_error from last_error
             started = monotonic()
@@ -263,23 +264,20 @@ class ProviderRegistry:
                 raise
             except TimeoutError as exc:
                 last_error = ProviderTimeoutError(f"Provider '{normalized}' timed out.")
+                last_error.attempts = attempt + 1
                 self._record_failure(normalized)
                 if not self._should_retry(attempt, last_error, attempts):
                     raise last_error from exc
                 await self._wait_before_retry(attempt, last_error, deadline=deadline)
-            except ProviderRateLimitError as exc:
+            except (ProviderRateLimitError, ProviderUnavailableError) as exc:
                 last_error = exc
+                exc.attempts = attempt + 1
                 self._record_failure(normalized)
                 if not self._should_retry(attempt, last_error, attempts):
                     raise
                 await self._wait_before_retry(attempt, last_error, deadline=deadline)
-            except ProviderUnavailableError as exc:
-                last_error = exc
-                self._record_failure(normalized)
-                if not self._should_retry(attempt, last_error, attempts):
-                    raise
-                await self._wait_before_retry(attempt, last_error, deadline=deadline)
-            except ProviderError:
+            except ProviderError as exc:
+                exc.attempts = attempt + 1
                 self._record_failure(normalized)
                 raise
             else:

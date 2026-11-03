@@ -456,15 +456,15 @@ async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(availa
     start, end = midnight + timedelta(days=1), midnight + timedelta(days=2)
     # Open-Meteo times are local to the point (UTC+1) and hour-ending.
     local_hours = [(midnight + timedelta(hours=hour + 1)).replace(tzinfo=None) for hour in range(available_hours)]
-    requested: list[int | None] = []
+    requested: list[tuple[datetime, datetime] | None] = []
 
     ###############################################################################
     class Service:
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, forecast_days=None):
-            requested.append(forecast_days)
+        async def get_weather_grid(self, points, past_days, forecast_days=None, window=None):
+            requested.append(window)
             sample = {"utc_offset_seconds": 3600, "current": {"time": local_hours[0].isoformat(timespec="minutes"), "temperature_2m": 10},
                       "hourly": {"time": [stamp.isoformat(timespec="minutes") for stamp in local_hours],
                                  "temperature_2m": [10] * available_hours, "precipitation": [1] * available_hours}}
@@ -474,7 +474,8 @@ async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(availa
                               params={"sampling": "area", "end_time_iso": end.isoformat()})
     result = await OpenMeteoProvider(service=Service()).fetch(request)
 
-    assert requested and all(days is not None and days >= 2 for days in requested)
+    # The exact requested dates are asked of the endpoint, not a rolling span.
+    assert requested and all(window == (start, end) for window in requested)
     feature = result.payload["features"][0]
     selected_hours = min(available_hours, 49) - 25
     assert feature["precipitation_sum_mm"] == selected_hours

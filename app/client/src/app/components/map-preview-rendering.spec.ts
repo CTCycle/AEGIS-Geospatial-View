@@ -2,7 +2,11 @@ import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
 import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
+  allTargetsInView,
   applyOverlayLayerOrder,
+  computeFitPadding,
+  computeFrameInsets,
+  featureAnchors,
   buildStyle,
   getOverlayLayerIds,
   isGeoJsonOverlay,
@@ -477,5 +481,64 @@ describe('map-preview-rendering', () => {
       'overlay-layer-clustered-no-glyphs-clusters',
       'overlay-layer-clustered-no-glyphs-points',
     ]);
+  });
+});
+
+describe('map framing', () => {
+  const container = { left: 0, top: 0, right: 1000, bottom: 700 };
+  const chrome = [
+    { left: 400, top: 12, right: 600, bottom: 40 },   // title chip
+    { left: 350, top: 53, right: 650, bottom: 83 },   // activity pill
+    { left: 880, top: 12, right: 990, bottom: 44 },   // canvas actions
+    { left: 940, top: 540, right: 990, bottom: 620 }, // zoom controls
+    { left: 12, top: 650, right: 988, bottom: 690 },  // attribution bar
+  ];
+
+  // Linear stand-in for fitBounds: the bbox fills the padded rectangle.
+  const fit = (bbox: number[], points: Array<[number, number]>) => {
+    const padding = computeFitPadding(container, chrome);
+    const [west, south, east, north] = bbox;
+    const width = container.right - padding.left - padding.right;
+    const height = container.bottom - padding.top - padding.bottom;
+    return points.map(([lon, lat]) => ({
+      x: padding.left + ((lon - west) / (east - west)) * width,
+      y: padding.top + ((north - lat) / (north - south)) * height,
+    }));
+  };
+
+  it('pads each edge by the measured overlay plus the marker radius', () => {
+    expect(computeFrameInsets(container, chrome)).toEqual({ top: 83, right: 60, bottom: 50, left: 0 });
+    expect(computeFitPadding(container, chrome)).toEqual({ top: 113, right: 90, bottom: 80, left: 30 });
+  });
+
+  it('keeps two distant points clear of the overlays', () => {
+    const paris: [number, number] = [2.35, 48.86];
+    const berlin: [number, number] = [13.4, 52.52];
+    const pixels = fit([2.35, 48.86, 13.4, 52.52], [paris, berlin]);
+    expect(allTargetsInView(pixels, container, computeFrameInsets(container, chrome))).toBeTrue();
+    // The former fixed 30px padding put the northern point under the activity pill.
+    const legacy = { x: 500, y: 30 };
+    expect(allTargetsInView([legacy], container, computeFrameInsets(container, chrome))).toBeFalse();
+  });
+
+  it('centres a single point inside the unobstructed area', () => {
+    const pixels = fit([12.4, 41.8, 12.6, 42.0], [[12.5, 41.9]]);
+    expect(allTargetsInView(pixels, container, computeFrameInsets(container, chrome))).toBeTrue();
+  });
+
+  it('never lets overlays consume the whole viewport', () => {
+    const huge = [{ left: 0, top: 0, right: 1000, bottom: 600 }];
+    expect(computeFrameInsets(container, huge).bottom).toBeLessThanOrEqual(700 * 0.35);
+  });
+
+  it('derives one anchor per feature part', () => {
+    expect(featureAnchors({
+      features: [
+        { geometry: { type: 'Point', coordinates: [1, 2] } },
+        { geometry: { type: 'MultiPoint', coordinates: [[3, 4], [5, 6]] } },
+        { geometry: { type: 'LineString', coordinates: [[0, 0], [10, 20]] } },
+        { geometry: null },
+      ],
+    })).toEqual([[1, 2], [3, 4], [5, 6], [5, 10]]);
   });
 });

@@ -34,9 +34,16 @@ import {
 } from '../core/types';
 import { OverlayControlsComponent } from './overlay-controls.component';
 import {
+  FrameInsets,
+  FrameRect,
+  MARKER_FIT_PADDING_PX,
   OverlayEntry,
+  allTargetsInView,
   applyOverlayLayerOrder,
   addOverlayLayers,
+  computeFitPadding,
+  computeFrameInsets,
+  featureAnchors,
   buildRasterOverlayTiles,
   buildStyle,
   getOverlayLayerIds,
@@ -797,7 +804,7 @@ candidate.on('load', () => {
           ? DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM
           : DEFAULT_MAP_FIT_MAX_ZOOM;
         const maxZoom = this.fitMaxZoom(defaultMaxZoom);
-        candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom });
+        candidate.fitBounds(bounds, { padding: this.fitPadding(candidate), duration: 0, maxZoom });
         const rasterMinZoom = this.requiredRasterMinZoom();
         if (
           rasterMinZoom !== null
@@ -1216,9 +1223,65 @@ candidate.on('load', () => {
       required_sources_loaded: state === 'ready' && required.every((item) => item.loaded === true),
       required_layers_present: state === 'ready' && required.every((item) => item.layer_present === true),
       viewport_valid: state === 'ready' && Boolean(viewportBounds),
+      ...this.targetsInViewCheck(map),
       ...checkOverrides,
     };
     return { viewportBounds, checks, overlayResults };
+  }
+
+  /** Pixel rect of the map and the overlay insets, in container-local coordinates. */
+  private measureFrame(map: Map | null): { container: FrameRect; insets: FrameInsets; padding: FrameInsets } | null {
+    const element = (map as unknown as { getContainer?: () => HTMLElement } | null)?.getContainer?.();
+    if (!element || typeof element.getBoundingClientRect !== 'function') {
+      return null;
+    }
+    const box = element.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) {
+      return null;
+    }
+    const scope = this.hostElement.nativeElement.closest('[data-map-frame]') ?? this.hostElement.nativeElement;
+    const obstructions = Array.from(scope.querySelectorAll('[data-map-obstruction]'))
+      .map((node) => node.getBoundingClientRect())
+      .map((rect): FrameRect => ({
+        left: rect.left - box.left,
+        top: rect.top - box.top,
+        right: rect.right - box.left,
+        bottom: rect.bottom - box.top,
+      }));
+    const container: FrameRect = { left: 0, top: 0, right: box.width, bottom: box.height };
+    return {
+      container,
+      insets: computeFrameInsets(container, obstructions),
+      padding: computeFitPadding(container, obstructions),
+    };
+  }
+
+  private fitPadding(map: Map): FrameInsets | number {
+    return this.measureFrame(map)?.padding ?? MARKER_FIT_PADDING_PX;
+  }
+
+  /** Whether every rendered target feature lies in the unobstructed viewport. */
+  private targetsInViewCheck(map: Map | null): Record<string, boolean> {
+    const frame = this.measureFrame(map);
+    const project = (map as unknown as {
+      project?: (lngLat: [number, number]) => { x: number; y: number };
+    } | null)?.project;
+    if (!frame || !map || typeof project !== 'function') {
+      return {};
+    }
+    const anchors = this.overlays
+      .filter((overlay) => !isMetadataOnlyOverlay(overlay) && isGeoJsonOverlay(overlay))
+      .flatMap((overlay) => featureAnchors(overlay.data));
+    if (!anchors.length) {
+      return {};
+    }
+    return {
+      targets_in_view: allTargetsInView(
+        anchors.map((anchor) => project.call(map, anchor)),
+        frame.container,
+        frame.insets,
+      ),
+    };
   }
 
   private validViewportBounds(map: Map | null): [number, number, number, number] | undefined {

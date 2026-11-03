@@ -11,19 +11,26 @@ from shapely.geometry import Point
 
 from server.configurations.settings import OpenMeteoSettings
 from server.services.geospatial.openmeteo import (
+    OPENMETEO_AIR_QUALITY_MAX_FORECAST_DAYS,
+    OPENMETEO_WEATHER_MAX_FORECAST_DAYS,
     OpenMeteoRateLimitError,
+    OpenMeteoRequestError,
     OpenMeteoService,
     OpenMeteoServiceError,
+    clip_window_to_forecast_range,
 )
 from server.services.catalog.loader import find_macro_region_entry
 from server.services.geospatial.land_mask import MASK_SOURCE, LandMask, land_mask
 from server.services.geospatial.providers._request import request_center, grid_points
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderError,
+    ProviderInvalidQueryError,
     ProviderRequest,
     ProviderRateLimitError,
     ProviderResponse,
     ProviderUnavailableError,
+    provider_error_for_http_status,
     safe_request_params,
 )
 
@@ -52,6 +59,28 @@ class OpenMeteoProvider(GeospatialProvider):
         if request.params.get("sampling") == "area" and request.bbox is not None and request.capability_id == "openmeteo_weather_forecast":
             return await self._weather_grid(request)
         latitude, longitude = request_center(request)
+        now = datetime.now(UTC)
+        requested = _requested_window(request, now)
+        window: tuple[datetime, datetime] | None = None
+        if requested is not None and "elevation" not in request.capability_id:
+            # The endpoints only serve a bounded span of dates; anything
+            # outside it cannot be requested, and an uncovered remainder is
+            # reported as partial coverage below.
+            window = clip_window_to_forecast_range(
+                requested,
+                now,
+                max_forecast_days=(
+                    OPENMETEO_AIR_QUALITY_MAX_FORECAST_DAYS
+                    if "air_quality" in request.capability_id
+                    else OPENMETEO_WEATHER_MAX_FORECAST_DAYS
+                ),
+            )
+            if window is None:
+                raise ProviderInvalidQueryError(
+                    "Open-Meteo serves no hours for the requested window "
+                    f"{requested[0].isoformat()} to {requested[1].isoformat()}."
+                )
+        window_args: dict[str, Any] = {"window": window} if window is not None else {}
         try:
             if "elevation" in request.capability_id:
                 payload = await self.service.get_elevation(
@@ -62,31 +91,21 @@ class OpenMeteoProvider(GeospatialProvider):
                 payload = await self.service.get_air_quality_forecast(
                     latitude=latitude,
                     longitude=longitude,
+                    **window_args,
                 )
             else:
                 payload = await self.service.get_weather_forecast(
                     latitude=latitude,
                     longitude=longitude,
+                    **window_args,
                 )
-        except OpenMeteoRateLimitError as exc:
-            raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
         except (OpenMeteoServiceError, ValueError) as exc:
-            raise ProviderUnavailableError(str(exc)) from exc
+            raise _provider_error(exc) from exc
         payload = dict(payload)
         if not json_object(payload.get("request_parameters")):
             payload["request_parameters"] = safe_request_params(request.params)
-        window = _forecast_window(request, datetime.now(UTC))
-        if window is not None:
-            # Point forecasts carry three days of hours from local midnight.
-            coverage = dict(json_object(payload.get("coverage")))
-            coverage.setdefault(
-                "temporal_scope_satisfied",
-                window[1] <= datetime.now(UTC) + timedelta(days=2, hours=12),
-            )
-            payload["coverage"] = coverage
-            # The forecast addresses the requested window, not the moment the
-            # current conditions were sampled; completion checks this instant.
-            payload["observation_time"] = window[0].isoformat()
+        if requested is not None and window is not None:
+            payload = _apply_window(payload, requested, window, now)
         rendering_mode = "clustered-points"
         normalized = self._payload(payload, rendering_mode=rendering_mode)
         partial = bool(payload.get("partial"))
@@ -157,17 +176,30 @@ class OpenMeteoProvider(GeospatialProvider):
             else 1
         )
 
+        # The grid asks for the exact dated window; only the span the endpoint
+        # can serve is requested, so an uncovered remainder shows as partial.
+        served = (
+            clip_window_to_forecast_range(
+                window, now, max_forecast_days=OPENMETEO_WEATHER_MAX_FORECAST_DAYS
+            )
+            if window is not None
+            else None
+        )
+
         async def fetch_grid(grid: list[tuple[float, float]]) -> list[dict[str, Any] | None]:
             if window is None:
                 return await self.service.get_weather_grid(grid, past_days)
-            return await self.service.get_weather_grid(grid, 0, forecast_days=forecast_days)
+            if served is None:
+                raise ProviderInvalidQueryError(
+                    "Open-Meteo serves no hours for the requested window "
+                    f"{window[0].isoformat()} to {window[1].isoformat()}."
+                )
+            return await self.service.get_weather_grid(grid, 0, forecast_days=forecast_days, window=served)
 
         try:
             samples = await fetch_grid(points)
-        except OpenMeteoRateLimitError as exc:
-            raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
         except (OpenMeteoServiceError, ValueError) as exc:
-            raise ProviderUnavailableError(str(exc)) from exc
+            raise _provider_error(exc) from exc
         features = _grid_features(points, samples, past_days, "coarse", window)
         if not features:
             # Land points always have model weather; no usable sample is a
@@ -181,7 +213,7 @@ class OpenMeteoProvider(GeospatialProvider):
             try:
                 refined_samples = await fetch_grid(refined_points)
             except OpenMeteoRateLimitError as exc:
-                raise ProviderRateLimitError(str(exc), retry_after_seconds=exc.retry_after_seconds) from exc
+                raise _provider_error(exc) from exc
             except (OpenMeteoServiceError, ValueError):
                 refined_samples = []
             refined = _grid_features(refined_points, refined_samples, past_days, "refined", window)
@@ -246,6 +278,8 @@ class OpenMeteoProvider(GeospatialProvider):
             "fetched_at": payload.get("fetched_at"),
             "result_status": payload.get("result_status"),
             "partial": bool(payload.get("partial")),
+            "window_summary": payload.get("window_summary"),
+            "current_in_window": payload.get("current_in_window"),
             "requested_variables": payload.get("requested_variables") or [],
             "request_parameters": payload.get("request_parameters") or {},
         }
@@ -266,6 +300,9 @@ class OpenMeteoProvider(GeospatialProvider):
             return []
         kind = str(payload.get("kind") or "")
         current = json_object(payload.get("current"))
+        if payload.get("current_in_window") is False:
+            # Conditions now describe a different instant than the window.
+            current = {}
         preview = json_array(payload.get("hourly_preview"))
         first_hour = preview[0] if preview and is_json_object(preview[0]) else {}
         source_url = payload.get("source_url")
@@ -285,6 +322,8 @@ class OpenMeteoProvider(GeospatialProvider):
             "units": json_object(payload.get("units")),
             "request_parameters": json_object(payload.get("request_parameters")),
         }
+        if payload.get("window_summary"):
+            common["window_summary"] = payload["window_summary"]
         if "elevation" in kind:
             elevation = payload.get("elevation")
             return [
@@ -402,32 +441,137 @@ class OpenMeteoProvider(GeospatialProvider):
         return datetime.now(UTC)
 
 ###############################################################################
-def _forecast_window(request: ProviderRequest, now: datetime) -> tuple[datetime, datetime] | None:
-    """Return the requested UTC window when it lies in the future."""
+def _requested_end(request: ProviderRequest) -> datetime | None:
+    """The explicit window end; a date-only end covers its whole day and an
+    end at the last second of a minute is inclusive of that second."""
+
+    raw_end = request.params.get("end_time_iso")
+    if not isinstance(raw_end, str) or not raw_end.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw_end.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    parsed = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    if len(raw_end.strip()) == 10:
+        return parsed + timedelta(days=1)
+    parsed = parsed.replace(microsecond=0)
+    return parsed + timedelta(seconds=1) if parsed.second == 59 else parsed
+
+###############################################################################
+def _requested_window(request: ProviderRequest, now: datetime) -> tuple[datetime, datetime] | None:
+    """The explicit UTC window a request addresses, past or future.
+
+    A request without an end that starts now or earlier asks for current
+    conditions, not a window.
+    """
 
     start = request.time
     if start is None:
         return None
-    raw_end = request.params.get("end_time_iso")
-    end: datetime | None = None
-    if isinstance(raw_end, str) and raw_end.strip():
-        try:
-            parsed = datetime.fromisoformat(raw_end.replace("Z", "+00:00"))
-        except ValueError:
-            parsed = None
-        if parsed is not None:
-            parsed = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-            # A date-only end ("2026-11-03") covers its whole day.
-            end = parsed + timedelta(days=1) if len(raw_end.strip()) == 10 else parsed
+    end = _requested_end(request)
     if end is None:
         if start <= now + timedelta(minutes=1):
             return None
         end = start + timedelta(days=1)
+    return (start, end) if end > start else None
+
+###############################################################################
+def _forecast_window(request: ProviderRequest, now: datetime) -> tuple[datetime, datetime] | None:
+    """Return the requested UTC window when it lies in the future."""
+
+    window = _requested_window(request, now)
+    if window is None:
+        return None
     # "Next 24 hours" starts about now; a window ending in the future is a
     # forecast window, while one ending before now stays a past window.
-    if end <= now + timedelta(hours=1) or start < now - timedelta(hours=2):
+    if window[1] <= now + timedelta(hours=1) or window[0] < now - timedelta(hours=2):
         return None
-    return (start, end) if end > start else None
+    return window
+
+###############################################################################
+def _provider_error(error: Exception) -> ProviderError:
+    """Classify an Open-Meteo failure: 429 capacity, other 4xx unsupported
+    (the endpoint explains why), 5xx and transport failures transient."""
+
+    if isinstance(error, OpenMeteoRateLimitError):
+        return ProviderRateLimitError(str(error), retry_after_seconds=error.retry_after_seconds)
+    if isinstance(error, OpenMeteoRequestError) and error.status_code is not None:
+        return provider_error_for_http_status(error.status_code, str(error))
+    return ProviderUnavailableError(str(error))
+
+###############################################################################
+def _numeric(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+###############################################################################
+def _apply_window(
+    payload: dict[str, Any],
+    requested: tuple[datetime, datetime],
+    served: tuple[datetime, datetime],
+    now: datetime,
+) -> dict[str, Any]:
+    """Restrict a dated point forecast to the requested window and report the
+    window actually covered.
+
+    Hours are hour-ending UTC stamps, so an hour belongs to the window when it
+    ends after the start and by the end. Coverage is satisfied only when the
+    returned hours span the whole requested (not merely the served) window.
+    """
+
+    kind = str(payload.get("kind") or "")
+    core = ("temperature_2m", "precipitation") if "weather" in kind else None
+    rows: list[dict[str, Any]] = []
+    stamps: list[datetime] = []
+    for raw in json_array(payload.get("hourly_forecast")):
+        row = json_object(raw)
+        try:
+            stamp = datetime.fromisoformat(str(row.get("time"))).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        if requested[0] < stamp <= requested[1]:
+            rows.append(row)
+            stamps.append(stamp)
+    if not rows:
+        raise ProviderUnavailableError("Open-Meteo returned no hours inside the requested window.")
+    keys = core or tuple(key for key in rows[0] if key != "time")
+    missing_hours = sum(1 for row in rows if not all(_numeric(row.get(key)) for key in keys))
+    tolerance = timedelta(hours=1, minutes=1)
+    covered = stamps[0] <= requested[0] + tolerance and stamps[-1] >= requested[1] - tolerance
+    summary: dict[str, Any] = {"hours": len(rows), "missing_hours": missing_hours}
+    variables: dict[str, dict[str, float]] = {}
+    for key in rows[0]:
+        values = [float(row[key]) for row in rows if key != "time" and _numeric(row.get(key))]
+        if values:
+            variables[key] = {"min": min(values), "max": max(values)}
+    if "precipitation" in variables:
+        summary["precipitation_sum_mm"] = round(
+            sum(float(row["precipitation"]) for row in rows if _numeric(row.get("precipitation"))), 2
+        )
+    summary["variables"] = variables
+    coverage = dict(json_object(payload.get("coverage")))
+    coverage.update({
+        "requested_window_utc": [requested[0].isoformat(), requested[1].isoformat()],
+        "window_start_utc": stamps[0].isoformat(),
+        "window_end_utc": stamps[-1].isoformat(),
+        "temporal_scope_satisfied": covered and missing_hours == 0,
+        "missing_hours": missing_hours,
+    })
+    partial = not coverage["temporal_scope_satisfied"]
+    payload.update({
+        "hourly_forecast": rows,
+        "hourly_preview": rows[:6],
+        "coverage": coverage,
+        "window_summary": summary,
+        "current_in_window": requested[0] < now <= requested[1],
+        # The forecast addresses the requested window, not the moment the
+        # current conditions were sampled; completion checks this instant.
+        "observation_time": requested[0].isoformat(),
+        "partial": bool(payload.get("partial")) or partial,
+    })
+    if partial:
+        payload["result_status"] = "partial"
+    return payload
 
 ###############################################################################
 def _window_covered(features: list[dict[str, Any]], window: tuple[datetime, datetime]) -> bool:

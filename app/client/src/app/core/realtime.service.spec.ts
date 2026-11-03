@@ -81,6 +81,22 @@ describe('RealtimeService', () => {
     expect(commands.filter((command) => command.type === 'run.steer').length).toBe(1);
   });
 
+  it('reports page visibility changes to the server', () => {
+    service.connect('conv-1');
+    sockets[0].open();
+    let visibility: DocumentVisibilityState = 'hidden';
+    spyOnProperty(document, 'visibilityState', 'get').and.callFake(() => visibility);
+    document.dispatchEvent(new Event('visibilitychange'));
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    const reports = sockets[0].sent
+      .map((value) => JSON.parse(value) as { type: string; payload: { visibility?: string } })
+      .filter((command) => command.type === 'client.visibility')
+      .map((command) => command.payload.visibility);
+    expect(reports).toEqual(['hidden', 'visible']);
+  });
+
   it('replays an unacknowledged command after reconnect', () => {
     jasmine.clock().install();
     clockInstalled = true;

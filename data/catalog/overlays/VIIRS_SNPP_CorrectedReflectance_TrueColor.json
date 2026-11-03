@@ -45,8 +45,13 @@
       "show recent true color imagery over Italy",
       "visualize current cloud cover near Rome"
     ],
+    "semantic_aliases": [
+      "MODIS Terra true colour imagery",
+      "MODIS Aqua true colour imagery"
+    ],
     "disambiguation_notes": [
-      "Use for current visual context when users ask for recent satellite-like appearance."
+      "Use for current visual context when users ask for recent satellite-like appearance.",
+      "Daily true color imagery from NASA GIBS; the catalog has no MODIS true color layer, so this is the substitute for MODIS Terra or Aqua true color requests and the sensor difference must be disclosed."
     ],
     "location_dependency": "Location-dependent and frequently updated.",
     "integration_requirements": [
@@ -133,10 +138,12 @@
       "viewport"
     ],
     "temporal_modes": [
-      "current"
+      "current",
+      "historical"
     ],
     "temporal_windows": [
-      "static_current_service"
+      "current_service",
+      "dated_daily_archive"
     ],
     "supported_aggregations": [],
     "required_inputs": [

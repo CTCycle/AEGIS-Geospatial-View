@@ -102,6 +102,135 @@ def test_unacknowledged_candidate_fails_at_the_render_deadline(
     assert "error" in _event_types(publisher, run_id)
 
 ###############################################################################
+def _away(service: RenderCompletionService, conversation_id: str, cause: str) -> None:
+    service.client_connected(conversation_id, "tab-1")
+    if cause == "render_client_hidden":
+        service.set_client_visibility(conversation_id, "tab-1", hidden=True)
+    else:
+        service.client_disconnected(conversation_id, "tab-1")
+
+###############################################################################
+def _back(service: RenderCompletionService, conversation_id: str, cause: str) -> None:
+    if cause == "render_client_hidden":
+        service.set_client_visibility(conversation_id, "tab-1", hidden=False)
+    else:
+        service.client_connected(conversation_id, "tab-1")
+
+###############################################################################
+@pytest.mark.parametrize("cause", ["render_client_disconnected", "render_client_hidden"])
+def test_transient_client_gap_extends_once_then_redelivers_and_completes(
+    render_context, monkeypatch: pytest.MonkeyPatch, cause: str
+) -> None:
+    import asyncio
+
+    from server.services.agent_runs import render_completion
+
+    repository, publisher, conversation_id, run_id = render_context
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35))
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.3
+    )
+    candidate = _session()
+    _away(service, conversation_id, cause)
+
+    async def scenario() -> None:
+        service.prepare(run_id=run_id, run_version=1, response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+        })
+        await real_sleep(0.45)
+        # The overdue candidate was neither failed nor left unbounded.
+        snapshot = repository.get_run(run_id)
+        assert snapshot is not None and snapshot.state == "awaiting_render"
+        assert snapshot.presentation["deadline_extensions"] == 1
+        _back(service, conversation_id, cause)
+        await service.redeliver_pending_map(conversation_id)
+        await service.redeliver_pending_map(conversation_id)
+        await service.acknowledge(conversation_id, RealtimeRenderAckPayload(
+            run_id=run_id,
+            run_version=1,
+            map_session_id=candidate.session_id,
+            collection_revision=candidate.overlay_collection.revision,
+            status="ready",
+            viewport_bounds=candidate.bounds,
+            checks={
+                "required_sources_loaded": True,
+                "required_layers_present": True,
+                "viewport_valid": True,
+            },
+        ))
+        await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
+
+    run_async_in_thread(scenario())
+
+    snapshot = repository.get_run(run_id)
+    assert snapshot is not None and snapshot.state != "failed"
+    assert snapshot.presentation_status == "ready"
+    assert _event_types(publisher, run_id).count("map_prepared") == 1
+
+###############################################################################
+@pytest.mark.parametrize("cause", ["render_client_disconnected", "render_client_hidden"])
+def test_transient_client_gap_is_bounded_and_fails_with_the_observed_cause(
+    render_context, monkeypatch: pytest.MonkeyPatch, cause: str
+) -> None:
+    import asyncio
+
+    from server.services.agent_runs import render_completion
+
+    repository, publisher, conversation_id, run_id = render_context
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35))
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.3
+    )
+    _away(service, conversation_id, cause)
+
+    async def scenario() -> None:
+        service.prepare(run_id=run_id, run_version=1, response_payload={
+            "map_session": _session().model_dump(mode="json"),
+        })
+        await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
+
+    run_async_in_thread(scenario())
+
+    snapshot = repository.get_run(run_id)
+    assert snapshot is not None and snapshot.state == "failed"
+    assert snapshot.error_code == cause
+    assert snapshot.presentation_status == "render_timeout"
+    assert snapshot.presentation["deadline_extensions"] == 1
+
+###############################################################################
+def test_explicit_failure_ack_fails_fast_even_while_the_client_is_away(
+    render_context,
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    candidate = _session()
+    _away(service, conversation_id, "render_client_hidden")
+
+    async def scenario() -> None:
+        service.prepare(run_id=run_id, run_version=1, response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+        })
+        await service.acknowledge(conversation_id, RealtimeRenderAckPayload(
+            run_id=run_id,
+            run_version=1,
+            map_session_id=candidate.session_id,
+            collection_revision=candidate.overlay_collection.revision,
+            status="failed",
+            failure_code="render_failed",
+            failure_summary="style rejected",
+        ))
+        await service.shutdown()
+
+    run_async_in_thread(scenario())
+
+    snapshot = repository.get_run(run_id)
+    assert snapshot is not None and snapshot.state == "failed"
+    assert snapshot.error_code == "render_failed"
+    assert "deadline_extensions" not in (snapshot.presentation or {})
+
+###############################################################################
 def test_shutdown_cancels_pending_render_deadline(render_context) -> None:
     repository, publisher, _, run_id = render_context
     service = RenderCompletionService(run_repository=repository, event_publisher=publisher)

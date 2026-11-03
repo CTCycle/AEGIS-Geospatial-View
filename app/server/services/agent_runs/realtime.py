@@ -26,6 +26,7 @@ from server.domain.realtime import (
     RealtimeServerMessage,
     RealtimeStartPayload,
     RealtimeSteerPayload,
+    RealtimeVisibilityPayload,
 )
 from server.contracts.events import RunEventType
 from server.domain.steering import SteeringMessageRequest
@@ -143,6 +144,7 @@ class RealtimeConnection:
         self._command_times: list[float] = []
         self._first_message_received = False
         self._metrics_opened = False
+        self._presence_token = f"conn_{uuid4().hex}"
 
     # -------------------------------------------------------------------------
     async def run(self) -> None:
@@ -150,6 +152,10 @@ class RealtimeConnection:
         await self.websocket.accept(subprotocol=REALTIME_SUBPROTOCOL)
         self.metrics.connection_opened()
         self._metrics_opened = True
+        if self.render_completion_service is not None:
+            self.render_completion_service.client_connected(
+                self.conversation_id, self._presence_token
+            )
         self._writer_task = asyncio.create_task(self._writer(), name="realtime-writer")
         self._heartbeat_task = asyncio.create_task(
             self._heartbeat(), name="realtime-heartbeat"
@@ -205,6 +211,10 @@ class RealtimeConnection:
             if self._metrics_opened:
                 self.metrics.connection_closed()
                 self._metrics_opened = False
+            if self.render_completion_service is not None:
+                self.render_completion_service.client_disconnected(
+                    self.conversation_id, self._presence_token
+                )
             await self.registry.remove(self)
 
     # -------------------------------------------------------------------------
@@ -285,6 +295,8 @@ class RealtimeConnection:
                 await self._cancel_run(message)
             elif message.type == "map.render_ack":
                 await self._render_ack(message)
+            elif message.type == "client.visibility":
+                await self._client_visibility(message)
         except RunServiceError as exc:
             await self._protocol_error(
                 message.message_id,
@@ -368,6 +380,31 @@ class RealtimeConnection:
             },
         )
         await self._attach_run(payload.run_id, payload.after_sequence)
+        await self._redeliver_pending_render()
+
+    # -------------------------------------------------------------------------
+    async def _client_visibility(self, message: RealtimeClientMessage) -> None:
+        payload = RealtimeVisibilityPayload.model_validate(message.payload)
+        if self.render_completion_service is not None:
+            self.render_completion_service.set_client_visibility(
+                self.conversation_id,
+                self._presence_token,
+                hidden=payload.visibility == "hidden",
+            )
+        await self._send(
+            "run.ack",
+            correlation_id=message.message_id,
+            payload={"command": "client.visibility", "accepted": True},
+        )
+        if payload.visibility == "visible":
+            await self._redeliver_pending_render()
+
+    # -------------------------------------------------------------------------
+    async def _redeliver_pending_render(self) -> None:
+        if self.render_completion_service is not None:
+            await self.render_completion_service.redeliver_pending_map(
+                self.conversation_id
+            )
 
     # -------------------------------------------------------------------------
     async def _start_run(self, message: RealtimeClientMessage) -> None:

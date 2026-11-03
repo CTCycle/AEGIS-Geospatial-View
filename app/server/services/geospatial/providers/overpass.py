@@ -64,7 +64,9 @@ class OverpassProvider(GeospatialProvider):
                     limit=_optional_int(request.params.get("limit")),
                 )
             except OverpassRateLimitError as exc:
-                raise ProviderRateLimitError(str(exc)) from exc
+                raise ProviderRateLimitError(
+                    str(exc), retry_after_seconds=exc.retry_after_seconds
+                ) from exc
             except OverpassInvalidQueryError as exc:
                 raise ProviderInvalidQueryError(str(exc)) from exc
             except OverpassRequestError as exc:
@@ -114,7 +116,9 @@ class OverpassProvider(GeospatialProvider):
                 limit=_optional_int(request.params.get("limit")),
             )
         except OverpassRateLimitError as exc:
-            raise ProviderRateLimitError(str(exc)) from exc
+            raise ProviderRateLimitError(
+                str(exc), retry_after_seconds=exc.retry_after_seconds
+            ) from exc
         except OverpassInvalidQueryError as exc:
             raise ProviderInvalidQueryError(str(exc)) from exc
         except OverpassRequestError as exc:

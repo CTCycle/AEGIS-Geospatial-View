@@ -2482,10 +2482,14 @@ async def test_completion_accepts_each_city_point_forecast_for_tomorrow() -> Non
     class Service:
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
-        async def get_weather_forecast(self, *, latitude, longitude):
-            # Point forecasts stamp the current conditions with the sampling time.
+        async def get_weather_forecast(self, *, latitude, longitude, window):
+            # Point forecasts stamp the current conditions with the sampling time
+            # and return the hour-ending UTC hours of the requested window.
+            hours = [{"time": (window[0] + timedelta(hours=hour)).replace(tzinfo=None).isoformat(timespec="minutes"),
+                      "temperature_2m": 10.0, "precipitation": 0.0} for hour in range(1, 25)]
             return {"kind": "weather_forecast", "latitude": latitude, "longitude": longitude,
-                    "observation_time": datetime.now(UTC).isoformat(), "coverage": {}}
+                    "observation_time": datetime.now(UTC).isoformat(), "coverage": {},
+                    "hourly_forecast": hours, "timezone": "UTC"}
 
     state = _state()
     state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
@@ -2806,3 +2810,85 @@ def test_tool_correction_lifts_a_simple_run_to_the_complex_budget(
     if profile == "simple":
         assert request.budget.run_profile == "complex"
         assert request.budget.max_tool_calls == 20
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_incapable() -> None:
+    provider = FakeProvider([
+        LLMResult(
+            content="",
+            tool_calls=[
+                LLMToolCall(id=f"bad-{index}", name="test_tool", arguments=None, parse_error="bad_json")
+            ],
+        )
+        for index in range(4)
+    ])
+    state = _state()
+    state.context_hydrated = True
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="none",
+        capability_queries=["hospitals"],
+    )
+
+    outcome = await _loop(provider).run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+            max_validation_corrections=2,
+        )
+    )
+
+    repeat = next(
+        item for item in state.tool_results if item.error is not None
+        and item.error.code == "repeated_failed_fingerprint"
+    )
+    assert repeat.data is not None
+    feedback = repeat.data
+    assert "'test_tool'" in repeat.summary and feedback["valid_tools"] == ["test_tool"]
+    assert any("finish with an answer" in action for action in feedback["allowed_next_actions"])
+    assert outcome.stopped_reason == "failed"
+    assert outcome.failure_category == "model_capability"
+    assert state.termination_reason == "model_incapable"
+    assert "valid tools and arguments were available" in outcome.final_text
+
+###############################################################################
+def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_range() -> None:
+    state = _state()
+    state.validation_corrections = 3
+    state.tool_results = [
+        ToolResult(
+            call_id="quake",
+            tool_name="execute_geospatial_capability",
+            status="failed",
+            summary="Tool arguments failed semantic validation.",
+            data={"issues": [{
+                "path": "arguments.minmagnitude", "code": "out_of_range",
+                "message": "arguments.minmagnitude: number 15 is outside the valid range (maximum 10).",
+            }]},
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    ]
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute",
+        presentation="text", location_mode="none",
+    )
+
+    stop = AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+        state, route, state.tool_results,
+        max_consecutive_tool_failures=3, max_validation_corrections=2, max_discovery_attempts=2,
+    )
+    assert stop is not None and stop[0] == "unsupported_request"
+    assert "maximum 10" in stop[1]
+
+    outcome = _loop(FakeProvider([]))._outcome(  # pyright: ignore[reportPrivateUsage]
+        state, stop[1], stop[0],
+        AgentLoopRequest(provider="fake", model="fake-model", state=state,
+                         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10)),
+    )
+    assert outcome.stopped_reason == "insufficient_evidence"
+    assert outcome.failure_category is None

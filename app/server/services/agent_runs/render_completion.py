@@ -12,6 +12,7 @@ from typing import Any, cast
 from server.common.time import utc_now
 from server.contracts.events import RunEventType, RunEventVisibility, RunProgressStage
 from server.contracts.geospatial import MapSession
+from server.contracts.runs import AgentRunState as RunLifecycleState
 from server.domain.realtime import RealtimeRenderAckPayload
 from server.domain.agent.capability_route import AgentGoal, AgentRunState, CompletionContract
 from server.domain.agent.capability_route import RenderObservation
@@ -19,6 +20,10 @@ from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.repositories.agent_runs import AgentRunRepository
 from server.services.agent.completion import CompletionEvaluator
 from server.services.agent_runs.events import RunEventPublisher
+
+# One extension: a transient gap (lost socket, hidden page) buys a single
+# further deadline window, after which the run fails with the observed cause.
+MAX_RENDER_DEADLINE_EXTENSIONS = 1
 
 ###############################################################################
 class RenderAcknowledgementError(ValueError):
@@ -91,6 +96,12 @@ class RenderCompletionService:
         self.resume_mode = bool(resume_mode)
         self.max_render_attempts = max(1, min(32, int(max_render_attempts)))
         self._deadline_tasks: set[asyncio.Task[None]] = set()
+        # conversation -> {connection token: page hidden}. Absent means no
+        # browser ever connected; an empty mapping means every socket dropped.
+        self._clients: dict[str, dict[str, bool]] = {}
+        # Runs whose deadline was extended for a transient cause and whose
+        # prepared plan is re-delivered once when a client is back.
+        self._awaiting_redelivery: dict[str, tuple[str, int]] = {}
 
     # -------------------------------------------------------------------------
     def prepare(
@@ -235,11 +246,29 @@ class RenderCompletionService:
 
         async def expire() -> None:
             await asyncio.sleep(timeout_seconds + 1.0)
+            cause = self._transient_cause(conversation_id)
+            while cause is not None:
+                outcome = self.run_repository.extend_pending_render(
+                    conversation_id=conversation_id,
+                    run_id=run_id,
+                    run_version=run_version,
+                    timeout_seconds=timeout_seconds,
+                    max_extensions=MAX_RENDER_DEADLINE_EXTENSIONS,
+                )
+                if outcome in {"gone", "not_due"}:
+                    return
+                if outcome == "exhausted":
+                    break
+                self._awaiting_redelivery[conversation_id] = (run_id, run_version)
+                await asyncio.sleep(timeout_seconds + 1.0)
+                cause = self._transient_cause(conversation_id)
+            self._awaiting_redelivery.pop(conversation_id, None)
             snapshot = self.run_repository.expire_pending_render(
                 conversation_id=conversation_id,
                 run_id=run_id,
                 run_version=run_version,
                 timeout_seconds=timeout_seconds,
+                failure_code=cause or "render_timeout",
             )
             if snapshot is None:
                 return
@@ -250,6 +279,78 @@ class RenderCompletionService:
         task = loop.create_task(expire())
         self._deadline_tasks.add(task)
         task.add_done_callback(self._deadline_tasks.discard)
+
+    # -------------------------------------------------------------------------
+    def client_connected(self, conversation_id: str, token: str) -> None:
+        self._clients.setdefault(conversation_id, {})[token] = False
+
+    # -------------------------------------------------------------------------
+    def client_disconnected(self, conversation_id: str, token: str) -> None:
+        if conversation_id in self._clients:
+            self._clients[conversation_id].pop(token, None)
+
+    # -------------------------------------------------------------------------
+    def set_client_visibility(
+        self, conversation_id: str, token: str, *, hidden: bool
+    ) -> None:
+        connections = self._clients.get(conversation_id)
+        if connections is not None and token in connections:
+            connections[token] = hidden
+
+    # -------------------------------------------------------------------------
+    def _transient_cause(self, conversation_id: str) -> str | None:
+        """Why a missing acknowledgment may still arrive, from server-side facts.
+
+        Genuine render failures and invalid plans never reach this path: they
+        are explicit failed acknowledgments or preparation errors.
+        """
+
+        connections = self._clients.get(conversation_id)
+        if connections is None:
+            return None
+        if not connections:
+            return "render_client_disconnected"
+        if all(connections.values()):
+            return "render_client_hidden"
+        return None
+
+    # -------------------------------------------------------------------------
+    async def redeliver_pending_map(self, conversation_id: str) -> None:
+        """Re-publish the pending prepared plan once, after a transient gap."""
+
+        pending = self._awaiting_redelivery.pop(conversation_id, None)
+        if pending is None:
+            return
+        run_id, run_version = pending
+        snapshot = self.run_repository.get_run(run_id)
+        if (
+            snapshot is None
+            or snapshot.conversation_id != conversation_id
+            or snapshot.active_run_version != run_version
+            or snapshot.state != RunLifecycleState.AWAITING_RENDER
+        ):
+            return
+        presentation = _json_object(snapshot.presentation)
+        pending_response = _json_object(presentation.get("pending_response"))
+        map_session = pending_response.get("map_session")
+        if not isinstance(map_session, dict):
+            return
+        operation = _json_object(pending_response.get("operation"))
+        await self.event_publisher.publish(
+            conversation_id=conversation_id,
+            run_id=run_id,
+            run_version=run_version,
+            type=RunEventType.MAP_PREPARED,
+            payload={
+                "presentation": presentation,
+                "map_session": map_session,
+                "operation": {
+                    **operation,
+                    "status": "pending",
+                    "message": "Data prepared; the map is loading.",
+                },
+            },
+        )
 
     # -------------------------------------------------------------------------
     async def shutdown(self) -> None:

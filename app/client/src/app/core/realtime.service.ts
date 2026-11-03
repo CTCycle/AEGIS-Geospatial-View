@@ -50,6 +50,7 @@ export class RealtimeService {
   private readonly messageHandlers = new Set<RealtimeMessageHandler>();
   private readonly stateHandlers = new Set<RealtimeStateHandler>();
   private state: RealtimeConnectionState = 'idle';
+  private readonly onVisibilityChange = (): void => this.reportVisibility();
 
   onMessage(handler: RealtimeMessageHandler): () => void {
     this.messageHandlers.add(handler);
@@ -77,6 +78,9 @@ export class RealtimeService {
     this.resumeSequence = Math.max(0, options.afterSequence ?? 0);
     this.shouldReconnect = true;
     this.clearReconnectTimer();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+    }
     if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
       return;
     }
@@ -85,6 +89,9 @@ export class RealtimeService {
 
   disconnect(options: { discardPending?: boolean } = {}): void {
     this.shouldReconnect = false;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    }
     this.clearReconnectTimer();
     this.clearStableTimer();
     this.clearStaleTimer();
@@ -141,9 +148,31 @@ export class RealtimeService {
     );
   }
 
+  /**
+   * Tells the server whether the page is hidden so an unacknowledged map
+   * render can be classified (and retried) instead of failing as a timeout.
+   */
+  private reportVisibility(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    this.discardPendingCommands('client.visibility');
+    try {
+      this.queueCommand('client.visibility', {
+        visibility: document.visibilityState === 'hidden' ? 'hidden' : 'visible',
+      });
+    } catch {
+      // A full queue already moved the service to its failed state.
+    }
+  }
+
   discardPendingMapRenderAcks(): void {
+    this.discardPendingCommands('map.render_ack');
+  }
+
+  private discardPendingCommands(type: string): void {
     this.pendingCommands.forEach((command, messageId) => {
-      if (command.type !== 'map.render_ack') {
+      if (command.type !== type) {
         return;
       }
       if (command.ackTimer !== undefined) {
@@ -190,6 +219,10 @@ export class RealtimeService {
         after_sequence: this.resumeSequence,
       }, false);
       this.flushPendingCommands();
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        // A fresh server connection assumes a visible page.
+        this.reportVisibility();
+      }
     };
     socket.onmessage = (event: MessageEvent<unknown>) => {
       if (!this.isCurrent(socket, generation)) {

@@ -57,6 +57,7 @@ def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata(
                 "wind_direction_10m": [0],
                 "wind_gusts_10m": [0.0],
                 "precipitation_probability": [0],
+                "cloud_cover": [40],
             },
             "hourly_units": {"precipitation": "mm", "relative_humidity_2m": "%"},
         }

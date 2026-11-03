@@ -16,7 +16,11 @@ from server.domain.agent.reliability import (
     AgentExecutionBudget,
     ExecutionBudgetExceeded,
 )
-from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.domain.agent.tools import RegisteredTool
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition
 from server.services.agent.native_tools import (  # pyright: ignore[reportPrivateUsage]
@@ -251,7 +255,8 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
     assert result.error.error_type == "tool_not_exposed"
     assert result.error.code == "tool_not_exposed"
     # The model is told what it can call instead.
-    assert result.error.message.endswith("Tools available now: another_tool.")
+    assert result.data is not None
+    assert result.data["valid_tools"] == ["another_tool"]
     assert "already succeeded" not in result.error.message
     assert calls == []
 
@@ -271,6 +276,58 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
 
     assert repeated.error is not None
     assert "It already succeeded in this run" in repeated.error.message
+
+###############################################################################
+def test_every_rejection_type_returns_the_uniform_feedback_block() -> None:
+    async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
+        return {}
+
+    def reject(_arguments: BaseModel, _state: AgentRunState) -> list[str]:
+        return ["arguments.minmagnitude: number 15 is outside the valid range (maximum 10)."]
+
+    registry = ToolRegistry(runtime_registry=cast(Any, None))
+    registry.register(_tool(handler, semantic_validator=reject))
+    registry.register(_tool(handler, name="policy_tool"))
+    exposed = {"test_tool", "policy_tool"}
+    calls = {
+        "tool_not_exposed": LLMToolCall(id="a", name="test_tool", arguments={"value": 1}),
+        "unknown_tool": LLMToolCall(id="b", name="invented_tool", arguments={}),
+        "malformed_call": LLMToolCall(id="c", name="test_tool", arguments=None, parse_error="bad_json"),
+        "schema_validation": LLMToolCall(id="d", name="test_tool", arguments={"x": 1}),
+        "semantic_validation": LLMToolCall(id="e", name="test_tool", arguments={"value": 1}),
+        "policy_rejection": LLMToolCall(id="f", name="policy_tool", arguments={"value": 1}),
+    }
+    for error_code, call in calls.items():
+        visible = {"other_tool"} if error_code == "tool_not_exposed" else exposed
+        executor = ToolExecutor(
+            tool_registry=registry,
+            policy_engine=_Policy(False) if error_code == "policy_rejection" else None,
+        )
+        result = asyncio.run(
+            executor.execute_tool(call, _state(), _budget(), exposed_tool_names=visible)
+        )
+        assert result.data is not None, error_code
+        feedback = result.data
+        assert feedback["error_code"] == error_code
+        assert feedback["valid_tools"] == sorted(visible)
+        assert feedback["allowed_next_actions"], error_code
+        assert set(feedback) <= {
+            "error_code", "issues", "valid_tools", "allowed_next_actions", "correction",
+        }
+    semantic_result = asyncio.run(
+        ToolExecutor(tool_registry=registry).execute_tool(
+            calls["semantic_validation"], _state(), _budget(), exposed_tool_names=exposed
+        )
+    )
+    assert semantic_result.data is not None
+    issue = semantic_result.data["issues"][0]
+    assert issue["code"] == "out_of_range"
+    assert issue["path"] == "arguments.minmagnitude"
+    assert "maximum 10" in issue["message"]
+    assert any(
+        "finish with an answer" in action
+        for action in semantic_result.data["allowed_next_actions"]
+    )
 
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
@@ -563,8 +620,8 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
 
     assert result.error is not None
     assert result.error.error_type == "semantic_validation"
-    assert result.error.validation_errors[0].path == "$"
-    assert "exclusive minimum" in result.error.validation_errors[0].message
+    assert result.error.validation_errors[0].path == "arguments.radius_m"
+    assert "valid range (greater than 0)" in result.error.validation_errors[0].message
     assert calls == []
 
 ###############################################################################
@@ -594,3 +651,36 @@ async def test_semantic_failure_is_reported_before_policy_or_handler() -> None:
     assert result.error is not None
     assert result.error.error_type == "semantic_validation"
     assert called is False
+
+###############################################################################
+def test_handler_side_provider_rejection_receives_the_same_feedback_block() -> None:
+    rejected = ToolResult(
+        call_id="quake",
+        tool_name="test_tool",
+        status="failed",
+        summary="rejected",
+        data={"failure_class": "unsupported", "attempts": 1},
+        error=ToolExecutionError(
+            error_type="semantic_validation",
+            code="provider_invalid_query",
+            message="Earthquake ranges are limited to 366 days.",
+            retryable=True,
+            recovery="correct_arguments",
+        ),
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+
+    result = ToolExecutor._with_rejection_feedback(  # pyright: ignore[reportPrivateUsage]
+        rejected,
+        LLMToolCall(id="quake", name="test_tool", arguments={"value": 1}),
+        _state(),
+        {"test_tool", "other_tool"},
+    )
+
+    assert result.data is not None
+    assert result.data["attempts"] == 1
+    assert result.data["error_code"] == "provider_invalid_query"
+    assert result.data["valid_tools"] == ["other_tool", "test_tool"]
+    assert result.data["issues"][0]["code"] == "unsupported_by_provider"
+    assert "limited to 366 days" in result.data["issues"][0]["message"]
+    assert any("states the limit" in action for action in result.data["allowed_next_actions"])
