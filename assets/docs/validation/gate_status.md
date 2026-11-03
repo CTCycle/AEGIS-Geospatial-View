@@ -2,6 +2,16 @@
 
 Last updated: 2026-11-03
 
+## 2026-11-03 Wave 3 live validation (`develop@d4f4c1e2`)
+
+The [live evaluation summary](live_eval_20261103_wave3.md) (full evidence: untracked `assets/QA/w3-validation-20261103/report.md`) re-runs the Wave 2 non-PASS turns and adds the Wave 3 framing, forecast-window, H-03 and discovery checks on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
+- Live UI **PARTIAL**: DeepSeek 11 PASS / 3 PARTIAL / 5 FAIL / 2 BLOCKED of 21 turns; Beam Free 9 / 6 / 9 / 1 of 25 (turn sets differ from Wave 2, see the summary).
+- False-success gate (target 0): **FAIL**, 2 (DeepSeek: a Brandenburg Gate request completed `goal_satisfied` on the Berlin map, stored-completion only; Beam: a recap claiming a magnitude filter that was never applied).
+- Graded runner (`--no-render`, 28 matrix plus 10 holdout scenarios): DeepSeek 27 pass / 11 fail (Wave 2: 25 / 13, no regression), Beam 23 / 15 (22 / 16, three pass-to-fail regressions from unexposed-tool calls); no false-success flag; a per-model baseline is proposed in the untracked QA folder, not applied.
+- Route revision (M-01): **PASS**, 9 of 9 revised runs record `outcome: revised` (5 still failed for other reasons). Forecast window (M-05): **PASS** (calendar-day evidence per target). H-03 Tokyo M>15: **PASS** on both (`unsupported_request`, no loop). Beam magnitude-filter follow-up: **FAIL**, honest.
+- Framing (M-03): **FAIL** for "Show Paris and Berlin" (one city framed, `targets_in_view` absent without markers); **PASS** for the Lugano/Milan, Rome/Milan and Zurich/Geneva marker maps.
+- Discovery: Madrid maximum temperature **PASS**; dated GIBS imagery **FAIL** (raster evidence has no temporal coverage, map rejected); cloud cover **PARTIAL** (data fetched, generic answer).
+
 ## 2026-11-03 Wave 2 live validation (`develop@740792f4`)
 
 The [live evaluation summary](live_eval_20261103_wave2.md) (full evidence: untracked `assets/QA/w2-validation-20261103/report.md`) re-runs the Wave 1 non-PASS turns and the Wave 2 scenarios on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
