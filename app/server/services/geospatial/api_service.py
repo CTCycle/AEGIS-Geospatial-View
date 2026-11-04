@@ -108,6 +108,10 @@ class GeospatialTileRequestError(GeospatialApiServiceError):
     """Raised when a tile provider request fails."""
 
 ###############################################################################
+class GeospatialTileNoDataError(GeospatialApiServiceError):
+    """Raised when the provider has no tile for the requested time or area."""
+
+###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
@@ -482,6 +486,13 @@ class GeospatialApiService:
             if exc.diagnostic.category == "authentication_rejected":
                 raise GeospatialTileCredentialError(
                     f"{self._humanize_provider(provider)} rejected the configured credentials."
+                ) from exc
+            if exc.diagnostic.status_code == 404:
+                # The provider answered normally: nothing is published for this
+                # time or place. That is not a provider fault.
+                raise GeospatialTileNoDataError(
+                    f"{self._humanize_provider(provider)} has no imagery for the "
+                    "requested date or area (not yet published or no data)."
                 ) from exc
             raise GeospatialTileRequestError(
                 f"{self._humanize_provider(provider)} tile request failed."

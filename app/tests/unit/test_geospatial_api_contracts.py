@@ -902,6 +902,32 @@ def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_respon
     assert "upstream=https://fema.example/arcgis/tile" in caplog.text
 
 ###############################################################################
+def test_geospatial_tile_proxy_reports_upstream_404_as_no_data_not_provider_fault() -> None:
+    diagnostic = RasterHttpDiagnostic(
+        category="invalid_request",
+        failure_phase="response_headers",
+        upstream="https://fema.example/arcgis/tile",
+        status_code=404,
+        provider_id="fema",
+        capability_id="fema_nfhl_flood_zones",
+    )
+
+    async def missing_tile(url: str, headers: dict[str, str] | None = None) -> bytes:
+        raise RasterHttpError("not found", diagnostic)
+
+    service = _build_api_service(ProviderRegistry())
+    service._fetch_binary_url = missing_tile  # type: ignore[method-assign]
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        service
+    )
+
+    response = client.get("/api/geospatial/tiles/fema_nfhl_flood_zones/4/5/6.png")
+
+    assert response.status_code == 404
+    assert "no imagery" in response.json()["detail"]
+
+###############################################################################
 def test_geospatial_relay_tile_proxy_retries_transient_upstream_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 import re
 from typing import Literal
 from xml.etree import ElementTree
@@ -152,6 +153,17 @@ class NASAGIBSProvider(GeospatialProvider):
         render = layer.render
         if render is not None and request.time is not None:
             render = render.model_copy(update={"time": request.time.date().isoformat()})
+        warnings = list(layer.warnings)
+        coverage: dict[str, object] | None = None
+        result_status: Literal["ok", "valid_empty"] = "ok"
+        if request.time is not None:
+            coverage = self._time_coverage(layer, request.time.date())
+            if coverage is not None and coverage["temporal_scope_satisfied"] is False:
+                # A date the layer does not publish (not yet, or never) has no
+                # tiles: an honest empty result, not a map that renders blank.
+                result_status = "valid_empty"
+                latest = f"; the latest available date is {layer.default_time}" if layer.default_time else ""
+                warnings.append(f"No imagery is published for {coverage['time']}{latest}.")
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
@@ -160,9 +172,40 @@ class NASAGIBSProvider(GeospatialProvider):
                 "render": render.model_dump(mode="json") if render else None,
             },
             result_type="raster",
+            result_status=result_status,
             attribution=[NASA_ATTRIBUTION],
-            warnings=list(layer.warnings),
+            warnings=warnings,
+            coverage=coverage,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _time_coverage(
+        layer: GeospatialProviderLayerDescriptor, day: date
+    ) -> dict[str, object] | None:
+        """Report whether the layer's catalog time extent contains the requested day.
+
+        Without a parsable extent nothing is known, so no verdict is returned.
+        """
+
+        satisfied: bool | None = None
+        for part in (layer.time_extent or "").split(","):
+            bounds = part.strip().split("/")
+            try:
+                first = date.fromisoformat(bounds[0][:10])
+                last = date.fromisoformat(bounds[1][:10]) if len(bounds) > 1 else first
+            except (ValueError, IndexError):
+                continue
+            satisfied = bool(satisfied) or first <= day <= last
+        if satisfied is None:
+            return None
+        coverage: dict[str, object] = {
+            "time": day.isoformat(),
+            "temporal_scope_satisfied": satisfied,
+        }
+        if layer.default_time:
+            coverage["latest_available_date"] = layer.default_time[:10]
+        return coverage
 
     # -------------------------------------------------------------------------
     async def _load_wmts_capabilities(self, *, refresh: bool) -> ElementTree.Element:

@@ -29,7 +29,8 @@ from server.domain.agent.map_plan import (
 )
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.map_plan_service import MapPlanService
+from server.services.agent.agent_loop import AgentLoop
+from server.services.agent.map_plan_service import MapPlanService, targets_outside_view
 from server.services.geospatial.map_session_builder import (
     viewport_covering_evidence,
     MapPlanBuildError,
@@ -1135,3 +1136,89 @@ async def test_comparison_viewport_is_widened_to_every_evidence_extent() -> None
     west, south, east, north = viewport_covering_evidence(candidate, evidence).viewport.bbox or []
 
     assert west <= 2.35 and east >= 13.4 and south <= 48.85 and north >= 52.52
+
+
+###############################################################################
+def test_location_only_map_view_must_frame_every_requested_place() -> None:
+    state = _state()
+    state.location_refs = {
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+    }
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=["Paris", "Berlin"],
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    assert targets_outside_view(state, [2.2, 48.8, 2.5, 48.9]) == ["Berlin"]
+    assert targets_outside_view(state, [2.0, 48.0, 14.0, 53.0]) == []
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_location_only_map_of_two_places_is_widened_to_frame_both() -> None:
+    state = _state()
+    state.location_refs = {
+        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+    }
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=["Paris", "Berlin"],
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                SetViewportAction(action="set_viewport", strategy="fit_location", location_ref="paris"),
+                SetViewportAction(action="set_viewport", strategy="fit_location", location_ref="berlin"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    west, south, east, north = state.prepared_map_session.viewport.bbox or []
+    assert west < 2.35 and east > 13.4 and south < 48.85 and north > 52.52
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_location_only_map_rejects_a_parent_standing_in_for_an_unresolved_landmark() -> None:
+    state = _state()
+    state.location_refs = {
+        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+    }
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=["Brandenburg Gate"],
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None and result.error.code == "target_not_resolved"
+    assert state.prepared_map_session is None

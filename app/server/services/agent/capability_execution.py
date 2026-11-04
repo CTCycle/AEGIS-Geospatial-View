@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
@@ -14,7 +15,7 @@ from shapely.geometry import Point, box, shape
 from shapely.errors import GEOSException
 
 from server.common.logging_handlers import log_unexpected_failure
-from server.common.typing import json_object, is_json_array, is_json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
@@ -242,6 +243,15 @@ class CapabilityExecutionService:
         response = _with_honest_partial(response)
         status = _tool_status(response)
         summary = _response_summary(response, request=request, location=location)
+        unmet_attributes = _unmet_requested_attributes(request, response, summary)
+        if unmet_attributes:
+            # A requested variable the source does not carry is an unmet part
+            # of the request, never a silent omission.
+            summary["unmet_requested_attributes"] = unmet_attributes
+            summary["warnings"] = [
+                *summary.get("warnings", []),
+                f"This source does not provide the requested {', '.join(unmet_attributes)}.",
+            ]
         coverage = dict(response.coverage or {})
         if request.arguments.get("sampling") == "area" and "sampling" not in provider_params:
             coverage["area_sampling"] = (
@@ -717,6 +727,44 @@ def _evidence_kind(result_type: str) -> EvidenceKind:
     return "capability_result"
 
 ###############################################################################
+def _requested_attributes(request: ExecuteCapabilityInput | None) -> list[str]:
+    values = request.arguments.get("requested_attributes") if request is not None else None
+    if not is_json_array(values):
+        return []
+    return list(dict.fromkeys(
+        name for item in values
+        if (name := re.sub(r"[^a-z0-9]+", "_", str(item).strip().casefold()).strip("_"))
+    ))
+
+###############################################################################
+def _unmet_requested_attributes(
+    request: ExecuteCapabilityInput, response: ProviderResponse, summary: dict[str, Any]
+) -> list[str]:
+    """Requested variables absent from a result whose fields are known.
+
+    Only weather/air-quality series and sampled grids are checked: their
+    field set is declared by the provider adapter, so absence is a verdict.
+    """
+
+    requested = _requested_attributes(request)
+    if not requested:
+        return []
+    features = response.payload.get("features")
+    if str((response.coverage or {}).get("type") or "") == "grid_sample" and is_json_array(features):
+        rows: list[Any] = features[:200]
+    elif response.payload.get("kind") in {"weather_forecast", "air_quality_forecast"}:
+        rows = json_array(summary.get("hourly_forecast"))
+    else:
+        return []
+    keys = {str(key).replace("_", "") for row in rows if is_json_object(row) for key in row}
+    if not keys:
+        return []
+    return [
+        name for name in requested
+        if not any(key.startswith(name.replace("_", "")) for key in keys)
+    ]
+
+###############################################################################
 def _response_summary(
     response: ProviderResponse,
     *,
@@ -800,7 +848,8 @@ def _response_summary(
         summary["kind"] = kind
         hourly = payload.get("hourlyForecast")
         if is_json_array(hourly):
-            fields = (
+            requested = _requested_attributes(request)
+            base_fields = (
                 (
                     "time",
                     "temperature_2m",
@@ -823,6 +872,11 @@ def _response_summary(
                     "sulphur_dioxide",
                 )
             )
+            fields = (*base_fields, *(name for name in requested if name not in base_fields))
+            summary["requested_fields"] = [
+                name for name in fields[len(base_fields):]
+                if any(is_json_object(row) and name in row for row in hourly)
+            ]
             timezone = payload.get("timezone")
             try:
                 timezone_info = (

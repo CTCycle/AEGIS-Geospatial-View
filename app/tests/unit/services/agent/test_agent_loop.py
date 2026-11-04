@@ -131,6 +131,10 @@ class FakeFactory:
 class FakeCapabilityRegistry:
 
     # -------------------------------------------------------------------------
+    def servable_queries(self, queries: Any) -> list[str]:
+        return list(queries)
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         if capability_id == "places:hospitals":
             return {"id": capability_id, "provider": "overpass"}
@@ -922,6 +926,38 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.spatial_scope_required is True
 
 ###############################################################################
+def test_route_revision_cannot_drop_the_data_obligation() -> None:
+    state = _state()
+    data_route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        secondary_domains=[CapabilityDomain.MAP_RENDERING],
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        capability_queries=["administrative boundaries"],
+        operation="show",
+        target_refs=["Canton Ticino"],
+    )
+    AgentLoop._compile_native_goal(state, data_route)  # pyright: ignore[reportPrivateUsage]
+    previous = state.completion_contract
+    assert previous is not None and "required_data_retrieved" in previous.requirements
+
+    AgentLoop._compile_native_goal(  # pyright: ignore[reportPrivateUsage]
+        state, data_route.model_copy(update={"primary_domain": CapabilityDomain.MAP_RENDERING})
+    )
+    assert state.completion_contract is not None
+    assert "required_data_retrieved" not in state.completion_contract.requirements
+    AgentLoop._keep_data_obligation(state, previous)  # pyright: ignore[reportPrivateUsage]
+
+    contract = state.completion_contract
+    assert contract is not None
+    assert "required_data_retrieved" in contract.requirements
+    assert contract.evidence_required is True
+    assert contract.data_requirement == "provider_data"
+    assert "required_data_retrieved" in state.completion_requirements
+
+
+###############################################################################
 def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None:
     state = _state()
     route = CapabilityRoute(
@@ -1596,6 +1632,43 @@ def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> N
     assert AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
         state, route
     ) == "kolkata, india"
+
+###############################################################################
+def test_hydrated_parent_location_never_satisfies_an_unresolved_landmark() -> None:
+    state = _state()
+    state.context_hydrated = True
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        capability_queries=["place search", "map viewport"],
+        target_refs=["Brandenburg Gate, Berlin, Germany"],
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    state.location_refs["berlin"] = ResolvedLocation(
+        label="Berlin, Germany", latitude=52.52, longitude=13.4, confidence=0.9,
+        location_type="city",
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="resolve-gate",
+            tool_name="resolve_geospatial_location",
+            status="failed",
+            summary="Ambiguous landmark.",
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+
+    assert AgentLoop._location_only_map_recovery_ref(state, route) is None  # pyright: ignore[reportPrivateUsage]
+    assert not AgentLoop._needs_location_only_map_recovery(state, route)  # pyright: ignore[reportPrivateUsage]
+    # Stored completion and answer agree: the target is unmet and named.
+    assert "location_resolved" in AgentLoop._pending_native_requirements(state)  # pyright: ignore[reportPrivateUsage]
+    disclosed = AgentLoop._limitation_disclosure(  # pyright: ignore[reportPrivateUsage]
+        state, "Berlin is shown."
+    )
+    assert "Brandenburg Gate, Berlin, Germany" in disclosed
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2410,6 +2483,35 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_exhausted_model_transport_retries_name_a_model_service_outage() -> None:
+    loop = _loop(FakeProvider([]))
+
+    async def unreachable(*args: Any, **kwargs: Any) -> Any:
+        raise LLMProviderRequestError(
+            provider="fake",
+            model="fake-model",
+            stage="model_call",
+            code="provider_request_failed",
+            retryable=True,
+        )
+
+    loop._route = unreachable  # type: ignore[method-assign]
+    outcome = await loop.run(
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=_state(),
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        )
+    )
+
+    assert outcome.stopped_reason == "failed"
+    assert "model-service outage" in (outcome.failure_detail or "")
+    assert "map-data failure" in (outcome.failure_detail or "")
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_unexpected_loop_exception_is_an_internal_error_not_a_provider_error() -> None:
     loop = _loop(FakeProvider([]))
 
@@ -2875,6 +2977,23 @@ async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_inc
     assert outcome.failure_category == "model_capability"
     assert state.termination_reason == "model_incapable"
     assert "valid tools and arguments were available" in outcome.final_text
+
+###############################################################################
+def test_stop_text_carries_the_provider_reason_for_an_empty_result() -> None:
+    state = _state()
+    state.tool_results = [ToolResult(
+        call_id="gibs", tool_name="execute_geospatial_capability", status="valid_empty",
+        summary="No matching data.",
+        metadata=ToolExecutionMetadata(
+            duration_ms=0,
+            warnings=["No imagery is published for 2026-11-03; the latest available date is 2026-11-02."],
+        ),
+    )]
+
+    note = AgentLoop._empty_result_note(state)  # pyright: ignore[reportPrivateUsage]
+
+    assert "latest available date is 2026-11-02" in note
+    assert AgentLoop._empty_result_note(_state()) == ""  # pyright: ignore[reportPrivateUsage]
 
 ###############################################################################
 def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_range() -> None:

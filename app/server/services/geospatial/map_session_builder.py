@@ -39,6 +39,8 @@ MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 # A single point fits to about city scale, not street level.
 MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
+# Margin around the places of a multi-place location-only view, per side.
+LOCATION_UNION_PADDING = 0.15
 # Web Mercator renders latitudes up to about 85.05 degrees.
 _MAX_VIEW_LATITUDE = 85.0
 _GEOJSON_RENDERING_MODES = frozenset(
@@ -345,7 +347,9 @@ class MapSessionBuilder:
                     session.viewport,
                 )
                 return _with_viewport(session, viewport)
-        if action.strategy == "fit_location":
+        # Raster evidence carries no bbox; the target place is the validated
+        # frame for it, so fit that instead of rejecting the action.
+        if action.strategy in {"fit_location", "fit_evidence"}:
             return _with_viewport(
                 session,
                 _viewport_for_location(session.resolved_location),
@@ -683,6 +687,26 @@ def _valid_geojson_sequence(
     return len(items) >= minimum and all(validator(item) for item in items)
 
 ###############################################################################
+def session_view_bbox(session: MapSession) -> list[float]:
+    """Return the [west, south, east, north] area the session's view frames."""
+
+    viewport = session.viewport
+    lat_span = viewport.radius_m / 111_320
+    lon_span = viewport.radius_m / (
+        111_320 * max(abs(cos(radians(viewport.center_latitude))), 0.01)
+    )
+    return (
+        _valid_bbox(viewport.bbox)
+        or _valid_bbox(session.bounds)
+        or [
+            viewport.center_longitude - lon_span,
+            viewport.center_latitude - lat_span,
+            viewport.center_longitude + lon_span,
+            viewport.center_latitude + lat_span,
+        ]
+    )
+
+###############################################################################
 def viewport_covering_evidence(
     session: MapSession, evidence: list[AgentEvidenceEnvelope]
 ) -> MapSession:
@@ -693,21 +717,7 @@ def viewport_covering_evidence(
     """
 
     extent = _evidence_bbox(evidence)
-    viewport = session.viewport
-    lat_span = viewport.radius_m / 111_320
-    lon_span = viewport.radius_m / (
-        111_320 * max(abs(cos(radians(viewport.center_latitude))), 0.01)
-    )
-    current = (
-        _valid_bbox(viewport.bbox)
-        or _valid_bbox(session.bounds)
-        or [
-            viewport.center_longitude - lon_span,
-            viewport.center_latitude - lat_span,
-            viewport.center_longitude + lon_span,
-            viewport.center_latitude + lat_span,
-        ]
-    )
+    current = session_view_bbox(session)
     if extent is None:
         return session
     if (
@@ -724,6 +734,34 @@ def viewport_covering_evidence(
         max(current[3], extent[3]),
     ]
     return _with_viewport(session, _viewport_for_bbox(union, session.viewport))
+
+###############################################################################
+def viewport_covering_points(
+    session: MapSession, points: list[tuple[float, float]]
+) -> MapSession:
+    """Widen a location-only view so every (longitude, latitude) point is framed.
+
+    One fit_location frames one place; several requested places need the union
+    of their positions, padded so none sits on the edge of the view.
+    """
+
+    if not points:
+        return session
+    west, south, east, north = session_view_bbox(session)
+    if all(west <= lon <= east and south <= lat <= north for lon, lat in points):
+        return session
+    lons = [lon for lon, _ in points] + [west, east]
+    lats = [lat for _, lat in points] + [south, north]
+    union = [min(lons), min(lats), max(lons), max(lats)]
+    pad_lon = (union[2] - union[0]) * LOCATION_UNION_PADDING
+    pad_lat = (union[3] - union[1]) * LOCATION_UNION_PADDING
+    padded = [
+        max(-180.0, union[0] - pad_lon),
+        max(-_MAX_VIEW_LATITUDE, union[1] - pad_lat),
+        min(180.0, union[2] + pad_lon),
+        min(_MAX_VIEW_LATITUDE, union[3] + pad_lat),
+    ]
+    return _with_viewport(session, _viewport_for_bbox(padded, session.viewport))
 
 ###############################################################################
 def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:

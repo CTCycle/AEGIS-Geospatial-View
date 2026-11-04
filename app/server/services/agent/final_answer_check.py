@@ -21,7 +21,7 @@ _COMPLETENESS = re.compile(
 )
 _DISCLOSURE = re.compile(
     r"\b(unavailable|could not|couldn't|unable|missing|only|partial(?:ly)?|"
-    r"no data|not (?:available|completed|retrieved)|failed)\b",
+    r"no data|not (?:available|completed|retrieved)|failed|ambiguous|unresolved)\b",
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
@@ -44,6 +44,8 @@ def check_final_answer(
     layer_count: int | None = None,
     feature_count: int | None = None,
     unmet: Sequence[str] = (),
+    unresolved_targets: Sequence[str] = (),
+    required_targets: Sequence[Sequence[str]] = (),
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -51,6 +53,10 @@ def check_final_answer(
     the request; ``layer_count`` is the number of visible committed overlays
     and ``feature_count`` the number of rendered point features. Either is
     ``None`` when unknown, which skips the matching claim check.
+    ``unresolved_targets`` are requested places no resolution answered to; an
+    answer may name them only to disclose that they were not shown.
+    ``required_targets`` lists, per resolved target of a multi-place request,
+    the spellings that name it; an answer must name every one of them.
     """
 
     violations: list[str] = []
@@ -67,6 +73,15 @@ def check_final_answer(
         verified = layer_count if match.group("noun").lower() in _LAYER_NOUNS else feature_count
         if verified is not None and claimed > verified:
             violations.append(f"claims {match.group(0)!r} but only {verified} verified")
+
+    for spellings in required_targets:
+        if spellings and not any(_mentions(text, spelling) for spelling in spellings):
+            violations.append(f"does not name the requested place '{spellings[0]}'")
+
+    if not _DISCLOSURE.search(text):
+        for name in unresolved_targets:
+            if _mentions(text, name):
+                violations.append(f"names '{name}' without disclosing it was not resolved")
 
     if unmet and not _DISCLOSURE.search(text):
         for match in _COMPLETENESS.finditer(text):

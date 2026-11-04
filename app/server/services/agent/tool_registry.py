@@ -256,24 +256,71 @@ def route_target_location_available(state: "AgentRunState") -> bool:
     route = state.route
     if _is_active_map_update(state):
         return state.active_map_session is not None and not _names_unresolved_place(state)
-    target_refs = (
-        list(route.spatial_scope.target_refs)
-        if route is not None
-        and route.spatial_scope is not None
-        and route.spatial_scope.target_refs
-        else list(route.target_refs) if route is not None else []
-    )
+    target_refs = _route_location_targets(state)
     if not target_refs and route is not None and route.location_mode == "search_area":
         return False
     if not target_refs:
         return bool(state.location_refs) or state.active_map_session is not None
-    return all(
-        any(
+    return not unresolved_route_targets(state)
+
+###############################################################################
+def _route_location_targets(state: "AgentRunState") -> list[str]:
+    route = state.route
+    if route is None:
+        return []
+    if route.spatial_scope is not None and route.spatial_scope.target_refs:
+        return list(route.spatial_scope.target_refs)
+    return list(route.target_refs)
+
+###############################################################################
+def unresolved_route_targets(state: "AgentRunState") -> list[str]:
+    """Route targets no resolved location answers to.
+
+    A location carried over from an earlier turn only answers a target it
+    matches by name: a parent ("Berlin") never stands in for a more specific
+    place ("Brandenburg Gate") whose own resolution failed or was ambiguous.
+    """
+
+    return [
+        str(target)
+        for target in _route_location_targets(state)
+        if not any(
             location_ref_matches(str(target), str(key), location.label)
             for key, location in state.location_refs.items()
         )
-        for target in target_refs
-    )
+    ]
+
+###############################################################################
+def resolved_route_target_names(state: "AgentRunState") -> list[list[str]]:
+    """Spellings of each resolved target of a multi-place route.
+
+    An answer about several places must be able to name every one of them;
+    each entry lists the spellings (request name, label, label head) that
+    count as naming that target. Single-target routes return nothing.
+    """
+
+    targets = _route_location_targets(state)
+    if len(targets) < 2:
+        return []
+    names: list[list[str]] = []
+    for target in targets:
+        location = next(
+            (
+                item
+                for key, item in state.location_refs.items()
+                if location_ref_matches(str(target), str(key), item.label)
+            ),
+            None,
+        )
+        if location is not None:
+            names.append(
+                list(dict.fromkeys(
+                    spelling
+                    for spelling in (str(target), location.label, location.label.split(",")[0].strip())
+                    if spelling
+                ))
+            )
+    return names
 
 ###############################################################################
 def _is_active_map_update(state: "AgentRunState") -> bool:

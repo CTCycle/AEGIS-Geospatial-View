@@ -331,7 +331,8 @@ class ToolExecutor:
                                 and result.status == "success"
                                 for result in state.tool_results
                             )
-                            else ""
+                            else " If it depends on another call from this step, "
+                            "issue it in the next step once that result is available."
                         )
                     ),
                     retryable=False,

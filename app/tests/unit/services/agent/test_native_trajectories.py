@@ -4,7 +4,7 @@ import json
 import pytest
 import asyncio
 from typing import Any
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, AgentSpatialScope, CapabilityRoute, CompletionContract
+from server.domain.agent.capability_route import AgentGoal, AgentPhase, AgentRunState, AgentSpatialScope, AgentTemporalScope, CapabilityRoute, CompletionContract
 from server.domain.agent.decision import ResolvedLocation, ClarificationRequest
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -888,6 +888,10 @@ class _Runtime:
 class _Catalog:
 
     # -------------------------------------------------------------------------
+    def servable_queries(self, queries: Any) -> list[str]:
+        return list(queries)
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, empty_first: bool) -> None:
         self.empty_first = empty_first
         self.shortlist_calls = 0
@@ -1657,3 +1661,94 @@ async def test_cancellation_in_parallel_batch_stops_sibling_tool_handlers() -> N
 
     assert outcome.stopped_reason == "cancelled"
     assert completed == [0]
+
+
+###############################################################################
+def test_ranking_on_a_field_the_evidence_lacks_fails_instead_of_succeeding_silently() -> None:
+    records = [{"latitude": 46, "longitude": 8, "precipitation_sum_mm": 3}, {"latitude": 47, "longitude": 9, "precipitation_sum_mm": 1}]
+    _, error = _apply_operations(records, [{"op": "sort", "field": "cloud_cover_mean"}])
+    assert error is not None and "cloud_cover_mean" in error and "precipitation_sum_mm" in error
+
+
+###############################################################################
+def test_country_ranking_excludes_records_in_neighbouring_countries() -> None:
+    from server.services.agent.tool_handlers.evidence import _within_requested_country
+    state = AgentRunState(request_id="r", conversation_id="c", phase=AgentPhase.RECEIVE_REQUEST, user_message="rank")
+    state.location_refs["switzerland"] = ResolvedLocation(label="Switzerland", latitude=46.8, longitude=8.2, location_type="country")
+    state.goal = AgentGoal(goal="rank", task_mode="execute", presentation="text", operation="rank", location_mode="target", target_ids=["Switzerland"])
+    records = [{"latitude": 46.8, "longitude": 8.2, "id": "ch"}, {"latitude": 45.5, "longitude": 9.2, "id": "milan"}, {"latitude": 40.5, "longitude": 3.0, "id": "sea"}]
+    kept, excluded = _within_requested_country(records, state)
+    assert [item["id"] for item in kept] == ["ch", "sea"] and excluded == 1
+
+
+###############################################################################
+def test_a_raster_layer_never_satisfies_a_requested_aggregate() -> None:
+    state = AgentRunState(request_id="r", conversation_id="c", phase=AgentPhase.RECEIVE_REQUEST, user_message="max temperature")
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute", presentation="text", location_mode="none",
+        temporal_scope=AgentTemporalScope(mode="historical", aggregation="maximum"),
+    )
+    state.completion_contract = CompletionContract(operation="show", evidence_required=True)
+    state.tool_results = [ToolResult(
+        call_id="lst", tool_name="execute_geospatial_capability", status="success", summary="raster", evidence_refs=["e1"],
+        metadata=ToolExecutionMetadata(duration_ms=0, capability_id="MODIS_Terra_Land_Surface_Temp_Day", result_type="raster"),
+    )]
+    assert CompletionEvaluator.data_checks(state)["required_data_retrieved"] is False
+    state.route = state.route.model_copy(update={"temporal_scope": AgentTemporalScope(mode="historical")})
+    assert CompletionEvaluator.data_checks(state)["required_data_retrieved"] is True
+
+
+###############################################################################
+def test_a_requested_variable_the_source_lacks_is_reported_as_unmet() -> None:
+    from server.services.agent.capability_execution import _unmet_requested_attributes
+    response = ProviderResponse(
+        capability_id="openmeteo_weather_forecast", provider_id="openmeteo", result_type="features",
+        payload={"features": [{"cloud_cover_mean": 20, "temperature_2m_max_c": 9}]}, coverage={"type": "grid_sample"},
+    )
+    request = ExecuteCapabilityInput(
+        capability_id="openmeteo_weather_forecast",
+        arguments={"requested_attributes": ["cloud cover", "visibility"]},
+    )
+    assert _unmet_requested_attributes(request, response, {}) == ["visibility"]
+
+
+###############################################################################
+def test_fallback_answers_carry_the_values_and_sources_the_question_asked_for() -> None:
+    forecast = ToolResult(
+        call_id="f", tool_name="execute_geospatial_capability", status="success", summary="Forecast returned.",
+        data={"hourly_forecast": [{"time": "t0", "cloud_cover": 10}, {"time": "t1", "cloud_cover": 90}], "units": {"cloud_cover": "%"}},
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+    assert "cloud cover 10 to 90 %" in AgentLoop._forecast_values(forecast)
+
+    state = AgentRunState(request_id="r", conversation_id="c", phase=AgentPhase.RECEIVE_REQUEST, user_message="what data?")
+    state.goal = AgentGoal(goal="what data?", task_mode="execute", presentation="text", operation="discover_available_map_data", location_mode="target")
+    state.tool_results = [ToolResult(
+        call_id="d", tool_name="discover_geospatial_capabilities", status="success", summary="Found 1 eligible capabilities.",
+        data={"capabilities": [{"id": "wikidata_place_facts", "name": "Wikidata Place Facts", "summary": "Population of a place."}]},
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )]
+    assert "Wikidata Place Facts: Population of a place." in AgentLoop._evidence_findings(state)
+
+
+###############################################################################
+def test_requested_forecast_variables_survive_the_model_observation_projection() -> None:
+    from server.domain.agent.tool_result import _project_result_data
+    data = {"kind": "weather_forecast", "hourly_forecast": [{"time": "t0", "temperature_2m": 5, "cloud_cover": 40}], "requested_fields": ["cloud_cover"]}
+    projected, _ = _project_result_data("execute_geospatial_capability", data, max_chars=4000)
+    assert isinstance(projected, dict) and projected["hourly_forecast"]["fields"][-1] == "cloud_cover" and projected["hourly_forecast"]["rows"][0][-1] == 40
+
+
+###############################################################################
+def test_imagery_only_answer_names_the_missing_values() -> None:
+    from server.services.agent.completion import imagery_only_note
+    state = AgentRunState(request_id="r", conversation_id="c", phase=AgentPhase.RECEIVE_REQUEST, user_message="max temperature")
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute", presentation="text", location_mode="none",
+        capability_queries=["temperature"], temporal_scope=AgentTemporalScope(mode="historical", aggregation="maximum"),
+    )
+    state.tool_results = [ToolResult(
+        call_id="lst", tool_name="execute_geospatial_capability", status="success", summary="raster",
+        metadata=ToolExecutionMetadata(duration_ms=0, result_type="raster"),
+    )]
+    assert "no numeric values" in imagery_only_note(state) and "maximum temperature" in imagery_only_note(state)

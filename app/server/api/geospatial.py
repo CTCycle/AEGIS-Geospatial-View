@@ -24,6 +24,7 @@ from server.services.geospatial.api_service import (
     GeospatialInvalidRequestError,
     GeospatialProviderResponseError,
     GeospatialTileCredentialError,
+    GeospatialTileNoDataError,
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
@@ -36,6 +37,7 @@ GEOSPATIAL_ERROR_STATUS = {
     GeospatialCapabilityDisabledError: status.HTTP_403_FORBIDDEN,
     GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
     GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
+    GeospatialTileNoDataError: status.HTTP_404_NOT_FOUND,
     GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,
     GeospatialTileRequestError: status.HTTP_502_BAD_GATEWAY,
 }

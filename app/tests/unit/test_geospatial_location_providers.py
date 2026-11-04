@@ -851,3 +851,62 @@ def test_accepts_canonical_request_fields() -> None:
 def test_rejects_removed_request_fields(removed_field: str, value: object) -> None:
     with pytest.raises(ValidationError):
         LocationSearchRequest.model_validate({**_base_payload(), removed_field: value})
+
+###############################################################################
+def test_nominatim_does_not_rival_an_exact_city_with_a_longer_name_that_only_lists_it_as_alias() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    city = {
+        "display_name": "Saint-Étienne, Loire, Auvergne-Rhône-Alpes, France", "lat": 45.43, "lon": 4.39,
+        "confidence": 0.82, "geocoder_importance": 0.65,
+        "selected_result_type": "administrative", "selected_address_type": "city",
+        "address": {"city": "Saint-Étienne", "state": "Auvergne-Rhône-Alpes", "country": "France"},
+        "namedetails": {"name": "Saint-Étienne", "name:fr": "Saint-Étienne"},
+    }
+    village = {
+        "display_name": "Saint-Étienne-la-Cigogne, Plaine-d'Argenson, Nouvelle-Aquitaine, France", "lat": 46.2, "lon": -0.4,
+        "confidence": 0.8159, "geocoder_importance": 0.52,
+        "selected_result_type": "village",
+        "address": {"village": "Saint-Étienne-la-Cigogne", "state": "Nouvelle-Aquitaine", "country": "France"},
+        "namedetails": {"name": "Saint-Étienne-la-Cigogne", "alt_name": "Saint-Étienne"},
+    }
+
+    assert service._find_ambiguous_candidates(
+        [city, village], expected_location_type="city", query="Saint-Etienne, France", has_parent_context=True
+    ) == []
+
+
+###############################################################################
+def test_nominatim_retries_a_transient_dns_failure_but_not_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.error import URLError
+    import socket
+
+    import server.services.geospatial.nominatim as module
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"[]"
+
+    def run(failures: list[Exception]) -> int:
+        calls: list[int] = []
+
+        def fake_urlopen(*args: object, **kwargs: object) -> _Response:
+            calls.append(1)
+            if failures:
+                raise failures.pop(0)
+            return _Response()
+
+        monkeypatch.setattr(module, "urlopen", fake_urlopen)
+        monkeypatch.setattr(module.time, "sleep", lambda _s: None)
+        service = NominatimService()
+        service._min_request_interval_s = 0.0  # pyright: ignore[reportPrivateUsage]
+        service.perform_request({"q": f"x{len(calls)}-{id(failures)}"})
+        return len(calls)
+
+    assert run([URLError(OSError(11001, "getaddrinfo failed"))]) == 2
+    assert run([URLError(socket.timeout("timed out"))]) == 1

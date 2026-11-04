@@ -637,3 +637,35 @@ def test_raster_http_classifies_oversized_response(monkeypatch: pytest.MonkeyPat
     assert error.value.diagnostic.failure_phase == "response_headers"
     assert error.value.diagnostic.status_code == 200
     assert error.value.diagnostic.content_length == 9
+###############################################################################
+def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import server.services.geospatial.openmeteo as module
+
+    monkeypatch.setattr(module, "WEATHER_GRID_BATCH_RETRY_DELAY_S", 0.0)
+    service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
+    points = [(45.0, 9.0), (46.0, 10.0)]
+
+    def grid(fail_times: int) -> tuple[list[object], list[str], int]:
+        attempts: list[int] = []
+
+        async def batch(batch_points: list[tuple[float, float]], *args: object) -> list[object]:
+            attempts.append(1)
+            if len(attempts) <= fail_times:
+                raise module.OpenMeteoRequestError("Open-Meteo request failed: HTTP 503", status_code=503)
+            return [{"sample": point} for point in batch_points]
+
+        service._weather_grid_batch = batch  # type: ignore[method-assign]
+        reasons: list[str] = []
+        samples = run_async_in_thread(
+            service.get_weather_grid(points, 0, failure_reasons=reasons)
+        )
+        return list(samples), reasons, len(attempts)
+
+    recovered, reasons, attempts = grid(1)
+    assert recovered == [{"sample": point} for point in points] and not reasons and attempts == 2
+
+    # A persistent failure of the only batch still raises (nothing to disclose).
+    with pytest.raises(module.OpenMeteoRequestError):
+        grid(2)

@@ -216,10 +216,14 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
     "index",
     "latest",
     "live",
+    "measurement",
+    "measurements",
     "near",
     "nearby",
     "now",
     "over",
+    "reading",
+    "readings",
     "recent",
     "retrieve",
     "search",
@@ -633,6 +637,26 @@ class CapabilityRegistry:
         ]
 
     # -------------------------------------------------------------------------
+    def servable_queries(self, queries: Sequence[str]) -> list[str]:
+        """Return the queries at least one catalog capability could cover.
+
+        A paraphrase no manifest names ("sky clarity viewing conditions")
+        can never be satisfied, so it must not become an obligation.
+        """
+
+        snapshot = self._ensure_snapshot()
+        searchable = [
+            _searchable_text(item)
+            for collection in (snapshot.overlays, snapshot.cameras, snapshot.transit, snapshot.tools)
+            for item in collection
+        ]
+        return [
+            query for query in queries
+            if (tokens := _raw_query_tokens([query]).difference(_ROUTING_CONTEXT_TOKENS))
+            and any(tokens.intersection(terms) for terms in searchable)
+        ]
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         normalized = str(capability_id).strip()
         if not normalized:
@@ -899,6 +923,10 @@ def _contract_supports(
         for item in contract.get("supported_scope_kinds", [])
         if str(item).strip()
     }
+    # A point-valued source answers "around <place>" for that place: a radius
+    # request is served by any source that supports radius or a point query.
+    if normalized_scope == "radius" and "point" in scopes:
+        scopes.add("radius")
     if normalized_scope and scopes and normalized_scope not in scopes:
         return False
 

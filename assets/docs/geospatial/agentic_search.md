@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-10-31
+Last updated: 2026-11-04
 
 ## Summary
 
@@ -332,7 +332,35 @@ picks only `steps` (1–4 zoom levels or half-view moves), `direction` (pan) and
 `anchor` (`current_view` or the shown place). The server computes the new
 bounds from the client-reported view, and the browser fits to them. A request
 that names a centre always zooms on the shown place. Bounds are clamped to the
-renderable world (±85° latitude).
+renderable world (±85° latitude). A location-only map of several named places
+takes one `fit_location`; the harness then widens the view to the padded union
+of every resolved place, and `apply_map_plan` is rejected (`targets_not_in_view`)
+only if a place still cannot be framed.
+
+Dated rasters report their own temporal coverage. NASA GIBS compares the
+requested day with the layer's catalog time extent: a covered day marks the
+temporal scope satisfied, an uncovered day (not yet published or never
+published) returns `valid_empty` with the layer's latest available date, and an
+upstream tile 404 is answered as HTTP 404 (no data), not 502 (provider fault).
+
+Analytical contract (Phase 3). `requested_attributes` that the Open-Meteo
+adapter offers (for example `cloud_cover`) are fetched and reported: grid
+features carry `<variable>_mean` over the window, point forecasts keep the
+variable in the hourly rows the model sees; an attribute a weather/air-quality
+source lacks is listed in `unmet_requested_attributes` with a warning.
+`transform_evidence` fails (`invalid_transform`, naming the numeric fields that
+exist) when it sorts, filters or aggregates on a field no record has, and drops
+located records that fall in another country than the single requested country
+(`excluded_outside_scope_count`). A request that asks for a maximum, minimum,
+average or similar over a period is a request for values: raster imagery never
+satisfies it, and the stop text says that only imagery was available. Data
+obligations derived from the route's queries ignore paraphrases no catalog
+entry names. A catalog-discovery answer falls back to the discovered sources,
+a forecast answer to the variable ranges, and a multi-place answer must name
+every resolved place (`check_final_answer`, `required_targets`). A radius
+request ("around Lugano") is served by point sources, generic words such as
+"measurements" no longer block a subject match, and a city name is not made
+ambiguous by a longer name that only lists it as an alternate name.
 
 A basemap style named by the user outranks the model's choice. Conflicting
 styles, unsupported commercial styles (Google, Bing, Mapbox, Apple, Yandex,
@@ -424,3 +452,5 @@ still miss extremes between samples. Earthquake catalogs remain incomplete
 below their completeness magnitude. Masks are simplified 1:50m shapes, so
 islands under about 5 km and fine coastlines are approximate. Attached images
 live in memory only and are lost on restart; only one image per request.
+
+Recovery keeps failures visible. A route revision re-compiles the goal but keeps a `required_data_retrieved` obligation the earlier route had, so a bare location fit cannot satisfy a data request. Exhausted model-transport retries end with a model-service-outage message, distinct from geospatial provider outages and from invalid tool calls. Nominatim retries DNS, 429 and 5xx failures (not timeouts); an Open-Meteo grid batch retries once on a 5xx, and a still-missing batch makes the result `partial` with a warning naming the cause. A dated raster whose layer publishes no imagery for that day (`temporal_scope_satisfied` false with a `latest_available_date`) stops the run at once with that disclosure. A tool the step did not expose is rejected with a hint to issue it in the next step; `fit_evidence` on evidence without a bbox fits the target location.

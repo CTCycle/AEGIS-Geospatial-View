@@ -379,6 +379,10 @@ def _project_result_data(
             if is_weather
             else ["time", "pm10", "pm2_5", "nitrogen_dioxide", "ozone"]
         )
+        # Variables the request named explicitly always reach the model.
+        requested_fields = data.get("requested_fields")
+        if is_json_array(requested_fields):
+            fields += [str(name) for name in requested_fields if name not in fields]
         rows = [
             [row.get(key) for key in fields]
             for row in data["hourly_forecast"][:24]

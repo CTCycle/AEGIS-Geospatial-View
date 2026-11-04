@@ -227,3 +227,19 @@ def test_reading_provider_records_as_text_is_not_filtered_by_the_inspect_label()
     assert searchable
     for capability_id in searchable:
         assert capability_id in _shortlist([capability_id], operation="inspect")
+
+
+###############################################################################
+@pytest.mark.parametrize("query", ["air quality measurements", "air quality"])
+def test_air_quality_is_discoverable_around_a_place_whatever_the_wording(query: str) -> None:
+    candidates = REGISTRY.shortlist(
+        domains={CapabilityDomain.MIXED}, queries=[query], explicit_ids=[], runtime_registry=cast(Any, _Runtime()),
+        limit=50, scope_kind="radius",
+    )
+
+    assert "openmeteo_air_quality_forecast" in {item["id"] for item in candidates}
+
+
+###############################################################################
+def test_a_paraphrase_no_capability_names_is_not_an_obligation() -> None:
+    assert REGISTRY.servable_queries(["cloud cover forecast", "sky clarity astronomical viewing conditions"]) == ["cloud cover forecast"]

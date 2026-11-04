@@ -261,6 +261,12 @@ def grade_scenario(
     unresolved = _unrecovered_failures(calls)
     last = runs[-1]
     answer, terminal_type = _final_text(runs)
+    # A partial result executed the call; it counts only when the run discloses
+    # the partiality (or no answer exists to judge), so it can never hide one.
+    partial_disclosed = render_mode != "browser" or bool(_DISCLOSURE.search(answer))
+    executed = successful + [
+        call for call in data_calls if call["status"] == "partial" and partial_disclosed
+    ]
     operation_status = _operation_status(runs)
     clarification = expected["clarification"]
     families_expected = list(expected.get("capability_families", []))
@@ -329,8 +335,8 @@ def grade_scenario(
     ]
     tool_reasons: list[str] = []
     minimum = int(expected["minimum_tool_count"])
-    if len(successful) < minimum and not asked:
-        tool_reasons.append(f"{len(successful)} successful data calls, expected at least {minimum}")
+    if len(executed) < minimum and not asked:
+        tool_reasons.append(f"{len(executed)} successful data calls, expected at least {minimum}")
     if len(invalid) > MAX_INVALID_CALLS:
         tool_reasons.append(f"{len(invalid)} model-induced invalid calls (limit {MAX_INVALID_CALLS})")
     signatures = [(c["tool"], repr(sorted(c["arguments"].items()))) for c in successful]
@@ -348,12 +354,12 @@ def grade_scenario(
     # Evidence provenance -----------------------------------------------------
     provenance_reasons: list[str] = []
     if expected["provenance_required"] and minimum > 0 and not asked:
-        if not successful:
+        if not executed:
             provenance_reasons.append("no successful tool result backs the answer")
     dims["provenance"] = _dimension(
         FAIL if provenance_reasons else (PASS if expected["provenance_required"] else NA),
         reasons=provenance_reasons,
-        evidence_refs=sum(len(c["evidence_refs"]) for c in successful),
+        evidence_refs=sum(len(c["evidence_refs"]) for c in executed),
     )
 
     # Render verdict ----------------------------------------------------------
@@ -425,7 +431,7 @@ def grade_scenario(
         "render_verified": render["verdict"] == PASS,
         "metrics": {
             "data_calls": len(data_calls),
-            "successful_data_calls": len(successful),
+            "successful_data_calls": len(executed),
             "invalid_calls": len(invalid),
             "turns": len(runs),
         },

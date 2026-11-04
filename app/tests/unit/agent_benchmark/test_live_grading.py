@@ -89,6 +89,21 @@ def test_success_without_any_successful_tool_is_a_false_success() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_partial_result_counts_as_executed_only_when_partiality_is_disclosed() -> None:
+    events = _call("execute_geospatial_capability", WEATHER, call_id="b", status="partial")
+
+    disclosed = grade_scenario(
+        _scenario(), [_run(events, answer="Only part of the grid is available.")], render_mode="browser"
+    )
+    silent = grade_scenario(_scenario(), [_run(events, answer="Done.")], render_mode="browser")
+
+    assert disclosed["metrics"]["successful_data_calls"] == 1
+    assert disclosed["false_success"] is False
+    assert silent["metrics"]["successful_data_calls"] == 0
+    assert silent["false_success"] is True
+
+
+# -----------------------------------------------------------------------------
 def test_disclosed_failure_is_not_a_false_success() -> None:
     events = _call("execute_geospatial_capability", WEATHER, call_id="b", status="failed", code="provider_timeout")
 

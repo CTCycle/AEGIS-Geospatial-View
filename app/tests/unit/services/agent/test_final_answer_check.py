@@ -88,3 +88,24 @@ def test_completeness_wording_passes_when_the_limitation_is_disclosed() -> None:
         "The request was fully completed.",
         target_names=["Rome"],
     )
+
+
+###############################################################################
+def test_claiming_an_unresolved_target_without_disclosure_is_flagged() -> None:
+    claim = "The map now shows the Brandenburg Gate."
+    assert check_final_answer(
+        claim, target_names=["Berlin"], unresolved_targets=["Brandenburg Gate"]
+    )
+    assert not check_final_answer(
+        "Berlin is shown; the Brandenburg Gate could not be resolved unambiguously.",
+        target_names=["Berlin"],
+        unresolved_targets=["Brandenburg Gate"],
+    )
+
+
+###############################################################################
+def test_an_answer_about_two_places_must_name_both() -> None:
+    required = [["Paris", "Paris, France"], ["Berlin", "Berlin, Germany"]]
+
+    assert check_final_answer("The map now shows Paris.", target_names=["Paris", "Berlin"], required_targets=required)
+    assert not check_final_answer("The map now shows Paris and Berlin.", target_names=["Paris", "Berlin"], required_targets=required)

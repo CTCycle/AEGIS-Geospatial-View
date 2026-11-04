@@ -5,10 +5,11 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 import asyncio
 import logging
 import math
+import re
 import threading
 import time
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import httpx
@@ -17,6 +18,8 @@ from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSetti
 from server.services.geospatial.providers.http import async_http_client, parse_retry_after
 
 WEATHER_GRID_BATCH_SIZE = 100
+WEATHER_GRID_BATCH_ATTEMPTS = 2
+WEATHER_GRID_BATCH_RETRY_DELAY_S = 1.0
 # Grid batches in flight per call. Every request still reserves its own rate
 # slot, so this bounds overlap rather than the provider request rate.
 WEATHER_GRID_MAX_CONCURRENT_BATCHES = 3
@@ -87,6 +90,23 @@ def window_query_params(window: tuple[datetime, datetime]) -> dict[str, str]:
     }
 
 ###############################################################################
+def requested_hourly_variables(attributes: object) -> tuple[str, ...]:
+    """Hourly weather variables named by requested attributes.
+
+    Names are compared without case or separators ("cloud cover" is
+    ``cloud_cover``); the grid always carries temperature and precipitation.
+    Attributes the service does not offer are left to the caller to report.
+    """
+
+    if not isinstance(attributes, list):
+        return ()
+    wanted = {re.sub(r"[^a-z0-9]+", "", str(item).casefold()) for item in cast(list[object], attributes)}
+    return tuple(
+        name for name in OpenMeteoService.WEATHER_VARIABLES
+        if name.replace("_", "") in wanted and name not in OpenMeteoService.WEATHER_GRID_VARIABLES
+    )
+
+###############################################################################
 class OpenMeteoService:
     WEATHER_VARIABLES = (
         "temperature_2m",
@@ -100,6 +120,7 @@ class OpenMeteoService:
         "precipitation_probability",
         "cloud_cover",
     )
+    WEATHER_GRID_VARIABLES = ("temperature_2m", "precipitation")
     WEATHER_CURRENT_VARIABLES = (
         "temperature_2m",
         "precipitation",
@@ -166,6 +187,8 @@ class OpenMeteoService:
         *,
         forecast_days: int = 1,
         window: tuple[datetime, datetime] | None = None,
+        extra_variables: tuple[str, ...] = (),
+        failure_reasons: list[str] | None = None,
     ) -> list[dict[str, Any] | None]:
         """Fetch a grid in cached multi-location calls of at most 100 points.
 
@@ -186,16 +209,25 @@ class OpenMeteoService:
             batch: list[tuple[float, float]],
         ) -> tuple[list[dict[str, Any] | None], OpenMeteoServiceError | None]:
             async with semaphore:
-                try:
-                    return await self._weather_grid_batch(batch, past_days, forecast_days, window), None
-                except OpenMeteoRateLimitError:
-                    raise
-                except OpenMeteoServiceError as exc:
-                    LOGGER.warning(
-                        "openmeteo grid batch failed points=%d error=%s",
-                        len(batch), exc,
-                    )
-                    return [None] * len(batch), exc
+                for attempt in range(WEATHER_GRID_BATCH_ATTEMPTS):
+                    try:
+                        return await self._weather_grid_batch(batch, past_days, forecast_days, window, extra_variables), None
+                    except OpenMeteoRateLimitError:
+                        raise
+                    except OpenMeteoServiceError as exc:
+                        LOGGER.warning(
+                            "openmeteo grid batch failed points=%d attempt=%d error=%s",
+                            len(batch), attempt + 1, exc,
+                        )
+                        status = getattr(exc, "status_code", None)
+                        transient = status is None or status >= 500
+                        if attempt + 1 < WEATHER_GRID_BATCH_ATTEMPTS and transient:
+                            await asyncio.sleep(WEATHER_GRID_BATCH_RETRY_DELAY_S)
+                            continue
+                        if failure_reasons is not None:
+                            failure_reasons.append(str(exc))
+                        return [None] * len(batch), exc
+                raise AssertionError("unreachable")
 
         tasks = [asyncio.create_task(fetch(batch)) for batch in batches]
         try:
@@ -219,12 +251,13 @@ class OpenMeteoService:
         past_days: int,
         forecast_days: int = 1,
         window: tuple[datetime, datetime] | None = None,
+        extra_variables: tuple[str, ...] = (),
     ) -> list[dict[str, Any] | None]:
         params = {
             "latitude": ",".join(f"{lat:.5f}" for lat, _ in batch),
             "longitude": ",".join(f"{lon:.5f}" for _, lon in batch),
             "current": "temperature_2m,precipitation",
-            "hourly": "temperature_2m,precipitation",
+            "hourly": ",".join((*self.WEATHER_GRID_VARIABLES, *extra_variables)),
             **(
                 window_query_params(window)
                 if window is not None

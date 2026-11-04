@@ -62,6 +62,8 @@ class NominatimService:
             "quartiere",
         }
     )
+    TRANSIENT_ATTEMPTS = 3
+    TRANSIENT_BACKOFF_S = 1.0
     ACRONYM_STOP_WORDS = frozenset(
         {"a", "an", "and", "at", "de", "del", "di", "la", "of", "the"}
     )
@@ -437,6 +439,9 @@ class NominatimService:
         )
         if second is None:
             return []
+        if expected in {"city", "municipality"} and self._names_query(first, query) and not self._names_query(second, query):
+            # A rival that is not named as asked is not a reading of the request.
+            return []
         first_confidence = float(first.get("confidence") or 0.0)
         second_confidence = float(second.get("confidence") or 0.0)
         confidence_gap = abs(first_confidence - second_confidence)
@@ -514,6 +519,24 @@ class NominatimService:
             if is_json_object(values):
                 parts.extend(str(value) for value in values.values())
         return " ".join(part for part in parts if part).strip()
+
+    # -------------------------------------------------------------------------
+    def _names_query(self, candidate: dict[str, Any], query: str) -> bool:
+        """Whether the candidate's own name is the requested place name."""
+
+        head = self.normalize_component(query.split(",")[0])
+        name = candidate.get("name")
+        if not isinstance(name, str):
+            # Formatted results carry the name as the display name's head.
+            name = str(candidate.get("display_name") or "").split(",")[0]
+        # Language variants of the name count ("Milano"); alternate names do not.
+        names = [name] + [
+            value for key, value in json_object(candidate.get("namedetails")).items()
+            if key == "name" or str(key).startswith("name:")
+        ]
+        return bool(head) and any(
+            self.normalize_component(str(value)) == head for value in names
+        )
 
     # -------------------------------------------------------------------------
     def _city_candidate_matches_query(
@@ -761,13 +784,25 @@ class NominatimService:
         cache: OrderedDict[str, Any],
         request_kind: str,
     ) -> Any:
-        self._wait_for_rate_limit_slot()
         request = Request(url, headers={"User-Agent": self.user_agent})
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                payload = response.read()
-        except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            logger.warning("Nominatim %s request failed: %s", request_kind, exc)
+        payload: bytes | None = None
+        for attempt in range(1, self.TRANSIENT_ATTEMPTS + 1):
+            self._wait_for_rate_limit_slot()
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    payload = response.read()
+                break
+            except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
+                logger.warning(
+                    "Nominatim %s request failed (attempt %d): %s",
+                    request_kind,
+                    attempt,
+                    exc,
+                )
+                if attempt == self.TRANSIENT_ATTEMPTS or not self._is_transient_failure(exc):
+                    return None
+                time.sleep(self.TRANSIENT_BACKOFF_S * attempt)
+        if payload is None:
             return None
         try:
             data = json.loads(payload.decode("utf-8"))
@@ -778,6 +813,22 @@ class NominatimService:
             return None
         self._cache_set(cache, cache_key, data)
         return data
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_transient_failure(exc: Exception) -> bool:
+        """Fast-failing outages (DNS, connection reset, 429/5xx) may recover.
+
+        Timeouts are not retried: they already consumed the request window.
+        """
+
+        if isinstance(exc, HTTPError):
+            return exc.code == 429 or exc.code >= 500
+        if isinstance(exc, (socket.timeout, TimeoutError)):
+            return False
+        if isinstance(exc, URLError):
+            return not isinstance(exc.reason, (socket.timeout, TimeoutError))
+        return False
 
     # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self) -> None:
@@ -1116,6 +1167,10 @@ class NominatimService:
                 address=address,
                 query=query,
             )
+            if expected_location_type in {"city", "municipality"} and location_type_bonus >= 3.0 and self._names_query(candidate, query):
+                # A locality named exactly as asked outranks one that only
+                # contains the name ("Saint-Etienne" vs "Saint-Etienne-la-Cigogne").
+                location_type_bonus += 0.2
             # Confidence rewards tight bounding boxes, so a same-name hamlet
             # can outscore a major city; the provider's prominence breaks it.
             importance_bonus = 0.3 * float(formatted.get("geocoder_importance") or 0.0)

@@ -170,6 +170,7 @@ class EvidenceToolHandler:
                 for record in parent_records:
                     _properties(record)["source_ref"] = ref
             records.extend(parent_records)
+        records, outside_scope = _within_requested_country(records, state)
         operations = [operation.model_dump(mode="python") for operation in request.operations]
         for operation in operations:
             if operation.get("op") != "distance_from":
@@ -226,6 +227,7 @@ class EvidenceToolHandler:
                 "bbox": bbox,
                 "located_record_count": len(points),
                 "place_labelled_count": labelled,
+                "excluded_outside_scope_count": outside_scope,
                 "value_fields": value_fields,
                 "map_eligibility": "renderable" if points else "not_renderable",
             },
@@ -242,6 +244,7 @@ class EvidenceToolHandler:
             data={"record_count": len(transformed), "parent_refs": refs,
                   "preview": transformed[:5], "located_record_count": len(points),
                   "unlocated_record_count": unlocated, "place_labelled_count": labelled,
+                  "excluded_outside_scope_count": outside_scope,
                   "parent_coverage": [parent.get("coverage") for parent in parents]},
             evidence_refs=[evidence_ref],
             metadata=ToolExecutionMetadata(
@@ -270,6 +273,35 @@ class EvidenceToolHandler:
                 properties["label_kind"] = "nearest_reverse_geocoded"
                 labelled += 1
         return labelled
+
+###############################################################################
+def _within_requested_country(
+    records: list[dict[str, Any]], state: AgentRunState
+) -> tuple[list[dict[str, Any]], int]:
+    """Drop located records that lie in another country than the requested one.
+
+    A ranking for one country must not admit neighbouring land that the
+    sampled bounding box happens to cover. Offshore points have no country
+    and stay; only a different country excludes a record.
+    """
+
+    targets = state.goal.target_ids if state.goal is not None else []
+    locations = [
+        location
+        for key, location in state.location_refs.items()
+        if any(location_ref_matches(str(target), str(key), location.label) for target in targets)
+    ]
+    if len(locations) != 1 or locations[0].location_type != "country":
+        return records, 0
+    code = country_at(locations[0].longitude, locations[0].latitude)
+    if code is None:
+        return records, 0
+    kept: list[dict[str, Any]] = []
+    for record in records:
+        point = _record_point(record)
+        if point is None or (found := country_at(point[0], point[1])) is None or found == code:
+            kept.append(record)
+    return kept, len(records) - len(kept)
 
 ###############################################################################
 def _decode_json(raw: bytes) -> Any:
@@ -366,6 +398,22 @@ def _apply_operations(
         op = str(operation.get("op") or "")
         if op not in allowed:
             return result, "Only supported declarative evidence operations are allowed."
+        field = str(operation.get("field") or "")
+        if (
+            op in {"sort", "attribute_filter", "aggregate"}
+            and field
+            and result
+            and not any(field in _properties(item) for item in result)
+        ):
+            # Ranking or filtering on an absent field would succeed silently
+            # on the record order; the requested analysis is not applicable.
+            available = sorted({key for item in result for key, value in _properties(item).items()
+                                if _numeric(value) is not None})[:16]
+            return result, (
+                f"The evidence has no '{field}' field, so {op} cannot be applied. "
+                f"Numeric fields available: {', '.join(available) or 'none'}. "
+                "Retrieve the missing variable or state that it is unavailable."
+            )
         if op == "attribute_filter":
             field = str(operation.get("field") or "")
             operator = str(operation.get("operator") or "eq")

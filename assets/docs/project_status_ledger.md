@@ -1,12 +1,15 @@
 # Project Status Ledger
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 The [2026-11-03 Wave 3 live validation](validation/live_eval_20261103_wave3.md) re-ran every Wave 2 non-PASS turn plus the Wave 3 framing, forecast-window, H-03 and discovery checks on the live UI against `develop@d4f4c1e2`, and the graded runner (38 scenarios per model).
 - **Counts:** DeepSeek 11 PASS / 3 PARTIAL / 5 FAIL / 2 BLOCKED of 21 turns; Beam Free 9 / 6 / 9 / 1 of 25. Turn sets differ from Wave 2, so the counts are indicative. Runner: DeepSeek 27 of 38 scenarios pass (Wave 2: 25), Beam 23 of 38 (22), no false-success flag; DeepSeek has no regression, Beam has three (unexposed-tool calls counted as invalid calls).
 - **Wave 3 effect:** route revision no longer crashes (9 of 9 revised); the forecast window is calendar-day aligned per target; H-03 ends honestly (`unsupported_request`, no loop) on both models; Madrid maximum temperature, B2, R2 tomorrow and Beam C1 now PASS.
 - **False successes:** 2 (DeepSeek Brandenburg Gate completion with the Berlin map, stored-completion only; Beam recap claiming an unapplied magnitude filter). The zero target is missed.
-- **Still open:** "Show Paris and Berlin" frames one city, dated GIBS rasters fail map validation (no raster temporal coverage), Beam unexposed-tool calls and invented evidence refs, generic "Results gathered so far" answers, Beam B4 render failure, ourairports and Overpass availability.
+- **Phase 2 (2026-11-04, uncommitted):** multi-place location-only maps frame the union of all places, dated GIBS rasters carry verified temporal coverage, and an unpublished GIBS date ends honestly with the latest available date. See [P2 report](../QA/p2-map-evidence-20261104/report.md).
+- **Phase 3 (2026-11-04, uncommitted):** requested weather variables reach the provider and ranking on a missing field fails explicitly; country rankings exclude neighbouring-country points; imagery never satisfies a requested maximum/minimum; air-quality discovery, the Saint-Etienne ambiguity, discovery-question fallbacks and two-place answers fixed. See [P3 report](../QA/p3-routing-synthesis-20261104/report.md).
+- **Phase 4 (2026-11-04, uncommitted):** a route revision can no longer drop `required_data_retrieved`; model-provider transport outages are named as such; Nominatim retries fast transient failures and Open-Meteo grid batches retry once on 5xx with the cause disclosed on a partial grid; a dated raster with no imagery stops in one step with the latest date; a raster `fit_evidence` falls back to the target location; the live grader counts a disclosed `partial` result as executed. See [P4 report](../QA/p4-recovery-20261104/report.md).
+- **Still open:** Beam unexposed-tool calls and invented evidence refs, generic "Results gathered so far" answers, Beam B4 render failure, ourairports and Overpass availability.
 
 The [2026-11-03 Wave 2 live validation](validation/live_eval_20261103_wave2.md) ran the Wave 1 non-PASS turns and the Wave 2 scenarios on the live UI against `develop@740792f4`, plus the graded runner (38 scenarios per model).
 - **Counts:** DeepSeek 7 PASS / 6 PARTIAL / 3 FAIL / 2 BLOCKED of 18 turns; Beam Free 8 / 5 / 11 / 0 of 24. Re-run sets differ from Wave 1, so the counts are indicative only. Runner: DeepSeek 25 of 38 scenarios pass, Beam 22 of 38, no false-success flag.

@@ -55,6 +55,10 @@ class _Factory:
 class _CapabilityRegistry:
 
     # -------------------------------------------------------------------------
+    def servable_queries(self, queries: Any) -> list[str]:
+        return list(queries)
+
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         return {"id": capability_id} if capability_id == "places:hospitals" else None
 

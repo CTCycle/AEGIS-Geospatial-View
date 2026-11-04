@@ -137,7 +137,7 @@ async def test_weather_grid_region_refinement_future_hours_and_provenance():
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days):
+        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
             requested.append(points)
             row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 30},
                    "hourly": {"time": ["2026-10-20T11:00", "2026-10-20T12:00", "2026-10-20T13:00"],
@@ -172,7 +172,7 @@ async def test_weather_grid_country_mask_excludes_neighbouring_countries():
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days):
+        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
             requested.extend(points)
             row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
                    "hourly": {"time": ["2026-10-20T12:00"], "temperature_2m": [10], "precipitation": [0]}}
@@ -375,7 +375,7 @@ class _GridService:
     def __init__(self, coarse, refined):
         self.stages = [coarse, refined]
 
-    async def get_weather_grid(self, points, past_days):
+    async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
         stage = self.stages.pop(0)
         if isinstance(stage, Exception):
             raise stage
@@ -463,7 +463,7 @@ async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(availa
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, forecast_days=None, window=None):
+        async def get_weather_grid(self, points, past_days, forecast_days=None, window=None, extra_variables=(), failure_reasons=None):
             requested.append(window)
             sample = {"utc_offset_seconds": 3600, "current": {"time": local_hours[0].isoformat(timespec="minutes"), "temperature_2m": 10},
                       "hourly": {"time": [stamp.isoformat(timespec="minutes") for stamp in local_hours],
@@ -907,3 +907,27 @@ def test_openchargemap_reads_local_snapshot(tmp_path) -> None:
     )
     assert response.payload["sourceMode"] == "local-snapshot"
     assert response.payload["featureCount"] == 1
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_weather_grid_carries_a_requested_hourly_variable_to_the_provider_and_features():
+    seen: list[tuple[str, ...]] = []
+
+    ###############################################################################
+    class Service:
+        weather_base_url = "https://api.open-meteo.com/v1/forecast"
+
+        # -------------------------------------------------------------------------
+        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
+            seen.append(extra_variables)
+            row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
+                   "hourly": {"time": ["2026-10-20T11:00", "2026-10-20T12:00"], "temperature_2m": [9, 10],
+                              "precipitation": [0, 0], "cloud_cover": [10, 30]},
+                   "hourly_units": {"cloud_cover": "%"}}
+            return [row for _ in points]
+    result = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
+        capability_id="openmeteo_weather_forecast", bbox=(5.95, 45.8, 10.5, 47.8),
+        params={"sampling": "area", "mask_countries": ["CH"], "requested_attributes": ["cloud cover", "visibility"]}))
+    assert seen[0] == ("cloud_cover",)
+    assert all(feature["cloud_cover_mean"] == 20 for feature in result.payload["features"])
+    assert result.units["cloud_cover_mean"] == "%"

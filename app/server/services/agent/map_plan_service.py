@@ -27,15 +27,68 @@ from server.domain.agent.tool_result import (
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.tool_registry import is_active_map_update
+from server.services.agent.tool_registry import (
+    is_active_map_update,
+    unresolved_route_targets,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.map_session_builder import (
     MapPlanBuildError,
     MapSessionBuilder,
+    session_view_bbox,
     viewport_covering_evidence,
+    viewport_covering_points,
 )
 
 LOGGER = logging.getLogger(__name__)
+
+###############################################################################
+def _is_location_only_map(state: AgentRunState) -> bool:
+    route = state.route
+    contract = state.completion_contract
+    return not (
+        route is None
+        or contract is None
+        or contract.evidence_required
+        or route.analysis is not None
+        or route.location_mode != "target"
+        or route.presentation not in {"map", "both"}
+        or is_active_map_update(route, state)
+    )
+
+###############################################################################
+def targets_outside_view(state: AgentRunState, view: list[float]) -> list[str]:
+    """Requested places a location-only map view does not frame.
+
+    Evidence maps widen their view to the data and are checked per layer; a
+    location-only map has nothing else to prove a place is shown, so each
+    resolved route target must lie inside the view that will be rendered.
+    """
+
+    west, south, east, north = view
+    return [
+        target
+        for target, matches in _resolved_target_locations(state)
+        if not any(
+            west <= location.longitude <= east and south <= location.latitude <= north
+            for location in matches
+        )
+    ]
+
+###############################################################################
+def _resolved_target_locations(state: AgentRunState) -> list[tuple[str, list[Any]]]:
+    if not _is_location_only_map(state) or state.route is None:
+        return []
+    resolved: list[tuple[str, list[Any]]] = []
+    for target in state.route.target_refs:
+        matches = [
+            location
+            for key, location in state.location_refs.items()
+            if location_ref_matches(str(target), str(key), location.label)
+        ]
+        if matches:
+            resolved.append((str(target), matches))
+    return resolved
 
 ###############################################################################
 class EvidenceReader(Protocol):
@@ -88,6 +141,23 @@ class MapPlanService:
                 code="stale_map_revision",
                 message="The active map changed before this plan could be applied.",
                 recovery="replan",
+            )
+
+        unresolved = unresolved_route_targets(state) if _is_location_only_map(state) else []
+        if unresolved:
+            # A location from an earlier turn must not stand in for a requested
+            # place whose own resolution is missing, failed or ambiguous.
+            return self._failure(
+                context=context,
+                started=started,
+                error_type="state_conflict",
+                code="target_not_resolved",
+                message=(
+                    f"'{unresolved[0]}' is not resolved. Resolve it with "
+                    "resolve_geospatial_location first; if it is ambiguous, ask the "
+                    "user which place they mean instead of mapping another place."
+                ),
+                recovery="choose_alternate_tool",
             )
 
         location = self._location_for_plan(plan, state, active_session)
@@ -163,6 +233,29 @@ class MapPlanService:
                 candidate = candidate.model_copy(
                     update={"payload": payload},
                     deep=True,
+                )
+            # Several requested places need one view that contains them all,
+            # whatever the model's viewport actions framed.
+            candidate = viewport_covering_points(
+                candidate,
+                [
+                    (matches[-1].longitude, matches[-1].latitude)
+                    for _, matches in _resolved_target_locations(state)
+                ],
+            )
+            outside = targets_outside_view(state, session_view_bbox(candidate))
+            if outside:
+                return self._failure(
+                    context=context,
+                    started=started,
+                    error_type="semantic_validation",
+                    code="targets_not_in_view",
+                    message=(
+                        "The map view must contain every requested place. Not in view: "
+                        + ", ".join(outside)
+                        + ". Fit the viewport so all requested places are visible."
+                    ),
+                    recovery="correct_arguments",
                 )
         except MapPlanBuildError as exc:
             return self._failure(

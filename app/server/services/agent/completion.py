@@ -28,6 +28,46 @@ def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
         parsed = datetime.combine(parsed.date(), time.min, tzinfo=UTC) + timedelta(days=1)
     return parsed
 
+_NUMERIC_AGGREGATIONS = frozenset({
+    "maximum", "max", "minimum", "min", "mean", "average", "avg", "sum", "total", "median", "count",
+})
+
+###############################################################################
+def needs_numeric_values(state: AgentRunState) -> bool:
+    """Whether the request asks for computed values, not for imagery.
+
+    An analysis route or a maximum/minimum/average over a period is answered
+    by numeric records. A raster layer only paints a field: it carries no
+    values to rank, compare or aggregate, so it never satisfies such a request.
+    """
+
+    route = state.route
+    if route is None:
+        return False
+    return route.analysis is not None or (
+        route.temporal_scope.aggregation.strip().casefold() in _NUMERIC_AGGREGATIONS
+    )
+
+###############################################################################
+def imagery_only_note(state: AgentRunState) -> str:
+    """Name the gap when only raster imagery answered a request for values."""
+
+    if not needs_numeric_values(state) or state.route is None:
+        return ""
+    executed = [
+        result for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability" and result.status != "failed"
+    ]
+    if not executed or any(result.metadata.result_type != "raster" for result in executed):
+        return ""
+    query = state.route.capability_queries[0] if state.route.capability_queries else ""
+    aggregation = state.route.temporal_scope.aggregation
+    subject = query if aggregation == "none" or aggregation in query else f"{aggregation} {query}".strip()
+    return (
+        "Only map imagery layers were available for this request. They carry no numeric values, "
+        f"so the requested {subject or 'values'} could not be computed or compared."
+    )
+
 ###############################################################################
 def _result_location_ref(result: ToolResult) -> str:
     """Name the target a result belongs to: its query, else its first source."""
@@ -154,7 +194,7 @@ class CompletionEvaluator:
             "execute_geospatial_capability", "inspect_evidence", "transform_evidence"
         }]
         analysis = state.route is not None and state.route.analysis is not None
-        if analysis:
+        if needs_numeric_values(state):
             # Derived evidence inherits its parents' source; raster parents
             # cannot be transformed, so only located numeric records remain.
             results = [result for result in results if (
@@ -650,6 +690,8 @@ def follow_up_location_keys(state: AgentRunState) -> set[str]:
 __all__ = [
     "CompletionEvaluator",
     "describe_requirements",
+    "imagery_only_note",
+    "needs_numeric_values",
     "requested_transform_unmet",
     "follow_up_location_keys",
     "uncovered_map_targets",

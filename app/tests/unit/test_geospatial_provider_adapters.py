@@ -1,6 +1,7 @@
 from __future__ import annotations
 from tests.conftest import run_async_in_thread
 import pytest
+import re
 import time
 import httpx
 from datetime import UTC, datetime, timedelta
@@ -675,6 +676,48 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
         response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
     )
     assert response.attribution
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("day", "satisfied"),
+    [(datetime(2026, 5, 4, tzinfo=UTC), True), (datetime(2026, 5, 11, tzinfo=UTC), False)],
+)
+def test_nasa_gibs_provider_reports_whether_the_dated_layer_covers_the_day(
+    day: datetime, satisfied: bool
+) -> None:
+    response = run_async_in_thread(
+        NASAGIBSProvider(fetcher=_gibs_capabilities_fetcher).fetch(
+            ProviderRequest(
+                capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor", time=day
+            )
+        )
+    )
+
+    assert response.coverage is not None
+    assert response.coverage["temporal_scope_satisfied"] is satisfied
+    assert response.coverage["latest_available_date"] == "2026-05-10"
+    assert bool(response.warnings) is (not satisfied)
+    assert response.result_status == ("ok" if satisfied else "valid_empty")
+
+###############################################################################
+def test_nasa_gibs_provider_gives_no_temporal_verdict_without_a_time_extent() -> None:
+    async def fetcher(url: str, headers: dict[str, str] | None = None):
+        del headers
+        xml = GIBS_WMTS_XML if "wmts" in url else GIBS_WMS_XML
+        return re.sub(r"<Dimension>.*?</Dimension>|<Dimension .*?</Dimension>", "", xml, flags=re.S)
+
+    response = run_async_in_thread(
+        NASAGIBSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
+                time=datetime(2026, 5, 11, tzinfo=UTC),
+            )
+        )
+    )
+
+    assert response.coverage is None
+    assert response.result_status == "ok"
+    assert not response.warnings
 
 ###############################################################################
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:

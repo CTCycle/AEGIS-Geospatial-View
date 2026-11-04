@@ -74,10 +74,18 @@ from server.services.agent.tool_executor import (
 from server.services.agent.completion import (
     CompletionEvaluator,
     describe_requirements,
+    imagery_only_note,
+    needs_numeric_values,
     requested_transform_unmet,
 )
 from server.services.agent.policy_engine import route_allows_capability_execution
-from server.services.agent.tool_registry import analysis_complete, route_target_location_available, ToolRegistry
+from server.services.agent.tool_registry import (
+    analysis_complete,
+    route_target_location_available,
+    ToolRegistry,
+    resolved_route_target_names,
+    unresolved_route_targets,
+)
 from server.services.agent.vision_policy import (
     ITERATION_CALL_KIND,
     TERMINAL_CALL_KIND,
@@ -349,6 +357,7 @@ class AgentLoop:
                 requests_entities=self.capability_router.requests_catalog_entities(
                     state.user_message
                 ),
+                servable_queries=self.capability_router.capability_registry.servable_queries,
             )
             await self._refresh_capabilities_after_location(request, state, [])
             self._sync_task_state(state)
@@ -447,10 +456,17 @@ class AgentLoop:
                     "run_deadline_exhausted",
                     request,
                 )
+            transport_failure = exc.retryable or exc.timeout_origin == "provider_transport"
             return self._failed(
                 state,
                 request,
-                "The selected model could not complete this request.",
+                (
+                    "The model provider could not be reached or answered with a "
+                    f"transient error ({exc.code}) and retries did not recover. "
+                    "This is a model-service outage, not a map-data failure; try again shortly."
+                    if transport_failure
+                    else "The selected model could not complete this request."
+                ),
                 category=exc.category,
             )
         except TimeoutError:
@@ -773,6 +789,9 @@ class AgentLoop:
                 # it has concluded no tool can close the gap.  Keep its
                 # answer, disclose what is unmet, and do not call it a crash.
                 stop = ("insufficient_evidence", self._limitation_disclosure(state, final_text))
+                final_text = stop[1]
+            elif stop[0] == "insufficient_evidence" and final_text:
+                stop = (stop[0], self._limitation_disclosure(state, final_text))
                 final_text = stop[1]
             await self._emit_completion_decision(
                 request, reason=stop[0], status="terminal"
@@ -1233,7 +1252,8 @@ class AgentLoop:
         session = state.active_map_session
         if session is None:
             return "The map was updated and confirmed in the browser."
-        place = session.resolved_location.label
+        places = [spellings[0] for spellings in resolved_route_target_names(state)]
+        place = " and ".join(places) if places else session.resolved_location.label
         basemap = session.basemap or {}
         basemap_label = str(
             basemap.get("label") or basemap.get("name") or session.basemap_id
@@ -1266,7 +1286,7 @@ class AgentLoop:
             None,
         )
         if result is None:
-            return ""
+            return AgentLoop._discovery_findings(state)
         lines: list[str] = []
         for item in json_array(json_object(result.data).get("preview"))[:5]:
             record = json_object(item)
@@ -1284,6 +1304,63 @@ class AgentLoop:
             if label or measures:
                 lines.append(f"- {label or 'record'}: {', '.join(measures)}".rstrip(": "))
         return "Top results:\n" + "\n".join(lines) if lines else ""
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _forecast_values(result: ToolResult) -> str:
+        """Range of each hourly variable a forecast result carries.
+
+        A fallback answer that only says a forecast was returned does not
+        answer the question it was fetched for.
+        """
+
+        data = json_object(result.data)
+        rows = [json_object(row) for row in json_array(data.get("hourly_forecast"))]
+        units = json_object(data.get("units"))
+        parts: list[str] = []
+        for name in dict.fromkeys(key for row in rows for key in row if key != "time"):
+            values = [
+                float(value) for row in rows
+                if isinstance(value := row.get(name), (int, float)) and not isinstance(value, bool)
+            ]
+            if values:
+                unit = units.get(name)
+                suffix = f" {unit}" if isinstance(unit, str) else ""
+                parts.append(f"{name.replace('_', ' ')} {min(values):g} to {max(values):g}{suffix}")
+        window = ""
+        if rows and data.get("forecast_window_start") and data.get("forecast_window_end"):
+            window = f" between {data['forecast_window_start']} and {data['forecast_window_end']}"
+        return f": {', '.join(parts[:8])}{window}" if parts else ""
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _discovery_findings(state: AgentRunState) -> str:
+        """List the sources a catalog-discovery question found.
+
+        When the question is which data exists, the discovered capabilities
+        are the answer; a resolved place alone never is.
+        """
+
+        if state.goal is None or state.goal.operation != "discover_available_map_data":
+            return ""
+        result = next(
+            (
+                item
+                for item in reversed(state.tool_results)
+                if item.tool_name == "discover_geospatial_capabilities"
+                and item.status == "success"
+            ),
+            None,
+        )
+        if result is None:
+            return ""
+        lines = [
+            f"- {entry.get('name') or entry.get('id')}: {str(entry.get('summary') or '').strip()}".rstrip(": ")
+            for entry in (
+                json_object(raw) for raw in json_array(json_object(result.data).get("capabilities"))[:8]
+            )
+        ]
+        return "Available sources:\n" + "\n".join(lines) if lines else ""
 
     # -------------------------------------------------------------------------
     async def _finalize_completed_request(
@@ -1437,6 +1514,8 @@ class AgentLoop:
             layer_count=layers,
             feature_count=features,
             unmet=self._pending_native_requirements(state),
+            unresolved_targets=unresolved_route_targets(state),
+            required_targets=resolved_route_target_names(state),
         )
         if not violations:
             return candidate
@@ -1461,10 +1540,12 @@ class AgentLoop:
                 if result.metadata.provider_id
                 else ""
             )
+            + AgentLoop._forecast_values(result)
             for result in state.tool_results
             if result.status in {"success", "partial", "valid_empty"}
             and result.tool_name in _EVIDENCE_TOOLS
             and result.summary.strip()
+            and not (needs_numeric_values(state) and result.metadata.result_type == "raster")
         ]
         if not lines:
             return ""
@@ -1653,8 +1734,7 @@ class AgentLoop:
             or (state.active_map_session is not None and state.render_verified)
         )
         return {
-            "location_resolved": bool(state.location_refs)
-            or state.active_map_session is not None,
+            "location_resolved": route_target_location_available(state),
             "search_area_bound": route_target_location_available(state),
             "result_locations_derived": analysis_complete(state),
             "measurement_computed": any(
@@ -2132,13 +2212,16 @@ class AgentLoop:
         state.route = revised
         self._forgive_route_rejections(state, calls, results)
         self._bind_search_area(state, revised)
+        previous_contract = state.completion_contract
         self._compile_native_goal(
             state,
             revised,
             requests_entities=self.capability_router.requests_catalog_entities(
                 state.user_message
             ),
+            servable_queries=self.capability_router.capability_registry.servable_queries,
         )
+        self._keep_data_obligation(state, previous_contract)
         record["outcome"] = "revised"
         record["revised_route"] = revised.model_dump(mode="json", exclude_defaults=True)
         await self._refresh_capabilities_after_location(request, state, [])
@@ -2154,6 +2237,38 @@ class AgentLoop:
             ),
         )
         return True
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _keep_data_obligation(
+        state: AgentRunState, previous: CompletionContract | None
+    ) -> None:
+        """Never let a route revision drop the provider-data obligation.
+
+        A revision repairs how the request is routed, not what it asks for; a
+        revised route that cannot execute capabilities would otherwise let a
+        bare location fit satisfy a request for data.
+        """
+
+        contract = state.completion_contract
+        if (
+            previous is None
+            or contract is None
+            or "required_data_retrieved" not in previous.requirements
+            or "required_data_retrieved" in contract.requirements
+        ):
+            return
+        state.completion_requirements = list(
+            dict.fromkeys([*state.completion_requirements, "required_data_retrieved"])
+        )
+        state.completion_contract = contract.model_copy(
+            update={
+                "requirements": list(state.completion_requirements),
+                "data_requirement": previous.data_requirement,
+                "evidence_required": True,
+                "data_obligations": list(previous.data_obligations),
+            }
+        )
 
     # -------------------------------------------------------------------------
     def _forgive_route_rejections(
@@ -3254,7 +3369,12 @@ class AgentLoop:
                 "failure_summary": render_failure.failure_summary,
                 "failed_action_fingerprint": render_failure.action_fingerprint,
                 "message": (
-                    "The browser did not confirm the previous map in time. Re-issue "
+                    "The map was prepared, but the retrieved data does not satisfy "
+                    "the request, so rendering again cannot fix it. Do not swap in "
+                    "a different dataset for the one requested; tell the user what "
+                    "is missing and any latest-available date the tool reported."
+                    if render_failure.failure_stage == "backend_validation"
+                    else "The browser did not confirm the previous map in time. Re-issue "
                     "the same map plan once, keeping every requested layer; if it "
                     "times out again, simplify the plan."
                     if render_failure.failure_code == "render_timeout"
@@ -3345,6 +3465,25 @@ class AgentLoop:
                 "no_progress",
                 "Render recovery requires a materially different map action.",
             )
+        uncovered_date = next(
+            (
+                result
+                for result in results
+                if result.tool_name == "execute_geospatial_capability"
+                and result.status == "valid_empty"
+                and result.metadata.coverage is not None
+                and result.metadata.coverage.get("temporal_scope_satisfied") is False
+                and result.metadata.coverage.get("latest_available_date")
+            ),
+            None,
+        )
+        if uncovered_date is not None:
+            # The layer publishes no imagery for the requested day; no other
+            # call can satisfy that day, so the provider's disclosure is final.
+            return (
+                "insufficient_evidence",
+                "The requested date has no imagery." + AgentLoop._empty_result_note(state),
+            )
         if any(result.status != "failed" for result in results):
             if (
                 all(result.status == "valid_empty" for result in results)
@@ -3381,7 +3520,11 @@ class AgentLoop:
             return None
         if results and all(result.status == "failed" for result in results):
             if state.consecutive_tool_failures >= max_consecutive_tool_failures:
-                return "failed", "The agent stopped after repeated tool failures."
+                return "failed", AgentLoop._limitation_disclosure(
+                    state,
+                    "The agent stopped after repeated tool failures."
+                    + AgentLoop._empty_result_note(state),
+                )
             if actionable_recovery:
                 return None
             return "failed", "The requested tool could not complete successfully."
@@ -3414,11 +3557,33 @@ class AgentLoop:
                 + " Ask again with a value inside the valid range."
             )
             return "unsupported_request", AgentLoop._limitation_disclosure(state, text)
+        last = state.tool_results[-1] if state.tool_results else None
+        if last is not None and last.error is not None and last.error.code == "targets_not_in_view":
+            return "model_incapable", AgentLoop._limitation_disclosure(
+                state,
+                "The map could not be fitted to show every requested place, "
+                "so the request was not completed.",
+            )
         text = (
             "The model repeatedly issued invalid tool calls even though valid "
             "tools and arguments were available, so the request was not completed."
         )
         return "model_incapable", AgentLoop._limitation_disclosure(state, text)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _empty_result_note(state: AgentRunState) -> str:
+        """Carry a provider's own explanation of an empty result into the stop text."""
+
+        warnings = next(
+            (
+                result.metadata.warnings
+                for result in reversed(state.tool_results)
+                if result.status == "valid_empty" and result.metadata.warnings
+            ),
+            list[str](),
+        )
+        return f" The provider reported: {' '.join(warnings)}" if warnings else ""
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -3644,12 +3809,19 @@ class AgentLoop:
         state: AgentRunState,
         route: CapabilityRoute | None = None,
     ) -> str | None:
-        location_results = [
+        attempts = [
             result
             for result in state.tool_results
             if result.tool_name == "resolve_geospatial_location"
-            and result.status == "success"
         ]
+        location_results = [result for result in attempts if result.status == "success"]
+        if len(location_results) < len(attempts) or (
+            state.route is not None and unresolved_route_targets(state)
+        ):
+            # A lookup this turn failed or was ambiguous, or a requested place
+            # is still unresolved: a location hydrated from an earlier turn
+            # (a parent such as "Berlin") must not stand in for it.
+            return None
         target_ids = [
             str(result.data.get("target_id") or "").strip()
             for result in location_results
@@ -3827,6 +3999,7 @@ class AgentLoop:
         route: CapabilityRoute,
         *,
         requests_entities: bool = False,
+        servable_queries: Callable[[Sequence[str]], list[str]] | None = None,
     ) -> None:
         route_temporal_scope = route.temporal_scope.model_dump(mode="json")
         route_has_temporal_scope = any(
@@ -3969,7 +4142,7 @@ class AgentLoop:
             location_required=route.location_mode != "none",
             evidence_required="required_data_retrieved" in state.completion_requirements,
             data_obligations=(
-                list(dict.fromkeys(route.capability_queries))[:4]
+                (servable_queries or list)(list(dict.fromkeys(route.capability_queries))[:4])
                 if requires_provider_data and len(route.capability_queries) > 1
                 else []
             ),
@@ -4470,7 +4643,15 @@ class AgentLoop:
         pending = AgentLoop._pending_native_requirements(state)
         if not pending:
             return text
-        note = f"Not completed: {describe_requirements(pending)}."
+        unresolved = unresolved_route_targets(state)
+        note = (
+            f"Not completed: {describe_requirements(pending)}"
+            + (f" ({', '.join(unresolved)})" if unresolved else "")
+            + "."
+        )
+        gap = imagery_only_note(state)
+        if gap:
+            note = f"{note} {gap}"
         return f"{text.rstrip()}\n\n{note}" if note not in text else text
 
     # -------------------------------------------------------------------------
