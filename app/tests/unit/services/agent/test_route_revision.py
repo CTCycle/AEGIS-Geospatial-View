@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -168,6 +168,55 @@ async def _run(model: _Model, state: AgentRunState, evidence: _Evidence) -> Any:
         provider="scripted", model="scripted", state=state,
         budget=AgentExecutionBudget(total_seconds=15, hard_max_seconds=15), max_no_progress_corrections=0))
 
+
+###############################################################################
+def _unrenderable_discovery(constraint: str) -> ToolResult:
+    return ToolResult(
+        call_id="discover-1", tool_name="discover_geospatial_capabilities", status="valid_empty",
+        summary="No enabled capability satisfies the map rendering.",
+        data={"capabilities": [], "diagnostics": {"unmet_constraints": [
+            {"constraint": constraint, "alternatives": [{"id": "pvgis_solar"}]}]}},
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    )
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("presentation", "constraint", "downgraded"),
+    [
+        ("both", "map_rendering", True),
+        ("both", "operation", False),
+        ("map", "map_rendering", False),
+    ],
+)
+async def test_both_route_drops_to_text_when_only_non_rendering_sources_match(
+    presentation: str, constraint: str, downgraded: bool
+) -> None:
+    loop = _loop(_Model([]), _Evidence())
+    state = AgentRunState(
+        phase=AgentPhase.MODEL_STEP, request_id="solar", conversation_id="solar",
+        user_message="How much solar energy could a rooftop panel produce in Seville?",
+        context_hydrated=True,
+    )
+    route = CapabilityRoute.model_validate({
+        "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": presentation,
+        "location_mode": "target", "target_refs": ["Seville"], "operation": "inspect",
+        "capability_queries": ["solar irradiance"],
+    })
+    state.route = route
+    loop._compile_native_goal(state, route, requests_entities=False, servable_queries=list)  # type: ignore[arg-type]
+    request = AgentLoopRequest(
+        provider="scripted", model="scripted", state=state,
+        budget=AgentExecutionBudget(total_seconds=15, hard_max_seconds=15),
+    )
+
+    changed = await loop._downgrade_unrenderable_route(request, route, [_unrenderable_discovery(constraint)])
+
+    assert changed is downgraded
+    assert state.route is not None
+    assert state.route.presentation == ("text" if downgraded else presentation)
+    assert ("map_candidate_prepared" in state.completion_requirements) is (not downgraded)
+    assert ("pvgis_solar" in state.capability_ids) is downgraded
 
 ###############################################################################
 @pytest.mark.asyncio

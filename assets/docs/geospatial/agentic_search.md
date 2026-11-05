@@ -130,6 +130,7 @@ tool. The model-visible action names are:
 
 - `resolve_geospatial_location`
 - `discover_geospatial_capabilities`
+- `discover_geospatial_provider_layers` (explicit provider-discovery routes only)
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `inspect_evidence`
@@ -139,9 +140,11 @@ tool. The model-visible action names are:
 - `search_conversation_history` (conditional history-repository registration)
 
 `transform_evidence` is the runtime name. `discover_geospatial_capabilities`
-is the single model-facing capability-discovery boundary. Provider-layer
-discovery remains a server-owned internal handler used to enrich that generic
-result; it is not a second model-facing catalog choice.
+is the generic model-facing capability-discovery boundary.
+`discover_geospatial_provider_layers` is also model-facing, but only when the
+route explicitly requests provider-native discovery and the generic manifest
+catalog is insufficient. It is not an interchangeable discovery alternative
+for ordinary capability discovery or a named provider-layer map request.
 
 The registry has one `RegisteredTool` contract and one `ToolExecutor` boundary.
 The executor validates policy and arguments, binds server-owned geography/time
@@ -167,12 +170,18 @@ location required and unresolved
 shortlist missing after required locations are resolved
   -> discover_geospatial_capabilities
 
+explicit provider-native discovery route
+  -> discover_geospatial_provider_layers
+
 shortlist selected
   -> describe_geospatial_capability (only when detail is needed)
   -> execute_geospatial_capability (when data is required)
 
 evidence analysis or transformation required
   -> inspect_evidence, transform_evidence
+
+resolved-location measurement requested
+  -> measure_geospatial
 
 map presentation pending
   -> apply_map_plan
@@ -197,10 +206,9 @@ user-semantic filters. AEGIS binds resolved coordinates, canonical bbox/radius,
 temporal boundaries, task-owned filters, and provider argument names.
 
 Discovery responses implement bounded deterministic pagination. Provider-layer
-descriptors, where required by the catalog contract, remain bounded normalized
-observations behind the generic discovery responsibility. They are never
-unrestricted provider browsing, and the model is not offered two
-interchangeable discovery choices for the same unmet responsibility.
+descriptors are bounded normalized observations on an explicit provider-native
+discovery route. They are never unrestricted provider browsing, and ordinary
+catalog discovery remains a separate generic responsibility.
 
 ### Spatial operations, multi-target completion, and current view
 

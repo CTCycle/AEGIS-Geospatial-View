@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from server.common.identifiers import normalize_target_key
 from server.contracts.geospatial import MapSession
@@ -598,37 +599,65 @@ class CapabilityRouter:
             proposed.operation == "inspect_evidence"
             and "text_evidence_inspection_route_normalized" in reasons
         )
+        shortlist_inputs: dict[str, Any] = dict(
+            domains=route_domains,
+            queries=proposed.capability_queries,
+            explicit_ids=valid_explicit_ids,
+            runtime_registry=self.runtime_registry,
+            limit=12,
+            operation=proposed.operation,
+            scope_kind=_concrete_scope_kind(proposed, active_state),
+            temporal_mode=(
+                proposed.temporal_scope.mode
+                if proposed.temporal_scope.mode != "none"
+                else None
+            ),
+            temporal_granularity=proposed.temporal_scope.granularity,
+            has_explicit_time_range=any(
+                value is not None
+                for value in (
+                    proposed.temporal_scope.reference_time_iso,
+                    proposed.temporal_scope.start_time_iso,
+                    proposed.temporal_scope.end_time_iso,
+                )
+            ),
+            location=_single_known_location(active_state),
+        )
+        skip_shortlist = (
+            catalog_discovery
+            or evidence_inspection_only
+            or bool(proposed.explicit_capability_ids and not valid_explicit_ids)
+        )
         candidates = (
             []
-            if catalog_discovery
-            or evidence_inspection_only
-            or (proposed.explicit_capability_ids and not valid_explicit_ids)
+            if skip_shortlist
             else self.capability_registry.shortlist(
-                domains=route_domains,
-                queries=proposed.capability_queries,
-                explicit_ids=valid_explicit_ids,
-                runtime_registry=self.runtime_registry,
-                limit=12,
-                operation=proposed.operation,
-                scope_kind=_concrete_scope_kind(proposed, active_state),
-                temporal_mode=(
-                    proposed.temporal_scope.mode
-                    if proposed.temporal_scope.mode != "none"
-                    else None
-                ),
-                temporal_granularity=proposed.temporal_scope.granularity,
-                has_explicit_time_range=any(
-                    value is not None
-                    for value in (
-                        proposed.temporal_scope.reference_time_iso,
-                        proposed.temporal_scope.start_time_iso,
-                        proposed.temporal_scope.end_time_iso,
-                    )
-                ),
                 requires_render=proposed.presentation in {"map", "both"},
-                location=_single_known_location(active_state),
+                **shortlist_inputs,
             )
         )
+        if proposed.presentation == "both" and not skip_shortlist:
+            # Text plus map is a preference: a source that cannot render still
+            # answers the question. Prefer it only when it is a clearly better
+            # subject match than every renderable candidate (or none exists).
+            text_candidates = self.capability_registry.shortlist(
+                requires_render=False, **shortlist_inputs
+            )
+            best_text = max(
+                (float(item.get("routing_score") or 0.0) for item in text_candidates),
+                default=None,
+            )
+            best_render = max(
+                (float(item.get("routing_score") or 0.0) for item in candidates),
+                default=None,
+            )
+            if best_text is not None and (
+                best_render is None
+                or best_text >= best_render + _TEXT_ONLY_SCORE_MARGIN
+            ):
+                proposed = proposed.model_copy(update={"presentation": "text"})
+                candidates = text_candidates
+                reasons.append("text_only_capability_preferred")
         capability_ids = [
             str(item.get("id") or "").strip()
             for item in candidates
@@ -719,6 +748,10 @@ class CapabilityRouter:
         )
 
 ###############################################################################
+# One direct subject-identity match, the weight the registry gives a capability
+# whose declared subject is the requested one (``capability_registry.shortlist``).
+_TEXT_ONLY_SCORE_MARGIN = 120.0
+
 _VIEW_ANCHOR_FILLER = frozenset({"the", "city", "of", "s", "town", "historic"})
 
 

@@ -949,6 +949,88 @@ def test_router_keeps_solar_estimate_on_metadata_only_text_route() -> None:
     assert "metadata_only_analysis_route_normalized" in decision.reason_codes
 
 ###############################################################################
+def _text_vs_render_router(*, renderable_matches: bool) -> CapabilityRouter:
+    contract = {
+        "supported_operations": ["show", "inspect"],
+        "supported_scope_kinds": ["point", "bbox"],
+        "temporal_modes": ["current"],
+        "coverage": "global",
+    }
+    registry = CapabilityRegistry.from_catalog_snapshot(
+        GeospatialManifestSnapshot(
+            providers=(),
+            basemaps=[],
+            overlays=[
+                {
+                    "id": "ozone_layer",
+                    "name": "Ozone column",
+                    "provider": "test",
+                    "capabilityKind": "raster-overlay",
+                    "description": "Ozone imagery",
+                    "agenticUse": {
+                        "domains": ["data_retrieval"],
+                        "plannerHints": ["soil moisture"] if renderable_matches else [],
+                    },
+                    "executionContract": {**contract, "render_support": "raster"},
+                }
+            ],
+            cameras=[],
+            transit=[],
+            tools=[
+                {
+                    "id": "soil_grid",
+                    "name": "Soil properties",
+                    "provider": "test",
+                    "capabilityKind": "analysis-tool",
+                    "description": "Soil clay, sand and pH values",
+                    "agenticUse": {"domains": ["data_retrieval"]},
+                    "executionContract": {**contract, "render_support": "metadata_only"},
+                }
+            ],
+            runtime_profiles=(),
+        )
+    )
+    return CapabilityRouter(capability_registry=registry, runtime_registry=cast(Any, _Runtime()))
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("presentation", "renderable_matches", "expected_presentation", "expected_ids"),
+    [
+        # A text-capable subject match answers a text-plus-map question.
+        ("both", False, "text", ["soil_grid"]),
+        # An unrelated renderable layer must not displace the direct subject (it ranks second).
+        ("both", True, "text", ["soil_grid"]),
+        # A map-only request still requires a renderable capability.
+        ("map", False, "map", []),
+    ],
+)
+def test_both_route_prefers_a_clearly_better_text_capability(
+    presentation: str,
+    renderable_matches: bool,
+    expected_presentation: str,
+    expected_ids: list[str],
+) -> None:
+    decision = _text_vs_render_router(renderable_matches=renderable_matches).validate_route(
+        _route(presentation=presentation, operation="inspect", capability_queries=["soil"]),
+        user_message="What is the soil composition?",
+        active_state=_state(),
+    )
+
+    assert decision.route.presentation == expected_presentation
+    assert decision.capability_ids[:1] == expected_ids
+
+###############################################################################
+def test_both_route_keeps_the_map_when_a_renderable_capability_matches_as_well() -> None:
+    decision = _router().validate_route(
+        _route(presentation="both", operation="inspect"),
+        user_message="Show traffic in Zurich.",
+        active_state=_state(),
+    )
+
+    assert decision.route.presentation == "both"
+    assert decision.capability_ids == ["traffic"]
+
+###############################################################################
 def test_router_rejects_answer_route_with_execution_intent() -> None:
     decision = _router().validate_route(
         CapabilityRoute(

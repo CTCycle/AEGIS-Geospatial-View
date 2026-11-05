@@ -1,6 +1,6 @@
 # Agent Catalog Contract
 
-Last updated: 2026-10-20
+Last updated: 2026-11-05
 
 ## Stable native boundary
 
@@ -18,6 +18,7 @@ The model-visible names are:
 - `execute_geospatial_capability`
 - `inspect_evidence`
 - `transform_evidence`
+- `measure_geospatial`
 - `apply_map_plan`
 - `search_conversation_history` (conditional history-repository registration)
 
@@ -45,6 +46,7 @@ route and completion responsibilities:
 | Shortlist selected and detail needed | `describe_geospatial_capability` |
 | Shortlist selected and data required | `execute_geospatial_capability` |
 | Evidence analysis or transformation required | `inspect_evidence`, `transform_evidence` |
+| Explicit resolved-location measurement required | `measure_geospatial` |
 | Map presentation still pending | `apply_map_plan` |
 | Earlier conversation must be recalled | `search_conversation_history` |
 

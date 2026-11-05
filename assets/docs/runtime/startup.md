@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-10-29
+Last updated: 2026-11-05
 
 ## Local Development Via Launcher
 
@@ -28,7 +28,7 @@ The batch launcher starts the application directly and runs the same first-run s
 creates the local file without overwriting an existing file.
 
 An explicit non-empty `AEGIS_DATA_DIR` inherited from the parent process takes
-precedence over the value in `settings/.env` for the launched backend. When no
+precedence over the value in `settings/.env` for the launched backend. A relative `AEGIS_DATA_DIR` resolves against the repository root, so `data` (not `../data`) selects the repository's `data/` folder; a wrong value silently creates a fresh database. When no
 process override is supplied, the launcher uses the environment-file value; a
 blank value keeps the default `data/runtime` root.
 

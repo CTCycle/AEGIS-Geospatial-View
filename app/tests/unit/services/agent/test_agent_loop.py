@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import replace
 import json
+import logging
 from typing import Any
 
 import pytest
@@ -426,7 +427,15 @@ async def test_conversation_with_empty_answers_uses_the_reserved_answer_call() -
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_empty_answer_truncated_by_output_cap_fails_and_sends_global_cap() -> None:
+async def test_empty_answer_truncated_by_output_cap_fails_and_sends_global_cap(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from server.services.llm.context_budget import (
+        request_output_token_cap,
+        resolve_model_context_profile,
+    )
+
+    caplog.set_level(logging.WARNING, logger="server.services.llm.context_budget")
     conversation = _route_call_with(
         primary_domain="conversation", task_mode="answer", capability_queries=[]
     )
@@ -441,12 +450,27 @@ async def test_empty_answer_truncated_by_output_cap_fails_and_sends_global_cap()
             budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
             max_model_calls=2,
             max_output_tokens=4096,
+            context_profile_metadata={
+                "context_profile_provider": "fake",
+                "context_profile_model": "fake-model",
+                "context_window_tokens": 1_000_000,
+                "maximum_output_tokens": 384_000,
+            },
         )
     )
 
     assert outcome.stopped_reason == "failed"
     assert "Max output tokens" in outcome.final_text
-    assert provider.requests[-1]["request"].metadata["max_output_tokens"] == 4096
+    llm_request = provider.requests[-1]["request"]
+    assert llm_request.metadata["max_tokens"] == 4096
+    assert llm_request.metadata["maximum_output_tokens"] == 384_000
+    profile = resolve_model_context_profile(
+        "fake", "fake-model", metadata=llm_request.metadata
+    )
+    assert profile is not None
+    assert profile.maximum_output_tokens == 384_000
+    assert request_output_token_cap(llm_request) == 4096
+    assert "Ignoring conflicting maximum output metadata aliases" not in caplog.text
 
 ###############################################################################
 @pytest.mark.parametrize(

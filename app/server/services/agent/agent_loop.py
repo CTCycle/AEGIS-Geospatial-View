@@ -622,7 +622,9 @@ class AgentLoop:
                 state,
                 exposed_tool_names=exposed_tool_names,
             )
-            if await self._revise_route(
+            if await self._downgrade_unrenderable_route(
+                request, route, tool_results
+            ) or await self._revise_route(
                 request, provider, messages, route, result.tool_calls, tool_results
             ):
                 if catalog_cursor is None:
@@ -2199,6 +2201,70 @@ class AgentLoop:
         return None
 
     # -------------------------------------------------------------------------
+    async def _downgrade_unrenderable_route(
+        self,
+        request: AgentLoopRequest,
+        route: CapabilityRoute,
+        results: list[ToolResult],
+    ) -> bool:
+        """Answer in text when only non-rendering sources match a text-and-map route.
+
+        Discovery names the sources that match once map rendering is relaxed.
+        For a ``both`` route the text answer is still wanted, so the route drops
+        to ``text`` and those sources become selectable; a ``map`` route keeps
+        its rendering requirement.
+        """
+
+        state = request.state
+        if route.presentation != "both" or state.route is not route:
+            return False
+        alternatives: list[str] = []
+        for result in results:
+            if result.tool_name != "discover_geospatial_capabilities":
+                continue
+            diagnostics = json_object(json_object(result.data).get("diagnostics"))
+            for item in json_array(diagnostics.get("unmet_constraints")):
+                unmet = json_object(item)
+                if unmet.get("constraint") != "map_rendering":
+                    continue
+                for entry in json_array(unmet.get("alternatives")):
+                    identifier = json_object(entry).get("id")
+                    if identifier:
+                        alternatives.append(str(identifier))
+        if not alternatives:
+            return False
+        previous = route.model_dump(mode="json", exclude_defaults=True)
+        revised = route.model_copy(update={"presentation": "text"})
+        state.route = revised
+        previous_contract = state.completion_contract
+        self._compile_native_goal(
+            state,
+            revised,
+            requests_entities=self.capability_router.requests_catalog_entities(
+                state.user_message
+            ),
+            servable_queries=self.capability_router.capability_registry.servable_queries,
+        )
+        self._keep_data_obligation(state, previous_contract)
+        state.capability_ids = list(dict.fromkeys([*state.capability_ids, *alternatives]))[:12]
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="plan_revised",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                iteration=max(1, state.current_iteration),
+                payload={
+                    "reason": "text_only_capability_available",
+                    "previous_route": previous,
+                    "outcome": "revised",
+                },
+            ),
+        )
+        return True
+
+    # -------------------------------------------------------------------------
     async def _revise_route(
         self,
         request: AgentLoopRequest,
@@ -2784,7 +2850,7 @@ class AgentLoop:
             metadata.update(profile_metadata)
         # The user's global cap applies to every model; providers still clamp
         # it to the model's published ``maximum_output_tokens``.
-        metadata["max_output_tokens"] = request.max_output_tokens
+        metadata["max_tokens"] = request.max_output_tokens
         llm_request = LLMRequest(
             model=request.model,
             provider=request.provider,
