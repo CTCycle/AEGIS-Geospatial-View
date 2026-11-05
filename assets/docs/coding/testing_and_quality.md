@@ -62,7 +62,7 @@ validation-script Python bytecode, pytest/Ruff caches, the legacy
 `app/runtimes/cache` test-runtime tree, local Angular cache, and coverage
 output. It skips dependency environments, retained QA evidence, and
 unrecognized directories. Use
-`start_on_windows.ps1 -Action ClearCache -WhatIf` to inspect paths before
+`setup_and_maintenance.ps1 -Action ClearCache -WhatIf` to inspect paths before
 cleanup.
 
 Retained QA evidence is not cache data: screenshots, reports, logs, and

@@ -51,7 +51,7 @@ database-backed credential resolver.
 - Frontend bootstrap: `app/client/src/main.ts`
 - Frontend root component: `app/client/src/app/app.component.ts`
 - Frontend routes: `app/client/src/app/app.routes.ts`
-- Windows launcher: `start_on_windows.ps1`
+- Windows application launch wrapper: start_on_windows.bat; setup and maintenance menu: setup_and_maintenance.ps1
 
 ## Backend Startup Behavior
 

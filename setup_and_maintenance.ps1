@@ -3,6 +3,7 @@
 param(
     [ValidateSet('Launch', 'ClearCache', 'RemoveLogs', 'Uninstall', 'RemoveAllData')]
     [string]$Action,
+    [switch]$Launch,
     [switch]$WhatIf,
     [switch]$ConfirmRemoval
 )
@@ -1890,7 +1891,7 @@ function Write-MenuSection {
 
 function Get-LauncherMenuEntries {
     return @(
-        [pscustomobject]@{ Section = 'APPLICATION'; Label = 'Launch application'; Description = 'Start local services'; Key = 'Launch'; Destructive = $false }
+
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Install / update dependencies'; Description = 'Sync and build'; Key = 'Install'; Destructive = $false }
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Rebuild frontend'; Description = 'Run frontend production build'; Key = 'Rebuild'; Destructive = $false }
         [pscustomobject]@{ Section = 'SETUP & VALIDATION'; Label = 'Initialize database'; Description = 'Create, upgrade, and seed SQLite schema'; Key = 'Database'; Destructive = $false }
@@ -1953,7 +1954,7 @@ function Show-LauncherMenu {
     return $entries
 }
 
-if ($Action -eq 'Launch') {
+if ($Launch -or $Action -eq 'Launch') {
     try {
         Invoke-TrackedLauncherAction -Name 'Launch application' -Action {
             Invoke-LaunchApplication
@@ -2029,10 +2030,7 @@ while ($true) {
     try {
         Invoke-TrackedLauncherAction -Name $entry.Label -Action {
             switch ($entry.Key) {
-                'Launch' {
-                    Invoke-LaunchApplication
-                    exit 0
-                }
+
                 'Install' { Invoke-InstallOrUpdate }
                 'Rebuild' { Invoke-RebuildFrontend }
                 'Database' { Invoke-InitializeDatabase }

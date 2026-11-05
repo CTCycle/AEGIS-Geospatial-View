@@ -46,6 +46,6 @@ data directory only after the original has been safely copied.
 ## Distribution notes
 
 Current scripts optimize for local execution rather than a standalone server
-bundle. Use `start_on_windows.ps1` for the supported Windows workflow or the
+bundle. Use `setup_and_maintenance.ps1` for the supported Windows workflow or the
 manual commands in `assets/docs/runtime/startup.md`. There is no first-class
 container or hosted deployment manifest in this checkout.

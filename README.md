@@ -57,10 +57,10 @@ Coverage, availability, credentials, quotas, attribution, and reuse terms vary b
 AEGIS currently runs on Windows. Use PowerShell 7 or later and a desktop browser viewport at least 1024 pixels wide. From the repository root, run:
 
 ```powershell
-.\start_on_windows.ps1
+.\start_on_windows.bat
 ```
 
-Choose **Launch application**. On first use, the launcher prepares portable Python, `uv`, and Node.js runtimes, synchronizes dependencies, and builds the frontend when needed. It opens the app after the backend is ready. Keep the launcher open while using AEGIS; press **Ctrl+C** to stop it.
+On first use, the launcher prepares portable Python, `uv`, and Node.js runtimes, synchronizes dependencies, and builds the frontend when needed. It opens the app after the backend is ready. Keep the launcher open while using AEGIS; press **Ctrl+C** to stop it. Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu.
 
 Before sending a chat request, select an agent model in **Settings → Models**. The model must support native tool calling and structured output. Install an Ollama model for local use, or configure credentials under **Settings → Model Providers** for a hosted model.
 

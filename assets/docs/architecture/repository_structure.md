@@ -47,7 +47,7 @@ AEGIS Geospatial View/
     catalog/
   runtimes/
     cache/
-  start_on_windows.ps1
+  setup_and_maintenance.ps1
   README.md
 ```
 

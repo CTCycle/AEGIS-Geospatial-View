@@ -28,7 +28,7 @@ def _write(root: Path, relative_path: str, contents: str = "fixture\n") -> Path:
 
 
 def _make_repository_fixture(root: Path) -> dict[str, Path]:
-    shutil.copy2(REPOSITORY_ROOT / "start_on_windows.ps1", root / "start_on_windows.ps1")
+    shutil.copy2(REPOSITORY_ROOT / "setup_and_maintenance.ps1", root / "setup_and_maintenance.ps1")
     _write(root, "settings/.env.example", "FASTAPI_PORT=8000\n")
     data_root = root.parent / "external-app-data"
     external_db = root.parent / "external-store" / "chosen.db"
@@ -157,7 +157,7 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
     outside = tmp_path / "other-working-directory"
     outside.mkdir()
     paths = _make_repository_fixture(repository)
-    launcher = repository / "start_on_windows.ps1"
+    launcher = repository / "setup_and_maintenance.ps1"
 
     preview = _run_launcher(
         launcher,
@@ -301,7 +301,7 @@ def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp
     repository = tmp_path / "fixture-repository"
     repository.mkdir()
     paths = _make_repository_fixture(repository)
-    launcher = repository / "start_on_windows.ps1"
+    launcher = repository / "setup_and_maintenance.ps1"
     working_directory = tmp_path
 
     locked_path = _write(repository, "runtimes/cache/uv/locked.bin")
@@ -382,3 +382,20 @@ def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp
     )
     assert final.returncode == 0, final.stdout + final.stderr
     assert paths["database"].exists()
+
+###############################################################################
+def test_batch_entrypoint_uses_non_menu_launch_and_maintenance_menu_hides_launch() -> None:
+    launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
+        encoding="utf-8"
+    )
+    wrapper = (REPOSITORY_ROOT / "start_on_windows.bat").read_text(encoding="utf-8")
+    menu_start = launcher.index("function Get-LauncherMenuEntries")
+    menu_end = launcher.index("\nfunction Write-MenuOption", menu_start)
+    menu = launcher[menu_start:menu_end]
+
+    assert "[switch]$Launch" in launcher
+    assert "if ($Launch -or $Action -eq 'Launch')" in launcher
+    assert "pwsh.exe" in wrapper
+    assert "setup_and_maintenance.ps1" in wrapper
+    assert "-Launch" in wrapper
+    assert "Label = 'Launch application'" not in menu

@@ -5,15 +5,15 @@ Last updated: 2026-10-29
 ## Local Development Via Launcher
 
 ```powershell
-.\start_on_windows.ps1
+.\start_on_windows.bat
 ```
 
 Use `-WhatIf` to preview the exact paths for any cleanup action:
 
 ```powershell
-.\start_on_windows.ps1 -Action ClearCache -WhatIf
-.\start_on_windows.ps1 -Action Uninstall -WhatIf
-.\start_on_windows.ps1 -Action RemoveAllData -WhatIf
+.\setup_and_maintenance.ps1 -Action ClearCache -WhatIf
+.\setup_and_maintenance.ps1 -Action Uninstall -WhatIf
+.\setup_and_maintenance.ps1 -Action RemoveAllData -WhatIf
 ```
 
 `-Action ClearCache` strictly clears `runtimes/cache`, recognized source-local
@@ -23,10 +23,7 @@ Direct cleanup actions require an interactive confirmation or `-ConfirmRemoval`
 after reviewing their `-WhatIf` preview; menu actions continue to ask for
 confirmation.
 
-The interactive launcher installs or updates portable Python 3.14.7, uv, and
-Node.js runtimes; synchronizes backend and frontend dependencies; optionally
-builds the frontend; runs tests; removes logs; clears caches; and starts
-backend and frontend services. If `settings/.env` is missing, the launcher reads
+The batch launcher starts the application directly and runs the same first-run setup before opening the browser. Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu. If `settings/.env` is missing, the launcher reads
 `settings/.env.example` for its first-run process settings and the application
 creates the local file without overwriting an existing file.
 
@@ -35,9 +32,7 @@ precedence over the value in `settings/.env` for the launched backend. When no
 process override is supplied, the launcher uses the environment-file value; a
 blank value keeps the default `data/runtime` root.
 
-The menu is grouped into clear sections. Application options launch the
-application, install or update dependencies, rebuild the frontend independently,
-and initialize the database explicitly. Maintenance options run the test suite,
+The menu is grouped into clear sections. Setup options install or update dependencies, rebuild the frontend independently, and initialize the database explicitly. Maintenance options run the test suite,
 remove logs, clear caches, and uninstall local dependencies. Cleanup previews
 enumerate the exact paths, then remove them in a deterministic, deepest-first
 order. Locked, inaccessible, and reparse-point paths are reported; cleanup does
@@ -60,7 +55,7 @@ contents. A first-run file defaults to `database.db`; database synchronization
 runs before repositories and run-lifecycle services are constructed. A missing
 SQLite file is initialized at the current revision, `202608200001`, and seeded.
 Existing files must already use that revision; unknown and retired revisions
-fail with an actionable error and are never stamped or replaced. Menu option 4
+fail with an actionable error and are never stamped or replaced. Menu option 3
 invokes the same guarded workflow. A populated database without an Alembic
 revision and structurally invalid files are also rejected. The migration lock
 protects read-only schema and required-seed checks. SQLite creates a temporary
@@ -80,7 +75,7 @@ settings are visible immediately. A switch never copies records between
 databases. Changing `AEGIS_DATA_DIR` or process-level hosts, ports, and reload
 configuration still requires an application restart.
 
-Launch option 1 checks the configured backend port (`FASTAPI_PORT`) before
+Direct launch checks the configured backend port (`FASTAPI_PORT`) before
 dependency work and again before starting the service. If the port is occupied,
 it shows the grouped PID, process name, and occupied ports, then accepts only an
 explicit `y` or `yes` before terminating each confirmed process tree once.
@@ -104,7 +99,7 @@ receives the interrupt, and runs its normal shutdown; the launcher waits up to
 exits on its own is reported with its exit code. `UI_HOST` and `UI_PORT` apply
 only to the Angular dev server.
 
-Option 1 validates Python runtime dependencies and a content fingerprint for
+Direct launch validates Python runtime dependencies and a content fingerprint for
 frontend dependencies. It synchronizes dependencies only when that state is
 missing or stale, then checks a separate production-build fingerprint. The
 build marker records sorted SHA-256 input and output hashes plus the Node
@@ -112,9 +107,7 @@ version; a missing or stale build is rebuilt, while a current build is reused.
 The build fingerprint excludes test-only source, E2E fixtures, proxy settings,
 Karma configuration, and backend or documentation changes. Dependency and
 build state markers live under the already ignored `node_modules` and `dist`
-directories. Use menu option 2 to install or update dependencies and build the
-frontend, or menu option 3 to rebuild the frontend without synchronizing
-backend dependencies.
+directories. Use the Install / update dependencies menu option to install dependencies and build the frontend, or Rebuild frontend to rebuild without synchronizing backend dependencies.
 
 `BACKEND_LOGS_VISIBLE=true` (the default when absent) shows backend logs in the
 launcher console. Set it to `false` to write backend output to

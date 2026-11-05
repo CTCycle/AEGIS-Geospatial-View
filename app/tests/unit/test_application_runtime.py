@@ -885,7 +885,7 @@ APP_ROOT = REPOSITORY_ROOT / "app"
 
 ###############################################################################
 def test_launcher_has_one_canonical_backend_entrypoint() -> None:
-    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+    launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )
 
@@ -902,7 +902,7 @@ def test_launcher_has_one_canonical_backend_entrypoint() -> None:
 
 ###############################################################################
 def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
-    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+    launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )
 
@@ -934,7 +934,7 @@ def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
 
 ###############################################################################
 def test_launcher_separates_dependency_sync_from_build_state() -> None:
-    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+    launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )
     package_json = json.loads(
@@ -1017,7 +1017,7 @@ def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> N
 
 ###############################################################################
 def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> None:
-    launcher = (REPOSITORY_ROOT / "start_on_windows.ps1").read_text(
+    launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )
     batch_runner = (APP_ROOT / "tests" / "run_tests.bat").read_text(

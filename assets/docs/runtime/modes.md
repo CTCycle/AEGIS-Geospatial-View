@@ -9,7 +9,7 @@ Last updated: 2026-10-22
 - Backend: FastAPI
 - Frontend: built Angular SPA served by the FastAPI backend on the same origin
   (Angular dev server only for frontend development)
-- Primary launcher: `start_on_windows.ps1`, which supervises the backend until
+- Application launch: start_on_windows.bat; setup and maintenance menu: setup_and_maintenance.ps1
   Ctrl+C
 - Portable runtimes are expected under `runtimes/`
 
