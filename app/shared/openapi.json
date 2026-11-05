@@ -1664,6 +1664,14 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Filters"
+          },
+          "obligations": {
+            "items": {
+              "$ref": "#/components/schemas/RequestObligation"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Obligations"
           }
         },
         "additionalProperties": false,
@@ -2057,6 +2065,18 @@
             ],
             "title": "Target Id"
           },
+          "obligation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Obligation Id"
+          },
           "result": {
             "anyOf": [
               {
@@ -2433,6 +2453,15 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Filters"
+          },
+          "obligations": {
+            "items": {
+              "$ref": "#/components/schemas/RouteObligation"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Obligations",
+            "description": "Every explicit part of the latest request, so none is dropped: kind location (a place), data (values), analysis (comparison/ranking) or presentation (shown on the map)."
           }
         },
         "additionalProperties": false,
@@ -6351,6 +6380,69 @@
         ],
         "title": "RenderCaptureResponse"
       },
+      "RequestObligation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "location",
+              "data",
+              "analysis",
+              "presentation"
+            ],
+            "title": "Kind"
+          },
+          "target_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Ids"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "temporal_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTemporalScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "RequestObligation",
+        "description": "One server-normalized part of the request the run must honour.\n\nDerived from the validated route (targets, data needs, analysis and\npresentation) plus the parts the routing model declared, so tasks,\ncoverage checks and completion read the same obligations."
+      },
       "ResolvedLocation": {
         "properties": {
           "label": {
@@ -6502,6 +6594,52 @@
           "longitude"
         ],
         "title": "ResolvedLocation"
+      },
+      "RouteObligation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "location",
+              "data",
+              "analysis",
+              "presentation"
+            ],
+            "title": "Kind"
+          },
+          "target_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Refs"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "RouteObligation"
       },
       "RunTraceEntry": {
         "properties": {

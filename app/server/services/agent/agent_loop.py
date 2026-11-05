@@ -4560,8 +4560,10 @@ class AgentLoop:
         ] if observed else []
         payload: dict[str, Any] = {
             "phase": state.phase.value,
+            # The task ledger in the canonical context already lists every
+            # obligation, and the declared route copy only repeats them.
             "goal": (
-                state.goal.model_dump(mode="json")
+                state.goal.model_dump(mode="json", exclude={"obligations"})
                 if state.goal is not None
                 else None
             ),
@@ -4570,7 +4572,11 @@ class AgentLoop:
                 if state.completion_contract is not None
                 else None
             ),
-            "route": state.route.model_dump(mode="json") if state.route else None,
+            "route": (
+                state.route.model_dump(mode="json", exclude={"obligations"})
+                if state.route
+                else None
+            ),
             "capability_ids": list(state.capability_ids),
             "excluded_capability_ids": list(state.excluded_capability_ids),
             "location_refs": sorted(state.location_refs),

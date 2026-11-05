@@ -30,22 +30,12 @@ ObligationKind = Literal["location", "data", "analysis", "presentation"]
 
 ###############################################################################
 class RouteObligation(BaseModel):
-    """One explicit part of the request, as the routing model declares it."""
+    # Described once on CapabilityRoute.obligations to keep the schema small.
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: ObligationKind = Field(
-        description=(
-            "location: a named place the request is about; data: values to "
-            "retrieve; analysis: a comparison, ranking or computation over them; "
-            "presentation: something the user asked to see on the map."
-        )
-    )
-    target_refs: list[str] = Field(
-        default_factory=lambda: list[str](),
-        max_length=16,
-        description="Places from target_refs this part applies to.",
-    )
+    kind: ObligationKind
+    target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     variable: str | None = Field(default=None, min_length=1, max_length=120)
     required: bool = True
 
@@ -87,8 +77,9 @@ class CapabilityRoute(BaseModel):
         default_factory=lambda: list[RouteObligation](),
         max_length=16,
         description=(
-            "Every explicit part of the latest request (each place, the data, any "
-            "comparison or analysis, and any map display), so none is dropped."
+            "Every explicit part of the latest request, so none is dropped: kind "
+            "location (a place), data (values), analysis (comparison/ranking) or "
+            "presentation (shown on the map)."
         ),
     )
 
@@ -374,7 +365,17 @@ class AgentTaskState(BaseModel):
         names = list(dict.fromkeys(str(item).strip() for item in requirements or [] if str(item).strip()))
         children: list[AgentTask] = []
         if compound:
+            # A requirement an obligation already tracks gets no second task.
+            tracked = {
+                "location_resolved" if item.kind == "location" else obligation_requirement(item.kind, names)
+                for item in obligations or []
+                if item.required
+            }
+            if "location_resolved" in tracked:
+                tracked.add("search_area_bound")
             for name in names:
+                if name in tracked:
+                    continue
                 children.append(
                     AgentTask(
                         task_id=f"{root_task_id}:requirement:{_safe_task_id(name)}",
@@ -386,17 +387,10 @@ class AgentTaskState(BaseModel):
             for obligation in obligations or []:
                 if not obligation.required:
                     continue
-                places = ", ".join(obligation.target_ids)
-                subject = " ".join(
-                    part for part in (obligation.kind, obligation.variable) if part
-                )
                 children.append(
                     AgentTask(
-                        task_id=f"{root_task_id}:obligation:{_safe_task_id(obligation.id)}",
-                        description=(
-                            f"Complete the {subject} part of the request"
-                            + (f" for {places}." if places else ".")
-                        )[:500],
+                        task_id=f"{root_task_id}:{_safe_task_id(obligation.id)}",
+                        description=obligation.kind,
                         parent_task_id=root_task_id,
                         obligation_id=obligation.id,
                         # A location obligation is tracked by its place; every
