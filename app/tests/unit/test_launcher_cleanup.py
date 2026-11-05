@@ -399,3 +399,26 @@ def test_batch_entrypoint_uses_non_menu_launch_and_maintenance_menu_hides_launch
     assert "setup_and_maintenance.ps1" in wrapper
     assert "-Launch" in wrapper
     assert "Label = 'Launch application'" not in menu
+
+
+def test_batch_entrypoint_reports_missing_powershell_without_cmd_parse_error() -> None:
+    if os.name != "nt":
+        pytest.skip("Batch launcher error handling requires Windows CMD.")
+
+    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    cmd = system_root / "System32" / "cmd.exe"
+    environment = os.environ.copy()
+    environment["PATH"] = str(system_root / "System32")
+    command = "call start_on_windows.bat"
+    result = subprocess.run(
+        [str(cmd), "/d", "/c", command],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "PowerShell 7 with pwsh.exe is required" in result.stdout
+    assert "unexpected" not in result.stdout.lower()
