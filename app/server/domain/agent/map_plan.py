@@ -77,6 +77,12 @@ class MarkLocationsAction(MapActionBase):
 
     action: Literal["mark_locations"]
     location_refs: list[str] = Field(min_length=1, max_length=25)
+    annotations: dict[str, str] = Field(
+        default_factory=dict,
+        max_length=25,
+        description="Value label per location ref, e.g. '18.3 °C'; numbers must come from retrieved data.",
+    )
+
 
 ###############################################################################
 class SetViewportAction(MapActionBase):

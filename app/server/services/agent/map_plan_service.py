@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from typing import Any, Protocol, cast
 
@@ -28,6 +29,8 @@ from server.domain.agent.tool_result import (
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
+from server.services.agent.completion import evidence_numbers
+from server.services.agent.final_answer_check import value_is_supported
 from server.services.agent.tool_registry import (
     is_active_map_update,
     unresolved_route_targets,
@@ -42,6 +45,21 @@ from server.services.geospatial.map_session_builder import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+###############################################################################
+def _ungrounded_annotation(plan: MapPlan, state: AgentRunState) -> str | None:
+    """Return the first marker label whose number the run's evidence lacks."""
+
+    numbers = evidence_numbers(state)
+    for action in plan.actions:
+        if not isinstance(action, MarkLocationsAction):
+            continue
+        for label in action.annotations.values():
+            for raw in re.findall(r"\d+(?:\.\d+)?", label):
+                if not value_is_supported(raw, "", numbers):
+                    return label
+    return None
+
 
 ###############################################################################
 def _is_location_only_map(state: AgentRunState) -> bool:
@@ -180,6 +198,20 @@ class MapPlanService:
                         recovery="choose_alternate_tool",
                     )
                 marked_locations[ref] = resolved
+
+        ungrounded = _ungrounded_annotation(plan, state)
+        if ungrounded is not None:
+            return self._failure(
+                context=context,
+                started=started,
+                error_type="semantic_validation",
+                code="annotation_not_in_evidence",
+                message=(
+                    f"The marker label '{ungrounded}' has a number the retrieved data "
+                    "does not contain. Label markers only with values from the evidence."
+                ),
+                recovery="correct_arguments",
+            )
 
         location = self._location_for_plan(plan, state, active_session)
         if location is None:

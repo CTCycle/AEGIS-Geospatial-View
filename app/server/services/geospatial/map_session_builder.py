@@ -412,6 +412,8 @@ class MapSessionBuilder:
         features: list[dict[str, Any]] = []
         for ref in dict.fromkeys(action.location_refs):
             location = marked_locations[ref]
+            annotation = action.annotations.get(ref, "").strip()
+            name = _marker_name(ref, location.label)
             features.append(
                 {
                     "type": "Feature",
@@ -420,10 +422,11 @@ class MapSessionBuilder:
                         "coordinates": [location.longitude, location.latitude],
                     },
                     "properties": {
-                        "name": _marker_name(ref, location.label),
+                        "name": f"{name}: {annotation}" if annotation else name,
                         "label": location.label,
                         "location_ref": ref,
                         "source": "resolved_location",
+                        **({"annotation": annotation} if annotation else {}),
                     },
                 }
             )

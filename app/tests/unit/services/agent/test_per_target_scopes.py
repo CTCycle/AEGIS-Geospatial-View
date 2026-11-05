@@ -6,7 +6,10 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from server.contracts.geospatial import MapSession, OverlayCollectionState, OverlayInstance, ViewportPolicy
 from server.domain.agent.capability_domains import CapabilityDomain
+from server.domain.agent.map_plan import PLACE_MARKERS_INSTANCE_ID
+from server.domain.realtime import RealtimeRenderAckPayload
 from server.domain.agent.capability_route import (
     AgentPhase,
     AgentRunState,
@@ -21,11 +24,12 @@ from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.geospatial.providers import ProviderResponse
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
-from server.services.agent.completion import CompletionEvaluator
+from server.services.agent.completion import CompletionEvaluator, build_completion_summary, presentation_contract
 from server.services.agent.native_tools import register_agent_tools
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent_runs.render_completion import RenderCompletionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -289,3 +293,102 @@ async def test_compound_request_queries_each_target_with_its_own_window() -> Non
         42: ("2026-11-03", TODAY.end_time_iso),
         45: ("2026-11-04", TOMORROW.end_time_iso),
     }
+
+
+###############################################################################
+def _map(*instances: OverlayInstance) -> MapSession:
+    location = ResolvedLocation(label="Rome, Italy", latitude=41.9, longitude=12.5)
+    return MapSession(
+        session_id="map-1", resolved_location=location, basemap_id="osm_standard",
+        viewport=ViewportPolicy(center_latitude=41.9, center_longitude=12.5),
+        overlay_collection=OverlayCollectionState(revision=1, instances=list(instances)),
+    )
+
+
+###############################################################################
+def _markers(*annotations: str | None) -> OverlayInstance:
+    features = [
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
+         "properties": {"name": place, "location_ref": place, **({"annotation": text} if text else {})}}
+        for place, text in zip(("Rome", "Milan"), annotations)
+    ]
+    return OverlayInstance(
+        instance_id=PLACE_MARKERS_INSTANCE_ID, capability_id=PLACE_MARKERS_INSTANCE_ID, label="Marked places",
+        provider="aegis", overlay_type="geojson", rendering_mode="place-markers",
+        descriptor={"data": {"features": features}},
+    )
+
+
+###############################################################################
+def test_a_comparison_map_must_show_every_requested_place() -> None:
+    state = _state(_compound_route(presentation="map"))
+    labelled = _map(_markers("18.3 °C", "19.4 °C"))
+    contract = presentation_contract(state, labelled)
+    assert contract is not None and [target.ref for target in contract.targets] == ["rome", "milan"]
+
+    only_rome = contract.violations([12.0, 41.5, 13.0, 42.3])
+    assert any("Milan" in item for item in only_rome)
+    assert not contract.violations([8.5, 41.0, 13.0, 46.0])
+
+
+###############################################################################
+def test_a_landmark_must_be_framed_at_landmark_scale_not_as_its_city() -> None:
+    route = _compound_route(
+        presentation="map", target_refs=["Brandenburg Gate"], target_requirements=[],
+        temporal_scope=AgentTemporalScope(), capability_queries=[],
+    )
+    state = _state(route)
+    state.location_refs = {"brandenburg gate": ResolvedLocation(
+        label="Brandenburg Gate, Berlin", latitude=52.5163, longitude=13.3777, location_type="landmark",
+    )}
+    contract = presentation_contract(state, _map())
+    assert contract is not None
+
+    berlin_view = [13.08, 52.33, 13.76, 52.68]
+    assert any("too wide" in item for item in contract.violations(berlin_view))
+    assert not contract.violations([13.37, 52.51, 13.39, 52.52])
+
+
+###############################################################################
+def test_requested_values_must_be_labelled_not_shown_as_bare_markers() -> None:
+    state = _state(_compound_route(presentation="map", temporal_scope=AgentTemporalScope(), target_requirements=[]))
+    bare = presentation_contract(state, _map(_markers(None, None)))
+    labelled = presentation_contract(state, _map(_markers("18.3 °C", "19.4 °C")))
+
+    assert bare is not None and any("without the weather values" in item for item in bare.findings)
+    assert labelled is not None and not labelled.findings
+
+
+###############################################################################
+def test_a_render_acknowledgment_satisfies_only_the_presentation_obligation() -> None:
+    state = _state(_compound_route(presentation="map", temporal_scope=AgentTemporalScope(), target_requirements=[]))
+    state.render_verified = True
+
+    summary = build_completion_summary(state, AgentLoop._completion_checks(state))  # pyright: ignore[reportPrivateUsage]
+    status = {item.kind: item.status for item in summary.obligations}
+
+    assert summary.map_state == "rendered"
+    assert status["presentation"] == "met"
+    assert status["data"] == "unmet"
+
+
+###############################################################################
+def test_contract_rejects_a_ready_acknowledgment_that_misses_a_place() -> None:
+    state = _state(_compound_route(presentation="map"))
+    contract = presentation_contract(state, _map(_markers("18.3 °C", "19.4 °C")))
+    assert contract is not None
+    presentation = {
+        "presentation_contract": contract.model_dump(mode="json"),
+        "map_session_id": "map-1", "collection_revision": 1,
+    }
+
+    def ack(viewport: list[float]) -> RealtimeRenderAckPayload:
+        return RealtimeRenderAckPayload(
+            run_id="run-1", run_version=1, map_session_id="map-1", collection_revision=1,
+            status="ready", viewport_bounds=viewport,
+        )
+
+    enforce = RenderCompletionService._enforce_presentation_contract  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(ValueError, match="Presentation contract failed"):
+        enforce(presentation, ack([12.0, 41.5, 13.0, 42.3]))
+    enforce(presentation, ack([8.5, 41.0, 13.0, 46.0]))

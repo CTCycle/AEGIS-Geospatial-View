@@ -40,6 +40,7 @@ from server.services.agent.agent_loop import (
     AgentLoopRequest,
 )
 from server.services.agent.capability_router import CapabilityRouter
+from server.services.agent.completion import data_verified_empty
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -3058,3 +3059,61 @@ def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_ra
     )
     assert outcome.stopped_reason == "insufficient_evidence"
     assert outcome.failure_category is None
+
+###############################################################################
+def _map_request_state(*, hydrated: bool = True) -> AgentRunState:
+    state = _state()
+    state.user_message = "Show wildfire hotspots in Portugal on the map"
+    state.context_hydrated = hydrated
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=["Portugal"],
+        capability_queries=["wildfire hotspots"],
+    )
+    state.route = route
+    state.location_refs = {"portugal": ResolvedLocation(label="Portugal", latitude=39.4, longitude=-8.2)}
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    return state
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_answer_describing_a_map_whose_render_failed_is_replaced_and_the_gap_disclosed() -> None:
+    provider = FakeProvider([])
+    state = _map_request_state()
+    state.render_observations = [
+        RenderObservation(
+            map_session_id="map-1", collection_revision=1, attempt=1, status="failed",
+            failure_code="render_timeout", recovery="terminal",
+        )
+    ]
+    request = AgentLoopRequest(
+        provider="fake", model="fake-model", state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+    loop = _loop(provider)
+
+    checked = await loop._verified_answer_text(  # pyright: ignore[reportPrivateUsage]
+        request, "What's on the map: a thermal-anomaly overlay for Portugal.", reason="test"
+    )
+
+    assert checked == ""
+    assert "could not be confirmed" in loop._with_disclosure(state, "Hotspots found.")  # pyright: ignore[reportPrivateUsage]
+
+###############################################################################
+def test_verified_empty_data_ends_the_run_with_the_unpresented_map_disclosed() -> None:
+    state = _map_request_state()
+    state.tool_results.append(ToolResult(
+        call_id="usgs", tool_name="execute_geospatial_capability", status="valid_empty",
+        summary="No events matched.", semantic_outcome="resolved",
+        metadata=ToolExecutionMetadata(
+            duration_ms=1, capability_id="usgs_earthquakes", result_type="features",
+            coverage={"query_complete": True, "data_valid": True},
+        ),
+    ))
+
+    assert data_verified_empty(state)
+    answer = AgentLoop._with_disclosure(state, "No matching events were found.")  # pyright: ignore[reportPrivateUsage]
+    assert "Not delivered: the requested map" in answer

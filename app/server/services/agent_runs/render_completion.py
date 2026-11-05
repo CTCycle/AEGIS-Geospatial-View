@@ -16,14 +16,16 @@ from server.contracts.runs import AgentRunState as RunLifecycleState
 from server.domain.realtime import RealtimeRenderAckPayload
 from server.domain.agent.capability_route import AgentGoal, AgentRunState, CompletionContract
 from server.domain.agent.capability_route import RenderObservation
+from server.domain.agent.presentation_contract import PresentationContract
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.repositories.agent_runs import AgentRunRepository
-from server.services.agent.completion import CompletionEvaluator
+from server.services.agent.completion import CompletionEvaluator, presentation_contract
 from server.services.agent_runs.events import RunEventPublisher
 
 # One extension: a transient gap (lost socket, hidden page) buys a single
 # further deadline window, after which the run fails with the observed cause.
 MAX_RENDER_DEADLINE_EXTENSIONS = 1
+CONTRACT_FAILURE_PREFIX = "Presentation contract failed:"
 
 ###############################################################################
 class RenderAcknowledgementError(ValueError):
@@ -141,8 +143,10 @@ class RenderCompletionService:
         checkpoint = _json_object(
             _json_object(response_payload.get("execution_trace")).get("checkpoint")
         )
+        contract: PresentationContract | None = None
         if checkpoint.get("request_id"):
             state = AgentRunState.from_checkpoint(checkpoint)
+            contract = presentation_contract(state, candidate_model)
             checks = CompletionEvaluator.data_checks(state)
             for requirement in render_requirements:
                 if requirement.name in checks and state.completion_contract and (
@@ -203,6 +207,9 @@ class RenderCompletionService:
             },
             "required_overlay_ids": required_overlay_ids,
             "completion_requirements": render_requirements_payload,
+            "presentation_contract": (
+                contract.model_dump(mode="json") if contract is not None else None
+            ),
             "vision_capture_requested": bool(
                 _json_object(
                     _json_object(response_payload.get("execution_trace"))
@@ -495,6 +502,8 @@ class RenderCompletionService:
             timeout_seconds=render_ack_timeout_seconds,
         )
         try:
+            if payload.status == "ready":
+                self._enforce_presentation_contract(prior_presentation, payload)
             snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
                 conversation_id=conversation_id,
                 run_id=payload.run_id,
@@ -551,7 +560,12 @@ class RenderCompletionService:
                     # resume observation must retain the original cause, not
                     # replace it with a generic backend-validation label.
                     "failure_code": payload.failure_code or "render_validation_failed",
-                    "failure_stage": payload.failure_stage or "backend_validation",
+                    "failure_stage": payload.failure_stage
+                    or (
+                        "presentation_contract"
+                        if str(exc).startswith(CONTRACT_FAILURE_PREFIX)
+                        else "backend_validation"
+                    ),
                     "failure_summary": (
                         f"{payload.failure_summary}; backend validation: {exc}"
                         if payload.failure_summary
@@ -649,6 +663,30 @@ class RenderCompletionService:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _enforce_presentation_contract(
+        presentation: dict[str, Any], payload: RealtimeRenderAckPayload
+    ) -> None:
+        """Reject a ready acknowledgment that does not satisfy the contract.
+
+        The rejection is a compact, actionable render failure: it reaches the
+        model through the ordinary ``revise_map`` recovery and its budgets.
+        """
+
+        stored = presentation.get("presentation_contract")
+        if (
+            not isinstance(stored, dict)
+            or presentation.get("map_session_id") != payload.map_session_id
+            or presentation.get("collection_revision") != payload.collection_revision
+        ):
+            return
+        violations = PresentationContract.model_validate(stored).violations(
+            payload.viewport_bounds
+        )
+        if violations:
+            raise ValueError(f"{CONTRACT_FAILURE_PREFIX} " + "; ".join(violations))
+
+    # -------------------------------------------------------------------------
     def _observation_from_ack(
         self, payload: RealtimeRenderAckPayload
     ) -> RenderObservation:
@@ -698,6 +736,7 @@ class RenderCompletionService:
         normalized = message.casefold()
         return normalized.startswith(
             (
+                CONTRACT_FAILURE_PREFIX.casefold(),
                 "required render checks failed:",
                 "required overlay render checks failed:",
                 "required rendered features are not visible:",

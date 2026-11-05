@@ -42,6 +42,7 @@ from server.domain.agent.capability_route import (
     unrouted_obligations,
 )
 from server.domain.agent.context import AgentContextView
+from server.domain.agent.presentation_contract import CompletionSummary
 from server.domain.agent.map_plan import (
     PLACE_MARKERS_INSTANCE_ID,
     is_mark_locations_operation,
@@ -84,7 +85,10 @@ from server.services.agent.tool_executor import (
 )
 from server.services.agent.completion import (
     CompletionEvaluator,
+    build_completion_summary,
+    data_verified_empty,
     describe_requirements,
+    evidence_numbers,
     imagery_only_note,
     needs_numeric_values,
     requested_transform_unmet,
@@ -709,6 +713,22 @@ class AgentLoop:
             await self._checkpoint(request)
             if (
                 stop is None
+                and route.task_mode == "execute"
+                and state.prepared_map_session is None
+                and data_verified_empty(state)
+            ):
+                # A completed empty query is the answer: nothing to map, rank or
+                # compare, so say so instead of presenting empty data.
+                final_text = await self._finalize_completed_request(
+                    request, provider, messages
+                )
+                await self._emit_completion_decision(
+                    request, reason="goal_satisfied", status="terminal"
+                )
+                state.termination_reason = "goal_satisfied"
+                return self._outcome(state, final_text, "goal_satisfied", request)
+            if (
+                stop is None
                 and state.context_hydrated
                 and route.task_mode == "execute"
                 and state.prepared_map_session is None
@@ -803,7 +823,7 @@ class AgentLoop:
                         or self._evidence_summary(state)
                         or (
                             self._verified_map_fallback(state)
-                            if state.active_map_session is not None
+                            if state.active_map_session is not None and state.render_verified
                             else ""
                         )
                         or "The model's answer did not match the verified results."
@@ -1198,6 +1218,7 @@ class AgentLoop:
             or self._verified_map_fallback(state)
         )
         note = self._basemap_mismatch_note(state)
+        final = self._with_disclosure(state, final)
         return f"{final}\n\n{note}" if note else final
 
     # -------------------------------------------------------------------------
@@ -1413,6 +1434,24 @@ class AgentLoop:
         return "Available sources:\n" + "\n".join(lines) if lines else ""
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _completion_summary(state: AgentRunState) -> CompletionSummary:
+        summary = build_completion_summary(state, AgentLoop._completion_checks(state))
+        # Like the pending requirements, obligations are judged once the run's
+        # tool context exists; an unhydrated state has verified nothing yet.
+        if state.context_hydrated:
+            return summary
+        return summary.model_copy(update={"obligations": []})
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _with_disclosure(state: AgentRunState, text: str) -> str:
+        """Append what the user did not get, unless the text already says it."""
+
+        note = AgentLoop._completion_summary(state).disclosure()
+        return f"{text.rstrip()}\n\n{note}" if note and note not in text else text
+
+    # -------------------------------------------------------------------------
     async def _finalize_completed_request(
         self,
         request: AgentLoopRequest,
@@ -1428,11 +1467,12 @@ class AgentLoop:
             ),
             reason="goal_satisfied",
         )
-        return (
+        return self._with_disclosure(
+            request.state,
             candidate
             or self._evidence_findings(request.state)
             or self._evidence_summary(request.state)
-            or "The requested work finished, but the model returned no answer text."
+            or "The requested work finished, but the model returned no answer text.",
         )
 
     # -------------------------------------------------------------------------
@@ -1465,6 +1505,20 @@ class AgentLoop:
             )
             return ""
         state.finalization_attempted = True
+        messages.append({
+            "role": "system",
+            "content": json.dumps(
+                {
+                    "observation_type": "completion_summary",
+                    "instruction": (
+                        "Answer only from this summary: disclose unmet obligations, "
+                        "describe the map only if map_state is rendered, use given values."
+                    ),
+                    **self._completion_summary(state).model_view(),
+                },
+                separators=(",", ":"),
+            ),
+        })
         await self._emit_finalization_trace(
             request, reason=reason, kind="finalization_started"
         )
@@ -1557,6 +1611,8 @@ class AgentLoop:
                 if isinstance(value := item.get("rendered_feature_count"), int)
             ]
             features = sum(counts) if counts else (0 if not visible else None)
+        summary = self._completion_summary(state)
+        map_requested = route is not None and route.presentation in {"map", "both"}
         violations = check_final_answer(
             candidate,
             target_names=targets,
@@ -1565,7 +1621,23 @@ class AgentLoop:
             feature_count=features,
             unmet=self._pending_native_requirements(state),
             unresolved_targets=unresolved_route_targets(state),
-            required_targets=resolved_route_target_names(state),
+            required_targets=[
+                *resolved_route_target_names(state),
+                *(
+                    item.answer_must_name
+                    for item in summary.obligations
+                    if item.answer_must_name
+                ),
+            ],
+            undelivered=[item.label or item.obligation_id for item in summary.undelivered()],
+            map_rendered=(
+                False
+                if summary.map_state == "failed"
+                or (map_requested and summary.map_state == "none")
+                else None
+            ),
+            evidence_numbers=evidence_numbers(state),
+            truncations=summary.truncations,
         )
         if not violations:
             return candidate

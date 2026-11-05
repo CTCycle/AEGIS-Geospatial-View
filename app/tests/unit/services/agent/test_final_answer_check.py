@@ -109,3 +109,49 @@ def test_an_answer_about_two_places_must_name_both() -> None:
 
     assert check_final_answer("The map now shows Paris.", target_names=["Paris", "Berlin"], required_targets=required)
     assert not check_final_answer("The map now shows Paris and Berlin.", target_names=["Paris", "Berlin"], required_targets=required)
+
+
+###############################################################################
+def test_map_content_is_not_described_when_no_map_was_verified() -> None:
+    claim = "What's on the map: a thermal-anomaly overlay for Portugal."
+    assert check_final_answer(claim, target_names=["Portugal"], map_rendered=False)
+    assert not check_final_answer(claim, target_names=["Portugal"], map_rendered=None)
+    assert not check_final_answer(
+        "The map could not be shown, so no overlay was drawn.",
+        target_names=["Portugal"], map_rendered=False,
+    )
+
+
+###############################################################################
+def test_undelivered_obligations_must_be_disclosed() -> None:
+    assert check_final_answer(
+        "Lugano is 18.3 °C and Milan 19.4 °C.", target_names=["Lugano"],
+        undelivered=["the requested map"],
+    )
+    assert not check_final_answer(
+        "Lugano is 18.3 °C, but the map could not be confirmed.", target_names=["Lugano"],
+        undelivered=["the requested map"],
+    )
+
+
+###############################################################################
+def test_cited_values_must_match_the_evidence() -> None:
+    evidence = [18.3, 19.4]
+    assert check_final_answer("It is 21.7 °C in Lugano.", target_names=[], evidence_numbers=evidence)
+    assert not check_final_answer("It is 18.3 °C in Lugano.", target_names=[], evidence_numbers=evidence)
+    # A difference of two retrieved values is supported by them.
+    assert not check_final_answer("Milan is 1.1 °C warmer.", target_names=[], evidence_numbers=evidence)
+    assert check_final_answer("The strongest was magnitude 7.9.", target_names=[], evidence_numbers=[6.1, 5.4])
+
+
+###############################################################################
+def test_a_truncated_layer_must_be_disclosed() -> None:
+    assert check_final_answer(
+        "The map shows the earthquakes.", target_names=[], truncations=[(25, 205)],
+    )
+    assert not check_final_answer(
+        "The map shows only the strongest 25 of the earthquakes.", target_names=[], truncations=[(25, 205)],
+    )
+    assert not check_final_answer(
+        "There were 205 earthquakes; the map shows 25.", target_names=[], truncations=[(25, 205)],
+    )

@@ -203,6 +203,7 @@ class EvidenceToolHandler:
                 started=started,
             )
         status = "success" if transformed else "valid_empty"
+        truncated_from = _count_cut_by_limit(records, operations)
         labelled = await self._label_places(transformed)
         points = [point for item in transformed if (point := _record_point(item)) is not None]
         bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None
@@ -242,6 +243,7 @@ class EvidenceToolHandler:
             status=status,
             summary=f"Created derived evidence with {len(transformed)} records.",
             data={"record_count": len(transformed), "parent_refs": refs,
+                  "truncated_from": truncated_from,
                   "preview": transformed[:5], "located_record_count": len(points),
                   "unlocated_record_count": unlocated, "place_labelled_count": labelled,
                   "excluded_outside_scope_count": outside_scope,
@@ -376,6 +378,20 @@ def _inspect_payload(
             "total": len(records),
         },
     }
+
+###############################################################################
+def _count_cut_by_limit(
+    records: list[dict[str, Any]], operations: list[dict[str, Any]]
+) -> int | None:
+    """Records that existed when a ``limit`` operation cut the set, if it cut."""
+
+    index = next((i for i, item in enumerate(operations) if item.get("op") == "limit"), None)
+    if index is None:
+        return None
+    before, error = _apply_operations(records, operations[:index])
+    cap = operations[index].get("value")
+    return len(before) if error is None and isinstance(cap, int) and len(before) > cap else None
+
 
 ###############################################################################
 def _apply_operations(

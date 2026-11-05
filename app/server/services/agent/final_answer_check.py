@@ -24,6 +24,20 @@ _DISCLOSURE = re.compile(
     r"no data|not (?:available|completed|retrieved)|failed|ambiguous|unresolved)\b",
     re.IGNORECASE,
 )
+_MAP_CLAIM = re.compile(
+    r"\b(?:the map (?:now )?(?:shows|displays|contains|is showing)|on the map|"
+    r"map (?:overlay|layer)s?|(?:I(?:'ve| have)?|we) (?:prepared|created|built|added|drawn) (?:the |a )?map)",
+    re.IGNORECASE,
+)
+_TRUNCATION_DISCLOSURE = re.compile(
+    r"\b(?:only|limited|truncated|subset|top \d+|first \d+|cut)\b", re.IGNORECASE
+)
+# Numbers an answer cites with a unit that evidence can confirm.
+_UNIT_NUMBER = re.compile(
+    r"(?<![\w.])(?P<n>-?\d+(?:\.\d+)?)\s?(?P<unit>°\s?[CF]?|m/s|km/h|kph|mph|hPa)(?!\w)"
+    r"|\b(?:magnitude\s+|(?-i:M)\s?)(?P<m>\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
 
@@ -33,6 +47,22 @@ def _mentions(text: str, name: str) -> bool:
     if not cleaned:
         return False
     return re.search(rf"(?<!\w){re.escape(cleaned)}(?!\w)", text, re.IGNORECASE) is not None
+
+
+# -----------------------------------------------------------------------------
+def value_is_supported(raw: str, unit: str, evidence: Sequence[float]) -> bool:
+    """Whether evidence supports a cited value: a datum, a difference or a conversion."""
+
+    value = float(raw)
+    decimals = len(raw.split(".")[1]) if "." in raw else 0
+    tolerance = 0.5 * 10 ** -decimals + 1e-9
+    candidates = {round(item, 6) for item in evidence}
+    if unit.upper().endswith("F"):
+        candidates |= {round(item * 9 / 5 + 32, 6) for item in candidates}
+    if any(abs(value - item) <= tolerance for item in candidates):
+        return True
+    ordered = sorted(candidates)
+    return any(abs(abs(a - b) - abs(value)) <= tolerance for a in ordered for b in ordered)
 
 
 # -----------------------------------------------------------------------------
@@ -46,6 +76,10 @@ def check_final_answer(
     unmet: Sequence[str] = (),
     unresolved_targets: Sequence[str] = (),
     required_targets: Sequence[Sequence[str]] = (),
+    undelivered: Sequence[str] = (),
+    map_rendered: bool | None = None,
+    evidence_numbers: Sequence[float] = (),
+    truncations: Sequence[tuple[int, int]] = (),
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -57,6 +91,11 @@ def check_final_answer(
     answer may name them only to disclose that they were not shown.
     ``required_targets`` lists, per resolved target of a multi-place request,
     the spellings that name it; an answer must name every one of them.
+    ``undelivered`` describes unmet or failed obligations the answer must
+    disclose; ``map_rendered`` is False when no verified map exists, so the
+    answer may not describe map content; ``evidence_numbers`` are the values
+    the run's data carries, which numbers cited with a unit must match; and
+    ``truncations`` are (shown, total) layers whose records were cut.
     """
 
     violations: list[str] = []
@@ -89,6 +128,26 @@ def check_final_answer(
                 violations.append(
                     f"uses completeness wording ({match.group(0)!r}) while the result is incomplete"
                 )
+                break
+
+    if undelivered and not _DISCLOSURE.search(text):
+        violations.append("does not disclose: " + "; ".join(undelivered))
+
+    if map_rendered is False:
+        for match in _MAP_CLAIM.finditer(text):
+            if not _NEGATION.search(text[max(0, match.start() - 24) : match.start()]):
+                violations.append(f"describes map content ({match.group(0)!r}) but no map was verified")
+                break
+
+    for shown, total in truncations:
+        if str(total) not in text and not _TRUNCATION_DISCLOSURE.search(text):
+            violations.append(f"does not disclose that the map layer shows {shown} of {total} records")
+
+    if evidence_numbers:
+        for match in _UNIT_NUMBER.finditer(text):
+            raw = match.group("n") or match.group("m")
+            if not value_is_supported(raw, match.group("unit") or "", evidence_numbers):
+                violations.append(f"cites {match.group(0)!r}, which the evidence does not support")
                 break
 
     return violations

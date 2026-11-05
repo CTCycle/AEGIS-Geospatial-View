@@ -1375,3 +1375,38 @@ def test_marking_recovery_keeps_each_place_on_its_own_lookup() -> None:
         "byward market, ottawa",
         "national gallery of canada, ottawa",
     ]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_marker_value_labels_must_come_from_the_retrieved_data() -> None:
+    state = _marking_state({
+        "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
+    })
+    state.tool_results.append(ToolResult(
+        call_id="weather", tool_name="execute_geospatial_capability", status="success",
+        summary="ok", data={"current": {"temperature_2m": 18.3}},
+        metadata=ToolExecutionMetadata(duration_ms=1),
+    ))
+
+    async def mark(label: str) -> ToolResult:
+        return await _service().apply(
+            MapPlan(
+                expected_collection_revision=2,
+                actions=[MarkLocationsAction(
+                    action="mark_locations", location_refs=["Kunsthaus"], annotations={"Kunsthaus": label},
+                )],
+            ),
+            state,
+            ToolExecutionContext(conversation_id="conversation-1"),
+        )
+
+    invented = await mark("21.7 °C")
+    assert invented.error is not None and invented.error.code == "annotation_not_in_evidence"
+
+    assert (await mark("18.3 °C")).status == "success"
+    markers = next(
+        item for item in (state.prepared_map_session or _active_session()).overlay_collection.instances
+        if item.rendering_mode == "place-markers"
+    )
+    properties = markers.descriptor["data"]["features"][0]["properties"]
+    assert properties["name"] == "Kunsthaus: 18.3 °C" and properties["annotation"] == "18.3 °C"

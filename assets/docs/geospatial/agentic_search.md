@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 
 ## Summary
 
@@ -134,6 +134,48 @@ deterministic step between route validation and the first tool call.
   `uncovered_map_targets`, per-target scope checks) read the data and
   presentation obligation targets. Tasks, coverage and completion therefore
   share one source.
+
+### Presentation contract and grounded answers
+
+A map that rendered is not a request that was fulfilled, and an answer is not
+true because it sounds finished. Two server-owned structures separate the two.
+
+- `PresentationContract` (`domain/agent/presentation_contract.py`) is built by
+  `presentation_contract(state, map_session)` when a candidate is prepared and
+  stored on the run presentation. Its `targets` are the places of the
+  presentation obligation (none for map-state edits); its `findings` are the
+  candidate verdicts: a compared place with no layer (`uncovered_map_targets`),
+  a layer outside the requested time window (`assess_evidence`), a requested
+  transform that failed, and requested values shown only as bare place markers.
+  A marker counts as carrying data only with an `annotation` (the optional
+  `mark_locations.annotations` value labels, which `apply_map_plan` rejects when
+  a number is not in the run's evidence).
+- `RenderCompletionService.acknowledge` evaluates the contract against the
+  browser viewport of a `ready` acknowledgment: every target must be inside the
+  view, and a fine place (landmark, address, station, street...) or local one
+  (district, neighbourhood) must be framed at its own scale rather than as its
+  parent city. A violation turns the acknowledgment into a failed observation
+  (`failure_stage: "presentation_contract"`) with a compact reason, which
+  re-enters the loop through the ordinary `revise_map` recovery and its render
+  attempt budget. Vision capture stays conditional.
+- A render acknowledgment decides presentation obligations only. Data,
+  analysis and location obligations read their own completion requirements.
+- `build_completion_summary` derives a `CompletionSummary` (per obligation:
+  status `met|unmet|failed`, evidence ref, leading verified values; map state
+  `rendered|failed|none`; presentation findings; layers truncated by a
+  `transform_evidence` `limit`, recorded as `truncated_from`). It is appended
+  as a system message to the tools-disabled final-answer call and checked by
+  `check_final_answer`, which additionally flags: undisclosed unmet
+  obligations, map content described without a verified map, temperature,
+  wind, pressure and magnitude values the evidence does not support (a datum,
+  a difference of two data or a unit conversion), undisclosed truncation, and
+  a coordinate target whose reverse-geocoded place the answer never names.
+  A rejected answer is replaced by deterministic text, and the finalizers
+  append the summary's disclosure.
+- Once every requested data query is verified empty (`data_verified_empty`),
+  the loop stops and answers honestly instead of mapping empty data.
+- A live `current` reading is accepted within two hours of the routed instant,
+  so a pure information answer no longer waits on `temporal_scope_applied`.
 
 The completion contract can require location resolution, data retrieval,
 spatial and temporal filtering, renderable geometry, map-state commit, viewport
