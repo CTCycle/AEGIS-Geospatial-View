@@ -14,6 +14,7 @@ from server.common.typing import json_object
 from server.contracts.geospatial import MapSession, OverlayInstance
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.evidence import AgentEvidenceEnvelope
+from server.domain.agent.task_ledger import map_fingerprint
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
@@ -74,6 +75,27 @@ def _is_location_only_map(state: AgentRunState) -> bool:
         or route.presentation not in {"map", "both"}
         or is_active_map_update(route, state)
     )
+
+###############################################################################
+def _already_shown(state: AgentRunState, candidate: MapSession) -> bool:
+    """Whether the candidate is the committed map and the user still sees it.
+
+    The client-reported view, when present, must still contain the map's
+    centre; after the user panned away the same map is rendered again.
+    """
+
+    active = state.active_map_session
+    if active is None or map_fingerprint(active) != map_fingerprint(candidate):
+        return False
+    bounds = json_object(state.map_memory.get("current_view")).get("bounds")
+    if not isinstance(bounds, list):
+        return True
+    edges = [float(value) for value in cast(list[object], bounds) if isinstance(value, (int, float))]
+    if len(edges) != 4:
+        return True
+    west, south, east, north = edges
+    viewport = candidate.viewport
+    return west <= viewport.center_longitude <= east and south <= viewport.center_latitude <= north
 
 ###############################################################################
 def targets_outside_view(state: AgentRunState, view: list[float]) -> list[str]:
@@ -373,12 +395,29 @@ class MapPlanService:
                 recovery="terminal",
             )
 
-        state.prepared_map_session = candidate
         evidence_refs = [
             action.evidence_ref
             for action in effective_actions
             if isinstance(action, AddEvidenceLayerAction)
         ]
+        if _already_shown(state, candidate):
+            # The committed map is exactly this candidate and still in the
+            # user's view: rendering it again would change nothing, so the
+            # presentation counts as delivered by the map already shown.
+            state.render_verified = True
+            return ToolResult(
+                call_id=context.call_id,
+                tool_name=self.TOOL_NAME,
+                status="success",
+                summary="The map already shows exactly this plan; nothing was re-rendered.",
+                data={"render_status": "already_shown", "basemap_id": candidate.basemap_id},
+                evidence_refs=list(dict.fromkeys(evidence_refs)),
+                metadata=ToolExecutionMetadata(
+                    duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+                    evidence_refs=list(dict.fromkeys(evidence_refs)),
+                ),
+            )
+        state.prepared_map_session = candidate
         summary = {
             "map_candidate_id": candidate.session_id,
             "collection_revision": candidate.overlay_collection.revision,

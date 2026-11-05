@@ -11,6 +11,7 @@ import asyncio
 import logging
 from contextlib import contextmanager
 from collections.abc import Awaitable, Iterable, Mapping
+from datetime import UTC, datetime
 from typing import Any, Callable, Generator, cast
 from uuid import uuid4
 
@@ -21,6 +22,7 @@ from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.conversation import ConversationState, PendingClarification
 from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.task_ledger import complete_presentation, merge_ledger
 from server.domain.agent.reliability import (
     COMPLEX_RUN_SECONDS,
     DEFAULT_STAGE_LIMITS,
@@ -282,6 +284,7 @@ class NativeAgentOrchestrator:
                         ]
                     )
                 ),
+                prior_tasks=list(conversation_state.tasks),
                 defer_map_commit=defer_map_commit,
                 checkpoint=checkpoint,
                 checkpoint_callback=checkpoint_callback,
@@ -304,6 +307,11 @@ class NativeAgentOrchestrator:
             committed_map = native_response.map_session
         merged_locations = dict(conversation_state.resolved_locations)
         merged_locations.update(native_response.location_refs)
+        # Only the run's verified obligation outcomes advance the ledger; a
+        # map committed here completes the presentation task that prepared it.
+        ledger = merge_ledger(conversation_state.tasks, native_response.task_outcomes)
+        if committed_map is not None and committed_map is native_response.map_session:
+            ledger = complete_presentation(ledger, committed_map, datetime.now(UTC))
         stored_clarification = conversation_state.pending_clarification
         if native_response.operation.kind == "clarification":
             next_clarification = PendingClarification.from_turn(
@@ -344,6 +352,7 @@ class NativeAgentOrchestrator:
                 ),
                 "committed_map_session": committed_map,
                 "pending_clarification": next_clarification,
+                "tasks": ledger,
             }
         )
         memory_snapshot = next_state.memory_projection()

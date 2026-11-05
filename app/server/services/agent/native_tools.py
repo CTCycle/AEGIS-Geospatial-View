@@ -466,13 +466,21 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
         )
         bound_request = _bind_execute_request(internal_request, state)
         location = _location_for_request(bound_request, state)
-        result = await service.execute_capability(
-            bound_request,
-            ToolExecutionContext(
-                conversation_id=state.conversation_id,
-                run_id=state.run_id,
-            ),
-            location=location,
+        context = ToolExecutionContext(
+            conversation_id=state.conversation_id,
+            run_id=state.run_id,
+        )
+        # An identical request a compatible earlier turn already answered is
+        # served from its stored evidence, without a provider call.
+        reused = (
+            await service.reuse_evidence(
+                bound_request, context, state.prior_tasks, now=datetime.now(UTC)
+            )
+            if state.prior_tasks
+            else None
+        )
+        result = reused or await service.execute_capability(
+            bound_request, context, location=location
         )
         if state.route is not None and result.status != "failed":
             result.metadata.covered_queries = service.capability_registry.covered_queries(

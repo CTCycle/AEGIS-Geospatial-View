@@ -135,6 +135,16 @@ than migrated. Conversation-state writes validate the typed contract and set
 the state revision to the same optimistic context revision that commits the
 write.
 
+`tasks` is the bounded conversation task ledger (32 `ConversationTask`
+entries, oldest completed evicted first). It is an additive field with an empty
+default, so version 2 payloads written before it existed still validate
+without a migration. It is written only at the native orchestrator commit from
+the run's verified obligation outcomes; the render-acknowledgment commit
+(`ConversationState.with_committed_map`) completes the presentation task that
+prepared the committed map. Evidence records also persist the bound execute
+request in `provenance.request`, which the evidence reuse gate matches. See
+[agentic search](../geospatial/agentic_search.md#conversation-task-ledger-and-reuse).
+
 Agent-run terminal transitions close an in-flight presentation in the same
 transaction as the run state. A failed, cancelled, superseded, or timed-out
 run cannot leave a `pending` presentation or its `pending_response` behind.

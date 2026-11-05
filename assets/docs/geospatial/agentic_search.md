@@ -39,7 +39,8 @@ decide which semantic history to discard.
 Durable state is separated from the model view:
 
 - `ConversationState` owns revisioned conversation directives, summary, goal,
-  committed map state, durable evidence references, and unresolved questions.
+  committed map state, durable evidence references, unresolved questions, and
+  the conversation task ledger (see *Conversation task ledger and reuse*).
 - `AgentRunState` owns one run's route, completion obligations, resolved
   locations, candidate capabilities, observations, counters, deadlines, and
   terminal state.
@@ -196,6 +197,60 @@ point, bbox, radius, or viewport; they never receive the raw semantic scope
 label. Location resolution automatically refreshes the capability shortlist so
 the model does not spend a second planning turn rediscovering candidates that
 were unavailable before geography was known.
+
+### Conversation task ledger and reuse
+
+`ConversationState.tasks` (at most 32 `ConversationTask` entries) is the
+single record of what earlier turns verifiably established. Each entry is one
+request obligation's outcome: `task_id` (the obligation id, e.g.
+`data:paris:temperature`), `description`, `kind`, `status`
+(`in_progress|completed|failed`), `dependencies`, `target_ids`,
+`capability_id`, `variable`, `temporal_scope`, `filters`, `evidence_refs`,
+`map_revision` (content fingerprint of the prepared or shown map),
+`source_request_id` and `completed_at`.
+
+- **Writes.** `ledger_outcomes` (`services/agent/completion.py`) turns the
+  run's `CompletionSummary` and its own tool results into entries: a met
+  obligation completes, a failed one fails, an unmet one is not recorded
+  except a map awaiting the browser (`in_progress`). Cancelled or superseded
+  runs record nothing; model text is never read. The native orchestrator
+  folds them in at the commit with `merge_ledger` (a newer outcome replaces
+  the same `task_id`, a failure never erases a completed result, the oldest
+  completed entries are evicted first). A map commit, in the orchestrator or
+  at the render acknowledgment (`ConversationState.with_committed_map`),
+  completes the presentation task whose `map_revision` matches. A data
+  entry's `completed_at` is the evidence fetch time, so reuse never extends
+  freshness.
+- **Projection.** The pre-route context carries `conversation_tasks` (the
+  latest request's entries plus known places, at most 12, compact) in place
+  of the previous turn's `goal` and `route`, which are no longer projected:
+  a follow-up is routed afresh instead of copying a stale route.
+- **Compatibility.** Once the goal is compiled, `compatible_tasks` narrows
+  `AgentRunState.prior_tasks` to completed places the goal names and fresh
+  evidence whose geography, variable, time window (bounds may drift by the
+  evidence lifetime) and filters agree with the goal. Freshness is the
+  manifest `cachePolicy.ttlSeconds` plus `staleWhileRevalidateSeconds` when a
+  positive TTL is declared, else 900 s. The working-state message lists the
+  survivors as `reusable_evidence`.
+- **Evidence reuse gate.** Every evidence record stores its bound request
+  (`provenance.request`). Before a provider call,
+  `CapabilityExecutionService.reuse_evidence` answers an identical bound
+  request from a compatible entry's stored evidence (same capability, place,
+  filters and arguments; time bounds within the lifetime; still fresh) and
+  returns a `reused_evidence_ref` result without a provider request. A changed
+  window, filter or place makes a normal provider call.
+- **Map no-op gate.** When a prepared candidate's `map_fingerprint` (basemap,
+  viewport, payload and overlays; ids, timestamps and revisions excluded)
+  equals the committed map and the client-reported view still contains its
+  centre, `apply_map_plan` prepares no candidate, records the render as
+  verified and returns `render_status: already_shown`; the presentation
+  obligation is met by the map already shown.
+- **Route carry-over.** Besides the projection change, the pre-tool intent
+  check rejects a route whose target is an earlier turn's data subject (for
+  example "weather radar" after "Remove that layer and just show Tokyo")
+  with `prior_subject_used_as_place`; the single route revision is asked for
+  place targets only, and the misread target is not counted as a dropped
+  obligation.
 
 ## Capability catalogue and tools
 

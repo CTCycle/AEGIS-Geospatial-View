@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, cast
 
@@ -450,6 +451,37 @@ class AgentTaskState(BaseModel):
         return self.model_dump(mode="json", exclude_none=True)
 
 ###############################################################################
+ConversationTaskStatus = Literal["in_progress", "completed", "failed"]
+
+###############################################################################
+class ConversationTask(BaseModel):
+    """One request obligation's verified outcome, kept across turns.
+
+    Written only from a run's validated completion summary at the commit, so
+    a later turn can reuse places, evidence and the shown map without
+    trusting what a model said it did.  ``task_id`` is the obligation id, so
+    a later run that redoes the same part of a request replaces the entry.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=300)
+    kind: ObligationKind
+    status: ConversationTaskStatus
+    dependencies: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
+    target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
+    capability_id: str | None = Field(default=None, max_length=160)
+    variable: str | None = Field(default=None, max_length=120)
+    temporal_scope: AgentTemporalScope | None = None
+    filters: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
+    # Content fingerprint of the map a presentation task prepared or showed.
+    map_revision: str | None = Field(default=None, max_length=64)
+    source_request_id: str = Field(min_length=1, max_length=160)
+    completed_at: datetime | None = None
+
+###############################################################################
 # Completion requirements that satisfy each obligation kind, most specific
 # first.  An obligation with none of them in the contract is unrouted.
 OBLIGATION_REQUIREMENTS: dict[ObligationKind, tuple[str, ...]] = {
@@ -798,6 +830,11 @@ class AgentRunState(BaseModel):
         default_factory=lambda: dict[str, ResolvedLocation]()
     )
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
+    # Conversation ledger tasks from earlier turns; narrowed to the ones
+    # compatible with this run's goal once the goal is compiled.
+    prior_tasks: list[ConversationTask] = Field(
+        default_factory=lambda: list[ConversationTask](), max_length=32
+    )
     active_map_session: MapSession | None = None
     prepared_map_session: MapSession | None = None
     render_observations: list[RenderObservation] = Field(

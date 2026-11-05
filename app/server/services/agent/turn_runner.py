@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import asdict
 from copy import copy
+from datetime import UTC, datetime
 from typing import Any, Callable, Literal, cast
 
 from server.contracts.chat import (
@@ -19,12 +20,13 @@ from server.configurations.settings import AgentExecutionSettings
 from server.services.llm.factory import LLMFactory
 from server.services.llm.transport import LLMTransportPolicy
 from server.domain.agent.context import AgentContextPackage
-from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.capability_route import AgentRunState, ConversationTask
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.geospatial.providers import ProviderExecutionPolicy, provider_execution_scope
 from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentLoopRequest
 from server.services.agent.agent_state_factory import AgentStateFactory
+from server.services.agent.completion import ledger_outcomes
 
 type PresentationStatus = Literal[
     "not_requested", "prepared", "prepared_unverified", "ready", "failed"
@@ -68,6 +70,9 @@ class AgentTurnRequest:
         default_factory=lambda: dict[str, ResolvedLocation]()
     )
     evidence_refs: list[str] = field(default_factory=lambda: list[str]())
+    prior_tasks: list[ConversationTask] = field(
+        default_factory=lambda: list[ConversationTask]()
+    )
     run_version: int = 1
     conversation_revision: int = 0
     checkpoint: Mapping[str, Any] | None = None
@@ -111,6 +116,7 @@ class AgentTurnRunner:
                 active_map_session=request.active_map_session,
                 location_refs=request.location_refs,
                 evidence_refs=request.evidence_refs,
+                prior_tasks=request.prior_tasks,
                 context_package=request.context_package,
                 run_version=request.run_version,
                 conversation_revision=request.conversation_revision,
@@ -253,6 +259,9 @@ class AgentResponseBuilder:
                 "checkpoint": state.checkpoint(),
             },
             location_refs=dict(state.location_refs),
+            task_outcomes=ledger_outcomes(
+                state, AgentLoop.completion_summary(state), now=datetime.now(UTC)
+            ),
         )
 
 

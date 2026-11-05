@@ -43,6 +43,7 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.context import AgentContextView
 from server.domain.agent.presentation_contract import CompletionSummary
+from server.domain.agent.task_ledger import compatible_tasks, freshness_seconds
 from server.domain.agent.map_plan import (
     PLACE_MARKERS_INSTANCE_ID,
     is_mark_locations_operation,
@@ -386,6 +387,7 @@ class AgentLoop:
                     reason=violation[0], missing=violation[1],
                 ):
                     route = state.route or route
+            self._narrow_prior_tasks(state)
             await self._refresh_capabilities_after_location(request, state, [])
             self._sync_task_state(state)
             await self._checkpoint(request)
@@ -507,6 +509,22 @@ class AgentLoop:
                 phase=state.phase.value, iteration=state.current_iteration,
             )
             return self._failed(state, request, "The agent stopped after an unexpected execution failure.", category="internal_error")
+
+    # -------------------------------------------------------------------------
+    def _narrow_prior_tasks(self, state: AgentRunState) -> None:
+        """Keep only the ledger tasks the compiled goal may reuse."""
+
+        if state.goal is None or not state.prior_tasks:
+            return
+        registry = self.capability_router.capability_registry
+        state.prior_tasks = compatible_tasks(
+            state.prior_tasks,
+            state.goal,
+            freshness=lambda capability_id: freshness_seconds(
+                registry.get_capability(capability_id) if capability_id else None
+            ),
+            now=datetime.now(UTC),
+        )
 
     # -------------------------------------------------------------------------
     def _attach_client_map_view(self, state: AgentRunState) -> None:
@@ -1435,7 +1453,7 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _completion_summary(state: AgentRunState) -> CompletionSummary:
+    def completion_summary(state: AgentRunState) -> CompletionSummary:
         summary = build_completion_summary(state, AgentLoop._completion_checks(state))
         # Like the pending requirements, obligations are judged once the run's
         # tool context exists; an unhydrated state has verified nothing yet.
@@ -1448,7 +1466,7 @@ class AgentLoop:
     def _with_disclosure(state: AgentRunState, text: str) -> str:
         """Append what the user did not get, unless the text already says it."""
 
-        note = AgentLoop._completion_summary(state).disclosure()
+        note = AgentLoop.completion_summary(state).disclosure()
         return f"{text.rstrip()}\n\n{note}" if note and note not in text else text
 
     # -------------------------------------------------------------------------
@@ -1514,7 +1532,7 @@ class AgentLoop:
                         "Answer only from this summary: disclose unmet obligations, "
                         "describe the map only if map_state is rendered, use given values."
                     ),
-                    **self._completion_summary(state).model_view(),
+                    **self.completion_summary(state).model_view(),
                 },
                 separators=(",", ":"),
             ),
@@ -1611,7 +1629,7 @@ class AgentLoop:
                 if isinstance(value := item.get("rendered_feature_count"), int)
             ]
             features = sum(counts) if counts else (0 if not visible else None)
-        summary = self._completion_summary(state)
+        summary = self.completion_summary(state)
         map_requested = route is not None and route.presentation in {"map", "both"}
         violations = check_final_answer(
             candidate,
@@ -2335,6 +2353,20 @@ class AgentLoop:
             )
         if omitted:
             return "known_place_missing_from_targets", omitted[:16]
+        # "Remove that layer": an earlier turn's data subject is not a place.
+        subjects = {
+            normalize_target_key(item.variable)
+            for item in state.prior_tasks
+            if item.kind == "data" and item.variable
+        }
+        misread = [
+            RequestObligation(id=f"location:{normalize_target_key(target).replace(' ', '-')}"[:200], kind="location", target_ids=[target])
+            for target in goal.target_ids
+            if normalize_target_key(target) in subjects
+            and not any(location_ref_matches(target, str(key), item.label) for key, item in state.location_refs.items())
+        ]
+        if misread:
+            return "prior_subject_used_as_place", misread[:16]
         return None
 
     # -------------------------------------------------------------------------
@@ -2438,7 +2470,12 @@ class AgentLoop:
                 item.model_dump(mode="json", exclude_defaults=True) for item in missing
             ]
             revision["instruction"] = (
-                "The previous route does not cover every part of the latest user "
+                "The target_refs in missing_obligations name the data subject of an "
+                "earlier request, not a place. Return one route_request call whose "
+                "target_refs are only the places the latest user message asks for; "
+                "existing map layers are edited through the map state."
+                if reason == "prior_subject_used_as_place"
+                else "The previous route does not cover every part of the latest user "
                 "request listed in missing_obligations. Return one route_request "
                 "call whose target_refs, domains, analysis and presentation cover "
                 "all of them, and list every part in obligations."
@@ -2476,6 +2513,14 @@ class AgentLoop:
             dict(state.task_state),
         )
         prior_obligations = list(state.goal.obligations) if state.goal is not None else []
+        if reason == "prior_subject_used_as_place":
+            # The misread targets were never part of the request.
+            misread = {target for item in missing or [] for target in item.target_ids}
+            prior_obligations = [
+                item.model_copy(update={"target_ids": [t for t in item.target_ids if t not in misread]})
+                for item in prior_obligations
+                if not (item.kind == "location" and set(item.target_ids) <= misread)
+            ]
         state.route = revised
         self._compile_native_goal(
             state,
@@ -4590,6 +4635,13 @@ class AgentLoop:
                 else 0
             ),
         }
+        # Evidence of earlier turns compatible with this goal: an identical
+        # execute call is answered from it without a provider request.
+        reusable = {
+            item.task_id: item.evidence_refs for item in state.prior_tasks if item.kind == "data"
+        }
+        if reusable:
+            payload["reusable_evidence"] = reusable
         if observed:
             payload["render_observations"] = [
                 item.model_dump(mode="json") for item in state.render_observations[-4:]

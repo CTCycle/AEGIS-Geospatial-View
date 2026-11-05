@@ -7,7 +7,11 @@ from typing import Any
 
 from server.contracts.geospatial import MapSession
 from server.domain.agent.context import AgentContextPackage
-from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    ConversationTask,
+)
 from server.domain.agent.decision import ResolvedLocation
 
 ###############################################################################
@@ -25,6 +29,7 @@ class AgentStateFactory:
         active_map_session: MapSession | None = None,
         location_refs: Mapping[str, ResolvedLocation] | None = None,
         evidence_refs: list[str] | None = None,
+        prior_tasks: list[ConversationTask] | None = None,
         context_package: AgentContextPackage | None = None,
         run_version: int = 1,
         conversation_revision: int = 0,
@@ -74,6 +79,7 @@ class AgentStateFactory:
             active_map_session=active_map_session,
             location_refs=dict(location_refs or {}),
             evidence_refs=list(dict.fromkeys(str(item) for item in evidence_refs or [])),
+            prior_tasks=list(prior_tasks or []),
             **context_values,
         )
 

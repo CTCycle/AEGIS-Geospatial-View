@@ -10,13 +10,15 @@ reconstructing semantic state from a recent-message suffix.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.contracts.geospatial import MapSession
-from server.domain.agent.capability_route import AgentGoal, CapabilityRoute
+from server.domain.agent.capability_route import AgentGoal, CapabilityRoute, ConversationTask
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.task_ledger import LEDGER_LIMIT, complete_presentation, ledger_view
 
 
 _CLARIFICATION_ACTION_MARKERS = re.compile(
@@ -162,6 +164,11 @@ class ConversationState(BaseModel):
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     committed_map_session: MapSession | None = None
     pending_clarification: PendingClarification | None = None
+    # Verified per-obligation outcomes of earlier turns; the source of truth
+    # for what a follow-up may reuse.
+    tasks: list[ConversationTask] = Field(
+        default_factory=lambda: list[ConversationTask](), max_length=LEDGER_LIMIT
+    )
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -219,14 +226,31 @@ class ConversationState(BaseModel):
 
     # -------------------------------------------------------------------------
     def context_projection(self, message: str) -> dict[str, Any]:
-        """Return the model-visible state with clarification scope applied."""
+        """Return the model-visible state with clarification scope applied.
 
-        result = self.model_dump(mode="json")
+        The previous turn's goal and route are not projected: a follow-up is
+        routed afresh, and the compact task ledger says what earlier turns
+        already established.
+        """
+
+        result = self.model_dump(mode="json", exclude={"goal", "route", "tasks"})
+        result["conversation_tasks"] = ledger_view(self.tasks)
         pending = self.pending_clarification_for(message)
         result["pending_clarification"] = (
             pending.model_dump(mode="json") if pending is not None else None
         )
         return result
+
+    # -------------------------------------------------------------------------
+    def with_committed_map(self, session: MapSession, now: datetime) -> "ConversationState":
+        """Commit an acknowledged map and complete the tasks that prepared it."""
+
+        return self.model_copy(
+            update={
+                "committed_map_session": session,
+                "tasks": complete_presentation(self.tasks, session, now),
+            }
+        )
 
     # -------------------------------------------------------------------------
     def memory_projection(self) -> dict[str, Any]:

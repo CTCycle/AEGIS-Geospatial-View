@@ -1196,11 +1196,8 @@ class AgentRunRepository:
                             raise ValueError(
                                 "Prepared map does not match the current contract."
                             ) from exc
-                        state = state.model_copy(
-                            update={
-                                "revision": conversation.context_revision,
-                                "committed_map_session": committed_map,
-                            }
+                        state = state.with_committed_map(committed_map, datetime.now(UTC)).model_copy(
+                            update={"revision": conversation.context_revision}
                         )
                         checkpoint["active_map_session"] = candidate_map
                     else:
@@ -1267,11 +1264,8 @@ class AgentRunRepository:
                         committed_map = MapSession.model_validate(candidate_map)
                     except (TypeError, ValueError) as exc:
                         raise ValueError("Prepared map does not match the current contract.") from exc
-                    state = state.model_copy(
-                        update={
-                            "revision": conversation.context_revision,
-                            "committed_map_session": committed_map,
-                        }
+                    state = state.with_committed_map(committed_map, datetime.now(UTC)).model_copy(
+                        update={"revision": conversation.context_revision}
                     )
                 else:
                     state = state.model_copy(

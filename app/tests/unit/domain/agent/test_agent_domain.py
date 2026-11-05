@@ -2,8 +2,9 @@ from __future__ import annotations
 import json
 import pytest
 from pydantic import ValidationError
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute
+from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute, ConversationTask
 from server.domain.agent.conversation import ConversationState, PendingClarification
+from server.domain.agent.task_ledger import LEDGER_LIMIT, merge_ledger
 from server.domain.agent.map_plan import MapPlan
 from server.domain.agent.tool_result import ModelObservation, ToolExecutionError, ToolExecutionMetadata, ToolResult, ValidationIssue
 
@@ -362,3 +363,28 @@ def test_oversized_inspect_evidence_records_are_trimmed_not_dropped() -> None:
     records = observation.result["result"]["records"]
     assert 0 < len(records) < 40
     assert len(json.dumps(observation.result, separators=(",", ":"))) <= 1200
+
+
+###############################################################################
+def test_task_ledger_is_additive_bounded_and_replaces_the_stale_route_in_the_projection() -> None:
+    route = {"primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text",
+             "target_refs": ["Tokyo"], "capability_queries": ["weather radar"]}
+    # A v2 payload written before the ledger existed still validates.
+    state = ConversationState.from_persisted("ledger", {"conversation_id": "ledger", "route": route})
+    assert state.tasks == []
+
+    def task(index: int, status: str) -> ConversationTask:
+        return ConversationTask.model_validate({
+            "task_id": f"data:city-{index}", "description": "data", "kind": "data", "status": status,
+            "source_request_id": f"request-{index}"})
+
+    ledger = merge_ledger([task(0, "failed"), *(task(index, "completed") for index in range(1, LEDGER_LIMIT))], [])
+    ledger = merge_ledger(ledger, [task(LEDGER_LIMIT, "completed"), task(1, "failed")])
+    # The oldest completed entry goes first, and a failure never erases a completed result.
+    assert len(ledger) == LEDGER_LIMIT
+    assert [item.task_id for item in ledger[:2]] == ["data:city-0", "data:city-2"]
+
+    projection = state.model_copy(update={"tasks": ledger}).context_projection("Just show Tokyo")
+    assert "route" not in projection and "goal" not in projection and "tasks" not in projection
+    assert projection["conversation_tasks"] == [
+        {"id": f"data:city-{LEDGER_LIMIT}", "status": "completed"}]

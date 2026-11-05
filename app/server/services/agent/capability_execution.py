@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import time
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from collections.abc import Sequence
+from typing import Any, Literal, Protocol
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from shapely.geometry import Point, box, shape
 from shapely.errors import GEOSException
 
+from server.common.identifiers import normalize_target_key
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
-from server.domain.agent.evidence import EvidenceKind, EvidenceStatus
+from server.domain.agent.capability_route import ConversationTask
+from server.domain.agent.evidence import AgentEvidenceSummary, EvidenceKind, EvidenceStatus
+from server.domain.agent.task_ledger import freshness_seconds
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -71,6 +76,11 @@ class EvidenceStore(Protocol):
         provenance: dict[str, Any],
         parent_evidence_ids: list[str] | None = None,
     ) -> Any: ...
+
+    # -------------------------------------------------------------------------
+    def get_summary(
+        self, evidence_id: str, *, conversation_id: str | None = None
+    ) -> AgentEvidenceSummary | None: ...
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -367,6 +377,52 @@ class CapabilityExecutionService:
         )
 
     # -------------------------------------------------------------------------
+    async def reuse_evidence(
+        self,
+        request: ExecuteCapabilityInput,
+        context: ToolExecutionContext,
+        tasks: Sequence[ConversationTask],
+        *,
+        now: datetime,
+    ) -> ToolResult | None:
+        """Answer a bound execute call from an earlier turn's evidence.
+
+        ``tasks`` are the ledger entries the run's goal may reuse.  A stored
+        record qualifies only when it was produced by this exact request
+        (time bounds may drift within the evidence lifetime) and is still
+        fresh; a changed window, filter or place makes a provider call.
+        """
+
+        repository = self.evidence_repository
+        if repository is None:
+            return None
+        started = time.perf_counter()
+        ttl = freshness_seconds(self.capability_registry.get_capability(request.capability_id))
+        key = request_key(request)
+        for task in reversed(tasks):
+            if task.kind != "data" or task.capability_id != request.capability_id:
+                continue
+            for evidence_ref in reversed(task.evidence_refs):
+                record = await asyncio.to_thread(
+                    repository.get_summary, evidence_ref, conversation_id=context.conversation_id
+                )
+                if record is None or record.status in {"failed", "superseded"}:
+                    continue
+                fetched_at = record.provenance.get("fetched_at")
+                stored = json_object(record.provenance.get("request"))
+                if (
+                    not isinstance(fetched_at, str)
+                    or not stored
+                    or not _same_request(stored, key, tolerance_seconds=ttl)
+                    or now - _aware_instant(fetched_at) > timedelta(seconds=ttl)
+                ):
+                    continue
+                return _reused_result(
+                    record, request=request, context=context, started=started, fetched_at=fetched_at
+                )
+        return None
+
+    # -------------------------------------------------------------------------
     async def _persist_evidence(
         self,
         *,
@@ -395,6 +451,9 @@ class CapabilityExecutionService:
                     "result_type": response.result_type,
                     "observation_time": response.observation_time,
                     "parent_evidence_refs": list(request.evidence_refs),
+                    # The bound request this evidence answers; the reuse gate
+                    # matches later calls against it.
+                    "request": request_key(request),
                 },
                 parent_evidence_ids=list(request.evidence_refs),
             )
@@ -536,6 +595,101 @@ class CapabilityExecutionService:
                 duration_ms=_duration_ms(started),
             ),
         )
+
+###############################################################################
+_REQUEST_TIME_KEYS = ("start_time_iso", "end_time_iso")
+
+###############################################################################
+def request_key(request: ExecuteCapabilityInput) -> dict[str, Any]:
+    """Canonical identity of a bound execute request (what the provider is asked)."""
+
+    return {
+        "capability_id": request.capability_id,
+        "operation": request.operation,
+        "temporal_mode": request.temporal_mode,
+        "location_ref": normalize_target_key(request.location_ref) if request.location_ref else None,
+        "evidence_refs": sorted(request.evidence_refs),
+        "radius_m": request.radius_m,
+        "bbox": [round(value, 6) for value in request.bbox] if request.bbox is not None else None,
+        "start_time_iso": request.start_time_iso,
+        "end_time_iso": request.end_time_iso,
+        "filters": json.loads(json.dumps(request.filters, sort_keys=True, default=str)),
+        "arguments": json.loads(json.dumps(request.arguments, sort_keys=True, default=str)),
+    }
+
+###############################################################################
+def _same_request(stored: dict[str, Any], key: dict[str, Any], *, tolerance_seconds: int) -> bool:
+    """Equal request identity; time bounds may drift within the evidence lifetime."""
+
+    if {name: value for name, value in stored.items() if name not in _REQUEST_TIME_KEYS} != {
+        name: value for name, value in key.items() if name not in _REQUEST_TIME_KEYS
+    }:
+        return False
+    for name in _REQUEST_TIME_KEYS:
+        left, right = stored.get(name), key.get(name)
+        if left is None and right is None:
+            continue
+        if not isinstance(left, str) or not isinstance(right, str):
+            return False
+        try:
+            drift = abs(_aware_instant(left) - _aware_instant(right))
+        except ValueError:
+            return False
+        if drift > timedelta(seconds=tolerance_seconds):
+            return False
+    return True
+
+###############################################################################
+def _aware_instant(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+###############################################################################
+def _reused_result(
+    record: AgentEvidenceSummary,
+    *,
+    request: ExecuteCapabilityInput,
+    context: ToolExecutionContext,
+    started: float,
+    fetched_at: str,
+) -> ToolResult:
+    summary = dict(record.summary)
+    evidence_refs = [record.evidence_id]
+    units = json_object(summary.get("units"))
+    coverage = json_object(summary.get("coverage"))
+    status: Literal["success", "valid_empty", "partial"] = (
+        "valid_empty"
+        if record.status == "valid_empty"
+        else "partial"
+        if record.status == "partial"
+        else "success"
+    )
+    return ToolResult(
+        call_id=context.call_id,
+        tool_name=CapabilityExecutionService.TOOL_NAME,
+        status=status,
+        summary=(
+            f"Reused evidence {record.evidence_id} from an earlier turn (fetched {fetched_at}) "
+            "for this identical request; no provider request was made."
+        ),
+        data={**summary, "reused_evidence_ref": record.evidence_id},
+        evidence_refs=evidence_refs,
+        metadata=ToolExecutionMetadata(
+            capability_id=request.capability_id,
+            provider_id=str(record.provenance.get("provider_id") or "") or None,
+            duration_ms=_duration_ms(started),
+            evidence_refs=evidence_refs,
+            result_type=str(record.provenance.get("result_type") or "") or None,
+            result_status=str(summary.get("result_status") or "") or None,
+            stale=bool(summary.get("stale")),
+            fetched_at=fetched_at,
+            observation_time=str(record.provenance.get("observation_time") or "") or None,
+            units={str(name): str(value) for name, value in units.items()},
+            coverage=coverage or None,
+            warnings=[str(item)[:300] for item in json_array(summary.get("warnings"))[:8]],
+            source_url=str(summary.get("source_url") or "")[:500] or None,
+        ),
+    )
 
 ###############################################################################
 def _failure_shape(error: Exception) -> tuple[Any, str, str, Any, bool, str | None]:

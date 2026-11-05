@@ -3798,6 +3798,14 @@
                 "type": "null"
               }
             ]
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationTask"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Tasks"
           }
         },
         "additionalProperties": false,
@@ -3900,6 +3908,145 @@
         ],
         "title": "ConversationSummary",
         "description": "Searchable, bounded conversation listing item."
+      },
+      "ConversationTask": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "location",
+              "data",
+              "analysis",
+              "presentation"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Dependencies"
+          },
+          "target_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Ids"
+          },
+          "capability_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability Id"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "temporal_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTemporalScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Evidence Refs"
+          },
+          "map_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map Revision"
+          },
+          "source_request_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source Request Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_id",
+          "description",
+          "kind",
+          "status",
+          "source_request_id"
+        ],
+        "title": "ConversationTask",
+        "description": "One request obligation's verified outcome, kept across turns.\n\nWritten only from a run's validated completion summary at the commit, so\na later turn can reuse places, evidence and the shown map without\ntrusting what a model said it did.  ``task_id`` is the obligation id, so\na later run that redoes the same part of a request replaces the entry."
       },
       "DatabaseConnectionTestResponse": {
         "properties": {

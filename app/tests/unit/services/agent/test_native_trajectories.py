@@ -27,7 +27,8 @@ from server.contracts.location import LocationSignal
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult, ToolExecutionError
 from server.services.agent.capability_execution import _provider_params
-from server.services.agent.completion import CompletionEvaluator
+from server.services.agent.completion import CompletionEvaluator, ledger_outcomes
+from server.domain.agent.task_ledger import merge_ledger
 from server.services.agent.tool_definitions import ExecuteCapabilityInput, TransformEvidenceInput, CapabilityDiscoveryInput, RouteRequestInput
 from server.services.agent.tool_handlers.evidence import EvidenceToolHandler, _apply_operations, _inspect_payload
 from server.services.catalog.loader import load_macro_regions
@@ -373,12 +374,14 @@ class DiscoveryProvider:
 
 
 ###############################################################################
-def make_loop(model: _ScriptedProvider, providers: Any, resolver: Any = None) -> AgentLoop:
+def make_loop(
+    model: _ScriptedProvider, providers: Any, resolver: Any = None, evidence: MemoryEvidence | None = None
+) -> AgentLoop:
     capabilities = CapabilityRegistry()
     runtime = RuntimeRegistry(catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None)
     registry = ToolRegistry(runtime_registry=runtime)
     register_agent_tools(registry, capability_registry=capabilities, runtime_registry=runtime,
-                         provider_registry=providers, evidence_repository=MemoryEvidence(),
+                         provider_registry=providers, evidence_repository=evidence or MemoryEvidence(),
                          geospatial_api_service=object(), location_resolver=resolver or LocationResolver())
     return AgentLoop(provider_factory=_ProviderFactory(model),
                      capability_router=CapabilityRouter(capability_registry=capabilities, runtime_registry=runtime),
@@ -1752,3 +1755,218 @@ def test_imagery_only_answer_names_the_missing_values() -> None:
         metadata=ToolExecutionMetadata(duration_ms=0, result_type="raster"),
     )]
     assert "no numeric values" in imagery_only_note(state) and "maximum temperature" in imagery_only_note(state)
+
+# --- cross-turn task ledger ---
+
+
+###############################################################################
+QUAKE_WEEK = {"mode": "historical", "start_time_iso": "2026-10-30T00:00:00Z", "end_time_iso": "2026-11-06T00:00:00Z"}
+QUAKE_DAY = {"mode": "historical", "start_time_iso": "2026-11-05T00:00:00Z", "end_time_iso": "2026-11-06T00:00:00Z"}
+
+
+###############################################################################
+def _quake_route(window: dict[str, str], **extra: Any) -> dict[str, Any]:
+    return {"primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text",
+            "location_mode": "search_area", "target_refs": ["World"], "operation": "inspect",
+            "capability_queries": ["earthquake"], "explicit_capability_ids": ["usgs_earthquakes"],
+            "temporal_scope": window, "filters": {"min_magnitude": 4.5}, **extra}
+
+
+###############################################################################
+class CityResolver:
+
+    # -------------------------------------------------------------------------
+    async def resolve_location_signals(self, signals: list[LocationSignal], *args: Any) -> ResolvedLocation:
+        name = signals[0].raw_value
+        latitude, longitude = {"Paris": (48.85, 2.35), "Berlin": (52.52, 13.4), "Lisbon": (38.72, -9.14)}[name]
+        return ResolvedLocation(label=name, latitude=latitude, longitude=longitude, location_type="city",
+                                bbox=[longitude - 0.2, latitude - 0.2, longitude + 0.2, latitude + 0.2])
+
+
+###############################################################################
+async def _turn(
+    script: list[LLMResult], *, message: str, providers: DiscoveryProvider, evidence: MemoryEvidence,
+    prior: AgentRunState | None = None, request_id: str,
+) -> AgentRunState:
+    """Run one turn; a follow-up starts from the prior turn's committed ledger."""
+
+    ledger = [] if prior is None else merge_ledger(
+        list(prior.prior_tasks),
+        ledger_outcomes(prior, AgentLoop.completion_summary(prior), now=datetime.now(UTC)),
+    )
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id=request_id, conversation_id="ledger",
+        user_message=message, context_hydrated=True, prior_tasks=ledger,
+        location_refs=dict(prior.location_refs) if prior else {},
+        evidence_refs=list(prior.evidence_refs) if prior else [],
+        active_map_session=(prior.prepared_map_session or prior.active_map_session) if prior else None,
+    )
+    await make_loop(_ScriptedProvider(script), providers, CityResolver(), evidence).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+    return state
+
+
+###############################################################################
+def _executions(state: AgentRunState) -> list[ToolResult]:
+    return [item for item in state.tool_results if item.tool_name == "execute_geospatial_capability"]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_strongest_follow_up_reuses_stored_evidence_without_a_provider_call() -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_WEEK)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="There were 2 earthquakes.") for _ in range(3)),
+    ], message="List earthquakes of magnitude 4.5 or higher in the last 7 days worldwide.",
+        providers=providers, evidence=evidence, request_id="t1")
+    assert len(providers.requests) == 1
+
+    second = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_WEEK)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="The strongest was M100.") for _ in range(3)),
+    ], message="Which one was strongest?", providers=providers, evidence=evidence, prior=first, request_id="t2")
+
+    assert len(providers.requests) == 1
+    reused = _executions(second)[-1]
+    assert reused.status == "success"
+    assert reused.evidence_refs == _executions(first)[-1].evidence_refs
+    assert isinstance(reused.data, dict) and reused.data["reused_evidence_ref"] == reused.evidence_refs[0]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_changed_time_window_invalidates_evidence_reuse() -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_WEEK)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="There were 2 earthquakes.") for _ in range(3)),
+    ], message="List earthquakes of magnitude 4.5 or higher in the last 7 days worldwide.",
+        providers=providers, evidence=evidence, request_id="t1")
+
+    second = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_DAY)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="There were 2 earthquakes today.") for _ in range(3)),
+    ], message="And only the last 24 hours?", providers=providers, evidence=evidence, prior=first, request_id="t2")
+
+    assert len(providers.requests) == 2
+    assert providers.requests[1].time != providers.requests[0].time
+    assert not any(item.kind == "data" for item in second.prior_tasks)
+    fetched = _executions(second)[-1].data
+    assert isinstance(fetched, dict) and "reused_evidence_ref" not in fetched
+
+
+###############################################################################
+def _city_weather_route(variable: str) -> dict[str, Any]:
+    return {"primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text",
+            "location_mode": "target", "target_refs": ["Paris", "Berlin"], "operation": "compare",
+            "capability_queries": [variable], "explicit_capability_ids": ["openmeteo_weather_forecast"],
+            "temporal_scope": {"mode": "current"}}
+
+
+###############################################################################
+def _city_executions(prefix: str) -> list[LLMResult]:
+    return [
+        _call(f"{prefix}-{city}", "execute_geospatial_capability",
+              {"capability_id": "openmeteo_weather_forecast", "location_ref": city})
+        for city in ("Paris", "Berlin")
+    ]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_precipitation_follow_up_keeps_places_and_temperature_and_fetches_only_precipitation() -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _city_weather_route("temperature")),
+        _call("resolve-paris", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
+        _call("resolve-berlin", "resolve_geospatial_location", {"query": "Berlin", "target_id": "Berlin"}),
+        *_city_executions("temperature"),
+        *(LLMResult(content="Paris 9 C, Berlin 9 C.") for _ in range(3)),
+    ], message="What are today's temperatures in Paris and Berlin?",
+        providers=providers, evidence=evidence, request_id="t1")
+    assert len(providers.requests) == 2
+
+    second = await _turn([
+        _call("route", "route_request", _city_weather_route("precipitation")),
+        *_city_executions("precipitation"),
+        *(LLMResult(content="Paris 100 mm, Berlin 100 mm.") for _ in range(3)),
+    ], message="Now compare precipitation instead.", providers=providers, evidence=evidence,
+        prior=first, request_id="t2")
+
+    # Places come from the ledger; temperature evidence is not offered for a precipitation goal.
+    assert {item.kind for item in second.prior_tasks} == {"location"}
+    assert not any(item.tool_name == "resolve_geospatial_location" for item in second.tool_results)
+    assert len(providers.requests) == 4
+    ledger = merge_ledger(
+        merge_ledger([], ledger_outcomes(first, AgentLoop.completion_summary(first), now=datetime.now(UTC))),
+        ledger_outcomes(second, AgentLoop.completion_summary(second), now=datetime.now(UTC)),
+    )
+    assert {(item.task_id, item.status) for item in ledger} == {
+        ("location:paris", "completed"), ("location:berlin", "completed"),
+        ("data:paris:temperature", "completed"), ("data:berlin:temperature", "completed"),
+        ("data:paris:precipitation", "completed"), ("data:berlin:precipitation", "completed"),
+    }
+
+
+###############################################################################
+LISBON_ROUTE = {"primary_domain": "place_search", "task_mode": "execute", "presentation": "map",
+                "location_mode": "target", "operation": "show_location_on_map", "target_refs": ["Lisbon"]}
+LISBON_PLAN = {"expected_collection_revision": 0, "actions": [
+    {"action": "set_basemap", "capability_id": "osm_default"},
+    {"action": "set_viewport", "strategy": "fit_location"}]}
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_identical_map_request_is_answered_from_the_shown_map_without_a_render() -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", LISBON_ROUTE),
+        _call("resolve", "resolve_geospatial_location", {"query": "Lisbon", "target_id": "Lisbon"}),
+        _call("map", "apply_map_plan", LISBON_PLAN),
+    ], message="Show me Lisbon on the map.", providers=providers, evidence=evidence, request_id="t1")
+    assert first.prepared_map_session is not None
+
+    second = await _turn([
+        _call("route", "route_request", LISBON_ROUTE),
+        _call("map", "apply_map_plan", LISBON_PLAN),
+        *(LLMResult(content="The map already shows Lisbon.") for _ in range(3)),
+    ], message="Show me Lisbon on the map.", providers=providers, evidence=evidence, prior=first, request_id="t2")
+
+    shown = next(item for item in second.tool_results if item.tool_name == "apply_map_plan")
+    assert isinstance(shown.data, dict) and shown.data["render_status"] == "already_shown"
+    assert second.prepared_map_session is None
+    assert second.termination_reason == "goal_satisfied"
+    assert AgentLoop.completion_summary(second).map_state == "rendered"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_map_follow_up_to_a_text_answer_is_rerouted_to_the_place_and_gets_the_map_tools() -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", {**_city_weather_route("weather radar"), "target_refs": ["Paris"]}),
+        _call("resolve", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
+        _call("execute", "execute_geospatial_capability",
+              {"capability_id": "openmeteo_weather_forecast", "location_ref": "Paris"}),
+        *(LLMResult(content="Radar is not available; it is dry in Paris.") for _ in range(3)),
+    ], message="Show the current weather radar over Paris.", providers=providers, evidence=evidence, request_id="t1")
+
+    second = await _turn([
+        # "Remove that layer": the router takes the earlier subject for a place.
+        _call("route", "route_request", {**LISBON_ROUTE, "target_refs": ["weather radar"]}),
+        _call("route-2", "route_request", {**LISBON_ROUTE, "target_refs": ["Paris"]}),
+        _call("map", "apply_map_plan", LISBON_PLAN),
+    ], message="Remove that layer and just show the city.", providers=providers, evidence=evidence,
+        prior=first, request_id="t2")
+
+    revision = second.route_revisions[0]
+    assert revision["reason"] == "prior_subject_used_as_place" and revision["outcome"] == "revised"
+    assert second.route is not None and second.route.target_refs == ["Paris"]
+    assert second.prepared_map_session is not None
+    assert second.prepared_map_session.resolved_location.label == "Paris"

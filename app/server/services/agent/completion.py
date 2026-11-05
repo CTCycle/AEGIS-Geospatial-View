@@ -14,6 +14,8 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     CompletionContract,
     CompletionRequirement,
+    ConversationTask,
+    ConversationTaskStatus,
     ObligationKind,
     RequestObligation,
     TargetRequirement,
@@ -31,6 +33,7 @@ from server.domain.agent.presentation_contract import (
     ObligationStatus,
     PresentationContract,
 )
+from server.domain.agent.task_ledger import map_fingerprint
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
 
 ###############################################################################
@@ -1019,6 +1022,83 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
     )
 
 ###############################################################################
+def ledger_outcomes(
+    state: AgentRunState, summary: CompletionSummary, *, now: datetime
+) -> list[ConversationTask]:
+    """Conversation-ledger entries for what this run verifiably did.
+
+    Only the completion summary decides status: a met obligation completes,
+    a failed one fails, and an unmet one is not recorded, except a map that
+    is prepared and awaiting the browser.  Evidence and capability come from
+    the run's own tool results; a reused result keeps its original fetch
+    time, so reuse never extends evidence freshness.
+    """
+
+    goal = state.goal
+    if goal is None or state.typed_task_state().status in {"cancelled", "superseded"}:
+        return []
+    verdicts = {item.obligation_id: item for item in summary.obligations}
+    required = [item for item in goal.obligations if item.required]
+    data_ids = [item.id for item in required if item.kind in {"data", "analysis"}]
+    shown = state.active_map_session if state.render_verified else state.prepared_map_session
+    tasks: list[ConversationTask] = []
+    for obligation in required:
+        verdict = verdicts.get(obligation.id)
+        if verdict is None:
+            continue
+        status: ConversationTaskStatus
+        if verdict.status == "met":
+            status = "completed"
+        elif verdict.status == "failed":
+            status = "failed"
+        elif obligation.kind == "presentation" and state.prepared_map_session is not None:
+            status = "in_progress"
+        else:
+            continue
+        target = obligation.target_ids[0] if obligation.target_ids else None
+        result = (
+            _obligation_result(state, obligation.kind, target)
+            if obligation.kind in {"data", "analysis"}
+            else None
+        )
+        if obligation.kind == "location":
+            dependencies: list[str] = []
+        elif obligation.kind == "data":
+            dependencies = [
+                item.id
+                for item in required
+                if item.kind == "location"
+                and any(location_ref_matches(ref, other, other) for ref in item.target_ids for other in obligation.target_ids)
+            ]
+        elif obligation.kind == "analysis":
+            dependencies = [item for item in data_ids if item != obligation.id]
+        else:
+            dependencies = list(data_ids)
+        completed_at: datetime | None = None
+        if status == "completed":
+            fetched = result.metadata.fetched_at if result is not None else None
+            completed_at = _parse_scope_time(fetched) if fetched else now
+        tasks.append(ConversationTask(
+            task_id=obligation.id,
+            description=_obligation_label(obligation)[:300],
+            kind=obligation.kind,
+            status=status,
+            dependencies=dependencies[:16],
+            target_ids=list(obligation.target_ids),
+            capability_id=result.metadata.capability_id if result is not None else None,
+            variable=obligation.variable,
+            temporal_scope=obligation.temporal_scope,
+            filters=dict(goal.filters),
+            evidence_refs=list(result.evidence_refs[:8]) if result is not None and status == "completed" else [],
+            map_revision=(
+                map_fingerprint(shown) if obligation.kind == "presentation" and shown is not None else None
+            ),
+            source_request_id=state.request_id,
+            completed_at=completed_at,
+        ))
+    return tasks
+
+###############################################################################
 def follow_up_location_keys(state: AgentRunState) -> set[str]:
     """Return points this run resolved inside a goal target's area.
 
@@ -1064,6 +1144,7 @@ __all__ = [
     "presentation_contract",
     "describe_requirements",
     "imagery_only_note",
+    "ledger_outcomes",
     "needs_numeric_values",
     "requested_transform_unmet",
     "follow_up_location_keys",

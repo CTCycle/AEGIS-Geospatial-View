@@ -13,6 +13,7 @@ from server.domain.agent.capability_route import (
     AgentTaskState,
     CapabilityRoute,
     CompletionContract,
+    ConversationTask,
 )
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.tool_result import ToolExecutionError
@@ -174,6 +175,10 @@ class AgentTurnResponse(BaseModel):
     context_usage: ContextUsageResponse | None = None
     location_refs: dict[str, ResolvedLocation] = Field(
         default_factory=lambda: dict[str, ResolvedLocation]()
+    )
+    # Verified obligation outcomes the commit folds into the task ledger.
+    task_outcomes: list[ConversationTask] = Field(
+        default_factory=lambda: list[ConversationTask](), max_length=32
     )
 
 ###############################################################################
