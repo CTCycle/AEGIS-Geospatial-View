@@ -15,7 +15,7 @@ from server.services.llm.opencode_provider import (
 from server.services.llm.errors import LLMProviderRequestError, LLMResponseParsingError
 from server.services.llm.opencode_messages_transport import build_messages_payload
 from server.services.llm.opencode_models_dev import ModelsDevEntry
-from server.services.llm.types import LLMRequest
+from server.services.llm.types import LLMRequest, LLMToolDefinition
 
 ###############################################################################
 class _StructuredPayload(BaseModel):
@@ -377,6 +377,31 @@ def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     provider.chat(request)
 
     assert client.completions.calls[0]["max_tokens"] == 77
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("tool_names", "expected"),
+    [(["route_request"], None), (["route_request", "other_tool"], "required")],
+)
+def test_lone_required_tool_omits_tool_choice_on_opencode(
+    monkeypatch, tool_names: list[str], expected: str | None
+) -> None:
+    client = _Client()
+    provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
+    monkeypatch.setattr(provider, "_client", lambda _request=None, **_kwargs: client)
+    request = LLMRequest(
+        model="deepseek-v4-flash",
+        provider_session_id="conversation-1",
+        messages=[{"role": "user", "content": "Hello"}],
+        metadata={"thinking_mode": "disabled"},
+    )
+    tools = [LLMToolDefinition(name, "d", {"type": "object"}) for name in tool_names]
+
+    provider.chat(request, tools=tools, tool_choice="required")
+
+    call = client.completions.calls[0]
+    assert call.get("tool_choice") == expected
+    assert call["extra_body"] == {"thinking": {"type": "disabled"}}
 
 ###############################################################################
 def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:

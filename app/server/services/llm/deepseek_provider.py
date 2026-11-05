@@ -310,7 +310,11 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
             ]
-            kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
+            effective_choice = self._effective_tool_choice(
+                tool_choice or request.tool_choice or "auto", native_tools
+            )
+            if effective_choice is not None:
+                kwargs["tool_choice"] = effective_choice
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
         client: Any | None = None
@@ -397,7 +401,11 @@ class DeepSeekProvider(LLMProvider):
             kwargs["tools"] = [
                 self.tool_to_openai_schema(tool) for tool in native_tools
             ]
-            kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
+            effective_choice = self._effective_tool_choice(
+                tool_choice or request.tool_choice or "auto", native_tools
+            )
+            if effective_choice is not None:
+                kwargs["tool_choice"] = effective_choice
         if schema and not native_tools:
             kwargs["response_format"] = {"type": "json_object"}
         client: Any | None = None
@@ -509,6 +517,27 @@ class DeepSeekProvider(LLMProvider):
 
         stream = LLMTextStream(iterate(), context_usage=usage.to_dict())
         return stream
+
+    # -------------------------------------------------------------------------
+    def _effective_tool_choice(
+        self, tool_choice: str, native_tools: Sequence[LLMToolDefinition]
+    ) -> str | None:
+        """Drop a forced choice that a lone tool already implies on OpenCode.
+
+        An explicit ``required`` choice combined with disabled thinking is
+        rejected (HTTP 400, "not yet supported") by some OpenCode upstream
+        backends, and which backend serves a conversation is fixed by its
+        session id. With exactly one tool the provider has no alternative to
+        select, so omitting the choice keeps the contract on every backend.
+        """
+
+        if (
+            tool_choice == "required"
+            and len(native_tools) == 1
+            and self._uses_structured_function_transport()
+        ):
+            return None
+        return tool_choice
 
     # -------------------------------------------------------------------------
     def _uses_structured_function_transport(self) -> bool:
