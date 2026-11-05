@@ -92,6 +92,49 @@ route, and resolution still runs normally, so "Show Springfield" still asks
 which Springfield. The choice is recorded as `route_source` (`model`, `fast`
 or `fallback`) on the run state and in the execution trace.
 
+### Request obligations and intent verification
+
+A route can be internally valid and still drop part of the request, because
+tool exposure follows the route. Intent verification is therefore a
+deterministic step between route validation and the first tool call.
+
+- `route_request` accepts an optional `obligations` list in which the routing
+  model declares every explicit part of the request as a `RouteObligation`
+  (`kind`, `target_refs`, `variable`, `required`).
+- `AgentGoal.obligations` holds the server-normalized `RequestObligation`
+  list (`id`, `kind` in `location|data|analysis|presentation`, `target_ids`,
+  optional `variable`, optional per-target `temporal_scope`, `required`;
+  at most 32). `derive_request_obligations` builds it from the validated
+  route: one location obligation per target, one data obligation per target
+  and variable when provider data is required, an analysis obligation for a
+  route analysis or measurement, and a map presentation obligation. A
+  declared part that none of these expresses is kept as its own obligation.
+  Map-state targets name map content, not places, and get no location
+  obligation.
+- `CapabilityRouter.validate_route` drops a declared part only when one of
+  its own normalizations replaced it (a catalog name removed from the places,
+  a map request answered in text, a cleared analysis, a marking route), and
+  each such rule is already in the decision's reason codes.
+- Before any tool runs, `unrouted_obligations` checks that every required
+  obligation names route targets and maps to a completion requirement or to
+  the route's presentation/analysis, and the loop checks that a place already
+  resolved in the conversation and named again in the message is a target.
+  A violation (`obligation_target_missing`, `<kind>_obligation_unrouted`,
+  `compound_obligation_dropped`, `known_place_missing_from_targets`) uses the
+  single bounded route revision, with the missing obligations in the request.
+  The step adds no planner and no extra model call type.
+- Any route revision, whether a tool result or this check triggered it,
+  must keep the prior goal's required obligations: every location and data
+  place, and the analysis and presentation kinds. `dropped_obligations`
+  otherwise rejects the revision, restores the prior route, goal, contract,
+  task ledger and shortlist, and records `outcome: "rejected"` with the
+  dropped ids.
+- `AgentTaskState.create` seeds its child tasks from the same obligations,
+  and the per-target coverage helpers (`uncovered_route_targets`,
+  `uncovered_map_targets`, per-target scope checks) read the data and
+  presentation obligation targets. Tasks, coverage and completion therefore
+  share one source.
+
 The completion contract can require location resolution, data retrieval,
 spatial and temporal filtering, renderable geometry, map-state commit, viewport
 evidence, and final response readiness. A valid empty result remains data with
@@ -485,4 +528,4 @@ airports (`aeroway=aerodrome`) and attractions (`tourism=attraction|museum|
 viewpoint`, `historic=monument`) without credentials, and keeps results of any
 queried OSM key instead of only amenity-style keys.
 
-Recovery keeps failures visible. A route revision re-compiles the goal but keeps a `required_data_retrieved` obligation the earlier route had, so a bare location fit cannot satisfy a data request. Exhausted model-transport retries end with a model-service-outage message, distinct from geospatial provider outages and from invalid tool calls. Nominatim retries DNS, 429 and 5xx failures (not timeouts); an Open-Meteo grid batch retries once on a 5xx, and a still-missing batch makes the result `partial` with a warning naming the cause. A dated raster whose layer publishes no imagery for that day (`temporal_scope_satisfied` false with a `latest_available_date`) stops the run at once with that disclosure. A tool the step did not expose is rejected with a hint to issue it in the next step; `fit_evidence` on evidence without a bbox fits the target location.
+Recovery keeps failures visible. A route revision re-compiles the goal and is rejected if it drops a required obligation of the earlier goal (a data obligation included), so a bare location fit cannot satisfy a data request. Exhausted model-transport retries end with a model-service-outage message, distinct from geospatial provider outages and from invalid tool calls. Nominatim retries DNS, 429 and 5xx failures (not timeouts); an Open-Meteo grid batch retries once on a 5xx, and a still-missing batch makes the result `partial` with a warning naming the cause. A dated raster whose layer publishes no imagery for that day (`temporal_scope_satisfied` false with a `latest_available_date`) stops the run at once with that disclosure. A tool the step did not expose is rejected with a hint to issue it in the next step; `fit_evidence` on evidence without a bbox fits the target location.

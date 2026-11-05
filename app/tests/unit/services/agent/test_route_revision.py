@@ -339,3 +339,107 @@ def test_route_revision_does_not_charge_the_revised_route_for_old_route_rejectio
     assert state.validation_corrections == 0
     assert state.consecutive_tool_failures == 0
     assert fingerprint not in state.failed_fingerprints
+
+
+###############################################################################
+COMPARE = "Compare today's temperatures in Lugano and Milan, then show the difference on the map"
+
+
+###############################################################################
+def _compare_route(presentation: str, targets: tuple[str, ...] = ("Lugano", "Milan")) -> dict[str, Any]:
+    """The comparison route; the model declares every explicit part of the request."""
+
+    return {
+        "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": presentation,
+        "location_mode": "target", "target_refs": list(targets), "operation": "compare",
+        "capability_queries": ["current temperature"], "temporal_scope": {"mode": "current"},
+        "obligations": [
+            *({"kind": "location", "target_refs": [city]} for city in targets),
+            *({"kind": "data", "target_refs": [city], "variable": "temperature"} for city in targets),
+            {"kind": "analysis", "target_refs": list(targets), "variable": "temperature difference"},
+            {"kind": "presentation", "target_refs": list(targets)},
+        ],
+    }
+
+
+###############################################################################
+def _compare_state() -> AgentRunState:
+    return AgentRunState(phase=AgentPhase.RECEIVE_REQUEST, request_id="cmp", conversation_id="cmp",
+                         user_message=COMPARE)
+
+
+###############################################################################
+def _obligation_targets(state: AgentRunState, kind: str) -> list[list[str]]:
+    assert state.goal is not None
+    return [item.target_ids for item in state.goal.obligations if item.kind == kind]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_compound_request_dropping_the_map_is_revised_before_any_tool_runs() -> None:
+    state = _compare_state()
+    model = _Model([
+        # The first route answers in text only: the map half of the request is lost.
+        _call("route-1", "route_request", _compare_route("text")),
+        _call("route-2", "route_request", _compare_route("both")),
+        *(LLMResult(content="Lugano is 2 °C warmer than Milan.") for _ in range(3)),
+    ])
+    await _run(model, state, _Evidence())
+
+    revision = state.route_revisions[0]
+    assert revision["reason"] == "compound_obligation_dropped"
+    assert revision["outcome"] == "revised"
+    assert revision["missing_obligations"] == ["presentation:lugano:milan"]
+    # The revision is the second model call: verification precedes tool execution.
+    assert "missing_obligations" in str(model.requests[1].messages[-1]["content"])
+    assert state.route is not None and state.route.presentation == "both"
+    assert _obligation_targets(state, "location") == [["Lugano"], ["Milan"]]
+    assert _obligation_targets(state, "data") == [["Lugano"], ["Milan"]]
+    assert len(_obligation_targets(state, "analysis")) == 1
+    assert _obligation_targets(state, "presentation") == [["Lugano", "Milan"]]
+    # Tasks are seeded from the same obligations the coverage checks read.
+    assert state.goal is not None
+    seeded = {task.obligation_id for task in state.typed_task_state().tasks if task.obligation_id}
+    assert seeded == {item.id for item in state.goal.obligations}
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_revision_that_drops_a_target_is_rejected_and_the_prior_route_stays() -> None:
+    state = _compare_state()
+    model = _Model([
+        _call("route-1", "route_request", _compare_route("text")),
+        # The "repair" adds the map but silently forgets Milan.
+        _call("route-2", "route_request", _compare_route("both", targets=("Lugano",))),
+        *(LLMResult(content="Lugano is 2 °C warmer than Milan.") for _ in range(3)),
+    ])
+    await _run(model, state, _Evidence())
+
+    revision = state.route_revisions[0]
+    assert revision["outcome"] == "rejected"
+    dropped = revision["dropped_obligations"]
+    assert isinstance(dropped, list) and "location:milan" in dropped
+    assert state.route is not None and state.route.target_refs == ["Lugano", "Milan"]
+    assert ["Milan"] in _obligation_targets(state, "data")
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_single_intent_request_is_not_revised() -> None:
+    state = AgentRunState(phase=AgentPhase.RECEIVE_REQUEST, request_id="one", conversation_id="one",
+                          user_message="What is the temperature in Milan right now?")
+    model = _Model([
+        _call("route-1", "route_request", {
+            "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text",
+            "location_mode": "target", "target_refs": ["Milan"], "operation": "inspect",
+            "capability_queries": ["current temperature"], "temporal_scope": {"mode": "current"},
+        }),
+        *(LLMResult(content="It is 18 °C in Milan.") for _ in range(3)),
+    ])
+    await _run(model, state, _Evidence())
+
+    assert state.route_revisions == []
+    assert not any("route_revision" in str(m.get("content")) for r in model.requests for m in r.messages)
+    assert state.goal is not None
+    assert [(item.kind, item.target_ids) for item in state.goal.obligations] == [
+        ("location", ["Milan"]), ("data", ["Milan"])]

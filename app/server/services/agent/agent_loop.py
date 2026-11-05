@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from server.common.identifiers import location_ref_matches
+from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.contracts.geospatial import MapSession
@@ -34,7 +34,12 @@ from server.domain.agent.capability_route import (
     CompletionRequirementKind,
     CompletionRequirement,
     LoopDecision,
+    RequestObligation,
     TaskStatus,
+    derive_request_obligations,
+    dropped_obligations,
+    same_target,
+    unrouted_obligations,
 )
 from server.domain.agent.context import AgentContextView
 from server.domain.agent.map_plan import (
@@ -316,6 +321,7 @@ class AgentLoop:
         try:
             self._ensure_run_control(request)
             self._transition(state, AgentPhase.ROUTE_REQUEST, request.budget)
+            resumed_route = state.route is not None
             route_result = (
                 (None, "", state.route)
                 if state.route is not None
@@ -366,6 +372,16 @@ class AgentLoop:
                 ),
                 servable_queries=self.capability_router.capability_registry.servable_queries,
             )
+            if not resumed_route:
+                # Intent verification: a route that cannot carry every part of
+                # the request is revised before any tool runs, not discovered
+                # missing at completion.
+                violation = self._obligation_violation(state)
+                if violation is not None and await self._revise_route(
+                    request, provider, messages, route, [], [],
+                    reason=violation[0], missing=violation[1],
+                ):
+                    route = state.route or route
             await self._refresh_capabilities_after_location(request, state, [])
             self._sync_task_state(state)
             await self._checkpoint(request)
@@ -1669,7 +1685,8 @@ class AgentLoop:
         route: CapabilityRoute,
     ) -> None:
         requirements = list(state.completion_requirements)
-        target_ids = list(state.goal.target_ids) if state.goal is not None else []
+        goal = state.goal
+        target_ids = list(goal.target_ids) if goal is not None else []
         compound = bool(
             len(requirements) > 1
             or len(target_ids) > 1
@@ -1682,7 +1699,7 @@ class AgentLoop:
             description=state.user_message,
             max_iterations=state.max_iterations,
             requirements=requirements,
-            target_ids=target_ids,
+            obligations=list(goal.obligations) if goal is not None else [],
             compound=compound,
         )
         # Preserve conversation-state keys from pre-hydrated checkpoints while
@@ -2047,7 +2064,6 @@ class AgentLoop:
                     "content": json.dumps(
                         {
                             "route_revision": True,
-                            **revision,
                             "instruction": (
                                 "The previous route could not run the requested "
                                 "operation. Return one route_request call for the "
@@ -2055,6 +2071,8 @@ class AgentLoop:
                                 "that operation needs; filtering or transforming data "
                                 "is not a map-state change."
                             ),
+                            # An obligation violation names its own instruction.
+                            **revision,
                         },
                         separators=(",", ":"),
                     ),
@@ -2201,6 +2219,53 @@ class AgentLoop:
         return None
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _obligation_violation(
+        state: AgentRunState,
+    ) -> tuple[str, list[RequestObligation]] | None:
+        """Check the compiled goal against the request before any tool runs.
+
+        Every required obligation must map to the route, and a place already
+        resolved in this conversation that the user names again must be one
+        of the route's targets.  Returns a reason code with the obligations it
+        concerns, or None when the route can carry the whole request.
+        """
+
+        goal = state.goal
+        route = state.route
+        if goal is None or route is None or goal.task_mode != "execute":
+            return None
+        violation = unrouted_obligations(goal, state.completion_requirements)
+        if violation is not None or route.location_mode != "target" or not goal.target_ids:
+            return violation
+        message = f" {normalize_target_key(state.user_message)} "
+        omitted: list[RequestObligation] = []
+        for key, location in state.location_refs.items():
+            name = (location.label or str(key)).split(",")[0].strip()
+            normalized = normalize_target_key(name)
+            if (
+                len(normalized) < 3
+                or f" {normalized} " not in message
+                or any(
+                    location_ref_matches(target, str(key), location.label)
+                    or same_target(target, name)
+                    or f" {normalized} " in f" {normalize_target_key(target)} "
+                    for target in goal.target_ids
+                )
+            ):
+                continue
+            omitted.append(
+                RequestObligation(
+                    id=f"location:{normalized.replace(' ', '-')}"[:200],
+                    kind="location",
+                    target_ids=[name],
+                )
+            )
+        if omitted:
+            return "known_place_missing_from_targets", omitted[:16]
+        return None
+
+    # -------------------------------------------------------------------------
     async def _downgrade_unrenderable_route(
         self,
         request: AgentLoopRequest,
@@ -2273,27 +2338,49 @@ class AgentLoop:
         route: CapabilityRoute,
         calls: list[LLMToolCall],
         results: list[ToolResult],
+        *,
+        reason: str | None = None,
+        missing: list[RequestObligation] | None = None,
     ) -> bool:
-        """Revise the route once per run when a tool result shows it was wrong.
+        """Revise the route once per run when it cannot express the request.
 
-        Completed evidence stays in the run state; only the route, goal and
-        contract are recompiled, and the revision is traced old to new.
+        The reason is either a tool result that showed the route was wrong or
+        a pre-tool obligation violation (``reason`` with the ``missing``
+        obligations).  Completed evidence stays in the run state; only the
+        route, goal and contract are recompiled.  A revision that drops a
+        required obligation of the prior goal is rejected and the prior route
+        stays.  Every attempt is traced old to new.
         """
 
         state = request.state
-        reason = self._route_mismatch(route, results)
+        reason = reason or self._route_mismatch(route, results)
         if reason is None or state.route_revisions:
             return False
         previous = route.model_dump(mode="json", exclude_defaults=True)
         # Recorded before the call so a failed attempt is never retried.
         record: dict[str, object] = {"reason": reason, "previous_route": previous}
+        revision: dict[str, object] = {"reason": reason, "previous_route": previous}
+        if missing:
+            record["missing_obligations"] = [item.id for item in missing]
+            revision["missing_obligations"] = [
+                item.model_dump(mode="json", exclude_defaults=True) for item in missing
+            ]
+            revision["instruction"] = (
+                "The previous route does not cover every part of the latest user "
+                "request listed in missing_obligations. Return one route_request "
+                "call whose target_refs, domains, analysis and presentation cover "
+                "all of them, and list every part in obligations."
+            )
         state.route_revisions.append(record)
+        # Routing may replace the shortlist; a rejected revision restores it.
+        prior_capability_ids = list(state.capability_ids)
+        prior_route_source = state.route_source
         try:
             _, _, revised = await self._route(
                 request,
                 provider,
                 messages,
-                revision={"reason": reason, "previous_route": previous},
+                revision=revision,
             )
         except (AgentRunControlSignal, asyncio.CancelledError, ExecutionBudgetExceeded):
             raise
@@ -2309,10 +2396,15 @@ class AgentLoop:
         if revised is None:
             record["outcome"] = "unchanged"
             return False
+        prior = (
+            state.route,
+            state.goal,
+            state.completion_contract,
+            list(state.completion_requirements),
+            dict(state.task_state),
+        )
+        prior_obligations = list(state.goal.obligations) if state.goal is not None else []
         state.route = revised
-        self._forgive_route_rejections(state, calls, results)
-        self._bind_search_area(state, revised)
-        previous_contract = state.completion_contract
         self._compile_native_goal(
             state,
             revised,
@@ -2321,9 +2413,38 @@ class AgentLoop:
             ),
             servable_queries=self.capability_router.capability_registry.servable_queries,
         )
-        self._keep_data_obligation(state, previous_contract)
-        record["outcome"] = "revised"
         record["revised_route"] = revised.model_dump(mode="json", exclude_defaults=True)
+        dropped = dropped_obligations(
+            prior_obligations, state.goal.obligations if state.goal is not None else []
+        )
+        if dropped:
+            # A revision repairs how the request is routed, never what it asks.
+            (
+                state.route,
+                state.goal,
+                state.completion_contract,
+                state.completion_requirements,
+                state.task_state,
+            ) = prior
+            state.capability_ids = prior_capability_ids
+            state.route_source = prior_route_source
+            record["outcome"] = "rejected"
+            record["dropped_obligations"] = [item.id for item in dropped]
+            await self._emit_trace(
+                request,
+                AgentTraceEvent(
+                    kind="plan_revised",
+                    run_id=state.run_id or state.request_id,
+                    run_version=state.run_version,
+                    sequence=self._trace_sequence(state),
+                    iteration=max(1, state.current_iteration),
+                    payload=dict(record),
+                ),
+            )
+            return False
+        self._forgive_route_rejections(state, calls, results)
+        self._bind_search_area(state, revised)
+        record["outcome"] = "revised"
         await self._refresh_capabilities_after_location(request, state, [])
         await self._emit_trace(
             request,
@@ -4268,6 +4389,11 @@ class AgentLoop:
             if is_mark_locations_operation(route.operation):
                 requirements.append("locations_marked")
         state.completion_requirements = list(dict.fromkeys(requirements))
+        data_obligations = (
+            (servable_queries or list)(list(dict.fromkeys(route.capability_queries))[:4])
+            if requires_provider_data and len(route.capability_queries) > 1
+            else []
+        )
         state.goal = AgentGoal(
             goal=state.user_message,
             task_mode=route.task_mode,
@@ -4280,6 +4406,13 @@ class AgentLoop:
             spatial_scope=spatial_scope,
             target_requirements=target_requirements,
             filters=filters,
+            obligations=derive_request_obligations(
+                route,
+                target_ids=target_ids,
+                target_requirements=target_requirements,
+                requirements=state.completion_requirements,
+                data_variables=data_obligations,
+            ),
         )
         state.completion_contract = CompletionContract(
             operation=operation,
@@ -4287,11 +4420,7 @@ class AgentLoop:
             requirements=list(state.completion_requirements),
             location_required=route.location_mode != "none",
             evidence_required="required_data_retrieved" in state.completion_requirements,
-            data_obligations=(
-                (servable_queries or list)(list(dict.fromkeys(route.capability_queries))[:4])
-                if requires_provider_data and len(route.capability_queries) > 1
-                else []
-            ),
+            data_obligations=data_obligations,
             map_preparation_required="map_candidate_prepared"
             in state.completion_requirements,
             temporal_scope_required=temporal_scope_needed,

@@ -7,7 +7,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from server.common.identifiers import normalize_target_key
+from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -25,6 +25,29 @@ class AgentAnalysisIntent(BaseModel):
     metric: str = Field(min_length=1, max_length=120)
     order: str = Field(default="descending", max_length=40)
     top_k: int = Field(default=5, ge=1, le=25)
+
+ObligationKind = Literal["location", "data", "analysis", "presentation"]
+
+###############################################################################
+class RouteObligation(BaseModel):
+    """One explicit part of the request, as the routing model declares it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ObligationKind = Field(
+        description=(
+            "location: a named place the request is about; data: values to "
+            "retrieve; analysis: a comparison, ranking or computation over them; "
+            "presentation: something the user asked to see on the map."
+        )
+    )
+    target_refs: list[str] = Field(
+        default_factory=lambda: list[str](),
+        max_length=16,
+        description="Places from target_refs this part applies to.",
+    )
+    variable: str | None = Field(default=None, min_length=1, max_length=120)
+    required: bool = True
 
 ###############################################################################
 class CapabilityRoute(BaseModel):
@@ -60,6 +83,14 @@ class CapabilityRoute(BaseModel):
         default_factory=lambda: list[TargetRequirement](), max_length=16
     )
     filters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    obligations: list[RouteObligation] = Field(
+        default_factory=lambda: list[RouteObligation](),
+        max_length=16,
+        description=(
+            "Every explicit part of the latest request (each place, the data, any "
+            "comparison or analysis, and any map display), so none is dropped."
+        ),
+    )
 
     # -------------------------------------------------------------------------
     @model_validator(mode="after")
@@ -131,6 +162,24 @@ class AgentSpatialScope(BaseModel):
 CapabilityRoute.model_rebuild()
 
 ###############################################################################
+class RequestObligation(BaseModel):
+    """One server-normalized part of the request the run must honour.
+
+    Derived from the validated route (targets, data needs, analysis and
+    presentation) plus the parts the routing model declared, so tasks,
+    coverage checks and completion read the same obligations.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=200)
+    kind: ObligationKind
+    target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
+    variable: str | None = Field(default=None, max_length=120)
+    temporal_scope: AgentTemporalScope | None = None
+    required: bool = True
+
+###############################################################################
 class AgentGoal(BaseModel):
     """Server-owned goal details derived from a validated native route."""
 
@@ -156,6 +205,9 @@ class AgentGoal(BaseModel):
     )
     filters: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
+    )
+    obligations: list[RequestObligation] = Field(
+        default_factory=lambda: list[RequestObligation](), max_length=32
     )
 
 ###############################################################################
@@ -267,6 +319,7 @@ class AgentTask(BaseModel):
     dependencies: list[str] = Field(default_factory=list, max_length=16)
     requirement_name: str | None = Field(default=None, max_length=120)
     target_id: str | None = Field(default=None, max_length=160)
+    obligation_id: str | None = Field(default=None, max_length=200)
     result: dict[str, object] | None = None
     failure_code: str | None = Field(default=None, max_length=120)
 
@@ -302,10 +355,15 @@ class AgentTaskState(BaseModel):
         description: str,
         max_iterations: int,
         requirements: list[str] | None = None,
-        target_ids: list[str] | None = None,
+        obligations: list[RequestObligation] | None = None,
         compound: bool = False,
     ) -> "AgentTaskState":
-        """Create a deterministic root task and optional child obligations."""
+        """Create a deterministic root task and its child obligations.
+
+        Children come from the completion requirements and the goal's request
+        obligations, so the ledger tracks the same parts of the request that
+        coverage and completion checks read.
+        """
 
         root_task_id = f"task-root-{_safe_task_id(run_id)}"
         root = AgentTask(
@@ -314,7 +372,6 @@ class AgentTaskState(BaseModel):
             status="in_progress",
         )
         names = list(dict.fromkeys(str(item).strip() for item in requirements or [] if str(item).strip()))
-        targets = list(dict.fromkeys(str(item).strip() for item in target_ids or [] if str(item).strip()))
         children: list[AgentTask] = []
         if compound:
             for name in names:
@@ -326,13 +383,34 @@ class AgentTaskState(BaseModel):
                         requirement_name=name,
                     )
                 )
-            for target in targets:
+            for obligation in obligations or []:
+                if not obligation.required:
+                    continue
+                places = ", ".join(obligation.target_ids)
+                subject = " ".join(
+                    part for part in (obligation.kind, obligation.variable) if part
+                )
                 children.append(
                     AgentTask(
-                        task_id=f"{root_task_id}:target:{_safe_task_id(target)}",
-                        description=f"Complete the request for {target}.",
+                        task_id=f"{root_task_id}:obligation:{_safe_task_id(obligation.id)}",
+                        description=(
+                            f"Complete the {subject} part of the request"
+                            + (f" for {places}." if places else ".")
+                        )[:500],
                         parent_task_id=root_task_id,
-                        target_id=target,
+                        obligation_id=obligation.id,
+                        # A location obligation is tracked by its place; every
+                        # other kind by the requirement that satisfies it.
+                        requirement_name=(
+                            None
+                            if obligation.kind == "location"
+                            else obligation_requirement(obligation.kind, names)
+                        ),
+                        target_id=(
+                            obligation.target_ids[0]
+                            if obligation.kind == "location" and obligation.target_ids
+                            else None
+                        ),
                     )
                 )
         return cls(
@@ -376,6 +454,231 @@ class AgentTaskState(BaseModel):
     # -------------------------------------------------------------------------
     def to_payload(self) -> dict[str, object]:
         return self.model_dump(mode="json", exclude_none=True)
+
+###############################################################################
+# Completion requirements that satisfy each obligation kind, most specific
+# first.  An obligation with none of them in the contract is unrouted.
+OBLIGATION_REQUIREMENTS: dict[ObligationKind, tuple[str, ...]] = {
+    "location": ("location_resolved", "search_area_bound"),
+    "data": (
+        "required_data_retrieved",
+        "evidence_inspected",
+        "measurement_computed",
+        "capabilities_discovered",
+    ),
+    "analysis": (
+        "result_locations_derived",
+        "measurement_computed",
+        "required_data_retrieved",
+        "evidence_inspected",
+    ),
+    "presentation": ("map_candidate_prepared",),
+}
+
+###############################################################################
+def obligation_requirement(kind: ObligationKind, requirements: list[str]) -> str | None:
+    """Return the completion requirement that satisfies an obligation kind."""
+
+    return next(
+        (name for name in OBLIGATION_REQUIREMENTS[kind] if name in requirements), None
+    )
+
+###############################################################################
+def same_target(left: str, right: str) -> bool:
+    """Whether two target spellings name the same place."""
+
+    return (
+        normalize_target_key(left) == normalize_target_key(right)
+        or location_ref_matches(left, right, None)
+        or location_ref_matches(right, left, None)
+    )
+
+###############################################################################
+def derive_request_obligations(
+    route: CapabilityRoute,
+    *,
+    target_ids: list[str],
+    target_requirements: list[TargetRequirement],
+    requirements: list[str],
+    data_variables: list[str],
+) -> list[RequestObligation]:
+    """Normalize the validated route and its declared parts into obligations.
+
+    Places, provider data, analysis and map presentation come from the route
+    and its completion requirements; a part the routing model declared that
+    none of them expresses is kept as its own obligation, so the consistency
+    check can see that the route dropped it.
+    """
+
+    route_scope = route.temporal_scope if route.temporal_scope != AgentTemporalScope() else None
+
+    def scope_for(target: str | None) -> AgentTemporalScope | None:
+        requirement = next(
+            (
+                item
+                for item in target_requirements
+                if target is not None and same_target(item.target_ref, target)
+            ),
+            None,
+        )
+        if requirement is not None and requirement.temporal_scope is not None:
+            return requirement.temporal_scope
+        return route_scope
+
+    obligations: list[RequestObligation] = []
+    # A map-state route edits the current map: its targets name layers and
+    # styles on it, not places to locate.
+    if route.location_mode != "none" and route.primary_domain is not CapabilityDomain.MAP_STATE:
+        obligations.extend(
+            RequestObligation(
+                id=f"location:{_safe_task_id(target)}",
+                kind="location",
+                target_ids=[target],
+                temporal_scope=scope_for(target),
+            )
+            for target in target_ids
+        )
+    variables: list[str | None] = [
+        *(data_variables or route.capability_queries[:1])
+    ] or [None]
+    # Data and its map are per requested place; spatial-scope anchors are not.
+    places = list(dict.fromkeys(ref.strip() for ref in route.target_refs if ref.strip()))
+    if "required_data_retrieved" in requirements:
+        data_targets: list[str | None] = [*places] or [None]
+        obligations.extend(
+            RequestObligation(
+                id=":".join(
+                    ["data", *(_safe_task_id(part) for part in (target, variable) if part)]
+                ),
+                kind="data",
+                target_ids=[target] if target else [],
+                variable=variable,
+                temporal_scope=scope_for(target),
+            )
+            for target in data_targets
+            for variable in variables
+        )
+    if route.analysis is not None or "measurement_computed" in requirements:
+        obligations.append(
+            RequestObligation(
+                id=f"analysis:{route.analysis.kind if route.analysis else 'measurement'}",
+                kind="analysis",
+                target_ids=list(target_ids),
+                variable=route.analysis.metric if route.analysis else None,
+            )
+        )
+    if route.presentation in {"map", "both"}:
+        obligations.append(
+            RequestObligation(
+                id="presentation:map",
+                kind="presentation",
+                target_ids=places,
+                variable=(
+                    route.analysis.metric
+                    if route.analysis is not None
+                    else variables[0] if len(variables) == 1 else None
+                ),
+            )
+        )
+    for declared in route.obligations:
+        targets = [
+            next((known for known in target_ids if same_target(ref, known)), ref.strip())
+            for ref in declared.target_refs
+            if ref.strip()
+        ]
+        if any(
+            existing.kind == declared.kind
+            and all(
+                any(same_target(target, other) for other in existing.target_ids)
+                for target in targets
+            )
+            for existing in obligations
+        ):
+            continue
+        base = ":".join([declared.kind, *(_safe_task_id(t) for t in targets)] or [declared.kind])
+        identifier = base
+        suffix = 2
+        while any(item.id == identifier for item in obligations):
+            identifier = f"{base}:{suffix}"
+            suffix += 1
+        obligations.append(
+            RequestObligation(
+                id=identifier[:200],
+                kind=declared.kind,
+                target_ids=targets[:16],
+                variable=declared.variable,
+                temporal_scope=next((scope_for(t) for t in targets), route_scope),
+                required=declared.required,
+            )
+        )
+    return obligations[:32]
+
+###############################################################################
+def unrouted_obligations(
+    goal: AgentGoal, requirements: list[str]
+) -> tuple[str, list[RequestObligation]] | None:
+    """Name required obligations the validated route cannot satisfy.
+
+    Each required obligation must map to a route target, a completion
+    requirement, or the route's presentation/analysis.  Returns a specific
+    reason code with the offending obligations, or None when consistent.
+    """
+
+    required = [item for item in goal.obligations if item.required]
+    missing_targets = [
+        item
+        for item in required
+        if any(
+            not any(same_target(target, known) for known in goal.target_ids)
+            for target in item.target_ids
+        )
+    ]
+    if missing_targets:
+        return "obligation_target_missing", missing_targets
+
+    def routed(item: RequestObligation) -> bool:
+        if item.kind == "location":
+            return True
+        if item.kind == "presentation":
+            return goal.presentation in {"map", "both"}
+        if item.kind == "analysis" and goal.analysis is not None:
+            return True
+        return obligation_requirement(item.kind, requirements) is not None
+
+    unrouted = [item for item in required if not routed(item)]
+    if not unrouted:
+        return None
+    compound = {"analysis", "presentation"}
+    unrouted_kinds = {item.kind for item in unrouted}
+    if compound <= {item.kind for item in required} and len(unrouted_kinds & compound) == 1:
+        # "Compare ... and show it on the map" kept only one of its halves.
+        return "compound_obligation_dropped", unrouted
+    return f"{unrouted[0].kind}_obligation_unrouted", unrouted
+
+###############################################################################
+def dropped_obligations(
+    previous: list[RequestObligation], current: list[RequestObligation]
+) -> list[RequestObligation]:
+    """Return prior required obligations a revised goal no longer carries.
+
+    A location or data obligation is kept only when the revision still names
+    each of its places; analysis and presentation only need the same kind.
+    """
+
+    dropped: list[RequestObligation] = []
+    for item in previous:
+        if not item.required:
+            continue
+        same_kind = [other for other in current if other.required and other.kind == item.kind]
+        if not same_kind:
+            dropped.append(item)
+            continue
+        if item.kind in {"location", "data"} and not all(
+            any(same_target(target, other_target) for other in same_kind for other_target in other.target_ids)
+            for target in item.target_ids
+        ):
+            dropped.append(item)
+    return dropped
 
 ###############################################################################
 def _safe_task_id(value: str) -> str:

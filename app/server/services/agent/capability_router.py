@@ -14,6 +14,7 @@ from server.domain.agent.capability_route import (
     AgentTemporalScope,
     CapabilityRoute,
     CapabilityRouteDecision,
+    RouteObligation,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.map_plan import is_mark_locations_operation
@@ -333,6 +334,22 @@ class CapabilityRouter:
     ) -> CapabilityRouteDecision:
         """Validate route semantics and return only an eligible shortlist."""
 
+        decision = self._validate_route(
+            proposed, user_message=user_message, active_state=active_state
+        )
+        reconciled = _reconcile_declared_obligations(proposed, decision.route)
+        if reconciled is decision.route:
+            return decision
+        return decision.model_copy(update={"route": reconciled})
+
+    # -------------------------------------------------------------------------
+    def _validate_route(
+        self,
+        proposed: CapabilityRoute,
+        *,
+        user_message: str,
+        active_state: AgentRunState,
+    ) -> CapabilityRouteDecision:
         reasons: list[str] = []
         rejected: list[str] = []
         valid_explicit_ids: list[str] = []
@@ -746,6 +763,57 @@ class CapabilityRouter:
             rejected_capability_ids=rejected,
             reason_codes=list(dict.fromkeys(reasons)),
         )
+
+###############################################################################
+def _reconcile_declared_obligations(
+    proposed: CapabilityRoute, validated: CapabilityRoute
+) -> CapabilityRoute:
+    """Drop declared parts that a deliberate server normalization replaced.
+
+    Validation may remove a catalog name from the places, answer a map request
+    in text, clear an analysis, or reduce marking to a location-only map; each
+    such rule is recorded in the decision's reason codes.  The declared
+    obligation that rule replaced is dropped here so the pre-tool consistency
+    check only flags parts the routing model itself left out.
+    """
+
+    if not validated.obligations:
+        return validated
+    validated_places = {
+        normalize_target_key(ref)
+        for ref in [
+            *validated.target_refs,
+            *(validated.spatial_scope.target_refs if validated.spatial_scope else []),
+        ]
+    }
+    removed_places = {
+        normalize_target_key(ref)
+        for ref in [
+            *proposed.target_refs,
+            *(proposed.spatial_scope.target_refs if proposed.spatial_scope else []),
+        ]
+    } - validated_places
+    dropped_kinds: set[str] = set()
+    if proposed.presentation != "text" and validated.presentation == "text":
+        dropped_kinds.add("presentation")
+    if proposed.analysis is not None and validated.analysis is None:
+        dropped_kinds.add("analysis")
+    if is_mark_locations_operation(validated.operation):
+        dropped_kinds.update({"data", "analysis"})
+    kept: list[RouteObligation] = []
+    for item in validated.obligations:
+        if item.kind in dropped_kinds:
+            continue
+        places = [
+            ref for ref in item.target_refs if normalize_target_key(ref) not in removed_places
+        ]
+        if item.target_refs and not places:
+            # Every place it named was a catalog reference, not a place.
+            continue
+        kept.append(item.model_copy(update={"target_refs": places}))
+    if kept == validated.obligations:
+        return validated
+    return validated.model_copy(update={"obligations": kept})
 
 ###############################################################################
 # One direct subject-identity match, the weight the registry gives a capability

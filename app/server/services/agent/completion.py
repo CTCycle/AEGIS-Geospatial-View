@@ -13,6 +13,7 @@ from server.domain.agent.capability_route import (
     AgentRunState,
     CompletionContract,
     CompletionRequirement,
+    ObligationKind,
     TargetRequirement,
 )
 from server.domain.agent.map_plan import (
@@ -210,17 +211,18 @@ class CompletionEvaluator:
                     if _is_eligible_evidence(result, assessment, analysis)]
         required = set(state.route.explicit_capability_ids if state.route else [])
         route = state.route
+        data_targets = _obligation_targets(state, "data")
         per_target = (
             not required and route is not None and not analysis
-            and route.location_mode == "target" and len(route.target_refs) >= 2
+            and route.location_mode == "target" and len(data_targets) >= 2
         )
         def covered(field: str) -> bool:
-            if per_target and route is not None:
+            if per_target:
                 # Each requested place needs its own in-scope evidence; one
                 # matching place must not vouch for the others.
                 return all(
-                    _target_has_scoped_evidence(state, str(target), eligible, field)
-                    for target in route.target_refs
+                    _target_has_scoped_evidence(state, target, eligible, field)
+                    for target in data_targets
                 )
             matched = {result.metadata.capability_id for result, assessment in eligible
                        if getattr(assessment, field) is True}
@@ -586,8 +588,28 @@ def uncovered_data_obligations(state: AgentRunState) -> list[str]:
 
 
 ###############################################################################
+def _obligation_targets(state: AgentRunState, kind: ObligationKind) -> list[str]:
+    """Return the places the goal's required obligations of one kind name.
+
+    Before a goal is compiled the validated route's targets stand in.
+    """
+
+    goal = state.goal
+    if goal is None:
+        return list(state.route.target_refs) if state.route is not None else []
+    return list(
+        dict.fromkeys(
+            target
+            for obligation in goal.obligations
+            if obligation.required and obligation.kind == kind
+            for target in obligation.target_ids
+        )
+    )
+
+
+###############################################################################
 def uncovered_route_targets(state: AgentRunState) -> list[str]:
-    """Return resolved route targets that no data execution has covered yet.
+    """Return data-obligation targets that no data execution has covered yet.
 
     A comparison such as "Paris and Berlin" needs data for each place; one
     successful execution must not satisfy the whole route. Single-target and
@@ -595,11 +617,12 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
     """
 
     route = state.route
+    targets = _obligation_targets(state, "data")
     if (
         route is None
         or route.analysis is not None
         or route.location_mode != "target"
-        or len(route.target_refs) < 2
+        or len(targets) < 2
     ):
         return []
     # Executions name a target by any spelling the model chose; stored refs
@@ -618,7 +641,7 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
             for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
         )
     uncovered: list[str] = []
-    for target in route.target_refs:
+    for target in targets:
         matches = [
             key
             for key, location in state.location_refs.items()
@@ -666,12 +689,13 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
     """
 
     route = state.route
+    targets = _obligation_targets(state, "presentation")
     if (
         route is None
         or route.analysis is not None
         or route.location_mode != "target"
         or route.presentation not in {"map", "both"}
-        or len(route.target_refs) < 2
+        or len(targets) < 2
     ):
         return []
     shown: set[str] = set()
@@ -684,7 +708,7 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
             for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
         )
     uncovered: list[str] = []
-    for target in route.target_refs:
+    for target in targets:
         matches = [
             key
             for key, location in state.location_refs.items()

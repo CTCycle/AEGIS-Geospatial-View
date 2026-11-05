@@ -23,6 +23,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CompletionContract,
     RenderObservation,
+    RequestObligation,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -2600,7 +2601,9 @@ def test_completion_requires_scope_for_every_route_target(second_time, second_sp
     state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
         presentation='text', location_mode="target", target_refs=['paris', 'berlin'])
     state.goal = AgentGoal(goal='Weather in Paris and Berlin', task_mode='execute', presentation='text',
-        operation='compare', location_mode="target", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
+        operation='compare', location_mode="target", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'},
+        obligations=[RequestObligation(id=f'data:{target}', kind='data', target_ids=[target])
+                     for target in ('paris', 'berlin')])
     state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
         temporal_scope_required=True, spatial_scope_required=True)
     for name in resolved:
