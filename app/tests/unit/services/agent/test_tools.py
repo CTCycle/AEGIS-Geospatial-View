@@ -979,10 +979,58 @@ def test_manifest_argument_schema_is_checked_before_execution() -> None:
         capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
     )
 
-    assert errors == [
+    assert errors[:2] == [
         "arguments.unexpected: additional property is not allowed.",
         "arguments.query: string is too short.",
     ]
+    assert errors[2].startswith("Allowed operations: none declared. Allowed arguments: query (string")
+
+###############################################################################
+class _MultiOperationRegistry(FakeCapabilityRegistry):
+
+    # -------------------------------------------------------------------------
+    def execution_contract(self, capability_id: str) -> dict[str, Any]:
+        return {"supported_operations": ["show", "search"]}
+
+    # -------------------------------------------------------------------------
+    def argument_schema(self, capability_id: str) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "radius_km": {"type": "number", "minimum": 1, "maximum": 500, "default": 50},
+            },
+        }
+
+###############################################################################
+def _execute_errors(operation: str | None, arguments: dict[str, Any]) -> list[str]:
+    state = _state()
+    state.capability_ids = ["places:hospitals", "places:clinics", "places:pharmacies"]
+    return _capability_semantic_validator(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals", operation=operation, arguments=arguments
+        ),
+        state,
+        capability_registry=_MultiOperationRegistry(),  # type: ignore[arg-type]
+    )
+
+###############################################################################
+def test_unknown_operation_is_rejected_with_the_allowed_list() -> None:
+    errors = _execute_errors("teleport", {})
+
+    assert errors[0] == "operation 'teleport' is not declared by this capability."
+    assert "Allowed operations: show, search." in errors[1]
+    assert "radius_km (number, >=1, <=500, default 50)" in errors[1]
+
+###############################################################################
+def test_unknown_or_mistyped_argument_is_rejected_without_declared_additional_properties() -> None:
+    errors = _execute_errors("search", {"radius": "far", "radius_km": "far", "colour": 1})
+
+    assert "arguments.colour: additional property is not allowed." in errors
+    assert "arguments.radius_km: value must be a number." in errors
+
+###############################################################################
+def test_valid_call_passes_with_several_shortlisted_candidates() -> None:
+    assert _execute_errors("Search", {"radius_km": 25}) == []
 
 ###############################################################################
 def _route() -> CapabilityRoute:

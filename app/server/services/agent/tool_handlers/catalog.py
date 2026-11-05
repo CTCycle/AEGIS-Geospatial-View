@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import time
-from typing import Any
+from typing import Any, cast
 
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.common.identifiers import location_ref_matches
@@ -171,7 +172,7 @@ class CatalogToolHandler:
         page_limit = min(request.limit, 12) if catalog_discovery else request.limit
         page = candidates[offset : offset + page_limit]
         descriptors = [
-            _descriptor(self.capability_registry, self.runtime_registry, item)
+            _descriptor(self.capability_registry, self.runtime_registry, item, query_values)
             for item in page
         ]
         discovered_ids = [str(item["id"]) for item in descriptors if item.get("id")]
@@ -360,6 +361,7 @@ def _descriptor(
     registry: CapabilityRegistry,
     runtime_registry: RuntimeRegistry,
     capability: dict[str, Any],
+    queries: list[str] | None = None,
 ) -> dict[str, Any]:
     capability_id = str(capability.get("id") or "").strip()
     execution_contract = registry.execution_contract(capability_id)
@@ -379,7 +381,45 @@ def _descriptor(
             if str(operation).strip()
         ],
         "render_support": render_support,
+        "reason": _match_reason(capability, execution_contract, queries or []),
     }
+
+###############################################################################
+def _match_reason(
+    capability: dict[str, Any],
+    execution_contract: dict[str, Any],
+    queries: list[str],
+) -> str:
+    """Say why a candidate was shortlisted, from catalog fields only."""
+
+    metadata = capability.get("metadata")
+    agentic = capability.get("agenticUse")
+    vocabulary: list[str] = [str(capability.get("name") or "")]
+    for source, keys in ((metadata, ("keywords", "action_tags")), (agentic, ("plannerHints",))):
+        if isinstance(source, dict):
+            for key in keys:
+                values = cast(dict[str, Any], source).get(key)
+                if isinstance(values, list):
+                    vocabulary.extend(str(item) for item in cast(list[Any], values))
+    query_terms = {term for query in queries for term in re.findall(r"[a-z0-9]+", query.casefold()) if len(term) > 2}
+    matched = sorted(
+        {
+            term
+            for entry in vocabulary
+            for term in re.findall(r"[a-z0-9]+", entry.casefold())
+            if term in query_terms
+        }
+    )
+    domains = cast(dict[str, Any], agentic).get("domains") if isinstance(agentic, dict) else None
+    parts: list[str] = []
+    if matched:
+        parts.append("matches " + ", ".join(matched[:4]))
+    elif isinstance(domains, list) and domains:
+        parts.append("domain " + ", ".join(str(item) for item in cast(list[Any], domains)[:2]))
+    coverage = execution_contract.get("coverage")
+    if coverage:
+        parts.append(f"coverage {coverage}")
+    return "; ".join(parts)[:120]
 
 ###############################################################################
 def _failure(

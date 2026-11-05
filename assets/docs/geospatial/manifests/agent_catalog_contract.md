@@ -59,11 +59,15 @@ registry is filtered again after each state update and completion evaluation.
 ## Tool rules
 
 - `discover_geospatial_capabilities` returns compact, deterministic catalog
-  metadata only. Pagination is deterministic and page size is capped at 50.
+  metadata only; each entry carries a short `reason` (matched terms or domain,
+  plus coverage). Pagination is deterministic and page size is capped at 50.
 - `describe_geospatial_capability` returns one full manifest descriptor plus
   its executable argument schema.
-- `execute_geospatial_capability` validates supplied arguments against the
-  manifest schema before execution; the server owns resolved geography and
+- `execute_geospatial_capability` validates the `operation` (must be a declared
+  `supported_operations` entry) and the arguments (declared names only, types,
+  ranges, enums, required keys) against the chosen capability's manifest before
+  execution. A rejection lists the allowed operations and parameters with
+  units and defaults; the server owns resolved geography and
   temporal binding.
 - `discover_geospatial_provider_layers` accepts only policy-allowed provider
   IDs on its explicit provider-native route and returns normalized descriptors,

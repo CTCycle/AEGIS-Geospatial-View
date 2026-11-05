@@ -81,6 +81,7 @@ def test_discovery_cursor_returns_a_stable_bounded_page() -> None:
                     "provider": "test",
                     "operations": [],
                     "render_support": "vector",
+                    "reason": "",
                 }
         ],
         "provider_id": None,

@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-10-31
+Last updated: 2026-11-05
 
 ## Layering
 
@@ -168,20 +168,25 @@ render observations.
 - `discover_geospatial_capabilities`
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
+- `discover_geospatial_provider_layers` (model-visible only on `provider_discovery` routes)
 - `inspect_evidence`
 - `transform_evidence`
 - `measure_geospatial`
 - `apply_map_plan`
 
 `search_conversation_history` is registered when a history repository is available.
-Provider-layer discovery stays behind the generic capability-discovery tool.
+`discover_geospatial_provider_layers` is registered permanently but exposed only on
+provider-discovery routes (the `provider_discovery_route` prerequisite); every
+other route uses the generic capability-discovery tool.
 Multi-target completion retains each execution's location binding through compact
 checkpoints, including the browser render/resume boundary. A single bounded
 terminal synthesis call may use one reserved model slot when the ordinary call
 budget is exhausted; the run deadline and cancellation still apply.
 
 `route_request` is an internal bootstrap definition. `ToolExecutor` is the
-only execution boundary; it validates input, applies policy, counts attempts,
+only execution boundary; it validates input (for `execute_geospatial_capability`,
+the operation and arguments against the chosen capability's manifest contract,
+rejecting unknown names with the allowed list), applies policy, counts attempts,
 records timeout/trace metadata, invokes the handler, and normalizes one
 `ToolResult`.
 

@@ -243,3 +243,18 @@ def test_air_quality_is_discoverable_around_a_place_whatever_the_wording(query: 
 ###############################################################################
 def test_a_paraphrase_no_capability_names_is_not_an_obligation() -> None:
     assert REGISTRY.servable_queries(["cloud cover forecast", "sky clarity astronomical viewing conditions"]) == ["cloud cover forecast"]
+
+
+###############################################################################
+def test_shortlist_descriptors_carry_a_bounded_reason() -> None:
+    from server.services.agent.tool_handlers.catalog import _descriptor
+
+    item = next(iter(REGISTRY.snapshot.overlays))
+    keyword = str(cast(dict[str, list[str]], item["metadata"])["keywords"][0])
+
+    matched = _descriptor(REGISTRY, cast(Any, _Runtime()), item, [keyword])
+    unmatched = _descriptor(REGISTRY, cast(Any, _Runtime()), item, ["zzzz"])
+
+    assert keyword.split()[0].casefold() in matched["reason"]
+    assert unmatched["reason"].startswith("domain ")
+    assert len(matched["reason"]) <= 120

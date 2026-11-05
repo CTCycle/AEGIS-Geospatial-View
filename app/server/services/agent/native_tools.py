@@ -966,23 +966,101 @@ def _capability_semantic_validator(
             "available."
         )
     if capability_registry is not None:
-        schema_provider = getattr(capability_registry, "argument_schema", None)
-        if callable(schema_provider):
-            try:
-                schema = schema_provider(request.capability_id)
-            except Exception:
-                errors.append(
-                    "The selected capability does not expose a usable argument schema."
+        contract_errors, schema = _manifest_contract_errors(
+            request, capability_registry
+        )
+        contract_errors = contract_errors[:4]
+        if contract_errors and isinstance(schema, dict):
+            contract_errors.append(
+                _contract_hint(
+                    schema,
+                    _declared_operations(capability_registry, request.capability_id),
                 )
-            else:
-                errors.extend(
-                    _json_schema_errors(
-                        _manifest_arguments(request.arguments),
-                        schema,
-                        path="arguments",
-                    )
-                )
+            )
+        errors.extend(contract_errors)
     return errors[:8]
+
+###############################################################################
+def _declared_operations(
+    capability_registry: CapabilityRegistry, capability_id: str
+) -> list[str]:
+    contract_provider = getattr(capability_registry, "execution_contract", None)
+    if not callable(contract_provider):
+        return []
+    contract = cast(dict[str, Any], contract_provider(capability_id))
+    raw = contract.get("supported_operations")
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in cast(list[Any], raw) if str(item).strip()]
+
+###############################################################################
+def _manifest_contract_errors(
+    request: ExecuteCapabilityInput,
+    capability_registry: CapabilityRegistry,
+) -> tuple[list[str], dict[str, Any] | None]:
+    """Check operation and arguments against the chosen capability's manifest."""
+
+    schema_provider = getattr(capability_registry, "argument_schema", None)
+    if not callable(schema_provider):
+        return [], None
+    try:
+        schema = schema_provider(request.capability_id)
+    except Exception:
+        return ["The selected capability does not expose a usable argument schema."], None
+    errors: list[str] = []
+    operations = _declared_operations(capability_registry, request.capability_id)
+    if (
+        request.operation is not None
+        and operations
+        and request.operation.strip().casefold()
+        not in {item.casefold() for item in operations}
+    ):
+        errors.append(f"operation '{request.operation}' is not declared by this capability.")
+    if isinstance(schema, dict):
+        typed_schema = cast(dict[str, Any], schema)
+        if isinstance(typed_schema.get("properties"), dict):
+            # Declared names are the whole contract: unknown keys are never forwarded.
+            schema = {**typed_schema, "additionalProperties": False}
+    errors.extend(
+        _json_schema_errors(_manifest_arguments(request.arguments), schema, path="arguments")
+    )
+    return errors, cast(dict[str, Any], schema) if isinstance(schema, dict) else None
+
+###############################################################################
+def _contract_hint(schema: dict[str, Any], operations: list[str]) -> str:
+    """Compact allowed operations and parameters for a corrective retry."""
+
+    properties = schema.get("properties")
+    required = {
+        str(item)
+        for item in cast(list[Any], schema.get("required") or [])
+        if isinstance(item, str)
+    }
+    parts: list[str] = []
+    if isinstance(properties, dict):
+        for name, raw in list(cast(dict[str, Any], properties).items())[:24]:
+            spec = cast(dict[str, Any], raw) if isinstance(raw, dict) else {}
+            detail = [str(spec["type"])] if isinstance(spec.get("type"), str) else []
+            if isinstance(spec.get("enum"), list):
+                detail.append("one of " + "|".join(str(v) for v in spec["enum"][:12]))
+            for bound, label in (("minimum", ">="), ("maximum", "<=")):
+                if bound in spec:
+                    detail.append(f"{label}{spec[bound]}")
+            for key in ("unit", "units"):
+                if isinstance(spec.get(key), str):
+                    detail.append(f"unit {spec[key]}")
+            if "default" in spec:
+                detail.append(f"default {spec['default']}")
+            if name in required:
+                detail.append("required")
+            parts.append(f"{name} ({', '.join(detail)})" if detail else str(name))
+    return (
+        "Allowed operations: "
+        + (", ".join(operations[:12]) or "none declared")
+        + ". Allowed arguments: "
+        + ("; ".join(parts) or "none")
+        + "."
+    )
 
 ###############################################################################
 def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
