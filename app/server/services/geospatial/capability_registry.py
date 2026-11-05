@@ -459,7 +459,14 @@ class CapabilityRegistry:
             if not runtime_registry.is_enabled(capability_id):
                 reason = "disabled in Settings"
             elif not runtime_registry.access_available(capability_id):
-                reason = "missing a required credential"
+                # Runtime registries that explain access state name the real
+                # cause (for example an ingestion-only source).
+                access_reason = getattr(runtime_registry, "access_reason", None)
+                reason = (
+                    str(access_reason(capability_id) or "").strip()
+                    if callable(access_reason)
+                    else ""
+                ) or "missing a required credential"
             else:
                 continue
             matches.append({"capability_id": capability_id, "reason": reason})

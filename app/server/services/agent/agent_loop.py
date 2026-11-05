@@ -17,8 +17,10 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
+from server.common.identifiers import location_ref_matches
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
+from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import (
     AgentGoal,
     AgentPhase,
@@ -35,6 +37,10 @@ from server.domain.agent.capability_route import (
     TaskStatus,
 )
 from server.domain.agent.context import AgentContextView
+from server.domain.agent.map_plan import (
+    PLACE_MARKERS_INSTANCE_ID,
+    is_mark_locations_operation,
+)
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.reliability import (
     AgentExecutionBudget,
@@ -77,6 +83,7 @@ from server.services.agent.completion import (
     imagery_only_note,
     needs_numeric_values,
     requested_transform_unmet,
+    unmarked_route_targets,
 )
 from server.services.agent.policy_engine import route_allows_capability_execution
 from server.services.agent.tool_registry import (
@@ -1263,11 +1270,36 @@ class AgentLoop:
             for instance in session.overlay_collection.instances
             if instance.visible
         ]
+        marked = AgentLoop._marked_place_names(session)
+        if marked:
+            # A marking turn keeps the shown place; name what was added to it.
+            text = f"Marked {len(marked)} place{'s' if len(marked) != 1 else ''} on the map: "
+            return text + ", ".join(marked) + "."
         text = "The map now shows " + (place or "the requested area")
         text += f" on the {basemap_label} basemap" if basemap_label else ""
         text += f" with {', '.join(layers)}." if layers else "."
         findings = AgentLoop._evidence_findings(state)
         return f"{text}\n\n{findings}" if findings else text
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _marked_place_names(session: MapSession) -> list[str]:
+        instance = next(
+            (
+                item
+                for item in session.overlay_collection.instances
+                if item.instance_id == PLACE_MARKERS_INSTANCE_ID and item.visible
+            ),
+            None,
+        )
+        if instance is None:
+            return []
+        features = json_array(json_object(instance.descriptor.get("data")).get("features"))
+        return [
+            name
+            for feature in features
+            if (name := str(json_object(json_object(feature).get("properties")).get("name") or "").strip())
+        ]
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1758,6 +1790,7 @@ class AgentLoop:
             or (state.active_map_session is not None and state.render_verified),
             "render_verified": bool(state.render_verified),
             "requested_transform_applied": not requested_transform_unmet(state),
+            "locations_marked": not unmarked_route_targets(state),
         }
 
     # -------------------------------------------------------------------------
@@ -1809,6 +1842,7 @@ class AgentLoop:
             "temporal_scope_applied": "temporal_scope",
             "spatial_scope_applied": "spatial_scope",
             "map_candidate_prepared": "map_candidate",
+            "locations_marked": "map_candidate",
             "render_verified": "render_ack",
         }
         existing = {
@@ -3672,26 +3706,34 @@ class AgentLoop:
             or self.tool_registry.get("apply_map_plan") is None
         ):
             return []
-        location_ref = self._location_only_map_recovery_ref(state, route)
-        if location_ref is None:
+        mark_refs = self._mark_recovery_refs(state, route)
+        location_ref = (
+            None if mark_refs else self._location_only_map_recovery_ref(state, route)
+        )
+        if not mark_refs and location_ref is None:
             return []
         expected_revision = (
             state.active_map_session.overlay_collection.revision
             if state.active_map_session is not None
             else 0
         )
+        actions: list[dict[str, Any]] = (
+            [{"action": "mark_locations", "location_refs": mark_refs}]
+            if mark_refs
+            else [
+                {
+                    "action": "set_viewport",
+                    "strategy": "fit_location",
+                    "location_ref": str(location_ref),
+                }
+            ]
+        )
         recovery_call = LLMToolCall(
             id=f"server-location-map-recovery-{state.request_id}",
             name="apply_map_plan",
             arguments={
                 "expected_collection_revision": expected_revision,
-                "actions": [
-                    {
-                        "action": "set_viewport",
-                        "strategy": "fit_location",
-                        "location_ref": str(location_ref),
-                    }
-                ],
+                "actions": actions,
             },
         )
 
@@ -3866,6 +3908,40 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _mark_recovery_refs(
+        state: AgentRunState,
+        route: CapabilityRoute,
+    ) -> list[str]:
+        """Location refs of every place a marking route names, once all resolved."""
+
+        if not is_mark_locations_operation(route.operation) or unresolved_route_targets(state):
+            return []
+        refs: list[str] = []
+        for target in route.target_refs:
+            # The target's own lookup first: another lookup can return a
+            # building whose label also names this place.
+            ref = next(
+                (
+                    key
+                    for key in state.location_refs
+                    if location_ref_matches(str(target), str(key), None)
+                ),
+                None,
+            ) or next(
+                (
+                    key
+                    for key, location in state.location_refs.items()
+                    if location_ref_matches(str(target), str(key), location.label)
+                ),
+                None,
+            )
+            if ref is None:
+                return []
+            refs.append(ref)
+        return list(dict.fromkeys(refs))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _needs_location_only_map_recovery(
         state: AgentRunState,
         route: CapabilityRoute,
@@ -3886,6 +3962,8 @@ class AgentLoop:
         # The contract, not a vocabulary allow-list, determines whether this
         # is a location-only presentation.  Capability choice remains the
         # model's responsibility for hydrated native runs.
+        if is_mark_locations_operation(route.operation):
+            return bool(AgentLoop._mark_recovery_refs(state, route))
         return AgentLoop._location_only_map_recovery_ref(state, route) is not None
 
     # -------------------------------------------------------------------------
@@ -4121,6 +4199,8 @@ class AgentLoop:
             requirements.append("spatial_scope_applied")
         if route.presentation in {"map", "both"}:
             requirements.append("map_candidate_prepared")
+            if is_mark_locations_operation(route.operation):
+                requirements.append("locations_marked")
         state.completion_requirements = list(dict.fromkeys(requirements))
         state.goal = AgentGoal(
             goal=state.user_message,

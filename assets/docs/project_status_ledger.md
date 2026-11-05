@@ -1,6 +1,6 @@
 # Project Status Ledger
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 The [2026-11-03 Wave 3 live validation](validation/live_eval_20261103_wave3.md) re-ran every Wave 2 non-PASS turn plus the Wave 3 framing, forecast-window, H-03 and discovery checks on the live UI against `develop@d4f4c1e2`, and the graded runner (38 scenarios per model).
 - **Counts:** DeepSeek 11 PASS / 3 PARTIAL / 5 FAIL / 2 BLOCKED of 21 turns; Beam Free 9 / 6 / 9 / 1 of 25. Turn sets differ from Wave 2, so the counts are indicative. Runner: DeepSeek 27 of 38 scenarios pass (Wave 2: 25), Beam 23 of 38 (22), no false-success flag; DeepSeek has no regression, Beam has three (unexposed-tool calls counted as invalid calls).
@@ -419,6 +419,16 @@ limitation.
 - **Remediation status:** Partially remediated. PVGIS, RainViewer, Acropolis, Open-Meteo aliases, generic-infrastructure clarification, and the adequately budgeted weather row have scoped passes. EEA passes render and lifecycle validation, including zero direct browser requests in a complete observed session. F-21 through F-23 are fixed and configured credentialed providers pass except OpenTripMap, which lacks a key. Elevation (licence opt-in), F-13 narration, Overpass reliability, and broader routing coverage remain open; Census and imagery pass live as of 2026-10-19.
 - **Required revalidation:** For every affected capability, verify discovery, exact location, execution, provider result semantics, and browser rendering where a map is requested.
 - **Related documentation:** [agentic search](geospatial/agentic_search.md), [provider framework](geospatial/providers/provider_framework.md), [EEA validation](../QA/validation-20261018-eea-end2022/report.md), [route matrix](../QA/tier3-validation-develop-20261001-route-matrix/report.md).
+
+### ISSUE-007 — Follow-up annotations re-showed the place instead of marking it
+
+- **Affected component:** agent.capability-routing.live-language and the map plan boundary.
+- **Severity:** HIGH.
+- **Description and impact:** In a 2026-11-05 DeepSeek session (Ottawa, OSM, zoomed twice), "mark 5 places you deem interesting" and its retry answered "The map now shows Ottawa…": no markers were drawn and the user's zoom was reset to the city frame. In the same session, "biggest airport" failed on OurAirports (`provider_unsupported`, ingestion-only source exposed for live execution) and "places to visit" found no credential-free source.
+- **Suspected cause:** No map action could mark places (only `fit_location` framing), the router had no annotation operation, completion accepted a re-fit of the shown place, OurAirports was shortlisted for live execution, and Overpass had no airport/tourism categories and dropped non-amenity results.
+- **Remediation status:** Remediated in code on 2026-11-05: `mark_locations` route operation and map action, a server-built `place-markers` layer with labels, view preservation, the `locations_marked` obligation with plan validation and server recovery, `ingestion_only` availability for OurAirports, and Overpass airport/attraction categories. Unit, routing, catalog and map-preview specs pass. The [2026-11-05 live replay](../QA/marker-intent-20261105/report.md) on DeepSeek v4.1 Flash marks all five places on the first try with the basemap and view kept, and routes the airport request to Overpass; Overpass execution was BLOCKED by an upstream HTTP 502 outage.
+- **Required revalidation:** Re-run the airport turn once Overpass is reachable, and replay the marking turn on a second model provider.
+- **Related documentation:** [agentic search](geospatial/agentic_search.md), [manifest contract](geospatial/manifests/manifest_contract.md).
 
 ## Resolved / historical findings
 

@@ -68,7 +68,10 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "13. Questions about results already retrieved or shown (which one, where "
     "exactly, how many) are operation inspect_evidence, domain data_retrieval, "
     "location_mode none, no queries or target_refs.\n"
-    "14. Return the tool call immediately without explanations or deliberation."
+    "14. Marking or pinning places on the shown map is operation mark_locations, "
+    "each place in target_refs qualified with the shown city ('Parliament Hill, "
+    "Ottawa'). If the user lets you pick them, choose from general knowledge.\n"
+    "15. Return the tool call immediately without explanations or deliberation."
 )
 
 ###############################################################################

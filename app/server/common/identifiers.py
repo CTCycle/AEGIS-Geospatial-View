@@ -26,6 +26,15 @@ def location_ref_matches(requested: str, key: str, label: str | None) -> bool:
     matches a resolved "Paris, France" because the leading name differs.
     """
 
+    if _matches(requested, key, label):
+        return True
+    # A parenthetical remark ("Gatineau (across from Ottawa)") is commentary
+    # the geocoded label never repeats.
+    plain = re.sub(r"\([^)]*\)", " ", requested)
+    return plain != requested and _matches(plain, key, label)
+
+###############################################################################
+def _matches(requested: str, key: str, label: str | None) -> bool:
     target = normalize_target_key(requested)
     if not target:
         return False

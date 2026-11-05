@@ -208,3 +208,17 @@ a:focus-visible {
         scroll-behavior: auto !important;
     }
 }
+
+/* Name labels of agent-marked places (MapLibre HTML markers). */
+.aegis-place-label {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #f8fafc;
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}

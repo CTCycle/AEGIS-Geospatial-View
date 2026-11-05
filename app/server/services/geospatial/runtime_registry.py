@@ -169,6 +169,8 @@ class RuntimeRegistry:
             return "Configure provider credentials in Settings under Geospatial Access."
         if mode in {"configured_source", "configuration-dependent"}:
             return "Configure the required local or trusted source before use."
+        if mode == "ingestion_only":
+            return "Available only through dataset ingestion; it cannot be queried live."
         if self._auth_required(capability_id):
             return "Configure provider credentials in Settings under Geospatial Access."
         return "Capability access is not configured."

@@ -22,6 +22,7 @@ from server.domain.agent.evidence import AgentEvidenceEnvelope, AgentEvidenceSum
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
+    MarkLocationsAction,
     RemoveLayerAction,
     SetBasemapAction,
     SetLayerVisibilityAction,
@@ -30,7 +31,12 @@ from server.domain.agent.map_plan import (
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.services.agent.capability_execution import ToolExecutionContext
 from server.services.agent.agent_loop import AgentLoop
+from server.services.agent.completion import unmarked_route_targets
 from server.services.agent.map_plan_service import MapPlanService, targets_outside_view
+from server.services.agent.native_tools import (
+    _map_plan_semantic_validator,  # pyright: ignore[reportPrivateUsage]
+)
+from server.services.agent.tool_definitions import ApplyMapPlanInput
 from server.services.geospatial.map_session_builder import (
     viewport_covering_evidence,
     MapPlanBuildError,
@@ -1222,3 +1228,150 @@ async def test_location_only_map_rejects_a_parent_standing_in_for_an_unresolved_
     assert result.status == "failed"
     assert result.error is not None and result.error.code == "target_not_resolved"
     assert state.prepared_map_session is None
+
+###############################################################################
+def _marking_state(
+    places: dict[str, ResolvedLocation], targets: list[str] | None = None
+) -> AgentRunState:
+    state = _state(active_map_session=_active_session())
+    state.user_message = "mark these places"
+    state.location_refs = {"location:zurich-hb": LOCATION, **places}
+    # The user zoomed in before asking: the view must survive the marking.
+    state.map_memory = {"current_view": {"bounds": [8.50, 47.35, 8.58, 47.40]}}
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        operation="mark_locations",
+        target_refs=targets or list(places),
+    )
+    state.route = route
+    AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
+    return state
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_marking_places_pins_them_on_the_shown_map_and_keeps_the_view() -> None:
+    state = _marking_state(
+        {
+            "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
+            "Grossmunster": ResolvedLocation(label="Grossmunster, Zurich", latitude=47.370, longitude=8.544),
+        },
+        # A route remark in parentheses must not leave the place unresolved.
+        targets=["Kunsthaus", "Grossmunster (old town)"],
+    )
+    assert "locations_marked" in state.completion_requirements
+    assert unmarked_route_targets(state) == ["Kunsthaus", "Grossmunster (old town)"]
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                MarkLocationsAction(action="mark_locations", location_refs=["Kunsthaus", "Grossmunster"]),
+                # A re-fit of the shown place would discard the user's zoom.
+                SetViewportAction(action="set_viewport", strategy="fit_location"),
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    candidate = state.prepared_map_session
+    assert candidate is not None
+    assert candidate.resolved_location == LOCATION
+    assert candidate.viewport.bbox == pytest.approx([8.50, 47.35, 8.58, 47.40])
+    markers = next(
+        item for item in candidate.overlay_collection.instances
+        if item.rendering_mode == "place-markers"
+    )
+    names = [feature["properties"]["name"] for feature in markers.descriptor["data"]["features"]]
+    assert names == ["Kunsthaus", "Grossmunster"]
+    assert unmarked_route_targets(state) == []
+    state.active_map_session = candidate
+    assert AgentLoop._verified_map_fallback(state) == (  # pyright: ignore[reportPrivateUsage]
+        "Marked 2 places on the map: Kunsthaus, Grossmunster."
+    )
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_marking_outside_the_view_frames_the_markers_under_the_requested_names() -> None:
+    state = _marking_state({
+        "Uetliberg": ResolvedLocation(label="Uetliberg, Zurich", latitude=47.349, longitude=8.491),
+        # The geocoder answered the district with a building inside it.
+        "niederdorf": ResolvedLocation(
+            label="Cabaret Voltaire, Spiegelgasse, Niederdorf, Zurich",
+            latitude=47.372,
+            longitude=8.544,
+        ),
+    })
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Uetliberg", "niederdorf"])],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    candidate = state.prepared_map_session
+    assert candidate is not None
+    west, south, east, north = candidate.viewport.bbox or []
+    assert west < 8.491 < 8.544 < east and south < 47.349 < 47.372 < north
+    # Framed on the markers, not on the union with the old view.
+    assert north < 47.40
+    markers = next(
+        item for item in candidate.overlay_collection.instances
+        if item.rendering_mode == "place-markers"
+    )
+    names = [feature["properties"]["name"] for feature in markers.descriptor["data"]["features"]]
+    assert names == ["Uetliberg", "Niederdorf"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_marking_route_rejects_plans_that_do_not_mark_resolved_places() -> None:
+    state = _marking_state({
+        "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
+    })
+    framing_only = ApplyMapPlanInput(
+        expected_collection_revision=2,
+        actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
+    )
+    assert any(
+        "mark_locations" in error
+        for error in _map_plan_semantic_validator(framing_only, state)
+    )
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Opera House"])],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+    assert result.status == "failed"
+    assert result.error is not None and result.error.code == "missing_location"
+
+###############################################################################
+def test_marking_recovery_keeps_each_place_on_its_own_lookup() -> None:
+    gallery = "National Gallery of Canada, 380 Sussex Drive, Byward Market, Ottawa"
+    state = _marking_state(
+        {
+            # The district lookup returned the gallery building inside it.
+            "byward market, ottawa": ResolvedLocation(label=gallery, latitude=45.429, longitude=-75.699),
+            "national gallery of canada, ottawa": ResolvedLocation(
+                label=gallery, latitude=45.4295, longitude=-75.6988
+            ),
+        },
+        targets=["ByWard Market, Ottawa", "National Gallery of Canada, Ottawa"],
+    )
+    assert state.route is not None
+
+    assert AgentLoop._mark_recovery_refs(state, state.route) == [  # pyright: ignore[reportPrivateUsage]
+        "byward market, ottawa",
+        "national gallery of canada, ottawa",
+    ]

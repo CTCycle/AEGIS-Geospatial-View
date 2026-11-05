@@ -100,6 +100,7 @@ export type RenderingMode =
   | 'clustered-points'
   | 'choropleth'
   | 'camera-points'
+  | 'place-markers'
   | 'metadata-only';
 
 export interface GeospatialLayerRenderDescriptor {

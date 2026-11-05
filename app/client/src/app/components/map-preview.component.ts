@@ -55,6 +55,7 @@ import {
   recordBooleanEqual,
   recordNumberEqual,
   removeOverlayLayers,
+  setPlaceLabelsVisible,
 } from './map-preview-rendering';
 import {
   GeographicBounds,
@@ -1541,6 +1542,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
           map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
         }
       });
+      setPlaceLabelsVisible(map, overlay.id, visible);
       if (overlay.value_encoding) {
         map.setPaintProperty(layerIds[0], overlay.value_encoding.mode === 'heatmap'
           ? 'heatmap-opacity' : 'circle-opacity', opacityValue);
@@ -1641,7 +1643,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
     this.unbindInspectionListeners();
     this.overlays.forEach((overlay) => {
       const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
-      if (!['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)) {
+      if (!['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points', 'place-markers'].includes(renderingMode)) {
         return;
       }
       const layerIds = getOverlayLayerIds(overlay).filter((layerId) => !layerId.endsWith('-clusters') && !layerId.endsWith('-cluster-count'));

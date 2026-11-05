@@ -20,7 +20,14 @@
       "osm",
       "poi",
       "amenities",
-      "places"
+      "places",
+      "airport",
+      "airports",
+      "aerodrome",
+      "tourism",
+      "attractions",
+      "landmarks",
+      "sightseeing"
     ],
     "supported_categories": [
       "bicycle_parking",
@@ -44,7 +51,12 @@
       "charging_stations",
       "charging_station",
       "bus_stops",
-      "bus_stop"
+      "bus_stop",
+      "airports",
+      "airport",
+      "attractions",
+      "attraction",
+      "tourism"
     ],
     "action_tags": [
       "poi search",
@@ -125,7 +137,14 @@
       "osm",
       "poi",
       "amenities",
-      "places"
+      "places",
+      "airport",
+      "airports",
+      "aerodrome",
+      "tourism",
+      "attractions",
+      "landmarks",
+      "sightseeing"
     ],
     "requiredUserAction": [],
     "avoidWhen": [

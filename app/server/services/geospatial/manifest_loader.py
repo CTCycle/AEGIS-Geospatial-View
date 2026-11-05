@@ -17,6 +17,9 @@ RuntimeAccessMode = Literal[
     "credential",
     "credential_or_local_source",
     "configured_source",
+    # The source is a download for the ingestion pipeline: it has no
+    # query-time records, so the agent can never execute it live.
+    "ingestion_only",
 ]
 
 ###############################################################################

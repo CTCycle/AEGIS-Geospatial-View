@@ -15,6 +15,7 @@ from server.domain.agent.capability_route import (
     CapabilityRouteDecision,
 )
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.map_plan import is_mark_locations_operation
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.agent.basemap_intent import (
     CENTRE_TERMS,
@@ -374,6 +375,30 @@ class CapabilityRouter:
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
+        if is_mark_locations_operation(proposed.operation) and proposed.task_mode == "execute":
+            if not proposed.target_refs:
+                return CapabilityRouteDecision(
+                    status="clarification",
+                    route=proposed,
+                    rejected_capability_ids=[],
+                    reason_codes=[*dict.fromkeys([*reasons, "mark_targets_missing"])],
+                    clarification_question="Which places should I mark on the map?",
+                )
+            # Marking pins each named place on the map: a location-only
+            # presentation whose places are resolved, never a provider query.
+            proposed = proposed.model_copy(
+                update={
+                    "primary_domain": CapabilityDomain.MAP_RENDERING,
+                    "secondary_domains": [],
+                    "presentation": "map",
+                    "location_mode": "target",
+                    "capability_queries": ["place search", "map viewport"],
+                    "analysis": None,
+                    "spatial_scope": None,
+                    "target_requirements": [],
+                }
+            )
+            reasons.append("mark_locations_route_normalized")
         if (
             proposed.task_mode == "execute"
             and proposed.operation == "inspect_evidence"

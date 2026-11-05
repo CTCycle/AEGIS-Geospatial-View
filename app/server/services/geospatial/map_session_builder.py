@@ -9,6 +9,7 @@ from typing import Any, cast
 from urllib.parse import urlparse
 from uuid import uuid4
 
+from server.common.identifiers import normalize_target_key
 from server.common.typing import json_object
 from server.contracts.geospatial import (
     MapSession,
@@ -19,8 +20,11 @@ from server.contracts.geospatial import (
 from server.domain.agent.evidence import AgentEvidenceEnvelope
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
+    PLACE_MARKERS_INSTANCE_ID,
+    PLACE_MARKERS_RENDERING_MODE,
     KeepOnlyLayersAction,
     MapAction,
+    MarkLocationsAction,
     RemoveLayerAction,
     SetBasemapAction,
     SetLayerOpacityAction,
@@ -41,10 +45,20 @@ MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
 # Margin around the places of a multi-place location-only view, per side.
 LOCATION_UNION_PADDING = 0.15
+# Marked places are framed at neighbourhood scale at most.
+MARKER_VIEWPORT_MIN_SPAN_DEGREES = 0.02
 # Web Mercator renders latitudes up to about 85.05 degrees.
 _MAX_VIEW_LATITUDE = 85.0
 _GEOJSON_RENDERING_MODES = frozenset(
-    {"geojson", "arcgis-geojson", "clustered-points", "choropleth", "camera-points", "circles"}
+    {
+        "geojson",
+        "arcgis-geojson",
+        "clustered-points",
+        "choropleth",
+        "camera-points",
+        "circles",
+        PLACE_MARKERS_RENDERING_MODE,
+    }
 )
 _GEOJSON_GEOMETRY_TYPES = frozenset(
     {
@@ -86,12 +100,21 @@ class MapSessionBuilder:
         active_session: MapSession | None,
         actions: list[MapAction],
         current_view_bounds: object = None,
+        marked_locations: dict[str, ResolvedLocation] | None = None,
     ) -> MapSession:
         evidence_by_ref = {
             item.evidence_ref: item for item in evidence if item.evidence_ref
         }
         candidate = self._initial_session(location, active_session, actions)
         for action in actions:
+            if isinstance(action, MarkLocationsAction):
+                candidate = self._mark_locations(
+                    candidate,
+                    action,
+                    marked_locations or {},
+                    current_view_bounds=current_view_bounds,
+                )
+                continue
             candidate = self._apply_action(
                 candidate,
                 action,
@@ -317,6 +340,11 @@ class MapSessionBuilder:
                 deep=True,
             )
             return OverlayCollectionService.merge_into_map_session(session, collection)
+        if isinstance(action, MarkLocationsAction):
+            # Markers need resolved locations; build() applies them.
+            raise MapPlanBuildError(
+                "missing_location", "Place markers require resolved location refs."
+            )
         if action.strategy == "preserve_current":
             return session
         if action.strategy in {"zoom_in", "zoom_out", "pan"}:
@@ -358,6 +386,96 @@ class MapSessionBuilder:
             "viewport_bounds_unavailable",
             "The requested viewport cannot be derived from validated state.",
         )
+
+    # -------------------------------------------------------------------------
+    def _mark_locations(
+        self,
+        session: MapSession,
+        action: MarkLocationsAction,
+        marked_locations: dict[str, ResolvedLocation],
+        *,
+        current_view_bounds: object = None,
+    ) -> MapSession:
+        """Pin resolved places as one labelled point layer on the current map.
+
+        The map keeps its subject and the view the user is looking at; the
+        view only widens when a marker would fall outside it.
+        """
+
+        missing = [ref for ref in action.location_refs if ref not in marked_locations]
+        if missing:
+            raise MapPlanBuildError(
+                "missing_location",
+                f"'{missing[0]}' is not a resolved location ref. Resolve it with "
+                "resolve_geospatial_location and pass the returned ref.",
+            )
+        features: list[dict[str, Any]] = []
+        for ref in dict.fromkeys(action.location_refs):
+            location = marked_locations[ref]
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [location.longitude, location.latitude],
+                    },
+                    "properties": {
+                        "name": _marker_name(ref, location.label),
+                        "label": location.label,
+                        "location_ref": ref,
+                        "source": "resolved_location",
+                    },
+                }
+            )
+        descriptor: dict[str, Any] = {
+            "id": PLACE_MARKERS_INSTANCE_ID,
+            "instance_id": PLACE_MARKERS_INSTANCE_ID,
+            "capability_id": PLACE_MARKERS_INSTANCE_ID,
+            "label": "Marked places",
+            "provider": "aegis",
+            "type": "geojson",
+            "rendering_mode": PLACE_MARKERS_RENDERING_MODE,
+            "geometry_type": "point",
+            "visible": True,
+            "default_opacity": 1.0,
+            "data": {"type": "FeatureCollection", "features": features},
+            "result_status": "success",
+            "result_type": "features",
+        }
+        self._validate_render_descriptor(descriptor)
+        additions = OverlayCollectionService.from_rendered_descriptors(
+            [descriptor],
+            resolved_location=session.resolved_location,
+            viewport=session.viewport,
+            revision=session.overlay_collection.revision,
+        )
+        session = OverlayCollectionService.merge_into_map_session(
+            session,
+            OverlayCollectionService.merge_instances(
+                session.overlay_collection, additions.instances
+            ),
+        )
+        points = [
+            (location.longitude, location.latitude)
+            for location in (marked_locations[ref] for ref in action.location_refs)
+        ]
+        west, south, east, north = (
+            _valid_bbox(current_view_bounds) or session_view_bbox(session)
+        )
+        if all(west <= lon <= east and south <= lat <= north for lon, lat in points):
+            # Every marker is already in the view the user is looking at.
+            return _with_viewport(
+                session, _viewport_for_bbox([west, south, east, north], session.viewport)
+            )
+        # Otherwise frame the markers themselves: the old view shows none of them.
+        lons = [lon for lon, _ in points]
+        lats = [lat for _, lat in points]
+        pad = max(max(lons) - min(lons), max(lats) - min(lats)) * LOCATION_UNION_PADDING
+        framed = _with_min_span(
+            [min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad],
+            MARKER_VIEWPORT_MIN_SPAN_DEGREES,
+        )
+        return _with_viewport(session, _viewport_for_bbox(framed, session.viewport))
 
     # -------------------------------------------------------------------------
     def _update_instance(
@@ -828,6 +946,26 @@ def _moved_viewport(
         ],
         session.viewport,
     )
+
+###############################################################################
+def _marker_name(ref: str, label: str) -> str:
+    """Name a marker after the place the user asked for.
+
+    A geocoder can answer a district with a building inside it ("ByWard
+    Market" -> "National Gallery of Canada, ..., Byward Market"); the marker
+    then keeps the requested name rather than the building's.
+    """
+
+    label_name = label.split(",")[0].strip() or label
+    requested = ref.split(",")[0].strip()
+    requested_key = normalize_target_key(requested)
+    if (
+        requested_key
+        and requested_key != normalize_target_key(label_name)
+        and requested_key in normalize_target_key(label)
+    ):
+        return requested if requested != requested.casefold() else requested.title()
+    return label_name
 
 ###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:

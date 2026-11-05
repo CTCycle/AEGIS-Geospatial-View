@@ -106,6 +106,21 @@ class OverpassService:
             ("public_transport", "platform"),
             ("public_transport", "stop_position"),
         ),
+        "airports": (("aeroway", "aerodrome"),),
+        "airport": (("aeroway", "aerodrome"),),
+        "attractions": (
+            ("tourism", "attraction"),
+            ("tourism", "museum"),
+            ("tourism", "viewpoint"),
+            ("historic", "monument"),
+        ),
+        "attraction": (("tourism", "attraction"),),
+        "tourism": (
+            ("tourism", "attraction"),
+            ("tourism", "museum"),
+            ("tourism", "viewpoint"),
+            ("historic", "monument"),
+        ),
     }
     DEFAULT_AMENITIES = (
         "cafe",
@@ -228,6 +243,13 @@ class OverpassService:
             limit=fetch_limit,
         )
         elements = json_array(payload.get("elements"))
+        # The queried keys name each element's category, so non-amenity
+        # selectors (shop, leisure, aeroway, tourism, ...) keep their results.
+        category_keys = tuple(
+            dict.fromkeys(
+                [*(key for key, _ in selectors), "amenity", "public_transport", "railway", "highway"]
+            )
+        )
         points: list[dict[str, Any]] = []
         for raw in elements:
             if not is_json_object(raw):
@@ -236,7 +258,7 @@ class OverpassService:
             category = next(
                 (
                     tags_payload.get(key)
-                    for key in ("amenity", "public_transport", "railway", "highway")
+                    for key in category_keys
                     if tags_payload.get(key)
                 ),
                 None,
@@ -345,6 +367,12 @@ class OverpassService:
             "charging_stations": "charging_stations",
             "bus_stops": "bus_stops",
             "rail_stations": "rail_stations",
+            "aeroway": "airports",
+            "aerodrome": "airports",
+            "aerodromes": "airports",
+            "tourist_attractions": "attractions",
+            "landmarks": "attractions",
+            "sightseeing": "attractions",
         }
         return aliases.get(normalized, normalized)
 

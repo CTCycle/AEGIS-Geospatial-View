@@ -1,6 +1,6 @@
 # Manifest Contract
 
-Last updated: 2026-09-15
+Last updated: 2026-11-05
 
 ## Loader Contract
 
@@ -9,8 +9,10 @@ Last updated: 2026-09-15
 - Capability IDs must remain stable because the agent executes by `capability_id`.
 - Runtime availability is controlled by `runtime_profiles.json` plus the typed
   `availability_mode`. Supported modes are `public`, `credential`,
-  `credential_or_local_source`, and `configured_source`; local source modes
-  name a non-secret environment variable such as `AEGIS_OCM_SNAPSHOT_PATH`.
+  `credential_or_local_source`, `configured_source`, and `ingestion_only`;
+  local source modes name a non-secret environment variable such as
+  `AEGIS_OCM_SNAPSHOT_PATH`. `ingestion_only` marks a download that has no
+  query-time records, so the agent never executes it live.
 
 ## Metadata Expectations
 

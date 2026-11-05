@@ -15,6 +15,10 @@ from server.domain.agent.capability_route import (
     CompletionRequirement,
     TargetRequirement,
 )
+from server.domain.agent.map_plan import (
+    PLACE_MARKERS_INSTANCE_ID,
+    is_mark_locations_operation,
+)
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
 
 ###############################################################################
@@ -312,6 +316,12 @@ class CompletionEvaluator:
             ),
             "spatial_scope_applied": _native_spatial_scope_applied(goal, map_session),
             "map_candidate_prepared": True,
+            # The loop checks every requested place; the browser only needs
+            # the marker layer to be part of the candidate.
+            "locations_marked": any(
+                instance.instance_id == PLACE_MARKERS_INSTANCE_ID
+                for instance in map_session.overlay_collection.instances
+            ),
             "map_state_committed": False,
             "viewport_contains_results": False,
             "final_response_ready": False,
@@ -486,6 +496,7 @@ _REQUIREMENT_DESCRIPTIONS = {
     "temporal_scope_applied": "the requested time window was not verified in the data",
     "spatial_scope_applied": "the requested area was not verified in the data",
     "map_candidate_prepared": "no map was prepared",
+    "locations_marked": "the requested places were not marked on the map",
     "map_state_committed": "the map was not committed",
     "viewport_contains_results": "the map view did not contain the results",
     "final_response_ready": "the map was not confirmed",
@@ -501,6 +512,41 @@ def describe_requirements(names: list[str]) -> str:
         for name in dict.fromkeys(names)
     ]
     return "; ".join(described)
+
+###############################################################################
+def unmarked_route_targets(state: AgentRunState) -> list[str]:
+    """Places a marking request names that the map's marker layer lacks."""
+
+    route = state.route
+    if route is None or not is_mark_locations_operation(route.operation):
+        return []
+    session = state.prepared_map_session or state.active_map_session
+    instance = next(
+        (
+            item
+            for item in (session.overlay_collection.instances if session else [])
+            if item.instance_id == PLACE_MARKERS_INSTANCE_ID
+        ),
+        None,
+    )
+    data = json_object(instance.descriptor.get("data")) if instance else {}
+    marked = [
+        json_object(json_object(feature).get("properties"))
+        for feature in json_array(data.get("features"))
+    ]
+    return [
+        target
+        for target in (str(ref).strip() for ref in route.target_refs)
+        if target
+        and not any(
+            location_ref_matches(
+                target,
+                str(item.get("location_ref") or ""),
+                str(item.get("label") or ""),
+            )
+            for item in marked
+        )
+    ]
 
 ###############################################################################
 def requested_transform_unmet(state: AgentRunState) -> bool:

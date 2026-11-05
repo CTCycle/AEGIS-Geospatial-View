@@ -669,3 +669,31 @@ def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent
     # A persistent failure of the only batch still raises (nothing to disclose).
     with pytest.raises(module.OpenMeteoRequestError):
         grid(2)
+
+###############################################################################
+def test_overpass_keeps_results_of_non_amenity_categories() -> None:
+    service = OverpassService(base_url="https://overpass.example/api/interpreter")
+    queried: list[list[tuple[str, str]]] = []
+
+    def query(*, selectors: list[tuple[str, str]], **_kwargs: Any) -> dict[str, Any]:
+        queried.append(selectors)
+        return {
+            "elements": [
+                {
+                    "type": "way",
+                    "id": 1,
+                    "center": {"lat": 45.32, "lon": -75.67},
+                    "tags": {"aeroway": "aerodrome", "name": "Ottawa International Airport"},
+                }
+            ]
+        }
+
+    service._query_overpass = query  # type: ignore[method-assign]
+    result = run_async_in_thread(
+        service.get_nearby_poi(latitude=45.42, longitude=-75.69, categories=["aeroway"])
+    )
+
+    assert queried == [[("aeroway", "aerodrome")]]
+    assert [(item["name"], item["category"]) for item in result["items"]] == [
+        ("Ottawa International Airport", "aerodrome")
+    ]

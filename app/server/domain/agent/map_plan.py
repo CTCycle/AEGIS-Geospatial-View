@@ -11,6 +11,20 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Route operation for "mark/pin these places on the map": the places are drawn
+# as markers on top of the current map instead of becoming its new subject.
+MARK_LOCATIONS_OPERATION = "mark_locations"
+# Rendering mode of the server-built marker layer.
+PLACE_MARKERS_RENDERING_MODE = "place-markers"
+# One marker layer per map: marking places again replaces the earlier markers.
+PLACE_MARKERS_INSTANCE_ID = "place-markers"
+
+
+###############################################################################
+def is_mark_locations_operation(operation: object) -> bool:
+    return str(operation or "").strip().casefold() == MARK_LOCATIONS_OPERATION
+
+
 ###############################################################################
 class MapActionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -58,6 +72,13 @@ class KeepOnlyLayersAction(MapActionBase):
     instance_ids: list[str] = Field(min_length=1, max_length=32)
 
 ###############################################################################
+class MarkLocationsAction(MapActionBase):
+    """Pin resolved places on the current map without changing its subject."""
+
+    action: Literal["mark_locations"]
+    location_refs: list[str] = Field(min_length=1, max_length=25)
+
+###############################################################################
 class SetViewportAction(MapActionBase):
     action: Literal["set_viewport"]
     strategy: Literal[
@@ -91,6 +112,7 @@ MapAction = Annotated[
     | SetLayerOpacityAction
     | RemoveLayerAction
     | KeepOnlyLayersAction
+    | MarkLocationsAction
     | SetViewportAction,
     Field(discriminator="action"),
 ]

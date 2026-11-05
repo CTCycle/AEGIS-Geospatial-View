@@ -1,5 +1,5 @@
 import type { ExpressionSpecification } from 'maplibre-gl';
-import { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
+import { LngLatBoundsLike, Map, Marker, StyleSpecification } from 'maplibre-gl';
 import type { GeoJSON } from 'geojson';
 
 import {
@@ -306,7 +306,7 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
       }
 
       if (
-        ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points', 'circles'].includes(renderingMode)
+        ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points', 'circles', 'place-markers'].includes(renderingMode)
         && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
       ) {
         statuses.push(noResultsStatus(overlay));
@@ -368,8 +368,60 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
   return statuses;
 };
 
+// Place names are HTML markers: raster basemap styles carry no glyphs, so a
+// symbol layer could not label them.
+const placeLabels = new WeakMap<Map, globalThis.Map<string, Marker[]>>();
+
+const removePlaceLabels = (map: Map, overlayId: string): void => {
+  placeLabels.get(map)?.get(overlayId)?.forEach((marker) => marker.remove());
+  placeLabels.get(map)?.delete(overlayId);
+};
+
+export const setPlaceLabelsVisible = (map: Map, overlayId: string, visible: boolean): void => {
+  placeLabels.get(map)?.get(overlayId)?.forEach((marker) => {
+    marker.getElement().style.display = visible ? '' : 'none';
+  });
+};
+
+const addPlaceLabels = (map: Map, overlay: OverlayEntry): void => {
+  removePlaceLabels(map, overlay.id);
+  if (typeof map.getCanvasContainer !== 'function') {
+    return;
+  }
+  const data = overlay.data as { features?: Array<{ geometry?: { coordinates?: unknown }; properties?: Record<string, unknown> }> } | undefined;
+  const markers: Marker[] = [];
+  for (const feature of data?.features || []) {
+    const coordinates = feature.geometry?.coordinates;
+    const name = String(feature.properties?.['name'] || '').trim();
+    if (!Array.isArray(coordinates) || !isFiniteNumber(coordinates[0]) || !isFiniteNumber(coordinates[1]) || !name) {
+      continue;
+    }
+    const element = document.createElement('div');
+    element.className = 'aegis-place-label';
+    element.textContent = name;
+    markers.push(
+      new Marker({ element, anchor: 'bottom', offset: [0, -10] })
+        .setLngLat([coordinates[0], coordinates[1]])
+        .addTo(map),
+    );
+  }
+  let byOverlay = placeLabels.get(map);
+  if (!byOverlay) {
+    byOverlay = new globalThis.Map();
+    placeLabels.set(map, byOverlay);
+  }
+  byOverlay.set(overlay.id, markers);
+};
+
 export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => {
-  const keep = new Set(mapSessionOverlayEntries(mapSession).flatMap(getOverlayLayerIds));
+  const entries = mapSessionOverlayEntries(mapSession);
+  const keptOverlayIds = new Set(entries.map((overlay) => overlay.id));
+  for (const overlayId of [...(placeLabels.get(map)?.keys() || [])]) {
+    if (!keptOverlayIds.has(overlayId)) {
+      removePlaceLabels(map, overlayId);
+    }
+  }
+  const keep = new Set(entries.flatMap(getOverlayLayerIds));
   const sourcesToRemove = new Set<string>();
   const styleLayers = typeof map.getStyle === 'function' ? map.getStyle()?.layers || [] : [];
   for (const layer of styleLayers) {
@@ -444,6 +496,7 @@ export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
     'circles',
     'choropleth',
     'camera-points',
+    'place-markers',
   ]);
   return Boolean(
     (overlay.url || overlay.data)
@@ -511,6 +564,22 @@ const addGeoJsonOverlayLayer = (
     return true;
   }
   const geometryType = overlay.geometry_type?.toLowerCase() || '';
+  if (renderingMode === 'place-markers') {
+    map.addLayer({
+      id: layerId,
+      source: sourceId,
+      type: 'circle',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#dc2626',
+        'circle-opacity': opacity,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+    addPlaceLabels(map, overlay);
+    return true;
+  }
   if (renderingMode === 'camera-points') {
     map.addLayer({
       id: layerId,

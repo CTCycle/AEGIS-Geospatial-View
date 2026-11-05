@@ -134,10 +134,10 @@ class OverpassProvider(GeospatialProvider):
                 feature = normalize_poi_feature(
                     {
                         **item,
-                        "category": item.get("amenity"),
+                        "category": item.get("amenity") or item.get("category"),
                     },
                     source=self.provider_id,
-                    category=str(item.get("amenity") or "amenity"),
+                    category=str(item.get("amenity") or item.get("category") or "amenity"),
                 )
             except NormalizationError:
                 continue

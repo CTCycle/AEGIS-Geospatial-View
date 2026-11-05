@@ -16,6 +16,7 @@ from server.domain.agent.evidence import AgentEvidenceEnvelope
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     MapPlan,
+    MarkLocationsAction,
     SetBasemapAction,
     SetViewportAction,
 )
@@ -160,6 +161,26 @@ class MapPlanService:
                 recovery="choose_alternate_tool",
             )
 
+        marked_locations: dict[str, Any] = {}
+        for action in plan.actions:
+            if not isinstance(action, MarkLocationsAction):
+                continue
+            for ref in action.location_refs:
+                resolved = self._resolved_ref(ref, state)
+                if resolved is None:
+                    return self._failure(
+                        context=context,
+                        started=started,
+                        error_type="state_conflict",
+                        code="missing_location",
+                        message=(
+                            f"Resolve '{ref}' with resolve_geospatial_location "
+                            "before marking it, then pass the returned location ref."
+                        ),
+                        recovery="choose_alternate_tool",
+                    )
+                marked_locations[ref] = resolved
+
         location = self._location_for_plan(plan, state, active_session)
         if location is None:
             named = self._explicit_location_refs(plan)
@@ -208,6 +229,18 @@ class MapPlanService:
                 else action
                 for action in effective_actions
             ]
+        if marked_locations and active_session is not None:
+            # Markers annotate the map the user is looking at; re-fitting the
+            # shown place would discard their zoom. The marker action widens
+            # the view itself when a marker falls outside it.
+            effective_actions = [
+                action
+                for action in effective_actions
+                if not (
+                    isinstance(action, SetViewportAction)
+                    and action.strategy == "fit_location"
+                )
+            ]
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
             evidence = self._evidence_for_plan(effective_plan, state, context)
@@ -219,6 +252,7 @@ class MapPlanService:
                 current_view_bounds=json_object(
                     state.map_memory.get("current_view")
                 ).get("bounds"),
+                marked_locations=marked_locations,
             )
             candidate = self._annotate_scope_metadata(
                 candidate,
@@ -592,6 +626,11 @@ class MapPlanService:
         state: AgentRunState,
         active_session: MapSession | None,
     ) -> Any | None:
+        if active_session is not None and any(
+            isinstance(action, MarkLocationsAction) for action in plan.actions
+        ):
+            # Marking places keeps the shown map as the subject.
+            return active_session.resolved_location
         explicit_refs = MapPlanService._explicit_location_refs(plan)
         if explicit_refs:
             location = MapPlanService._resolved_ref(explicit_refs[0], state)

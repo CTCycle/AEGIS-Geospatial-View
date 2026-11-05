@@ -17,7 +17,9 @@ from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
     KeepOnlyLayersAction,
     MapPlan,
+    MarkLocationsAction,
     RemoveLayerAction,
+    is_mark_locations_operation,
 )
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -836,6 +838,16 @@ def _map_plan_semantic_validator(
             if action.evidence_ref not in derived_refs | follow_up_refs:
                 errors.append("Analysis maps must use located derived evidence or data queried at a resolved result point; for valid_empty use fit_location without an evidence layer.")
 
+    if (
+        state.route is not None
+        and is_mark_locations_operation(state.route.operation)
+        and not any(isinstance(action, MarkLocationsAction) for action in request.actions)
+    ):
+        errors.append(
+            "The user asked to mark places on the map: include a mark_locations action "
+            "with the location ref of every requested place. Framing the places with "
+            "set_viewport does not mark them."
+        )
     contract = state.completion_contract
     if contract is not None and contract.evidence_required and uncovered_route_targets(state):
         errors.append(

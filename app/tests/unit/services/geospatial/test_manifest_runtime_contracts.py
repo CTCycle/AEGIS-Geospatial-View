@@ -8,6 +8,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.endpoint_validation import EndpointValidationService
 from types import SimpleNamespace
+from typing import Any
 from server.repositories.credential_material import seed_credential_encryption_material
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.composition import GeospatialRuntime, build_provider_execution_policy, build_geospatial_runtime
@@ -1298,3 +1299,34 @@ def test_coverage_global_policy_supported() -> None:
     )
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     assert service.is_location_supported("osm_default", location)
+
+###############################################################################
+def test_airport_and_attraction_requests_reach_a_live_source_not_an_ingestion_dataset() -> None:
+    registry = CapabilityRegistry()
+    runtime = RuntimeRegistry()
+    ottawa = ResolvedLocation(
+        label="Ottawa", latitude=45.4215, longitude=-75.6972, country="Canada"
+    )
+    constraints: dict[str, Any] = {
+        "domains": {CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
+        "explicit_ids": [],
+        "runtime_registry": runtime,
+        "operation": "show",
+        "scope_kind": "bbox",
+        "temporal_mode": "current",
+        "requires_render": True,
+        "location": ottawa,
+    }
+
+    airports = [str(item["id"]) for item in registry.shortlist(queries=["airports"], **constraints)]
+    attractions = [
+        str(item["id"]) for item in registry.shortlist(queries=["tourist attractions"], **constraints)
+    ]
+
+    assert "overpass_poi_amenities" in airports
+    assert "ourairports_airports" not in airports
+    assert "overpass_poi_amenities" in attractions
+    assert {
+        "capability_id": "ourairports_airports",
+        "reason": "Available only through dataset ingestion; it cannot be queried live.",
+    } in registry.unavailable_matches({**constraints, "queries": ["airports"]}, runtime)

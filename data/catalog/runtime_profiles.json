@@ -407,6 +407,7 @@
       "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": true,
+      "availability_mode": "ingestion_only",
       "coverage_policy": "global",
       "health_policy": "preprocessed",
       "handler_name": "ourairports_airports",
@@ -1214,7 +1215,14 @@
         "osm",
         "poi",
         "amenities",
-        "places"
+        "places",
+        "airport",
+        "airports",
+        "aerodrome",
+        "tourism",
+        "attractions",
+        "landmarks",
+        "sightseeing"
       ],
       "manual_toggle": true,
       "auth_required": false

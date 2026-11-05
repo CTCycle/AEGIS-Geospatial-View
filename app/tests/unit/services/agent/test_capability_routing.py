@@ -1711,3 +1711,43 @@ def test_plural_catalog_entity_place_route_keeps_data_retrieval() -> None:
 )
 def test_viewport_requests_are_not_catalog_entity_requests(message: str) -> None:
     assert not CapabilityRegistry().requests_catalog_entities(message)
+
+###############################################################################
+def test_marking_places_on_the_shown_map_is_a_location_only_marker_route() -> None:
+    state = _state()
+    state.active_map_session = cast(
+        Any, SimpleNamespace(
+            overlay_collection=SimpleNamespace(instances=[]),
+            resolved_location=ResolvedLocation(
+                label="Ottawa, Ontario, Canada", latitude=45.42, longitude=-75.69
+            ),
+        )
+    )
+    places = ["Parliament Hill, Ottawa", "ByWard Market, Ottawa"]
+    router = _router()
+    decision = router.validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            secondary_domains=[CapabilityDomain.DATA_RETRIEVAL],
+            location_mode="none",
+            capability_queries=["tourist attractions"],
+            operation="mark_locations",
+            target_refs=places,
+        ),
+        user_message="by your knowledge, can you mark 5 places you deem interesting to visit?",
+        active_state=state,
+    )
+
+    route = decision.route
+    assert route.operation == "mark_locations"
+    assert route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert route.secondary_domains == []
+    assert route.location_mode == "target"
+    assert route.target_refs == places
+
+    unnamed = router.validate_route(
+        _route(operation="mark_locations", target_refs=[]),
+        user_message="mark some places",
+        active_state=state,
+    )
+    assert unnamed.status == "clarification"

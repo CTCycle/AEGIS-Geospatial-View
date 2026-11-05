@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Summary
 
@@ -337,6 +337,23 @@ takes one `fit_location`; the harness then widens the view to the padded union
 of every resolved place, and `apply_map_plan` is rejected (`targets_not_in_view`)
 only if a place still cannot be framed.
 
+Marking places is an annotation of the shown map, not a new subject. "Mark",
+"pin" or "point out" requests route as operation `mark_locations` (domain
+`map_rendering`, `location_mode=target`, each place in `target_refs`, no
+provider query; a marking route without places asks which places to mark).
+When the user lets the model choose ("by your knowledge"), the model may name
+the places from general knowledge, but every position comes from
+`resolve_geospatial_location` and the answer must call them suggestions. The
+`mark_locations` map action builds one server-owned `place-markers` GeoJSON
+layer (instance `place-markers`, replaced on the next marking) from the
+resolved refs; the browser draws red points with HTML name labels, because
+raster basemap styles carry no glyphs. Marking keeps the shown place and the
+client-reported view, drops any `fit_location` in the same plan, and widens
+the view only when a marker falls outside it. A marking route requires the
+`locations_marked` obligation: a plan without `mark_locations` is rejected, and
+the run is not complete until the marker layer holds every requested place.
+If the model stops after resolving them, the server issues the marking itself.
+
 Dated rasters report their own temporal coverage. NASA GIBS compares the
 requested day with the layer's catalog time extent: a covered day marks the
 temporal scope satisfied, an uncovered day (not yet published or never
@@ -452,5 +469,12 @@ still miss extremes between samples. Earthquake catalogs remain incomplete
 below their completeness magnitude. Masks are simplified 1:50m shapes, so
 islands under about 5 km and fine coastlines are approximate. Attached images
 live in memory only and are lost on restart; only one image per request.
+
+Ingestion-only sources (runtime `availability_mode: ingestion_only`, currently
+OurAirports) are never shortlisted for live execution; discovery reports them
+as only available through dataset ingestion. Overpass POI search covers
+airports (`aeroway=aerodrome`) and attractions (`tourism=attraction|museum|
+viewpoint`, `historic=monument`) without credentials, and keeps results of any
+queried OSM key instead of only amenity-style keys.
 
 Recovery keeps failures visible. A route revision re-compiles the goal but keeps a `required_data_retrieved` obligation the earlier route had, so a bare location fit cannot satisfy a data request. Exhausted model-transport retries end with a model-service-outage message, distinct from geospatial provider outages and from invalid tool calls. Nominatim retries DNS, 429 and 5xx failures (not timeouts); an Open-Meteo grid batch retries once on a 5xx, and a still-missing batch makes the result `partial` with a warning naming the cause. A dated raster whose layer publishes no imagery for that day (`temporal_scope_satisfied` false with a `latest_available_date`) stops the run at once with that disclosure. A tool the step did not expose is rejected with a hint to issue it in the next step; `fit_evidence` on evidence without a bbox fits the target location.
