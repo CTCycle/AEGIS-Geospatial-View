@@ -1,6 +1,14 @@
 # Native Agent Validation Gate Ledger
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
+
+## 2026-11-06 agent-loop reliability re-run (`develop@6c954aea`)
+
+The [after report](../../QA/agent-loop-reliability-20261105/after.md) re-runs the frozen 16-scenario suite from the [baseline](../../QA/agent-loop-reliability-20261105/baseline.md) on the exact lane `opencode-go / deepseek-v4.1-flash` (built-in browser, fresh conversation per scenario).
+- Live UI **PARTIAL**: 11 PASS / 5 FAIL of 16 scenarios (baseline 7 / 9); obligations 58 / 67 (51 / 67).
+- False-success gate (target 0): **FAIL**, 1 firm (S15: the "what place is that" half of a coordinate request is dropped and reported complete; baseline 3) plus 1 partial (S10-T1: the answer says all 205 events are on the map, 25 are).
+- Invalid tool calls 3 (6); unnecessary renders 1 (5); redundant provider calls 1 (3); cross-turn reuse 6 / 6; tokens 818k in (976k); `provider_rate_limited` 10 of 36 runs (9 of 36).
+- New regression: S10-T2 presentation contract rejects a global ("World") target, 140k tokens, map not updated. Open: S03, S06, S13, S16 (see the report).
 
 ## 2026-11-05 tool-catalog audit (`develop@11cbb497` + working tree)
 
