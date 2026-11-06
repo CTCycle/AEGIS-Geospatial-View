@@ -2,6 +2,12 @@
 
 Last updated: 2026-11-06
 
+## 2026-11-06 agent-loop reliability re-run after remediation R4-R6 (`develop@080cc59a`)
+
+The [after-r3 report](../../QA/agent-loop-reliability-20261105/after-r3.md) compares baseline, `6c954aea`, `6e3404c8` and `080cc59a` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no model-provider 429, no data-provider rate limit, so R6 rate-limit recovery was not exercised live).
+- Live UI **PARTIAL**: 12 PASS / 4 FAIL (fail: S03, S08, S12, S16); obligations 61 / 67 (57 in r2). Fixed: S02, S06, S08-T1, S10-T2. Invalid tool calls **4** (r2 10). Firm false successes 0.
+- New regressions: S08-T2 returns "model returned no answer text" (2 of 2 samples), S12-T4 gives an irrelevant answer at 82k tokens, S16-T2 intermittent repetition loop (1 of 2). Not fixed: S03 framing. Tokens 781k in (871k).
+
 ## 2026-11-06 agent-loop reliability re-run after remediation R1-R3 (`develop@6e3404c8`)
 
 The [after-r2 report](../../QA/agent-loop-reliability-20261105/after-r2.md) compares baseline, `6c954aea` and `6e3404c8` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 runs, no model-provider 429).
