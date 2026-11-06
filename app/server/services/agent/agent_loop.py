@@ -93,6 +93,7 @@ from server.services.agent.completion import (
     describe_requirements,
     evidence_numbers,
     imagery_only_note,
+    layer_edit_count,
     needs_numeric_values,
     requested_transform_unmet,
     unmarked_route_targets,
@@ -1666,6 +1667,7 @@ class AgentLoop:
             ),
             evidence_numbers=evidence_numbers(state),
             truncations=summary.truncations,
+            layer_edits=layer_edit_count(state) if on_map else None,
         )
         if not violations:
             return candidate

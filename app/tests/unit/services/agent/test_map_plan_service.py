@@ -25,6 +25,7 @@ from server.domain.agent.map_plan import (
     MarkLocationsAction,
     RemoveLayerAction,
     SetBasemapAction,
+    SetLayerOpacityAction,
     SetLayerVisibilityAction,
     SetViewportAction,
 )
@@ -640,6 +641,39 @@ async def test_requery_with_a_new_time_window_replaces_the_earlier_layer() -> No
         item.descriptor["evidence_ref"]
         for item in state.prepared_map_session.overlay_collection.instances
     ] == ["evidence:new"]
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_an_action_on_a_superseded_layer_follows_its_replacement() -> None:
+    state = _state()
+    state.evidence_refs = ["evidence:old", "evidence:new"]
+    service = MapPlanService(
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        evidence_repository=_TimeWindowRepository(),
+    )
+    context = ToolExecutionContext(conversation_id="conversation-1")
+    first = await service.apply(MapPlan(expected_collection_revision=0, actions=[AddEvidenceLayerAction(
+        action="add_evidence_layer", evidence_ref="evidence:old", capability_id="places:hospitals"
+    )]), state, context)
+    assert first.status == "success" and state.prepared_map_session is not None
+    old_id = state.prepared_map_session.overlay_collection.instances[0].instance_id
+    state.active_map_session = state.prepared_map_session
+
+    result = await service.apply(MapPlan(
+        expected_collection_revision=state.active_map_session.overlay_collection.revision,
+        actions=[
+            AddEvidenceLayerAction(
+                action="add_evidence_layer", evidence_ref="evidence:new", capability_id="places:hospitals"
+            ),
+            SetLayerOpacityAction(action="set_layer_opacity", instance_id=old_id, opacity=0.5),
+        ],
+    ), state, context)
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    [layer] = state.prepared_map_session.overlay_collection.instances
+    assert layer.descriptor["evidence_ref"] == "evidence:new"
+    assert layer.opacity == 0.5
 
 ###############################################################################
 @pytest.mark.asyncio

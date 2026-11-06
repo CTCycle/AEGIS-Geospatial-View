@@ -50,6 +50,12 @@ _UNIT_NUMBER = re.compile(
     r"|\b(?:magnitude\s+|(?-i:M)\s?)(?P<m>\d+(?:\.\d+)?)\b",
     re.IGNORECASE,
 )
+# A layer reported removed or hidden; only a committed map edit supports it.
+_LAYER_EDIT_CLAIM = re.compile(
+    r"\b(?:remov(?:ed|ing)|delet(?:ed|ing)|cleared|hidden|hid|taken off|turned off|switched off)\b",
+    re.IGNORECASE,
+)
+_LAYER_WORD = re.compile(r"\b(?:layers?|overlays?)\b", re.IGNORECASE)
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
 
@@ -92,6 +98,7 @@ def check_final_answer(
     map_rendered: bool | None = None,
     evidence_numbers: Sequence[float] = (),
     truncations: Sequence[tuple[int, int]] = (),
+    layer_edits: int | None = None,
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -107,7 +114,9 @@ def check_final_answer(
     disclose; ``map_rendered`` is False when no verified map exists, so the
     answer may not describe map content; ``evidence_numbers`` are the values
     the run's data carries, which numbers cited with a unit must match; and
-    ``truncations`` are (shown, total) layers whose records were cut.
+    ``truncations`` are (shown, total) layers whose records were cut; and
+    ``layer_edits`` counts the layers the committed map-state diff removed or
+    hid (``None`` skips the claim check).
     """
 
     violations: list[str] = []
@@ -167,6 +176,17 @@ def check_final_answer(
     for shown, total in truncations:
         if str(total) not in text and not _TRUNCATION_DISCLOSURE.search(text):
             violations.append(f"does not disclose that the map layer shows {shown} of {total} records")
+
+    if layer_edits == 0:
+        for sentence in _SENTENCE_BREAK.split(text):
+            claim = _LAYER_EDIT_CLAIM.search(sentence)
+            if (
+                claim
+                and _LAYER_WORD.search(sentence)
+                and not _NEGATION.search(sentence[max(0, claim.start() - 24) : claim.start()])
+            ):
+                violations.append(f"claims a layer was changed ({claim.group(0)!r}) but the map edit removed or hid none")
+                break
 
     if evidence_numbers:
         for match in _UNIT_NUMBER.finditer(text):

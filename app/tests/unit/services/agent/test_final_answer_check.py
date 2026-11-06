@@ -163,3 +163,12 @@ def test_a_count_claim_about_the_map_may_not_exceed_what_rendered() -> None:
     assert check_final_answer("The map shows all 205 events.", **kwargs)
     assert not check_final_answer("The map shows only 25 of the 205 events.", **kwargs)
     assert not check_final_answer("USGS reported 205 events; the map shows 25.", **kwargs)
+
+
+###############################################################################
+def test_a_layer_removal_claim_needs_a_committed_layer_edit() -> None:
+    claim = "The radar layer has been removed from the map."
+    assert check_final_answer(claim, target_names=[], layer_edits=0)
+    assert not check_final_answer(claim, target_names=[], layer_edits=1)
+    assert not check_final_answer("No layer was removed.", target_names=[], layer_edits=0)
+    assert not check_final_answer(claim, target_names=[])

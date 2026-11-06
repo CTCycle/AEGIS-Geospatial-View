@@ -876,6 +876,7 @@ def presentation_contract(state: AgentRunState, session: MapSession) -> Presenta
             targets.append(ContractTarget(
                 ref=match[0], label=match[1].label, latitude=match[1].latitude,
                 longitude=match[1].longitude, location_type=match[1].location_type,
+                bbox=match[1].bbox,
             ))
     findings: list[str] = []
     layer_refs = _map_layer_refs(session)
@@ -901,6 +902,22 @@ def presentation_contract(state: AgentRunState, session: MapSession) -> Presenta
             "label the markers with the values or map the data layer"
         )
     return PresentationContract(targets=targets, findings=findings)
+
+###############################################################################
+def layer_edit_count(state: AgentRunState) -> int:
+    """Layers this run removed, hid or re-opacified, from the map-state diff."""
+
+    before = state.active_map_session
+    after = state.prepared_map_session
+    if before is None or after is None:
+        return 0
+    kept = {item.instance_id: item for item in after.overlay_collection.instances}
+    return sum(
+        1
+        for item in before.overlay_collection.instances
+        if (current := kept.get(item.instance_id)) is None
+        or (current.visible, current.opacity) != (item.visible, item.opacity)
+    )
 
 ###############################################################################
 def _map_state(state: AgentRunState) -> MapState:

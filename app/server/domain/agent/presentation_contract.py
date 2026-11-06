@@ -12,9 +12,13 @@ from server.domain.agent.capability_route import ObligationKind
 # own scale; a neighbourhood or district may fill a wider view.
 FINE_LOCATION_TYPES = frozenset({
     "landmark", "poi", "address", "feature", "airport", "station", "street", "road",
+    "attraction", "monument", "building",
 })
 LOCAL_LOCATION_TYPES = frozenset({"neighborhood", "district"})
 MAX_FINE_VIEW_SPAN_DEGREES = 0.15
+# Geocoders name the same kind of place differently; a result whose own extent
+# is this small is fine-grained whatever its type is called.
+FINE_PLACE_EXTENT_DEGREES = 0.02
 MAX_LOCAL_VIEW_SPAN_DEGREES = 0.6
 # Scopes whose centre point says nothing about what must be visible.
 AREA_LOCATION_TYPES = frozenset({
@@ -22,6 +26,9 @@ AREA_LOCATION_TYPES = frozenset({
     "ocean", "sea", "viewport", "global", "world",
 })
 MIN_RESULTS_IN_VIEW = 0.5
+# A target spanning at least this much longitude is the whole globe: no
+# viewport can contain it, so it never counts as out of view.
+GLOBAL_EXTENT_SPAN_DEGREES = 340.0
 
 MapState = Literal["rendered", "failed", "none"]
 ObligationStatus = Literal["met", "unmet", "failed"]
@@ -37,6 +44,23 @@ class ContractTarget(BaseModel):
     latitude: float = Field(ge=-90.0, le=90.0)
     longitude: float = Field(ge=-180.0, le=180.0)
     location_type: str | None = None
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4)
+
+    # -------------------------------------------------------------------------
+    @property
+    def is_fine(self) -> bool:
+        if self.location_type in FINE_LOCATION_TYPES:
+            return True
+        return (
+            self.bbox is not None
+            and self.location_type not in AREA_LOCATION_TYPES
+            and max(self.bbox[2] - self.bbox[0], self.bbox[3] - self.bbox[1]) <= FINE_PLACE_EXTENT_DEGREES
+        )
+
+    # -------------------------------------------------------------------------
+    @property
+    def is_global(self) -> bool:
+        return self.bbox is not None and self.bbox[2] - self.bbox[0] >= GLOBAL_EXTENT_SPAN_DEGREES
 
 ###############################################################################
 class PresentationContract(BaseModel):
@@ -71,7 +95,8 @@ class PresentationContract(BaseModel):
         out_of_view = [
             target.label or target.ref
             for target in self.targets
-            if (
+            if not target.is_global
+            and (
                 (results_in_viewport is not None and results_in_viewport < MIN_RESULTS_IN_VIEW)
                 if target.location_type in AREA_LOCATION_TYPES
                 else not (west <= target.longitude <= east and south <= target.latitude <= north)
@@ -80,9 +105,8 @@ class PresentationContract(BaseModel):
         coarse = [
             target.label or target.ref
             for target in self.targets
-            if target.location_type is not None
-            and (
-                (target.location_type in FINE_LOCATION_TYPES and span > MAX_FINE_VIEW_SPAN_DEGREES)
+            if (
+                (target.is_fine and span > MAX_FINE_VIEW_SPAN_DEGREES)
                 or (target.location_type in LOCAL_LOCATION_TYPES and span > MAX_LOCAL_VIEW_SPAN_DEGREES)
             )
         ]

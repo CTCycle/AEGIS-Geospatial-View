@@ -404,3 +404,20 @@ def test_an_area_scope_is_judged_by_its_results_not_its_centre() -> None:
     assert not contract.violations(far_from_centre, 0.9)
     assert contract.violations(far_from_centre, 0.1)
     assert not contract.violations(far_from_centre)
+
+
+###############################################################################
+def test_a_global_target_is_always_in_view_and_a_small_extent_is_a_fine_place() -> None:
+    world = ContractTarget(
+        ref="world", label="World", latitude=0.0, longitude=0.0,
+        location_type="macro_region", bbox=[-180.0, -85.0, 180.0, 85.0],
+    )
+    assert not PresentationContract(targets=[world]).violations([-180.0, -40.0, 180.0, 40.0], 0.4)
+
+    gate = ContractTarget(
+        ref="gate", label="Brandenburg Gate", latitude=52.5163, longitude=13.3777,
+        location_type="attraction", bbox=[13.3770, 52.5160, 13.3785, 52.5166],
+    )
+    city_view = [13.2, 52.45, 13.55, 52.6]
+    assert PresentationContract(targets=[gate]).violations(city_view)
+    assert not PresentationContract(targets=[gate]).violations([13.37, 52.51, 13.385, 52.522])

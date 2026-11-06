@@ -23,6 +23,8 @@ from server.domain.agent.map_plan import (
     MarkLocationsAction,
     RemoveLayerAction,
     SetBasemapAction,
+    SetLayerOpacityAction,
+    SetLayerVisibilityAction,
     SetViewportAction,
 )
 from server.domain.agent.tool_result import (
@@ -64,6 +66,18 @@ def _ungrounded_annotation(plan: MapPlan, state: AgentRunState) -> str | None:
                     return label
     return None
 
+
+###############################################################################
+def _addressed_to_replacements(actions: list[MapAction], replaced: dict[str, str]) -> list[MapAction]:
+    """Point actions that address a superseded layer at the layer replacing it."""
+
+    return [
+        action.model_copy(update={"instance_id": replaced[action.instance_id]})
+        if isinstance(action, (SetLayerVisibilityAction, SetLayerOpacityAction))
+        and action.instance_id in replaced
+        else action
+        for action in actions
+    ]
 
 ###############################################################################
 def _query_subject(summary: dict[str, Any]) -> tuple[str, ...] | None:
@@ -314,9 +328,10 @@ class MapPlanService:
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
             evidence = self._evidence_for_plan(effective_plan, state, context)
+            replaced = self._superseded_layer_removals(effective_actions, evidence, active_session, context)
             effective_actions = [
-                *self._superseded_layer_removals(effective_actions, evidence, active_session, context),
-                *effective_actions,
+                *(RemoveLayerAction(action="remove_layer", instance_id=old) for old in replaced),
+                *_addressed_to_replacements(effective_actions, replaced),
             ]
             candidate = await self.session_builder.build(
                 location=location,
@@ -466,8 +481,10 @@ class MapPlanService:
         evidence: list[AgentEvidenceEnvelope],
         active_session: MapSession | None,
         context: ToolExecutionContext,
-    ) -> list[RemoveLayerAction]:
-        """Remove committed layers a new layer of the same query subject replaces.
+    ) -> dict[str, str]:
+        """Map committed layers a new layer of the same query subject replaces.
+
+        Returns ``{superseded instance id: replacing instance id}``.
 
         A follow-up that re-queries one capability for one place with another
         time window or filter must replace that earlier layer, not stack on it.
@@ -477,19 +494,19 @@ class MapPlanService:
 
         repository = self.evidence_repository
         if active_session is None or repository is None:
-            return []
+            return {}
         if any(isinstance(action, (RemoveLayerAction, KeepOnlyLayersAction)) for action in actions):
-            return []
+            return {}
         added = [action for action in actions if isinstance(action, AddEvidenceLayerAction)]
         capabilities = [action.capability_id for action in added]
         if len(set(capabilities)) != len(capabilities):
-            return []
+            return {}
         subjects = {
             item.evidence_ref: _query_subject(item.summary)
             for item in evidence
             if item.evidence_ref
         }
-        removals: list[RemoveLayerAction] = []
+        removals: dict[str, str] = {}
         for instance in active_session.overlay_collection.instances:
             old_ref = str(instance.descriptor.get("evidence_ref") or "")
             if not old_ref:
@@ -508,7 +525,7 @@ class MapPlanService:
             old = repository.get_summary(old_ref, conversation_id=context.conversation_id)
             old_subject = _query_subject(dict(old.summary)) if old is not None else None
             if old_subject is not None and old_subject == subjects.get(replacement.evidence_ref):
-                removals.append(RemoveLayerAction(action="remove_layer", instance_id=instance.instance_id))
+                removals[instance.instance_id] = f"evidence:{replacement.evidence_ref}:{replacement.capability_id}"
         return removals
 
     # -------------------------------------------------------------------------
