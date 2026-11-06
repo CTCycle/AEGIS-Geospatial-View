@@ -30,13 +30,15 @@ def test_population_discovery_includes_keyless_place_facts() -> None:
 
 def test_prose_only_match_does_not_offer_an_unrelated_phenomenon() -> None:
     # IMERG precipitation mentions "hotspot" only in its descriptive prose.
-    candidates = CapabilityRegistry().shortlist(
-        domains={CapabilityDomain.DATA_RETRIEVAL}, queries=["fire", "hotspots"],
-        explicit_ids=[], runtime_registry=RuntimeRegistry(),
-    )
-    ids = {item["id"] for item in candidates}
-    assert "MODIS_Combined_Thermal_Anomalies_Fire" in ids
-    assert "IMERG_Precipitation_Rate" not in ids
+    # "wildfire" compounds the subject term "fire", so it still names the subject.
+    for queries in (["fire", "hotspots"], ["wildfire hotspots"]):
+        candidates = CapabilityRegistry().shortlist(
+            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=queries,
+            explicit_ids=[], runtime_registry=RuntimeRegistry(),
+        )
+        ids = {item["id"] for item in candidates}
+        assert "MODIS_Combined_Thermal_Anomalies_Fire" in ids, queries
+        assert "IMERG_Precipitation_Rate" not in ids, queries
 
 
 ###############################################################################

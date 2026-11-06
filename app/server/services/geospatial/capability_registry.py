@@ -825,7 +825,7 @@ class CapabilityRegistry:
             identity_matches = meaningful_queries.intersection(
                 _identity_searchable_text(item)
             )
-            if not has_routing_alias and meaningful_queries.intersection(_subject_terms(item)):
+            if not has_routing_alias and _names_subject(meaningful_queries, _subject_terms(item)):
                 subject_candidate_ids.add(capability_id)
             score = (
                 1000.0 - float(explicit_index)
@@ -1274,6 +1274,17 @@ def _subject_terms(capability: dict[str, Any]) -> set[str]:
     ]
     return _raw_query_tokens(
         [item for value in values for item in (value if is_json_array(value) else [value])]
+    )
+
+###############################################################################
+def _names_subject(query_terms: set[str], subject_terms: set[str]) -> bool:
+    """Return whether a query term equals a subject term or compounds it (wildfire, fire)."""
+
+    return any(
+        term == subject
+        or (len(subject) >= 4 and (term.startswith(subject) or term.endswith(subject)))
+        for term in query_terms
+        for subject in subject_terms
     )
 
 ###############################################################################

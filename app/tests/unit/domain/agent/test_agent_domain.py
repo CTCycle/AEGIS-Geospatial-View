@@ -3,6 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute, ConversationTask
+from server.prompts.capability_route import CAPABILITY_ROUTE_SYSTEM_PROMPT
 from server.domain.agent.conversation import ConversationState, PendingClarification
 from server.domain.agent.task_ledger import LEDGER_LIMIT, merge_ledger
 from server.domain.agent.map_plan import MapPlan
@@ -388,3 +389,8 @@ def test_task_ledger_is_additive_bounded_and_replaces_the_stale_route_in_the_pro
     assert "route" not in projection and "goal" not in projection and "tasks" not in projection
     assert projection["conversation_tasks"] == [
         {"id": f"data:city-{LEDGER_LIMIT}", "status": "completed"}]
+
+
+def test_route_prompt_reserves_map_presentation_for_map_requests() -> None:
+    # The route model chose "both" for plain value questions (S09).
+    assert "text for value, comparison or fact questions" in CAPABILITY_ROUTE_SYSTEM_PROMPT
