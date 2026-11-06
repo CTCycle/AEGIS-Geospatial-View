@@ -182,3 +182,10 @@ def test_a_comparison_answer_cites_each_targets_value_or_their_difference() -> N
     assert not check_final_answer("Vienna is 9.2 °C and Prague 5.9 °C.", target_names=[], cite_groups=groups)
     assert not check_final_answer("Vienna is warmer by 3.3 °C.", target_names=[], cite_groups=groups)
     assert not check_final_answer("The strongest was M 6.1.", target_names=[], cite_groups=[[6.1, 4.0]])
+
+
+###############################################################################
+def test_a_rate_per_place_is_not_a_count_of_places() -> None:
+    for text in ("Sampled at one point per city.", "Two samples for each city.", "One value every location."):
+        assert not check_final_answer(text, target_names=[], feature_count=0)
+    assert check_final_answer("Two cities are marked.", target_names=[], feature_count=1)

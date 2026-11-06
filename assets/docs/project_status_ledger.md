@@ -1,6 +1,8 @@
 # Project Status Ledger
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
+
+**S12-T4 follow-up comparison (2026-11-06, unit-verified, not yet re-run live):** root cause taken from the recorded run `run_89f61a56` in `data/database.db`. The model's answer was thrown away by a false claim check (`claims 'one point per city' but only 0 verified`: the regex counted "per city" and a text turn on a basemap-only map was given `feature_count=0`), and the fallback then printed the alphabetically first fields. Fixed: a rate per place is not a count, an earlier map's emptiness is unknown on a text turn, transforms over several refs tag records with `source_place` and keep shared units, a comparison's figures and `cite_groups` come per source from those records (so they also work with no execution in the run), `temperature_2m` now names "current temperature", and `transform_evidence` accepts the nested path summaries show (`observations.temperature_2m`).
 
 The [2026-11-03 Wave 3 live validation](validation/live_eval_20261103_wave3.md) re-ran every Wave 2 non-PASS turn plus the Wave 3 framing, forecast-window, H-03 and discovery checks on the live UI against `develop@d4f4c1e2`, and the graded runner (38 scenarios per model).
 - **Counts:** DeepSeek 11 PASS / 3 PARTIAL / 5 FAIL / 2 BLOCKED of 21 turns; Beam Free 9 / 6 / 9 / 1 of 25. Turn sets differ from Wave 2, so the counts are indicative. Runner: DeepSeek 27 of 38 scenarios pass (Wave 2: 25), Beam 23 of 38 (22), no false-success flag; DeepSeek has no regression, Beam has three (unexposed-tool calls counted as invalid calls).

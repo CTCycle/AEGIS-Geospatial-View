@@ -93,6 +93,7 @@ from server.services.agent.completion import (
     describe_requirements,
     evidence_numbers,
     imagery_only_note,
+    key_names_variable,
     layer_edit_count,
     needs_numeric_values,
     requested_transform_unmet,
@@ -1392,22 +1393,32 @@ class AgentLoop:
             item for item in AgentLoop.completion_summary(state).obligations
             if item.kind == "analysis"
         ]
-        if analysis and (result is None or any(item.status != "met" for item in analysis)):
-            # Records of an unfinished analysis are not its answer: state the
-            # figures the obligations did deliver (disclosure names the rest).
+        if analysis and (
+            result is None or any(item.status != "met" or len(item.cite_groups) > 1 for item in analysis)
+        ):
+            # Records of an unfinished analysis are not its answer, nor are
+            # leading fields the answer to a comparison: state the figures the
+            # obligations delivered (disclosure names the rest).
             return AgentLoop.completion_summary(state).value_lines()
         if result is None:
             return AgentLoop._discovery_findings(state)
+        metric = state.route.analysis.metric if state.route and state.route.analysis else None
         lines: list[str] = []
         for item in json_array(json_object(result.data).get("preview"))[:5]:
             record = json_object(item)
             values = json_object(record.get("properties")) or record
             label = str(
-                values.get("place_label") or values.get("name") or values.get("label") or ""
+                values.get("place_label")
+                or values.get("source_place")
+                or values.get("name")
+                or values.get("label")
+                or ""
             ).strip()
             measures = [
                 f"{key.replace('_', ' ')} {value:g}"
-                for key, value in values.items()
+                for key, value in sorted(
+                    values.items(), key=lambda pair: not key_names_variable(pair[0], metric)
+                )
                 if isinstance(value, (int, float))
                 and not isinstance(value, bool)
                 and key not in {"latitude", "longitude", "id", "time", "elevation"}
@@ -1660,6 +1671,7 @@ class AgentLoop:
             route is not None and route.presentation in {"map", "both"}
         )
         layers = len(visible) if on_map else None
+        map_requested = route is not None and route.presentation in {"map", "both"}
         features: int | None = None
         if on_map:
             observation = state.render_observations[-1] if state.render_observations else None
@@ -1668,9 +1680,10 @@ class AgentLoop:
                 for item in (observation.overlay_results if observation else [])
                 if isinstance(value := item.get("rendered_feature_count"), int)
             ]
-            features = sum(counts) if counts else (0 if not visible else None)
+            # An earlier turn's empty map says nothing about a text answer's
+            # "the two cities"; only a requested map is known to be empty.
+            features = sum(counts) if counts else (0 if not visible and map_requested else None)
         summary = self.completion_summary(state)
-        map_requested = route is not None and route.presentation in {"map", "both"}
         violations = check_final_answer(
             candidate,
             target_names=targets,

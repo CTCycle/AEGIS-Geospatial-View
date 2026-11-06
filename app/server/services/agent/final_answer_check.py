@@ -9,7 +9,8 @@ _NUMBER_WORDS = {
 }
 _COUNT_CLAIM = re.compile(
     r"\b(?P<n>\d+|" + "|".join(_NUMBER_WORDS) + r"|both)\s+"
-    r"(?:[a-z-]+\s+){0,2}?"
+    # "one point per city" counts points, not cities.
+    r"(?:(?!per\b|each\b|every\b)[a-z-]+\s+){0,2}?"
     r"(?P<noun>layers?|markers?|overlays?|pins?|places?|locations?|cities|city)\b",
     re.IGNORECASE,
 )

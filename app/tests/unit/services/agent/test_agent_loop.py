@@ -15,8 +15,10 @@ from server.contracts.geospatial import (
     ViewportPolicy,
 )
 from server.domain.agent.context import AgentContextPackage
+from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
+    AgentAnalysisIntent,
     AgentGoal,
     AgentPhase,
     AgentRunState,
@@ -41,8 +43,9 @@ from server.services.agent.agent_loop import (
 )
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.completion import data_verified_empty
-from server.services.agent.tool_definitions import RouteRequestInput
+from server.services.agent.tool_definitions import RouteRequestInput, TransformEvidenceInput
 from server.services.agent.tool_executor import ToolExecutor
+from server.services.agent.tool_handlers.evidence import EvidenceToolHandler
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.vision_policy import TERMINAL_CALL_KIND
 from server.services.geospatial.render_capture import RenderCaptureStore
@@ -3142,3 +3145,162 @@ def test_verified_empty_data_ends_the_run_with_the_unpresented_map_disclosed() -
     assert data_verified_empty(state)
     answer = AgentLoop._with_disclosure(state, "No matching events were found.")  # pyright: ignore[reportPrivateUsage]
     assert "Not delivered: the requested map" in answer
+
+###############################################################################
+# Trimmed from the recorded S12 conversation (conv_9bf5e08a, turns 2-4): a text
+# follow-up on a basemap-only map, comparing the evidence of two earlier turns.
+_S12_VIENNA = "evidence_76ca50d1c7af4156ac776555fe5d748f"
+_S12_PRAGUE = "evidence_713f3125e3764d36a17578b319898f54"
+_S12_UNITS = {"temperature_2m": "°C", "precipitation": "mm", "relative_humidity_2m": "%"}
+_S12_PARENTS: dict[str, tuple[dict[str, str], dict[str, Any]]] = {
+    _S12_VIENNA: ({"location_ref": "vienna", "resolved_location": "Vienna, Austria"}, {
+        "category": "wind", "id": "openmeteo:wind:48.2084:16.3725", "latitude": 48.2083537,
+        "longitude": 16.3725042, "name": "Open-Meteo wind forecast", "precipitation": 0.0,
+        "precipitation_probability": 0, "relative_humidity_2m": 60, "source": "openmeteo",
+        "metadata": {"humidity": 60, "pressure": 1002.5, "units": _S12_UNITS},
+        "temperature_2m": 10.0, "weather_code": 1,
+    }),
+    _S12_PRAGUE: ({"location_ref": "prague, czechia", "resolved_location": "Prague, Czechia"}, {
+        "category": "wind", "id": "openmeteo:wind:50.0875:14.4213", "latitude": 50.0874654,
+        "longitude": 14.4212535, "name": "Open-Meteo wind forecast", "precipitation": 0.0,
+        "precipitation_probability": 0, "relative_humidity_2m": 72, "source": "openmeteo",
+        "metadata": {"humidity": 72, "pressure": 1002.9, "units": _S12_UNITS},
+        "temperature_2m": 6.7, "weather_code": 0,
+    }),
+}
+
+
+###############################################################################
+class _S12Evidence:
+    """Evidence store holding the two recorded parents."""
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.records = {
+            ref: (
+                AgentEvidenceSummary(
+                    evidence_id=ref, kind="vector", media_type="application/json", status="available",
+                    summary={
+                        "capability_id": "get_weather_forecast",
+                        "units": _S12_UNITS,
+                        "query": query,
+                        "coverage": {"type": "point", "spatial_scope_satisfied": True, "temporal_scope_satisfied": True},
+                        # The nested shape the model reads next to flat records.
+                        "observations": {"temperature_2m": feature["temperature_2m"]},
+                    },
+                    provenance={"capability_id": "get_weather_forecast", "provider_id": "openmeteo"},
+                    byte_size=1, map_eligibility="renderable",
+                ),
+                json.dumps({"features": [feature]}).encode(),
+            )
+            for ref, (query, feature) in _S12_PARENTS.items()
+        }
+
+    # -------------------------------------------------------------------------
+    def create(self, **kwargs: Any) -> AgentEvidenceSummary:
+        return AgentEvidenceSummary(
+            evidence_id="evidence_e00afa0ff5074a97a35f438ce807085b", kind=kwargs["kind"],
+            media_type=kwargs["media_type"], status=kwargs["status"], summary=kwargs["summary"],
+            provenance=kwargs["provenance"], byte_size=1, map_eligibility="renderable",
+        )
+
+    # -------------------------------------------------------------------------
+    def get_payload(self, ref: str, **kwargs: Any) -> tuple[AgentEvidenceSummary, bytes] | None:
+        return self.records.get(ref)
+
+
+###############################################################################
+async def _s12_turn_four() -> AgentLoopRequest:
+    """State of the recorded turn after its failed and its successful transform."""
+
+    question = "Which of the two is warmer, and by how many degrees?"
+    analysis = AgentAnalysisIntent(kind="rank", metric="current temperature", order="descending", top_k=2)
+    vienna = ResolvedLocation(label="Vienna, Austria", latitude=48.2083537, longitude=16.3725042)
+    state = AgentRunState(
+        request_id="run_89f61a56", conversation_id="conv_9bf5e08a", phase=AgentPhase.EVALUATE_STOP,
+        user_message=question, context_hydrated=True,
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute", presentation="text",
+            location_mode="none", analysis=analysis, operation="inspect",
+        ),
+        goal=AgentGoal(
+            goal=question, task_mode="execute", presentation="text", operation="inspect",
+            location_mode="none", analysis=analysis,
+            obligations=[
+                RequestObligation(id="data", kind="data"),
+                RequestObligation(id="analysis:rank", kind="analysis", variable="current temperature"),
+            ],
+        ),
+        completion_contract=CompletionContract(
+            operation="inspect", data_requirement="provider_data",
+            requirements=["result_locations_derived", "required_data_retrieved"],
+        ),
+        evidence_refs=[_S12_VIENNA, _S12_PRAGUE],
+        location_refs={
+            "vienna": vienna,
+            "prague, czechia": ResolvedLocation(label="Prague, Czechia", latitude=50.0874654, longitude=14.4212535),
+        },
+        active_map_session=MapSession(
+            session_id="candidate-373f8682",
+            resolved_location=vienna,
+            basemap_id="osm_default",
+            viewport=ViewportPolicy(center_latitude=48.2083537, center_longitude=16.3725042),
+            basemap={"id": "osm_default", "label": "OpenStreetMap"},
+            overlay_collection=OverlayCollectionState(),
+        ),
+    )
+    handler = EvidenceToolHandler(repository=_S12Evidence())  # type: ignore[arg-type]
+    for field in ("observations.temperature_2m", "temperature_2m"):
+        state.tool_results.append(await handler.transform(
+            TransformEvidenceInput.model_validate({
+                "evidence_refs": [_S12_VIENNA, _S12_PRAGUE],
+                "operations": [{"op": "sort", "field": field, "descending": True}, {"op": "limit", "value": 2}],
+            }),
+            state,
+        ))
+    return AgentLoopRequest(
+        provider="fake", model="fake-model", state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_s12_comparison_answer_survives_and_grounds_on_each_places_figure() -> None:
+    # The recorded run lost its answer to "claims 'one point per city' but only 0 verified".
+    draft = "Of the two cities, Vienna is warmer by 3.3 °C (10.0 °C vs 6.7 °C), from one point per city."
+    provider = FakeProvider([LLMResult(content=draft)])
+    request = await _s12_turn_four()
+
+    answer = await _loop(provider)._finalize_completed_request(request, provider, [])  # pyright: ignore[reportPrivateUsage]
+
+    assert answer == draft
+    analysis = next(
+        item for item in AgentLoop.completion_summary(request.state).obligations if item.kind == "analysis"
+    )
+    assert analysis.status == "met"
+    assert analysis.cite_groups == [[10.0], [6.7]]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_s12_irrelevant_answer_is_replaced_by_the_compared_figures() -> None:
+    irrelevant = "Top results:\n- Open-Meteo wind forecast: precipitation 0, precipitation probability 0"
+    provider = FakeProvider([LLMResult(content=irrelevant)])
+    request = await _s12_turn_four()
+
+    answer = await _loop(provider)._finalize_completed_request(request, provider, [])  # pyright: ignore[reportPrivateUsage]
+
+    assert "precipitation" not in answer and "Top results" not in answer
+    assert "Vienna, Austria: temperature 2m 10 °C" in answer
+    assert "Prague, Czechia: temperature 2m 6.7 °C" in answer
+    assert "difference 3.3 °C" in answer
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_s12_the_nested_path_a_summary_shows_addresses_the_flat_records() -> None:
+    request = await _s12_turn_four()
+    shown_path, _ = request.state.tool_results
+    assert shown_path.status == "success"
+    assert [record["temperature_2m"] for record in shown_path.data["preview"]] == [10.0, 6.7]

@@ -778,18 +778,25 @@ def evidence_numbers(state: AgentRunState) -> list[float]:
     return numbers[:_MAX_EVIDENCE_NUMBERS]
 
 ###############################################################################
-def _key_names_variable(key: str, variable: str | None) -> bool:
-    """Whether a payload key names the requested variable ("mag" for "magnitude")."""
+def key_names_variable(key: str, variable: str | None) -> bool:
+    """Whether a payload key names the variable.
 
-    name = re.sub(r"[^a-z0-9]", "", key.rsplit(".", 1)[-1].casefold())
-    wanted = re.sub(r"[^a-z0-9]", "", (variable or "").casefold())
-    return len(name) >= 3 and bool(wanted) and (name in wanted or wanted in name)
+    "mag" names "magnitude"; "temperature_2m" names "current temperature".
+    """
+
+    leaf = key.rsplit(".", 1)[-1].casefold()
+    asked = (variable or "").casefold()
+    name = re.sub(r"[^a-z0-9]", "", leaf)
+    wanted = re.sub(r"[^a-z0-9]", "", asked)
+    if len(name) >= 3 and wanted and (name in wanted or wanted in name):
+        return True
+    return bool(set(re.findall(r"[a-z]{3,}", leaf)) & set(re.findall(r"[a-z]{3,}", asked)))
 
 ###############################################################################
 def _statistic_values(statistics: dict[str, Any], variable: str | None, limit: int) -> list[str]:
     """Extremes of the summarised fields, with the record holding the maximum."""
 
-    keys = [key for key in statistics if _key_names_variable(key, variable)] or list(statistics)
+    keys = [key for key in statistics if key_names_variable(key, variable)] or list(statistics)
     values: list[str] = []
     for key in keys[:limit]:
         stat = json_object(statistics[key])
@@ -825,7 +832,7 @@ def _leading_values(result: ToolResult, limit: int = 3, variable: str | None = N
         if name and name not in seen and not name.endswith("_count"):
             seen.add(name)
             named.append((name, value))
-    named.sort(key=lambda item: not _key_names_variable(item[0], variable))
+    named.sort(key=lambda item: not key_names_variable(item[0], variable))
     return [
         f"{name.replace('_', ' ')} {value:g}{(' ' + unit) if (unit := result.metadata.units.get(name, '')) else ''}"
         for name, value in named[:limit]
@@ -839,8 +846,47 @@ def _value_numbers(result: ToolResult, variable: str | None) -> list[float]:
         (key, value) for key, value in _numeric_leaves(result.data)
         if key != "count" and not key.endswith("_count")
     ]
-    named = [value for key, value in leaves if _key_names_variable(key, variable)]
+    named = [value for key, value in leaves if key_names_variable(key, variable)]
     return (named or [value for _, value in leaves])[:_MAX_EVIDENCE_NUMBERS]
+
+###############################################################################
+def _source_figures(result: ToolResult, variable: str | None) -> tuple[list[str], list[list[float]]]:
+    """Each source's figure in a record set combined from several evidence refs.
+
+    Returns the labelled values and the figures per source. A comparison over
+    earlier turns has no execution in this run: only the combined records say
+    which figure belongs to which place. Fewer than two sources compare nothing.
+    """
+
+    values: list[str] = []
+    numbers: list[float] = []
+    unit = ""
+    groups: dict[str, list[float]] = {}
+    for item in json_array(json_object(result.data).get("preview")):
+        record = json_object(item)
+        fields = json_object(record.get("properties")) or record
+        source = str(fields.get("source_ref") or "")
+        named = [
+            (key, float(value)) for key, value in fields.items()
+            if key_names_variable(key, variable)
+            and isinstance(value, (int, float)) and not isinstance(value, bool)
+        ]
+        if not source or not named:
+            continue
+        key, number = min(named, key=lambda pair: len(pair[0]))
+        groups.setdefault(source, []).extend(value for _, value in named)
+        numbers.append(number)
+        unit = f" {result.metadata.units[key]}" if key in result.metadata.units else ""
+        label = next(
+            (str(fields[name]) for name in ("place_label", "source_place", *_RECORD_LABEL_KEYS) if fields.get(name)),
+            source,
+        )
+        values.append(f"{label}: {key.replace('_', ' ')} {number:g}{unit}")
+    if len(groups) < 2:
+        return [], []
+    if len(numbers) == 2:
+        values.append(f"difference {abs(numbers[0] - numbers[1]):g}{unit}")
+    return values, list(groups.values())
 
 ###############################################################################
 def _scoped_data_result(state: AgentRunState, target: str) -> ToolResult | None:
@@ -1124,13 +1170,19 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
             if obligation.kind == "analysis" and status == "met":
                 # A comparison cites each target's own figure (or their
                 # difference); any other analysis cites its result.
-                scoped = [_scoped_data_result(state, item) for item in obligation.target_ids]
-                sources = (
-                    [item for item in scoped if item is not None]
-                    if len(scoped) > 1
-                    else [result] if result is not None else []
+                figures, cite_groups = (
+                    _source_figures(result, obligation.variable) if result is not None else ([], [])
                 )
-                cite_groups = [_value_numbers(item, obligation.variable) for item in sources]
+                if figures:
+                    values = figures
+                else:
+                    scoped = [_scoped_data_result(state, item) for item in obligation.target_ids]
+                    sources = (
+                        [item for item in scoped if item is not None]
+                        if len(scoped) > 1
+                        else [result] if result is not None else []
+                    )
+                    cite_groups = [_value_numbers(item, obligation.variable) for item in sources]
         outcomes.append(ObligationOutcome(
             obligation_id=obligation.id, kind=obligation.kind, status=status,
             label=_obligation_label(obligation),
@@ -1266,6 +1318,7 @@ __all__ = [
     "describe_requirements",
     "RASTER_ONLY_CODE",
     "imagery_only_note",
+    "key_names_variable",
     "ledger_outcomes",
     "needs_numeric_values",
     "requested_transform_unmet",

@@ -186,8 +186,11 @@ class EvidenceToolHandler:
             parent_records = _records_from_payload(_decode_json(raw))
             if len(refs) > 1:
                 # Keep each record's origin so combined sets stay comparable.
+                place = json_object(summary.summary.get("query")).get("resolved_location")
                 for record in parent_records:
                     _properties(record)["source_ref"] = ref
+                    if place:
+                        _properties(record)["source_place"] = place
             records.extend(parent_records)
         records, outside_scope = _within_requested_country(records, state)
         operations = [operation.model_dump(mode="python") for operation in request.operations]
@@ -273,6 +276,7 @@ class EvidenceToolHandler:
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=[evidence_ref],
                 coverage=coverage,
+                units=_shared_units(parents),
             ),
         )
 
@@ -442,6 +446,16 @@ def _apply_operations(
         if op not in allowed:
             return result, "Only supported declarative evidence operations are allowed."
         field = str(operation.get("field") or "")
+        leaf = field.rsplit(".", 1)[-1]
+        if (
+            op in {"sort", "attribute_filter", "aggregate"}
+            and leaf != field
+            and not any(field in _properties(item) for item in result)
+            and any(leaf in _properties(item) for item in result)
+        ):
+            # Summaries show a measurement nested (observations.temperature_2m)
+            # where the evidence records keep it flat; the shown path is valid.
+            operation["field"] = field = leaf
         if (
             op in {"sort", "attribute_filter", "aggregate"}
             and field
@@ -719,6 +733,17 @@ def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) ->
     order_by = str(operation.get("order_by") or "count")
     # Cells without the ordering value sort last instead of as zero.
     return sorted(cells, key=lambda item: (item.get(order_by) is not None, item.get(order_by) or 0), reverse=True)
+
+###############################################################################
+def _shared_units(parents: list[dict[str, Any]]) -> dict[str, str]:
+    """Units every parent agrees on; a conflicting unit stays unknown."""
+
+    tables = [json_object(parent.get("units")) for parent in parents]
+    return {
+        key: unit
+        for key, unit in tables[0].items()
+        if isinstance(unit, str) and all(table.get(key) == unit for table in tables)
+    }
 
 ###############################################################################
 def _inherited_assessment(
