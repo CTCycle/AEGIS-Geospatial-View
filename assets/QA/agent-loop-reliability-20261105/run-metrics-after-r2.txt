@@ -1,0 +1,26 @@
+c1857f 1a5902 completed not_required dur=10s calls=5 tok=20470/684 tools=3 maps=0 failed=[] | What is the current temperature in Zurich? I 
+e6eca9 597d3a completed ready dur=4s calls=17 tok=194730/3131 tools=17 maps=4 failed=['apply_map_plan:failed', 'execute_geospatial_capability:failed', 'apply_map_plan:failed', 'execute_geospatial_capability:failed'] | Compare today's temperatures in Lugano and Mi
+2fa9f8 b94b3a completed ready dur=1s calls=2 tok=5929/170 tools=2 maps=1 failed=[] | Show the Brandenburg Gate on the map.
+01b6fa 60b387 completed ready dur=5s calls=2 tok=5813/155 tools=2 maps=1 failed=[] | Show me Rome on the map.
+0cb998 d9c792 completed not_required dur=2s calls=1 tok=2855/88 tools=1 maps=0 failed=['resolve_geospatial_location:failed'] | Show me Springfield.
+0cb998 01f484 completed ready dur=2s calls=4 tok=15432/402 tools=2 maps=1 failed=[] | The one in Massachusetts.
+196733 347f7d completed not_required dur=5s calls=2 tok=6490/382 tools=1 maps=0 failed=['resolve_geospatial_location:failed'] | How windy is it in Wellington right now, and 
+78325f 22b040 completed failed dur=17s calls=5 tok=26852/911 tools=4 maps=0 failed=['execute_geospatial_capability:valid_empty'] | Show earthquakes of magnitude 15 or higher fr
+6129dd 2e1992 completed ready dur=3s calls=9 tok=52189/1574 tools=6 maps=1 failed=['execute_geospatial_capability:failed'] | Show earthquakes of magnitude 4.5 or higher i
+6129dd 028735 completed not_required dur=5s calls=3 tok=23926/371 tools=1 maps=0 failed=[] | Which one was strongest?
+1827c8 40daf6 completed not_required dur=16s calls=5 tok=28693/1345 tools=8 maps=0 failed=[] | What are today's temperatures in Paris, Berli
+1827c8 69f542 completed not_required dur=9s calls=3 tok=47359/1109 tools=3 maps=0 failed=[] | Now compare precipitation instead.
+acdc5c f2f18d completed ready dur=4s calls=6 tok=32466/1061 tools=4 maps=1 failed=[] | Show earthquakes of magnitude 5 or higher in 
+acdc5c eb44a4 completed failed dur=12s calls=9 tok=94194/2374 tools=4 maps=3 failed=['apply_map_plan:failed'] | Same thing but only the last 24 hours.
+94f3b4 3bd15f completed ready dur=3s calls=2 tok=5850/145 tools=2 maps=1 failed=[] | Show me Lisbon on the map.
+94f3b4 99811d completed ready dur=21s calls=2 tok=11731/108 tools=2 maps=2 failed=[] | Show me Lisbon on the map.
+f8ad41 af9c44 completed ready dur=3s calls=2 tok=5829/150 tools=2 maps=1 failed=[] | Show me Vienna on the map.
+f8ad41 47e87c completed not_required dur=15s calls=4 tok=27446/763 tools=3 maps=0 failed=[] | What is the temperature in Vienna right now?
+f8ad41 5950e7 completed not_required dur=22s calls=5 tok=48494/778 tools=3 maps=0 failed=[] | And in Prague?
+f8ad41 8d9cfc completed not_required dur=30s calls=6 tok=82685/996 tools=2 maps=0 failed=['transform_evidence:failed'] | Which of the two is warmer, and by how many d
+f8ad41 175b47 completed ready dur=5s calls=3 tok=40040/328 tools=1 maps=1 failed=[] | Now show Prague on the map.
+c84ccc d4c9b9 completed failed dur=13s calls=8 tok=50671/1052 tools=7 maps=1 failed=['apply_map_plan:failed', 'transform_evidence:failed'] | Show me the current wildfire hotspots in Port
+27bd3b 10d7d0 completed not_required dur=5s calls=2 tok=5258/114 tools=0 maps=0 failed=[] | Write a haiku about autumn.
+e008e2 39b237 completed ready dur=2s calls=3 tok=9852/450 tools=2 maps=1 failed=[] | Show 46.0037, 8.9511 on the map and tell me w
+b65382 f23972 completed not_required dur=14s calls=3 tok=12599/421 tools=2 maps=0 failed=['describe_geospatial_capability:failed'] | Show the current weather radar over Tokyo.
+b65382 e89090 completed ready dur=3s calls=3 tok=12791/309 tools=1 maps=1 failed=[] | Remove that layer and just show Tokyo.

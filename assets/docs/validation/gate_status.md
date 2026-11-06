@@ -2,6 +2,13 @@
 
 Last updated: 2026-11-06
 
+## 2026-11-06 agent-loop reliability re-run after remediation R1-R3 (`develop@6e3404c8`)
+
+The [after-r2 report](../../QA/agent-loop-reliability-20261105/after-r2.md) compares baseline, `6c954aea` and `6e3404c8` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 runs, no model-provider 429).
+- Live UI **PARTIAL**: 12 PASS / 4 FAIL of 16 scenarios (baseline 7 / 9, first re-run 11 / 5); obligations 57 / 67 (51, 58).
+- False-success gate (target 0): **PASS**, 0 firm (S15 fixed). Partial misleading statements: S08-T1 names a wrong place ("Earthquakes, Waitaki District"), S16-T2 says a radar layer was removed that never existed.
+- Invalid tool calls **10** (first re-run 3, baseline 6): regression across S02, S08-T1, S10-T2, S12-T4, S13, S16-T1. S02 flipped to FAIL (1 / 5 obligations, 195k tokens). S10-T2 "World" target rejection unchanged. Cross-turn reuse 6 / 6.
+
 ## 2026-11-06 agent-loop reliability re-run (`develop@6c954aea`)
 
 The [after report](../../QA/agent-loop-reliability-20261105/after.md) re-runs the frozen 16-scenario suite from the [baseline](../../QA/agent-loop-reliability-20261105/baseline.md) on the exact lane `opencode-go / deepseek-v4.1-flash` (built-in browser, fresh conversation per scenario).
