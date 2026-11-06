@@ -913,6 +913,10 @@ class AgentRunState(BaseModel):
         default_factory=lambda: dict[str, int]()
     )
     consecutive_tool_failures: int = Field(default=0, ge=0)
+    # Transient provider failures per "capability|target": one retry is allowed.
+    transient_failures: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    # Targets whose data source kept failing, mapped to the capability that failed.
+    failed_data_targets: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
     route_corrections: int = Field(default=0, ge=0)
     # At most one revision per run: old route, new route and the evidence that
     # showed the first interpretation could not be executed.

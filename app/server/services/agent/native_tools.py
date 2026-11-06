@@ -71,6 +71,7 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.presentation_contract import FINE_LOCATION_TYPES
 from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.contracts.geospatial import ExecutionExtent
 
@@ -495,6 +496,8 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
 
     return execute
 
+POINT_PLACE_TYPES = FINE_LOCATION_TYPES | frozenset({"city", "town", "village", "municipality", "hamlet"})
+
 ###############################################################################
 def _bind_execute_request(
     request: ExecuteCapabilityInput, state: AgentRunState
@@ -526,7 +529,9 @@ def _bind_execute_request(
     follow_up = _is_follow_up_location(
         normalize_target_key(str(request.location_ref or "")), state
     )
-    if goal.location_mode == "search_area" and not follow_up:
+    if goal.location_mode == "search_area" and not follow_up and not _is_point_place(
+        _location_for_request(request, state)
+    ):
         updates["arguments"]["sampling"] = "area"
     temporal = goal.temporal_scope
     requirement = requirement_for_location(state, str(request.location_ref or ""))
@@ -723,6 +728,17 @@ def _names_goal_target(
         )
         for key, location in state.location_refs.items()
     )
+
+###############################################################################
+def _is_point_place(location: ResolvedLocation | None) -> bool:
+    """Whether a resolved target is a single place, queried as one point.
+
+    A per-place value request ("compare Lugano and Milan") is a point query by
+    contract even when the route also carries an analysis; only region-scale
+    targets are sampled as an area.
+    """
+
+    return location is not None and location.location_type in POINT_PLACE_TYPES
 
 ###############################################################################
 def _is_follow_up_location(requested: str, state: AgentRunState) -> bool:

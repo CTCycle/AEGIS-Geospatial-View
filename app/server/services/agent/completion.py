@@ -1040,6 +1040,10 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 status = "unmet"
             elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
                 status = "failed"
+            elif obligation.kind == "data" and target is not None and any(
+                location_ref_matches(target, name, name) for name in state.failed_data_targets
+            ):
+                status = "failed"
             else:
                 target_uncovered = obligation.kind == "data" and target is not None and any(
                     location_ref_matches(target, name, name) for name in uncovered

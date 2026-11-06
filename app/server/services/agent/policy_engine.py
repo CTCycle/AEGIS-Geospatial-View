@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from server.common.identifiers import normalize_target_key
 from server.common.typing import is_json_array, json_array, json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
@@ -107,6 +108,25 @@ class PolicyEngine:
                 allowed=False,
                 reason="Capability is not present in the catalog.",
                 metadata={"code": "unknown_capability"},
+            )
+
+        failed_id = state.failed_data_targets.get(
+            normalize_target_key(str(getattr(arguments, "location_ref", "") or ""))
+        )
+        failed = (
+            self.capability_registry.get_capability(failed_id)
+            if failed_id and self.capability_registry is not None
+            else None
+        )
+        if failed is not None and not _is_substitute(capability, failed):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=(
+                    "The source for this place failed and this capability does not supply the "
+                    "same variable and kind of data. Do not substitute it; answer with what "
+                    "was retrieved and state that this place's data could not be retrieved."
+                ),
+                metadata={"code": "not_a_substitute"},
             )
 
         if self.runtime_registry is not None:
@@ -231,6 +251,16 @@ class PolicyEngine:
             return state.active_map_session.resolved_location
         return None
 
+
+###############################################################################
+def _is_substitute(candidate: dict[str, Any], failed: dict[str, Any]) -> bool:
+    """Whether a source supplies the failed one's variable in the same kind of data."""
+
+    kind = "render_support"
+    return bool(_routing_hints(candidate) & _routing_hints(failed)) and (
+        json_object(candidate.get("executionContract")).get(kind)
+        == json_object(failed.get("executionContract")).get(kind)
+    )
 
 ###############################################################################
 def _declared_coverage(capability: dict[str, Any]) -> str:

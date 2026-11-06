@@ -714,7 +714,7 @@ def _failure_shape(error: Exception) -> tuple[Any, str, str, Any, bool, str | No
     if isinstance(error, ProviderRateLimitError):
         return (
             "rate_limit", "provider_rate_limit",
-            "The provider rate limit was reached.", "choose_alternate_tool", False, None,
+            "The provider rate limit was reached.", "retry_transport", False, None,
         )
     if isinstance(error, ProviderTimeoutError):
         return (
@@ -946,6 +946,9 @@ def _response_summary(
             summary["feature_preview"] = feature_preview
             summary["feature_preview_limit"] = 10
             summary["feature_preview_truncated"] = len(features) > len(feature_preview)
+    record_fields = _record_fields(features)
+    if record_fields:
+        summary["record_fields"] = record_fields
     if response.attribution:
         summary["attribution"] = [str(item)[:200] for item in response.attribution[:8]]
     if response.warnings:
@@ -1099,6 +1102,21 @@ def _response_summary(
         }
     return summary
 
+
+###############################################################################
+def _record_fields(features: Any) -> str:
+    """Property names a later evidence transform may sort or filter on."""
+
+    if not is_json_array(features):
+        return ""
+    names = {
+        key
+        for feature in features[:50]
+        if is_json_object(feature) and is_json_object(feature.get("properties"))
+        for key, value in feature["properties"].items()
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool)
+    }
+    return ", ".join(sorted(names))[:300]
 
 ###############################################################################
 def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:

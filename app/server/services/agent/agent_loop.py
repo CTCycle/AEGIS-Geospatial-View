@@ -136,6 +136,9 @@ _PROVIDER_FAILURE_TYPES = frozenset(
     {"timeout", "rate_limit", "provider_unavailable", "provider_malformed_response"}
 )
 
+# Transient source failures that earn one retry before the target is failed.
+_TRANSIENT_FAILURE_TYPES = frozenset({"timeout", "rate_limit"})
+
 # Tools whose successful results are evidence worth listing in a fallback.
 _EVIDENCE_TOOLS = frozenset(
     {
@@ -3519,7 +3522,11 @@ class AgentLoop:
                 # later, materially different correction.
                 state.prepared_map_action_fingerprint = None
             self._ensure_run_control(request)
-            self._apply_result(state, result)
+            self._apply_result(
+                state,
+                result,
+                target=normalize_target_key(str((call.arguments or {}).get("location_ref") or "")),
+            )
         if batch_needs_correction and all(result.status == "failed" for result in results):
             state.validation_corrections += 1
         if results and all(result.status == "failed" for result in results):
@@ -3596,15 +3603,33 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _apply_result(state: AgentRunState, result: ToolResult) -> None:
+    def _apply_result(state: AgentRunState, result: ToolResult, target: str = "") -> None:
         if not any(item.call_id == result.call_id for item in state.tool_results):
             state.tool_results.append(result)
         if result.status == "failed":
             state.consecutive_tool_failures += 1
+            transient_exhausted = False
             if (
                 result.error is not None
-                and result.error.recovery in {"choose_alternate_tool", "replan"}
+                and result.error.error_type in _TRANSIENT_FAILURE_TYPES
                 and result.tool_name == "execute_geospatial_capability"
+                and result.metadata.capability_id
+            ):
+                # A rate limit or timeout is retried once for the same source
+                # and target; a repeat fails that target's data for good.
+                key = f"{result.metadata.capability_id}|{target}"
+                state.transient_failures[key] = state.transient_failures.get(key, 0) + 1
+                if state.transient_failures[key] <= 1:
+                    return
+                transient_exhausted = True
+                if target:
+                    state.failed_data_targets[target] = result.metadata.capability_id
+            if result.tool_name == "execute_geospatial_capability" and (
+                transient_exhausted
+                or (
+                    result.error is not None
+                    and result.error.recovery in {"choose_alternate_tool", "replan"}
+                )
             ):
                 capability_id = result.metadata.capability_id
                 if (

@@ -445,11 +445,11 @@ def _apply_operations(
             # Ranking or filtering on an absent field would succeed silently
             # on the record order; the requested analysis is not applicable.
             available = sorted({key for item in result for key, value in _properties(item).items()
-                                if _numeric(value) is not None})[:16]
+                                if not isinstance(value, (dict, list))})[:24]
             return result, (
-                f"The evidence has no '{field}' field, so {op} cannot be applied. "
-                f"Numeric fields available: {', '.join(available) or 'none'}. "
-                "Retrieve the missing variable or state that it is unavailable."
+                f"No '{field}' field, so {op} cannot be applied. "
+                f"Fields: {', '.join(available) or 'none'}. "
+                "Use one of them, or say the variable is unavailable."
             )
         if op == "attribute_filter":
             field = str(operation.get("field") or "")
