@@ -2,6 +2,12 @@
 
 Last updated: 2026-11-06
 
+## 2026-11-06 agent-loop reliability re-run after remediation R7-R8 (`develop@a23254e4`)
+
+The [after-r4 report](../../QA/agent-loop-reliability-20261105/after-r4.md) compares baseline, `6c954aea`, `6e3404c8`, `080cc59a` and `a23254e4` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no 429, no data-provider rate limit).
+- Live UI **PARTIAL**: 13 PASS / 3 FAIL (fail: S12, S13, S16); obligations 63 / 67 (61 in r3). Firm false successes 0. Invalid tool calls 6 (r3 4). Tokens 779k in.
+- Fixed: S08-T2 (answers, 2 of 2 clean samples), S16-T2 (no loop, 2 of 2), S03 (street-level framing). Not fixed: S12-T4 (irrelevant "Top results" answer, 68k tokens). New: S13 unrelated IMERG fetch back, S09 unrequested maps and 101k-token T2.
+
 ## 2026-11-06 agent-loop reliability re-run after remediation R4-R6 (`develop@080cc59a`)
 
 The [after-r3 report](../../QA/agent-loop-reliability-20261105/after-r3.md) compares baseline, `6c954aea`, `6e3404c8` and `080cc59a` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no model-provider 429, no data-provider rate limit, so R6 rate-limit recovery was not exercised live).
