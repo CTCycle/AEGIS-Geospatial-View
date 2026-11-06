@@ -328,6 +328,39 @@ def test_nominatim_accepts_a_clearly_more_prominent_city_but_not_a_comparable_on
     assert len(ambiguous(0.6, 0.55)) == 2
 
 ###############################################################################
+def test_nominatim_dominance_follows_recorded_geocoder_importance() -> None:
+    # Importance values recorded from Nominatim for the bare queries.
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+
+    def ambiguous(query: str, places: list[tuple[str, str, str, float]]) -> list[dict[str, object]]:
+        return service._find_ambiguous_candidates(
+            [
+                _city_candidate(name, region, country, lat=index, confidence=0.75 - 0.01 * index, importance=importance)
+                for index, (name, region, country, importance) in enumerate(places)
+            ],
+            expected_location_type="city",
+            query=query,
+            has_parent_context=False,
+        )
+
+    assert ambiguous(
+        "Wellington",
+        [
+            ("Wellington", "Wellington", "New Zealand", 0.67),
+            ("Wellington", "Texas", "United States", 0.511),
+            ("Wellington", "Kansas", "United States", 0.486),
+        ],
+    ) == []
+    assert len(ambiguous(
+        "Springfield",
+        [
+            ("Springfield", "Illinois", "United States", 0.613),
+            ("Springfield", "Massachusetts", "United States", 0.611),
+            ("Springfield", "Missouri", "United States", 0.596),
+        ],
+    )) == 2
+
+###############################################################################
 def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     ranked = [

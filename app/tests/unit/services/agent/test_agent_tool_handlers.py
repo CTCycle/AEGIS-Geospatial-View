@@ -545,6 +545,42 @@ async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_data_subject_is_rejected_as_a_place_without_geocoding() -> None:
+    calls: list[object] = []
+
+    ###############################################################################
+    class CountingResolver:
+
+        # -------------------------------------------------------------------------
+        async def resolve_location_signals(self, signals, _memory):  # noqa: ANN001
+            calls.append(signals)
+            raise AssertionError("the subject word must not be geocoded")
+
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Show earthquakes worldwide.",
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="execute",
+            presentation="map",
+            location_mode="search_area",
+            capability_queries=["earthquakes"],
+            target_refs=["World"],
+        ),
+    )
+
+    result = await LocationToolHandler(resolver=CountingResolver()).resolve(  # type: ignore[arg-type]
+        ResolveLocationInput(query="Earthquakes"), state
+    )
+
+    assert calls == []
+    assert result.status == "failed"
+    assert result.error is not None and result.error.code == "not_a_place"
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_administrative_geometry_type_reaches_the_native_resolver() -> None:
     captured: list[str] = []
 

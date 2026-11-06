@@ -851,6 +851,28 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
 
 
 ###############################################################################
+def test_router_does_not_geocode_the_data_subject_and_keeps_a_world_target_alone() -> None:
+    decision = _router().validate_route(
+        _route(
+            location_mode="search_area",
+            capability_queries=["traffic"],
+            target_refs=["Traffics"],
+        ),
+        user_message="Show traffic worldwide.",
+        active_state=_state(),
+    )
+
+    assert decision.route.target_refs == ["World"]
+    assert "data_subject_not_a_place" in decision.reason_codes
+
+    named = _router().validate_route(
+        _route(capability_queries=["traffic Zurich", "traffic"], target_refs=["Zurich"]),
+        user_message="Show traffic in Zurich.",
+        active_state=_state(),
+    )
+    assert named.route.target_refs == ["Zurich"]
+
+###############################################################################
 def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resolution() -> None:
     state = _state()
     state.location_refs["austin"] = ResolvedLocation(

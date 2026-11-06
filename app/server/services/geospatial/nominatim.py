@@ -464,7 +464,7 @@ class NominatimService:
                 or (
                     first_confidence >= 0.7
                     and provider_importance_gap >= 0.15
-                    and second_importance <= 0.75 * first_importance
+                    and second_importance <= 0.8 * first_importance
                 )
             ):
                 return []

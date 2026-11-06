@@ -15,6 +15,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CapabilityRouteDecision,
     RouteObligation,
+    names_data_subject,
     places_named_in,
 )
 from server.domain.agent.decision import ResolvedLocation
@@ -441,6 +442,20 @@ class CapabilityRouter:
                 rejected_capability_ids=[],
                 reason_codes=list(dict.fromkeys([*reasons, *contract_reasons])),
             )
+        if proposed.primary_domain is not CapabilityDomain.MAP_STATE:
+            # A target that only repeats the requested data is not a place; a
+            # global request then falls back to World below.
+            subject_refs = [ref for ref in proposed.target_refs if names_data_subject(ref, proposed)]
+            if subject_refs:
+                proposed = proposed.model_copy(
+                    update={
+                        "target_refs": [r for r in proposed.target_refs if r not in subject_refs],
+                        "target_requirements": [
+                            r for r in proposed.target_requirements if r.target_ref not in subject_refs
+                        ],
+                    }
+                )
+                reasons.append("data_subject_not_a_place")
         active_map_update = is_active_map_update(proposed, active_state)
         if active_map_update and proposed.presentation == "text":
             # Mutating a displayed map requires the browser handshake even

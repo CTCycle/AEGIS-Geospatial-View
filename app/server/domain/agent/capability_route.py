@@ -540,6 +540,29 @@ def places_named_in(message: str, locations: dict[str, ResolvedLocation]) -> lis
     return named
 
 ###############################################################################
+def names_data_subject(query: str, route: CapabilityRoute) -> bool:
+    """True when a place query only repeats what the request asks about.
+
+    The data subject and capability terms of a route (a variable, an analysis
+    metric, a capability query) describe the data, not a place.  A query that
+    adds anything to such a term (for example a place name) is not the subject.
+    """
+
+    def tokens(value: str) -> set[str]:
+        return {
+            word[:-1] if len(word) > 3 and word.endswith("s") else word
+            for word in normalize_target_key(value).split()
+        }
+
+    asked = tokens(query)
+    terms = [
+        *(item.variable for item in route.obligations if item.kind in {"data", "analysis"}),
+        route.analysis.metric if route.analysis else None,
+        *route.capability_queries,
+    ]
+    return bool(asked) and any(asked == tokens(term) for term in terms if term)
+
+###############################################################################
 def derive_request_obligations(
     route: CapabilityRoute,
     *,

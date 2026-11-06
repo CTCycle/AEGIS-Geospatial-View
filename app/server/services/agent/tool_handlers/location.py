@@ -14,7 +14,7 @@ from server.common.typing import json_object
 from server.contracts.geospatial import ClientMapView
 from server.contracts.location import LocationSignal
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
-from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.capability_route import AgentRunState, names_data_subject
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -127,6 +127,16 @@ class LocationToolHandler:
                 )
             state.location_refs[target_key] = location
             return _success(location=location, target_key=target_key, started=started)
+        if state.route is not None and names_data_subject(query, state.route):
+            return _failure(
+                code="not_a_place",
+                message=(
+                    f'"{query}" names the requested data, not a place. Resolve '
+                    "only the place the user named, or World for a global request."
+                ),
+                recovery="correct_arguments",
+                started=started,
+            )
         query = _retain_user_stated_location_components(query, state.user_message)
 
         expected_type = str(request.expected_location_type or "city").casefold()
