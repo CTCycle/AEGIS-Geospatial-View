@@ -172,3 +172,13 @@ def test_a_layer_removal_claim_needs_a_committed_layer_edit() -> None:
     assert not check_final_answer(claim, target_names=[], layer_edits=1)
     assert not check_final_answer("No layer was removed.", target_names=[], layer_edits=0)
     assert not check_final_answer(claim, target_names=[])
+
+
+###############################################################################
+def test_a_comparison_answer_cites_each_targets_value_or_their_difference() -> None:
+    groups = [[9.2, 8.8], [5.9, 6.1]]
+    assert check_final_answer("Top results: wind forecast: precipitation 0", target_names=[], cite_groups=groups)
+    assert check_final_answer("Vienna is warmer.", target_names=[], cite_groups=groups)
+    assert not check_final_answer("Vienna is 9.2 °C and Prague 5.9 °C.", target_names=[], cite_groups=groups)
+    assert not check_final_answer("Vienna is warmer by 3.3 °C.", target_names=[], cite_groups=groups)
+    assert not check_final_answer("The strongest was M 6.1.", target_names=[], cite_groups=[[6.1, 4.0]])

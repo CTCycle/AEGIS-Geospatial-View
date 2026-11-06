@@ -56,6 +56,7 @@ _LAYER_EDIT_CLAIM = re.compile(
     re.IGNORECASE,
 )
 _LAYER_WORD = re.compile(r"\b(?:layers?|overlays?)\b", re.IGNORECASE)
+_ANY_NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?!\w)")
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
 
@@ -84,6 +85,14 @@ def value_is_supported(raw: str, unit: str, evidence: Sequence[float]) -> bool:
 
 
 # -----------------------------------------------------------------------------
+def _cites_any(cited: Sequence[str], values: Sequence[float]) -> bool:
+    for raw in cited:
+        tolerance = 0.5 * 10 ** -(len(raw.split(".")[1]) if "." in raw else 0) + 1e-9
+        if any(abs(float(raw) - value) <= tolerance for value in values):
+            return True
+    return False
+
+# -----------------------------------------------------------------------------
 def check_final_answer(
     text: str,
     *,
@@ -99,6 +108,7 @@ def check_final_answer(
     evidence_numbers: Sequence[float] = (),
     truncations: Sequence[tuple[int, int]] = (),
     layer_edits: int | None = None,
+    cite_groups: Sequence[Sequence[float]] = (),
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -116,7 +126,9 @@ def check_final_answer(
     the run's data carries, which numbers cited with a unit must match; and
     ``truncations`` are (shown, total) layers whose records were cut; and
     ``layer_edits`` counts the layers the committed map-state diff removed or
-    hid (``None`` skips the claim check).
+    hid (``None`` skips the claim check); and ``cite_groups`` are the figures an
+    analysis answer must cite: one of each group, or, for several groups, the
+    difference between two of them.
     """
 
     violations: list[str] = []
@@ -194,5 +206,14 @@ def check_final_answer(
             if not value_is_supported(raw, match.group("unit") or "", evidence_numbers):
                 violations.append(f"cites {match.group(0)!r}, which the evidence does not support")
                 break
+
+    groups = [group for group in cite_groups if group]
+    if groups:
+        cited = _ANY_NUMBER.findall(text)
+        differences = [abs(a - b) for i, first in enumerate(groups) for second in groups[i + 1 :] for a in first for b in second]
+        if not all(_cites_any(cited, group) for group in groups) and not (
+            len(groups) > 1 and _cites_any(cited, differences)
+        ):
+            violations.append("cites no value for the requested analysis although the evidence has them")
 
     return violations

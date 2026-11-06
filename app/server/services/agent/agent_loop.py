@@ -1388,6 +1388,14 @@ class AgentLoop:
             ),
             None,
         )
+        analysis = [
+            item for item in AgentLoop.completion_summary(state).obligations
+            if item.kind == "analysis"
+        ]
+        if analysis and (result is None or any(item.status != "met" for item in analysis)):
+            # Records of an unfinished analysis are not its answer: state the
+            # figures the obligations did deliver (disclosure names the rest).
+            return AgentLoop.completion_summary(state).value_lines()
         if result is None:
             return AgentLoop._discovery_findings(state)
         lines: list[str] = []
@@ -1504,7 +1512,7 @@ class AgentLoop:
             candidate
             or self._evidence_findings(request.state)
             or self._evidence_summary(request.state)
-            or "The requested work finished, but the model returned no answer text.",
+            or "No answer could be produced from the available results.",
         )
 
     # -------------------------------------------------------------------------
@@ -1557,10 +1565,13 @@ class AgentLoop:
         candidate = ""
         outcome = "empty"
         try:
-            result = await self._model_step(
-                request, provider, messages, [], call_kind=TERMINAL_CALL_KIND
-            )
-            if not result.tool_calls:
+            for attempt in range(2):
+                result = await self._model_step(
+                    request, provider, messages, [], call_kind=TERMINAL_CALL_KIND
+                )
+                if result.tool_calls:
+                    outcome = "tool_calls_suppressed"
+                    break
                 candidate, protocol_text_suppressed = (
                     self._sanitize_finalization_candidate(result.content)
                 )
@@ -1571,8 +1582,23 @@ class AgentLoop:
                     if candidate
                     else "empty"
                 )
-            else:
-                outcome = "tool_calls_suppressed"
+                if outcome != "empty" or attempt:
+                    break
+                # One bounded correction: an empty answer answers nothing.
+                messages.append({
+                    "role": "system",
+                    "content": json.dumps(
+                        {
+                            "observation_type": "empty_answer_correction",
+                            "instruction": (
+                                "Your answer was empty. Reply now in plain text, "
+                                "answering the user's question from the evidence "
+                                "and values already retrieved."
+                            ),
+                        },
+                        separators=(",", ":"),
+                    ),
+                })
         except (AgentRunControlSignal, asyncio.CancelledError):
             outcome = "cancelled"
             raise
@@ -1671,6 +1697,12 @@ class AgentLoop:
             evidence_numbers=evidence_numbers(state),
             truncations=summary.truncations,
             layer_edits=layer_edit_count(state) if on_map else None,
+            cite_groups=[
+                group
+                for item in summary.obligations
+                if item.kind == "analysis" and item.status == "met"
+                for group in item.cite_groups
+            ],
         )
         if not violations:
             return candidate

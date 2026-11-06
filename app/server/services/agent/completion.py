@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from datetime import UTC, datetime, time, timedelta
 
@@ -743,6 +744,8 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
 
 _COORDINATE_KEYS = frozenset({"latitude", "longitude", "lat", "lon", "lng", "id", "elevation"})
 _MAX_EVIDENCE_NUMBERS = 400
+# Record fields that name what a statistic's extreme record is.
+_RECORD_LABEL_KEYS = ("name", "title", "place", "label", "id")
 
 ###############################################################################
 def _numeric_leaves(value: object, key: str = "", depth: int = 0) -> list[tuple[str, float]]:
@@ -775,23 +778,81 @@ def evidence_numbers(state: AgentRunState) -> list[float]:
     return numbers[:_MAX_EVIDENCE_NUMBERS]
 
 ###############################################################################
-def _leading_values(result: ToolResult, limit: int = 3) -> list[str]:
-    """Name the first numeric facts of a result, with units where known."""
+def _key_names_variable(key: str, variable: str | None) -> bool:
+    """Whether a payload key names the requested variable ("mag" for "magnitude")."""
+
+    name = re.sub(r"[^a-z0-9]", "", key.rsplit(".", 1)[-1].casefold())
+    wanted = re.sub(r"[^a-z0-9]", "", (variable or "").casefold())
+    return len(name) >= 3 and bool(wanted) and (name in wanted or wanted in name)
+
+###############################################################################
+def _statistic_values(statistics: dict[str, Any], variable: str | None, limit: int) -> list[str]:
+    """Extremes of the summarised fields, with the record holding the maximum."""
+
+    keys = [key for key in statistics if _key_names_variable(key, variable)] or list(statistics)
+    values: list[str] = []
+    for key in keys[:limit]:
+        stat = json_object(statistics[key])
+        holder = json_object(stat.get("argmax"))
+        label = next((str(holder[name]) for name in _RECORD_LABEL_KEYS if holder.get(name)), "")
+        values.append(
+            f"{key.replace('_', ' ')} max {stat.get('max')}"
+            + (f" ({label})" if label else "")
+            + f", min {stat.get('min')}"
+        )
+    return values
+
+###############################################################################
+def _leading_values(result: ToolResult, limit: int = 3, variable: str | None = None) -> list[str]:
+    """Name the first numeric facts of a result, with units where known.
+
+    Facts naming the requested ``variable`` come first.
+    """
 
     data = json_object(result.data)
-    preview = json_array(data.get("preview"))
-    source = json_object(preview[0]) if preview else data
+    if result.tool_name == "inspect_evidence":
+        inspected = json_object(data.get("result"))
+        if "statistics" in inspected:
+            return _statistic_values(json_object(inspected["statistics"]), variable, limit)
+        records = json_array(inspected.get("records"))
+        source = json_object(records[0]) if records else {}
+    else:
+        preview = json_array(data.get("preview"))
+        source = json_object(preview[0]) if preview else data
     seen: set[str] = set()
-    values: list[str] = []
+    named: list[tuple[str, float]] = []
     for name, value in _numeric_leaves(source):
-        if not name or name in seen or name.endswith("_count"):
-            continue
-        seen.add(name)
-        unit = result.metadata.units.get(name, "")
-        values.append(f"{name.replace('_', ' ')} {value:g}{(' ' + unit) if unit else ''}")
-        if len(values) >= limit:
-            break
-    return values
+        if name and name not in seen and not name.endswith("_count"):
+            seen.add(name)
+            named.append((name, value))
+    named.sort(key=lambda item: not _key_names_variable(item[0], variable))
+    return [
+        f"{name.replace('_', ' ')} {value:g}{(' ' + unit) if (unit := result.metadata.units.get(name, '')) else ''}"
+        for name, value in named[:limit]
+    ]
+
+###############################################################################
+def _value_numbers(result: ToolResult, variable: str | None) -> list[float]:
+    """Numbers of a result that an answer about ``variable`` may cite."""
+
+    leaves = [
+        (key, value) for key, value in _numeric_leaves(result.data)
+        if key != "count" and not key.endswith("_count")
+    ]
+    named = [value for key, value in leaves if _key_names_variable(key, variable)]
+    return (named or [value for _, value in leaves])[:_MAX_EVIDENCE_NUMBERS]
+
+###############################################################################
+def _scoped_data_result(state: AgentRunState, target: str) -> ToolResult | None:
+    """The latest data result retrieved for ``target`` itself, if any."""
+
+    return next((
+        result for result in reversed(state.tool_results)
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status in {"success", "partial"}
+        and (named := _result_location_ref(result))
+        and location_ref_matches(target, named, named)
+    ), None)
 
 ###############################################################################
 def _map_layer_refs(session: MapSession) -> set[str]:
@@ -947,7 +1008,11 @@ def _truncations(state: AgentRunState) -> list[tuple[int, int]]:
 
 ###############################################################################
 def _obligation_result(state: AgentRunState, kind: ObligationKind, target: str | None) -> ToolResult | None:
-    tools = {"execute_geospatial_capability"} if kind == "data" else {"transform_evidence", "measure_geospatial"}
+    tools = (
+        {"execute_geospatial_capability"}
+        if kind == "data"
+        else {"transform_evidence", "measure_geospatial", "inspect_evidence"}
+    )
     candidates = [
         result for result in state.tool_results
         if result.tool_name in tools and result.status in {"success", "partial", "valid_empty"}
@@ -1017,6 +1082,7 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         evidence_ref: str | None = None
         values: list[str] = []
         must_name: list[str] = []
+        cite_groups: list[list[float]] = []
         status: ObligationStatus
         if obligation.kind == "presentation":
             status = "met" if map_state == "rendered" else "failed" if map_state == "failed" else "unmet"
@@ -1050,13 +1116,26 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 )
                 status = "met" if checks.get(requirement, False) and not target_uncovered else "unmet"
             result = None if obligation.kind == "location" else _obligation_result(state, obligation.kind, target)
-            if result is not None and status == "met":
+            # Retrieved figures stay deliverable when only a later analysis
+            # step failed.
+            if result is not None and (status == "met" or (obligation.kind == "data" and status == "failed")):
                 evidence_ref = result.evidence_refs[0] if result.evidence_refs else None
-                values = _leading_values(result)
+                values = _leading_values(result, variable=obligation.variable)
+            if obligation.kind == "analysis" and status == "met":
+                # A comparison cites each target's own figure (or their
+                # difference); any other analysis cites its result.
+                scoped = [_scoped_data_result(state, item) for item in obligation.target_ids]
+                sources = (
+                    [item for item in scoped if item is not None]
+                    if len(scoped) > 1
+                    else [result] if result is not None else []
+                )
+                cite_groups = [_value_numbers(item, obligation.variable) for item in sources]
         outcomes.append(ObligationOutcome(
             obligation_id=obligation.id, kind=obligation.kind, status=status,
             label=_obligation_label(obligation),
             evidence_ref=evidence_ref, values=values, answer_must_name=must_name,
+            cite_groups=cite_groups,
         ))
     return CompletionSummary(
         obligations=outcomes, map_state=map_state,

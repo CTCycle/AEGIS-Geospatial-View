@@ -141,6 +141,9 @@ class ObligationOutcome(BaseModel):
     values: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
     # Spellings the answer must use to name what this obligation asked for.
     answer_must_name: list[str] = Field(default_factory=lambda: list[str](), max_length=4)
+    # Figures an analysis answer must cite: one group per compared target (a
+    # figure of each group, or their difference) or a single group.
+    cite_groups: list[list[float]] = Field(default_factory=lambda: list[list[float]]())
 
 ###############################################################################
 class CompletionSummary(BaseModel):
@@ -176,6 +179,16 @@ class CompletionSummary(BaseModel):
         for shown, total in self.truncations:
             sentences.append(f"The map layer shows only {shown} of {total} records.")
         return " ".join(sentences)
+
+    # -------------------------------------------------------------------------
+    def value_lines(self) -> str:
+        """The figures of every delivered data and analysis obligation."""
+
+        return "\n".join(
+            f"- {item.label}: {', '.join(item.values)}"
+            for item in self.obligations
+            if item.values
+        )
 
     # -------------------------------------------------------------------------
     def model_view(self) -> dict[str, object]:

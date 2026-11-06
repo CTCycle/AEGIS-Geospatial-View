@@ -10,7 +10,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from server.common.identifiers import location_ref_matches
-from server.common.typing import is_json_array, is_json_object, json_array, json_object
+from server.common.typing import (
+    is_json_array,
+    is_json_object,
+    json_array,
+    json_object,
+    with_nested_scalars,
+)
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.tool_result import (
     ToolExecutionError,
@@ -332,7 +338,7 @@ def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
             value = payload.get(key)
             if is_json_array(value):
                 return [item for item in value if is_json_object(item)]
-        return [payload]
+        return [with_nested_scalars(payload)]
     return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
 
 ###############################################################################

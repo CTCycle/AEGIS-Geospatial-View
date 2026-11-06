@@ -16,6 +16,7 @@ from server.domain.agent.capability_route import (
     AgentTemporalScope,
     CapabilityRoute,
     TargetRequirement,
+    CompletionContract,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
@@ -421,3 +422,63 @@ def test_a_global_target_is_always_in_view_and_a_small_extent_is_a_fine_place() 
     city_view = [13.2, 52.45, 13.55, 52.6]
     assert PresentationContract(targets=[gate]).violations(city_view)
     assert not PresentationContract(targets=[gate]).violations([13.37, 52.51, 13.385, 52.522])
+
+
+###############################################################################
+def _comparison_state(*, with_transform: bool) -> AgentRunState:
+    state = _state(_compound_route(
+        analysis={"kind": "rank", "metric": "temperature"}, temporal_scope=AgentTemporalScope(),
+        target_requirements=[],
+    ))
+    state.completion_contract = CompletionContract(
+        operation="compare", requirements=["required_data_retrieved", "result_locations_derived"]
+    )
+    for ref, value in (("Rome", 14.2), ("Milan", 10.9)):
+        result = _evidence(ref, "2026-11-03T10:00:00+00:00")
+        result.data = {"kind": "weather_forecast", "query": {"location_ref": ref},
+                       "precipitation": 0.0, "temperature_2m": value}
+        state.tool_results.append(result)
+    if with_transform:
+        state.tool_results.append(ToolResult(
+            call_id="transform-1", tool_name="transform_evidence", status="success", summary="ok",
+            data={"preview": [{"place_label": "Rome", "temperature_2m": 14.2}]},
+            metadata=ToolExecutionMetadata(duration_ms=0, capability_id="openmeteo_weather_forecast"),
+        ))
+    return state
+
+
+###############################################################################
+def test_comparison_requires_each_targets_figure_and_fallback_is_not_top_results() -> None:
+    state = _comparison_state(with_transform=False)
+    summary = build_completion_summary(state, {"required_data_retrieved": True, "result_locations_derived": True})
+    analysis = next(item for item in summary.obligations if item.kind == "analysis")
+    assert [14.2 in group for group in analysis.cite_groups] == [True, False]
+    assert [10.9 in group for group in analysis.cite_groups] == [False, True]
+
+    # An unfinished analysis never falls back to unrelated record previews.
+    state = _comparison_state(with_transform=True)
+    state.tool_results.append(ToolResult(
+        call_id="transform-2", tool_name="transform_evidence", status="failed", summary="no field",
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    ))
+    state.context_hydrated = True
+    findings = AgentLoop._evidence_findings(state)  # pyright: ignore[reportPrivateUsage]
+    assert "Top results" not in findings
+    assert "14.2" in findings and "10.9" in findings
+
+
+###############################################################################
+def test_statistics_inspection_supplies_the_ranked_record_to_the_summary() -> None:
+    state = _comparison_state(with_transform=False)
+    state.tool_results.append(ToolResult(
+        call_id="inspect-1", tool_name="inspect_evidence", status="success", summary="ok",
+        data={"result": {"statistics": {"mag": {
+            "min": 1.0, "max": 6.1, "count": 40, "mean": 2.0,
+            "argmax": {"place": "Offshore Chile", "mag": 6.1},
+        }}}},
+        metadata=ToolExecutionMetadata(duration_ms=0),
+    ))
+    from server.services.agent.completion import _leading_values  # pyright: ignore[reportPrivateUsage]
+
+    values = _leading_values(state.tool_results[-1], variable="magnitude")
+    assert values == ["mag max 6.1 (Offshore Chile), min 1.0"]

@@ -1998,6 +1998,31 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_an_empty_final_answer_gets_one_correction_then_an_honest_fallback() -> None:
+    corrected = FakeProvider([LLMResult(content=""), LLMResult(content="Vienna is warmer.")])
+    request = AgentLoopRequest(
+        provider="fake", model="fake-model", state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+    answer = await _loop(corrected)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
+        request, corrected, []
+    )
+    assert answer == "Vienna is warmer."
+    assert len(corrected.requests) == 2
+
+    silent = FakeProvider([LLMResult(content=""), LLMResult(content=""), LLMResult(content="unused")])
+    request = AgentLoopRequest(
+        provider="fake", model="fake-model", state=_state(),
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
+    answer = await _loop(silent)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
+        request, silent, []
+    )
+    assert len(silent.requests) == 2
+    assert "finished" not in answer
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_model_cap_exhaustion_summarizes_gathered_evidence() -> None:
     provider = FakeProvider(
         [

@@ -18,7 +18,13 @@ from shapely.errors import GEOSException
 
 from server.common.identifiers import normalize_target_key
 from server.common.logging_handlers import log_unexpected_failure
-from server.common.typing import is_json_array, is_json_object, json_array, json_object
+from server.common.typing import (
+    is_json_array,
+    is_json_object,
+    json_array,
+    json_object,
+    with_nested_scalars,
+)
 from server.domain.agent.capability_route import ConversationTask
 from server.domain.agent.evidence import AgentEvidenceSummary, EvidenceKind, EvidenceStatus
 from server.domain.agent.task_ledger import freshness_seconds
@@ -946,7 +952,7 @@ def _response_summary(
             summary["feature_preview"] = feature_preview
             summary["feature_preview_limit"] = 10
             summary["feature_preview_truncated"] = len(features) > len(feature_preview)
-    record_fields = _record_fields(features)
+    record_fields = _record_fields(features, payload)
     if record_fields:
         summary["record_fields"] = record_fields
     if response.attribution:
@@ -1104,18 +1110,27 @@ def _response_summary(
 
 
 ###############################################################################
-def _record_fields(features: Any) -> str:
-    """Property names a later evidence transform may sort or filter on."""
+def _record_fields(features: Any, payload: dict[str, Any]) -> str:
+    """Field names a later evidence transform may sort or filter on.
 
-    if not is_json_array(features):
-        return ""
-    names = {
-        key
-        for feature in features[:50]
-        if is_json_object(feature) and is_json_object(feature.get("properties"))
-        for key, value in feature["properties"].items()
-        if isinstance(value, (str, int, float)) and not isinstance(value, bool)
-    }
+    Feature results expose their property names; a single-object result
+    exposes its numeric fields, nested ones by dotted path.
+    """
+
+    if is_json_array(features):
+        names = {
+            key
+            for feature in features[:50]
+            if is_json_object(feature) and is_json_object(feature.get("properties"))
+            for key, value in feature["properties"].items()
+            if isinstance(value, (str, int, float)) and not isinstance(value, bool)
+        }
+    else:
+        names = {
+            key
+            for key, value in with_nested_scalars(payload).items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        }
     return ", ".join(sorted(names))[:300]
 
 ###############################################################################
