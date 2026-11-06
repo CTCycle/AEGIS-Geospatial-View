@@ -2,6 +2,13 @@
 
 Last updated: 2026-11-06
 
+## 2026-11-06 agent-loop reliability re-run after remediation R11 (`develop@cf6447ec`)
+
+The [after-r6 report](../../QA/agent-loop-reliability-20261105/after-r6.md) compares baseline through `cf6447ec` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs plus 8 probes, no 429, no data-provider rate limit).
+- Live UI **PARTIAL**: 15 PASS / 1 FAIL (fail: S16, no closest alternative layer); obligations 66 / 67 (r5 63). Firm false successes 0, misleading answers 0, invalid tool calls 4, tokens 727k in (lowest so far).
+- Fixed: S14, S15 and S12-T5 fallback-text regressions (2 of 2 samples each); S12-T3/T4 correct in both samples ("Vienna is warmer — by 2.7 °C"). No regression against r5.
+- Open: S16 O1; S13 cost (82.5k tokens, 3 invalid calls); disclosure gaps for plotted-event truncation. R6 rate-limit recovery still unexercised live.
+
 ## 2026-11-06 agent-loop reliability re-run after remediation R9-R10 (`develop@10678b20`)
 
 The [after-r5 report](../../QA/agent-loop-reliability-20261105/after-r5.md) compares baseline through `10678b20` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no 429, no data-provider rate limit).
