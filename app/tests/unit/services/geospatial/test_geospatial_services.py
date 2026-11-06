@@ -1,6 +1,6 @@
 from __future__ import annotations
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.openmeteo import OpenMeteoService
+from server.services.geospatial.openmeteo import OpenMeteoService, zoned_observation_time
 from server.services.geospatial.overpass import OverpassService
 import math
 from typing import Any
@@ -14,6 +14,22 @@ from server.services.geospatial.providers import http as provider_http
 
 # --- test_direct_service_provenance.py ---
 
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("stamp", "payload", "expected"),
+    [
+        ("2026-11-07T03:45", {"utc_offset_seconds": 46800}, "2026-11-07T03:45:00+13:00"),
+        ("2026-11-07T03:45", {"utc_offset_seconds": 0}, "2026-11-07T03:45:00+00:00"),
+        ("2026-11-07T03:45", {}, "2026-11-07T03:45"),
+        ("2026-11-07T03:45+01:00", {"utc_offset_seconds": 46800}, "2026-11-07T03:45+01:00"),
+    ],
+)
+def test_openmeteo_local_observation_time_carries_the_point_utc_offset(
+    stamp: str, payload: dict[str, object], expected: str
+) -> None:
+    assert zoned_observation_time(stamp, payload) == expected
 
 
 ###############################################################################

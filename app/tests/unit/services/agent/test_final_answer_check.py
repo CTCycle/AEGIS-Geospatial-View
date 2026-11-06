@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
+from server.services.agent.completion import evidence_coordinates
 from server.services.agent.final_answer_check import check_final_answer
 
 
@@ -189,3 +192,25 @@ def test_a_rate_per_place_is_not_a_count_of_places() -> None:
     for text in ("Sampled at one point per city.", "Two samples for each city.", "One value every location."):
         assert not check_final_answer(text, target_names=[], feature_count=0)
     assert check_final_answer("Two cities are marked.", target_names=[], feature_count=1)
+
+
+###############################################################################
+def test_coordinates_of_inspected_records_are_supported_but_invented_ones_are_not() -> None:
+    # S08-T2: the strongest event's position sits under record keys that
+    # evidence_numbers skips, so a correct answer was replaced.
+    record = {"latitude": 34.9677, "longitude": 142.1175, "magnitude": 6.1}
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="r", conversation_id="c", user_message="Which one was strongest?"
+    )
+    state.tool_results.append(ToolResult(
+        call_id="1", tool_name="inspect_evidence", status="success", summary="Inspected.",
+        data={"result": {"statistics": {"magnitude": {"max": 6.1, "argmax": record}}}},
+        metadata=ToolExecutionMetadata(duration_ms=1),
+    ))
+    coordinates = evidence_coordinates(state)
+
+    def violations(text: str) -> list[str]:
+        return check_final_answer(text, target_names=[], evidence_numbers=[6.1], coordinates=coordinates)
+
+    assert not violations("M6.1 at 34.9677° N, 142.1175° E.")
+    assert violations("M6.1 at 35.5° N, 142.1175° E.")

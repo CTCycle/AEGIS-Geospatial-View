@@ -8,7 +8,7 @@ import math
 import re
 import threading
 import time
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any, cast
 from urllib.parse import urlencode
 
@@ -32,6 +32,29 @@ OPENMETEO_WEATHER_MAX_FORECAST_DAYS = 16
 OPENMETEO_AIR_QUALITY_MAX_FORECAST_DAYS = 7
 
 LOGGER = logging.getLogger(__name__)
+
+###############################################################################
+def zoned_observation_time(stamp: object, payload: dict[str, Any]) -> object:
+    """Attach the point's UTC offset to a local Open-Meteo timestamp.
+
+    With ``timezone=auto`` Open-Meteo reports local wall-clock times without an
+    offset, which downstream scope checks would read as UTC.
+    """
+
+    offset = payload.get("utc_offset_seconds")
+    if (
+        not isinstance(stamp, str)
+        or not isinstance(offset, (int, float))
+        or isinstance(offset, bool)
+    ):
+        return stamp
+    try:
+        parsed = datetime.fromisoformat(stamp)
+    except ValueError:
+        return stamp
+    if parsed.tzinfo is not None:
+        return stamp
+    return parsed.replace(tzinfo=timezone(timedelta(seconds=offset))).isoformat()
 
 ###############################################################################
 class OpenMeteoServiceError(Exception):
@@ -354,7 +377,7 @@ class OpenMeteoService:
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
             "resolved_at": fetched_at,
-            "observation_time": current.get("time"),
+            "observation_time": zoned_observation_time(current.get("time"), payload),
             "units": self._units(payload),
             "requested_variables": list(self.WEATHER_VARIABLES),
             "request_parameters": dict(params),
@@ -423,7 +446,7 @@ class OpenMeteoService:
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
             "resolved_at": fetched_at,
-            "observation_time": preview[0].get("time") if preview else None,
+            "observation_time": zoned_observation_time(preview[0].get("time"), payload) if preview else None,
             "units": self._units(payload),
             "requested_variables": list(self.AIR_QUALITY_VARIABLES),
             "request_parameters": dict(params),

@@ -491,12 +491,30 @@ class ToolExecutor:
         authorization = self._authorize(registered, arguments, state)
         if not authorization[0]:
             # A place outside a source's coverage is the user's call (another
-            # source or another place); other rejections are the model's.
+            # source or another place) unless a covering source for the same
+            # phenomenon exists: that one joins the shortlist and the model
+            # uses it. Other rejections are the model's.
+            policy_code = authorization[2].get("code")
+            alternative_id = str(authorization[2].get("alternative_id") or "")
+            if alternative_id:
+                state.capability_ids = list(
+                    dict.fromkeys([*state.capability_ids, alternative_id])
+                )
             recovery = (
                 "request_user_input"
-                if authorization[2] == "unavailable_coverage"
+                if policy_code == "unavailable_coverage" and not alternative_id
                 else "choose_alternate_tool"
             )
+            feedback = self._feedback_data(
+                "policy_rejection", tool_call, state, exposed_tool_names
+            )
+            if alternative_id:
+                feedback["substitution"] = {
+                    "rejected_name": str(authorization[2].get("rejected_name") or ""),
+                    "alternative_id": alternative_id,
+                    "alternative_name": str(authorization[2].get("alternative_name") or ""),
+                    "coverage": str(authorization[2].get("region") or ""),
+                }
             return self._failure(
                 call_id=call_id,
                 tool_name=tool_call.name,
@@ -508,9 +526,7 @@ class ToolExecutor:
                     retryable=False,
                     recovery=recovery,
                 ),
-                data=self._feedback_data(
-                    "policy_rejection", tool_call, state, exposed_tool_names
-                ),
+                data=feedback,
             )
 
         execution_stage = (
@@ -594,15 +610,15 @@ class ToolExecutor:
         tool: RegisteredTool,
         arguments: BaseModel,
         state: AgentRunState,
-    ) -> tuple[bool, str | None, str | None]:
-        """Return (allowed, reason, policy code)."""
+    ) -> tuple[bool, str | None, dict[str, Any]]:
+        """Return (allowed, reason, policy metadata: code and alternative)."""
 
         authorize = getattr(self.policy_engine, "authorize", None)
         if callable(authorize):
             result = authorize(tool, arguments, state)
             allowed = bool(getattr(result, "allowed", False))
-            code = json_object(getattr(result, "metadata", None)).get("code")
-            return allowed, getattr(result, "reason", None), str(code) if code else None
+            metadata = json_object(getattr(result, "metadata", None))
+            return allowed, getattr(result, "reason", None), metadata
         if state.route is not None:
             route_domains = {
                 state.route.primary_domain,
@@ -614,13 +630,13 @@ class ToolExecutor:
                 and CapabilityDomain.MIXED not in tool.domains
                 and not tool.domains.intersection(route_domains)
             ):
-                return False, "Tool is outside the validated capability route.", None
+                return False, "Tool is outside the validated capability route.", {}
         capability_id = getattr(arguments, "capability_id", None)
         if capability_id and capability_id in state.excluded_capability_ids:
-            return False, "Capability was excluded after a failed attempt in this run.", None
+            return False, "Capability was excluded after a failed attempt in this run.", {}
         if capability_id and state.capability_ids and capability_id not in state.capability_ids:
-            return False, "Capability is outside the validated shortlist.", None
-        return True, None, None
+            return False, "Capability is outside the validated shortlist.", {}
+        return True, None, {}
 
     # -------------------------------------------------------------------------
     @staticmethod

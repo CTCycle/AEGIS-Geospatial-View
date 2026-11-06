@@ -52,10 +52,12 @@ class _Policy:
         allowed: bool = True,
         reason: str = "blocked",
         code: str = "policy_rejection",
+        alternative_id: str = "",
     ) -> None:
         self.allowed = allowed
         self.reason = reason
         self.code = code
+        self.alternative_id = alternative_id
 
     # -------------------------------------------------------------------------
     def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
@@ -64,7 +66,11 @@ class _Policy:
             type(
                 "Authorization",
                 (),
-                {"allowed": self.allowed, "reason": self.reason, "metadata": {"code": self.code}},
+                {
+                    "allowed": self.allowed,
+                    "reason": self.reason,
+                    "metadata": {"code": self.code, "alternative_id": self.alternative_id},
+                },
             )(),
         )
 
@@ -419,6 +425,21 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     )
     assert coverage_result.error is not None
     assert coverage_result.error.recovery == "request_user_input"
+
+    alternative_state = _state()
+    alternative_result = asyncio.run(
+        ToolExecutor(
+            tool_registry=policy_registry,
+            policy_engine=_Policy(False, code="unavailable_coverage", alternative_id="global_radar"),
+        ).execute_tool(
+            LLMToolCall(id="alternative", name="test_tool", arguments={"value": 1}),
+            alternative_state,
+            _budget(),
+        )
+    )
+    assert alternative_result.error is not None
+    assert alternative_result.error.recovery == "choose_alternate_tool"
+    assert "global_radar" in alternative_state.capability_ids
 
     timeout_registry = ToolRegistry(runtime_registry=cast(Any, None))
     timeout_registry.register(_tool(handler))

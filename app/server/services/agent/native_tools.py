@@ -36,6 +36,7 @@ from server.services.agent.capability_execution import (
     ToolExecutionContext,
 )
 from server.services.agent.completion import (
+    analysis_unsupported,
     follow_up_location_keys,
     requirement_for_location,
     uncovered_map_targets,
@@ -846,7 +847,11 @@ def _map_plan_semantic_validator(
                 f"evidence_ref '{action.evidence_ref}' must exactly match a successful "
                 "evidence-producing tool result in the current run."
             )
-        if state.route is not None and state.route.analysis is not None:
+        if (
+            state.route is not None
+            and state.route.analysis is not None
+            and not analysis_unsupported(state)
+        ):
             derived_refs = {ref for result in state.tool_results
                             if result.tool_name == "transform_evidence"
                             and result.status == "success" for ref in result.evidence_refs}

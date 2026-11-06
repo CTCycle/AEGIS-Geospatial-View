@@ -73,16 +73,39 @@ def needs_numeric_values(state: AgentRunState) -> bool:
     )
 
 ###############################################################################
-def imagery_only_note(state: AgentRunState) -> str:
-    """Name the gap when only raster imagery answered a request for values."""
+def analysis_unsupported(state: AgentRunState) -> bool:
+    """Whether the route's analysis needs records that no available source returned.
 
-    if not needs_numeric_values(state) or state.route is None:
-        return ""
+    The route asks for values (a ranking, count or aggregate) and shows a map,
+    every shortlisted source has run, and each answered with raster imagery:
+    imagery carries no records to analyse, so the analysis is settled as
+    unsupported (disclosed, never silently dropped) and the imagery can be
+    shown. Sources that have not run yet may still return records, so the
+    analysis stays open until the shortlist is exhausted.
+    """
+
+    route = state.route
+    if route is None or route.presentation not in {"map", "both"} or not needs_numeric_values(state):
+        return False
+    executed = _imagery_only_executions(state)
+    settled = {result.metadata.capability_id for result in executed} | set(state.excluded_capability_ids)
+    return bool(executed and state.capability_ids) and set(state.capability_ids) <= settled
+
+###############################################################################
+def _imagery_only_executions(state: AgentRunState) -> list[ToolResult]:
+    """The run's capability executions when every one returned raster imagery, else none."""
+
     executed = [
         result for result in state.tool_results
         if result.tool_name == "execute_geospatial_capability" and result.status != "failed"
     ]
-    if not executed or any(result.metadata.result_type != "raster" for result in executed):
+    return [] if any(result.metadata.result_type != "raster" for result in executed) else executed
+
+###############################################################################
+def imagery_only_note(state: AgentRunState) -> str:
+    """Name the gap when only raster imagery answered a request for values."""
+
+    if not needs_numeric_values(state) or state.route is None or not _imagery_only_executions(state):
         return ""
     query = state.route.capability_queries[0] if state.route.capability_queries else ""
     aggregation = state.route.temporal_scope.aggregation
@@ -222,7 +245,7 @@ class CompletionEvaluator:
             "execute_geospatial_capability", "inspect_evidence", "transform_evidence"
         }]
         analysis = state.route is not None and state.route.analysis is not None
-        if needs_numeric_values(state):
+        if needs_numeric_values(state) and not analysis_unsupported(state):
             # Derived evidence inherits its parents' source; raster parents
             # cannot be transformed, so only located numeric records remain.
             results = [result for result in results if (
@@ -599,11 +622,12 @@ def uncovered_data_obligations(state: AgentRunState) -> list[str]:
     if contract is None or not contract.data_obligations:
         return []
     analysis = state.route is not None and state.route.analysis is not None
+    imagery_counts = not analysis_unsupported(state)
     covered: set[str] = set()
     for result in state.tool_results:
         if result.tool_name != "execute_geospatial_capability" or not result.metadata.covered_queries:
             continue
-        if analysis and result.metadata.result_type == "raster":
+        if analysis and imagery_counts and result.metadata.result_type == "raster":
             continue
         if _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), analysis):
             covered.update(result.metadata.covered_queries)
@@ -713,8 +737,13 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
 
     route = state.route
     targets = _obligation_targets(state, "presentation")
+    contract = state.completion_contract
     if (
         route is None
+        # Without required evidence no target has data a layer could carry
+        # (a framing or layer-removal map).
+        or contract is None
+        or not contract.evidence_required
         or route.analysis is not None
         or route.location_mode != "target"
         or route.presentation not in {"map", "both"}
@@ -742,7 +771,8 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
     return uncovered
 
 
-_COORDINATE_KEYS = frozenset({"latitude", "longitude", "lat", "lon", "lng", "id", "elevation"})
+_POSITION_KEYS = frozenset({"latitude", "longitude", "lat", "lon", "lng"})
+_COORDINATE_KEYS = _POSITION_KEYS | {"id", "elevation"}
 _MAX_EVIDENCE_NUMBERS = 400
 # Record fields that name what a statistic's extreme record is.
 _RECORD_LABEL_KEYS = ("name", "title", "place", "label", "id")
@@ -763,6 +793,40 @@ def _numeric_leaves(value: object, key: str = "", depth: int = 0) -> list[tuple[
         for item in json_array(value)[:200]:
             leaves.extend(_numeric_leaves(item, key, depth + 1))
     return leaves
+
+###############################################################################
+def _position_leaves(value: object, key: str = "", depth: int = 0) -> list[float]:
+    """Collect the latitude and longitude values the records of a payload carry."""
+
+    if depth > 6 or isinstance(value, bool):
+        return []
+    if isinstance(value, (int, float)):
+        return [float(value)] if key in _POSITION_KEYS else []
+    leaves: list[float] = []
+    if isinstance(value, dict):
+        for name, item in json_object(value).items():
+            leaves.extend(_position_leaves(item, str(name), depth + 1))
+    elif isinstance(value, list):
+        for item in json_array(value)[:200]:
+            leaves.extend(_position_leaves(item, key, depth + 1))
+    return leaves
+
+###############################################################################
+def evidence_coordinates(state: AgentRunState) -> list[float]:
+    """Latitudes and longitudes of the records the run's and earlier turns' evidence carries.
+
+    An answer may cite the position of a record it inspected or derived (the
+    strongest event); resolved places are checked separately.
+    """
+
+    values: list[float] = []
+    for result in state.tool_results:
+        if result.status != "failed" and result.tool_name != "resolve_geospatial_location":
+            values.extend(_position_leaves(result.data))
+    for item in state.relevant_tool_outcomes:
+        if item.get("evidence_id"):
+            values.extend(_position_leaves(item.get("summary")))
+    return values[:_MAX_EVIDENCE_NUMBERS]
 
 ###############################################################################
 def evidence_numbers(state: AgentRunState) -> list[float]:
@@ -1049,20 +1113,37 @@ def _map_state(state: AgentRunState) -> MapState:
     return "none"
 
 ###############################################################################
+def map_layer_counts(state: AgentRunState, session: MapSession) -> dict[str, tuple[int, int]]:
+    """(shown, total) per visible evidence layer instance: drawn features vs source records."""
+
+    counts: dict[str, tuple[int, int]] = {}
+    for instance in session.overlay_collection.instances:
+        ref = str(instance.descriptor.get("evidence_ref") or "")
+        features = json_object(instance.descriptor.get("data")).get("features")
+        if not instance.visible or not ref or not isinstance(features, list):
+            continue
+        # The newest result that counted this evidence; map-plan results also
+        # carry the ref but no count.
+        total = next(
+            (
+                value
+                for item in reversed(state.tool_results)
+                if ref in item.evidence_refs
+                for key in ("truncated_from", "feature_count", "record_count")
+                if isinstance(value := json_object(item.data).get(key), int) and value > 0
+            ),
+            0,
+        )
+        if total:
+            counts[instance.instance_id] = (len(json_array(features)), total)
+    return counts
+
+###############################################################################
 def _truncations(state: AgentRunState) -> list[tuple[int, int]]:
     session = state.prepared_map_session or state.active_map_session
-    layer_refs = _map_layer_refs(session) if session is not None else set[str]()
-    cuts: list[tuple[int, int]] = []
-    for result in state.tool_results:
-        data = json_object(result.data)
-        total = data.get("truncated_from")
-        if (
-            result.tool_name == "transform_evidence"
-            and isinstance(total, int)
-            and set(result.evidence_refs).intersection(layer_refs)
-        ):
-            cuts.append((int(data.get("record_count") or 0), total))
-    return cuts[-8:]
+    if session is None:
+        return []
+    return [(shown, total) for shown, total in map_layer_counts(state, session).values() if shown < total][-8:]
 
 ###############################################################################
 def _obligation_result(state: AgentRunState, kind: ObligationKind, target: str | None) -> ToolResult | None:
@@ -1134,6 +1215,26 @@ def _obligation_label(obligation: RequestObligation) -> str:
     return f"the requested {obligation.id.split(':')[-1].replace('_', ' ')}"
 
 ###############################################################################
+def _substitutions(state: AgentRunState) -> list[tuple[str, str, str]]:
+    """Covering sources that replaced a rejected one and then ran."""
+
+    executed = {
+        result.metadata.capability_id for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability" and result.status == "success"
+    }
+    substitutions: list[tuple[str, str, str]] = []
+    for result in state.tool_results:
+        record = json_object(json_object(result.data).get("substitution")) if result.status == "failed" else {}
+        if not record.get("alternative_id") or record["alternative_id"] not in executed:
+            continue
+        item = (
+            str(record.get("rejected_name")), str(record.get("coverage") or ""), str(record.get("alternative_name"))
+        )
+        if item not in substitutions:
+            substitutions.append(item)
+    return substitutions[:4]
+
+###############################################################################
 def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> CompletionSummary:
     """Turn the run's verified facts into per-obligation outcomes.
 
@@ -1190,6 +1291,8 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 status = "met" if known else "unmet"
             elif requirement is None:
                 status = "unmet"
+            elif obligation.kind == "analysis" and analysis_unsupported(state):
+                status = "unsupported"
             elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
                 status = "failed"
             elif obligation.kind == "data" and target is not None and any(
@@ -1231,7 +1334,8 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         ))
     return CompletionSummary(
         obligations=outcomes, map_state=map_state,
-        presentation_findings=findings, truncations=_truncations(state),
+        presentation_findings=findings, substitutions=_substitutions(state),
+        truncations=_truncations(state),
     )
 
 ###############################################################################
@@ -1358,6 +1462,7 @@ __all__ = [
     "presentation_contract",
     "describe_requirements",
     "RASTER_ONLY_CODE",
+    "analysis_unsupported",
     "imagery_only_note",
     "key_names_variable",
     "ledger_outcomes",
@@ -1367,4 +1472,5 @@ __all__ = [
     "uncovered_map_targets",
     "uncovered_data_obligations",
     "uncovered_route_targets",
+    "evidence_coordinates",
 ]

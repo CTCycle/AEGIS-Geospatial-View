@@ -628,6 +628,17 @@ class CapabilityRegistry:
         return list(self._ensure_snapshot().tools)
 
     # -------------------------------------------------------------------------
+    def list_capabilities(self) -> list[dict[str, Any]]:
+        snapshot = self._ensure_snapshot()
+        return [
+            *snapshot.basemaps,
+            *snapshot.overlays,
+            *snapshot.cameras,
+            *snapshot.transit,
+            *snapshot.tools,
+        ]
+
+    # -------------------------------------------------------------------------
     def covered_queries(self, capability_id: str, queries: Sequence[str]) -> list[str]:
         """Return the requested queries this capability's manifest can serve."""
 

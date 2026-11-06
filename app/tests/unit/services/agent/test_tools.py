@@ -1310,14 +1310,21 @@ def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None
     assert allowed.allowed is True
 
 ###############################################################################
-def test_coverage_rejection_explains_and_offers_the_shortlisted_same_phenomenon_source() -> None:
-    # S16-T1: a US-only radar for Tokyo; the reply must explain and offer the
-    # next shortlisted source that shares the phenomenon and covers Japan.
-    def radar(identifier: str, name: str, coverage: str, hints: list[str]) -> dict[str, Any]:
+def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -> None:
+    # S16-T1: a US-only radar for Tokyo; the rejection names the covering
+    # source (declared fallback, shortlisted, or any catalog substitute) and
+    # tells the model to use it and disclose the substitution.
+    def radar(
+        identifier: str, name: str, coverage: str, hints: list[str], fallback_ids: list[str] | None = None
+    ) -> dict[str, Any]:
         return {
             "id": identifier,
             "name": name,
-            "executionContract": {"coverage": coverage},
+            "executionContract": {
+                "coverage": coverage,
+                "render_support": "raster",
+                "fallback_ids": fallback_ids or [],
+            },
             "agenticUse": {"plannerHints": hints},
         }
 
@@ -1326,33 +1333,49 @@ def test_coverage_rejection_explains_and_offers_the_shortlisted_same_phenomenon_
         "global_roads": radar("global_roads", "Global Roads", "global", ["roads"]),
         "global_radar": radar("global_radar", "Global Radar", "global-partial", ["radar"]),
     }
-    registry = _registry()
     state = _state()
     state.route = _route()
-    state.capability_ids = ["us_radar", "global_roads", "global_radar"]
     state.location_refs = {
         "tokyo": ResolvedLocation(label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan")
     }
-    tool = registry.get("execute_geospatial_capability")
+    tool = _registry().get("execute_geospatial_capability")
     assert tool is not None
-    policy = PolicyEngine(
-        capability_registry=SimpleNamespace(get_capability=catalog.get),  # type: ignore[arg-type]
-        runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
-    )
 
-    rejected = policy.authorize(tool, ExecuteCapabilityInput(capability_id="us_radar"), state)
-    state.capability_ids = ["us_radar", "global_roads"]
-    unmatched = policy.authorize(tool, ExecuteCapabilityInput(capability_id="us_radar"), state)
+    def reject(source: dict[str, dict[str, Any]], shortlist: list[str]) -> Any:
+        state.capability_ids = shortlist
+        policy = PolicyEngine(
+            capability_registry=SimpleNamespace(  # type: ignore[arg-type]
+                get_capability=source.get, list_capabilities=lambda: list(source.values())
+            ),
+            runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
+        )
+        return policy.authorize(tool, ExecuteCapabilityInput(capability_id="us_radar"), state)
 
-    assert rejected.allowed is False
-    assert rejected.metadata["code"] == "unavailable_coverage"
-    assert rejected.metadata["alternative_id"] == "global_radar"
-    assert rejected.reason == (
+    shortlisted = reject(catalog, ["us_radar", "global_roads", "global_radar"])
+    # Not shortlisted: the catalog's substitute is still found.
+    discovered = reject(catalog, ["us_radar", "global_roads"])
+    declared_catalog = {
+        **catalog,
+        "us_radar": radar(
+            "us_radar", "US Radar", "united-states", ["radar"], fallback_ids=["global_roads", "global_radar"]
+        ),
+    }
+    # Declared fallbacks are tried first, and only one sharing the phenomenon qualifies.
+    declared = reject(declared_catalog, ["us_radar"])
+    without = reject({key: catalog[key] for key in ("us_radar", "global_roads")}, ["us_radar"])
+
+    for rejected in (shortlisted, discovered, declared):
+        assert rejected.allowed is False
+        assert rejected.metadata["code"] == "unavailable_coverage"
+        assert rejected.metadata["alternative_id"] == "global_radar"
+    assert shortlisted.reason == (
         "US Radar only covers United States, so it has no data for Tokyo, Japan. "
-        "Global Radar covers Tokyo, Japan for the same kind of data. Should I use it instead?"
+        "Global Radar covers Tokyo, Japan for the same kind of data and is now available: "
+        "use it instead, and tell the user plainly that US Radar only covers United States "
+        "and Global Radar is shown in its place."
     )
-    assert unmatched.metadata["alternative_id"] == ""
-    assert "No other source shortlisted for this request covers Tokyo, Japan" in str(unmatched.reason)
+    assert without.metadata["alternative_id"] == ""
+    assert "No other available source covers Tokyo, Japan" in str(without.reason)
 
 ###############################################################################
 def test_location_reference_never_falls_back_to_another_resolved_location() -> None:

@@ -35,7 +35,12 @@ MIN_RESULTS_IN_VIEW = 0.5
 GLOBAL_EXTENT_SPAN_DEGREES = 340.0
 
 MapState = Literal["rendered", "failed", "none"]
-ObligationStatus = Literal["met", "unmet", "failed"]
+# "unsupported": the only evidence is imagery, which carries no records to analyse.
+ObligationStatus = Literal["met", "unmet", "failed", "unsupported"]
+
+###############################################################################
+def substitution_sentence(rejected: str, coverage: str, alternative: str) -> str:
+    return f"{rejected} only covers {coverage or 'a limited area'}, so {alternative} is shown instead."
 
 ###############################################################################
 def is_fine_place(location_type: str | None, bbox: list[float] | None) -> bool:
@@ -166,6 +171,11 @@ class CompletionSummary(BaseModel):
     )
     map_state: MapState = "none"
     presentation_findings: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
+    # A rejected source replaced by a covering one that then ran.
+    # (rejected source, its coverage, covering source shown instead).
+    substitutions: list[tuple[str, str, str]] = Field(
+        default_factory=lambda: list[tuple[str, str, str]](), max_length=4
+    )
     # (shown, total) per layer whose records were cut by a limit.
     truncations: list[tuple[int, int]] = Field(default_factory=lambda: list[tuple[int, int]](), max_length=8)
 
@@ -177,13 +187,22 @@ class CompletionSummary(BaseModel):
     def disclosure(self) -> str:
         """Plain sentences for everything the user did not get."""
 
-        sentences: list[str] = []
+        sentences: list[str] = [substitution_sentence(*item) for item in self.substitutions]
         if self.map_state == "failed":
             sentences.append("The map could not be confirmed in the browser, so it is not shown as requested.")
         sentences.extend(
             f"Map check: {finding}." for finding in self.presentation_findings
         )
-        undelivered = [item.label or item.obligation_id for item in self.undelivered()]
+        unsupported = [item.label or item.obligation_id for item in self.obligations if item.status == "unsupported"]
+        if unsupported:
+            sentences.append(
+                "Only map imagery was available, which has no point or numeric records, so "
+                + "; ".join(unsupported)
+                + " could not be computed from records; the imagery is shown instead."
+            )
+        undelivered = [
+            item.label or item.obligation_id for item in self.undelivered() if item.status != "unsupported"
+        ]
         if undelivered:
             sentences.append("Not delivered: " + "; ".join(undelivered) + ".")
         for shown, total in self.truncations:
@@ -220,5 +239,6 @@ class CompletionSummary(BaseModel):
                 for item in self.obligations
             ],
             "presentation_findings": self.presentation_findings,
+            "substitutions": [substitution_sentence(*item) for item in self.substitutions],
             "truncated_layers": [f"{shown} of {total}" for shown, total in self.truncations],
         }

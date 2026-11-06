@@ -160,6 +160,9 @@ class PolicyEngine:
                     "coverage": coverage,
                     "country": location.country or "",
                     "alternative_id": str(alternative.get("id") or "") if alternative else "",
+                    "rejected_name": _capability_name(capability),
+                    "alternative_name": _capability_name(alternative) if alternative else "",
+                    "region": _coverage_region(coverage),
                 },
             )
 
@@ -209,10 +212,11 @@ class PolicyEngine:
     ) -> dict[str, Any] | None:
         """Return the next eligible source for the same phenomenon at ``location``.
 
-        Candidates are the manifest's own ``fallback_ids`` and then the run's
-        ranked shortlist; one qualifies when it is enabled and accessible, not
-        excluded, covers the place, and shares a routing hint (the phenomenon,
-        such as radar or precipitation) with the rejected capability.
+        Candidates are the manifest's own ``fallback_ids``, the run's ranked
+        shortlist, and finally any catalog source that substitutes for the
+        rejected one (same phenomenon and kind of data, ``_is_substitute``);
+        one qualifies when it is enabled and accessible, not excluded, and
+        covers the place.
         """
 
         if self.capability_registry is None:
@@ -222,19 +226,47 @@ class PolicyEngine:
         contract = json_object(capability.get("executionContract"))
         fallback_ids = [str(item) for item in json_array(contract.get("fallback_ids"))]
         for candidate_id in dict.fromkeys([*fallback_ids, *state.capability_ids]):
-            if candidate_id == rejected_id or candidate_id in state.excluded_capability_ids:
-                continue
             candidate = self.capability_registry.get_capability(candidate_id)
-            if candidate is None or not phenomena & _routing_hints(candidate):
-                continue
-            if self.runtime_registry is not None and not (
-                self.runtime_registry.is_enabled(candidate_id)
-                and self.runtime_registry.access_available(candidate_id)
+            if (
+                candidate is not None
+                and phenomena & _routing_hints(candidate)
+                and self._covers_place(candidate, rejected_id, location, state)
             ):
-                continue
-            if coverage_matches(_declared_coverage(candidate), location):
                 return candidate
-        return None
+        substitutes = [
+            item
+            for item in self.capability_registry.list_capabilities()
+            if json_object(item.get("executionContract")) and _is_substitute(item, capability)
+        ]
+        substitutes.sort(
+            key=lambda item: (-len(phenomena & _routing_hints(item)), str(item.get("id") or ""))
+        )
+        return next(
+            (
+                item
+                for item in substitutes
+                if self._covers_place(item, rejected_id, location, state)
+            ),
+            None,
+        )
+
+    # -------------------------------------------------------------------------
+    def _covers_place(
+        self,
+        candidate: dict[str, Any],
+        rejected_id: str,
+        location: ResolvedLocation,
+        state: AgentRunState,
+    ) -> bool:
+        candidate_id = str(candidate.get("id") or "")
+        if candidate_id == rejected_id or candidate_id in state.excluded_capability_ids:
+            return False
+        if self.runtime_registry is not None and not (
+            self.runtime_registry.is_enabled(candidate_id)
+            and self.runtime_registry.access_available(candidate_id)
+        ):
+            return False
+        return coverage_matches(_declared_coverage(candidate), location)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -278,6 +310,11 @@ def _capability_name(capability: dict[str, Any]) -> str:
     return str(capability.get("name") or label or capability.get("id") or "This source")
 
 ###############################################################################
+def _coverage_region(coverage: str) -> str:
+    words = coverage.replace("-", " ").replace("_", " ").split()
+    return " ".join(word.upper() if len(word) <= 3 else word.capitalize() for word in words)
+
+###############################################################################
 def _coverage_explanation(
     capability: dict[str, Any],
     coverage: str,
@@ -286,8 +323,7 @@ def _coverage_explanation(
 ) -> str:
     """User-facing reason a source cannot serve a place, with the next option."""
 
-    words = coverage.replace("-", " ").replace("_", " ").split()
-    region = " ".join(word.upper() if len(word) <= 3 else word.capitalize() for word in words)
+    region = _coverage_region(coverage)
     place = location.label
     text = (
         f"{_capability_name(capability)} only covers {region or 'a limited area'}, "
@@ -296,10 +332,12 @@ def _coverage_explanation(
     if alternative is not None:
         return (
             f"{text} {_capability_name(alternative)} covers {place} for the same kind "
-            "of data. Should I use it instead?"
+            "of data and is now available: use it instead, and tell the user plainly "
+            f"that {_capability_name(capability)} only covers {region or 'a limited area'} "
+            f"and {_capability_name(alternative)} is shown in its place."
         )
     return (
-        f"{text} No other source shortlisted for this request covers {place}. "
+        f"{text} No other available source covers {place}. "
         "Which other data should I show there?"
     )
 

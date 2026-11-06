@@ -545,6 +545,21 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     }
     assert "features" not in result.model_dump(mode="json")
 
+    # The answer names the layer with the drawn count, and flags a cut against the source count.
+    state.active_map_session = state.prepared_map_session
+    state.tool_results.append(ToolResult(
+        call_id="execute-hospitals", tool_name="execute_geospatial_capability", status="success",
+        summary="Found hospitals.", evidence_refs=["evidence:hospitals"], data={"feature_count": 1},
+        metadata=ToolExecutionMetadata(capability_id="places:hospitals", duration_ms=0),
+    ))
+    # The later map-plan result names the same evidence but carries no count.
+    state.tool_results.append(result)
+    assert "(1 record)" in AgentLoop._verified_map_fallback(state)  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop.completion_summary(state).truncations == []
+    state.tool_results[-2].data = {"feature_count": 91}
+    assert "(1 of 91 records shown)" in AgentLoop._verified_map_fallback(state)  # pyright: ignore[reportPrivateUsage]
+    assert AgentLoop.completion_summary(state).truncations == [(1, 91)]
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view() -> None:

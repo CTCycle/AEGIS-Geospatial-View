@@ -20,6 +20,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver, find_macro_region
 from server.services.geospatial.providers.base import ProviderUnavailableError
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -27,6 +28,7 @@ from server.contracts.location import LocationSignal
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult, ToolExecutionError
 from server.services.agent.capability_execution import _provider_params
+from server.services.agent.completion import presentation_contract
 from server.services.agent.completion import CompletionEvaluator, ledger_outcomes
 from server.domain.agent.task_ledger import merge_ledger
 from server.services.agent.tool_definitions import ExecuteCapabilityInput, TransformEvidenceInput, CapabilityDiscoveryInput, RouteRequestInput
@@ -1836,6 +1838,117 @@ async def _turn(
 
 
 ###############################################################################
+class _PlaceResolver:
+
+    # -------------------------------------------------------------------------
+    async def resolve_location_signals(self, signals: list[LocationSignal], *args: Any) -> ResolvedLocation:
+        label, country, kind, bbox = {
+            "Tokyo": ("Tokyo, Japan", "Japan", "city", [139.0, 34.9, 140.5, 35.9]),
+            "Portugal": ("Portugal", "Portugal", "country", [-9.5, 36.9, -6.2, 42.2]),
+        }[signals[0].raw_value]
+        return ResolvedLocation(
+            label=label, country=country, latitude=(bbox[1] + bbox[3]) / 2, longitude=(bbox[0] + bbox[2]) / 2,
+            location_type=kind, bbox=bbox,
+        )
+
+
+###############################################################################
+async def _raster_map_run(
+    message: str, route: dict[str, Any], place: str, capability: str, *, first_try: str | None = None
+) -> tuple[AgentRunState, list[str]]:
+    """Run route -> resolve -> (describe first_try) -> describe -> execute -> map with a keyless raster source."""
+
+    placed = place.lower()
+    providers = _FakeProviderRegistry()
+    calls = ["resolve_geospatial_location", "describe_geospatial_capability", "execute_geospatial_capability", "apply_map_plan"]
+    model = _ScriptedProvider([
+        _call("route", "route_request", route),
+        _call("resolve", calls[0], {"query": place, "target_id": place}),
+        *([_call("describe-first", calls[1], {"capability_id": first_try})] if first_try else []),
+        _call("describe", calls[1], {"capability_id": capability}),
+        _call("execute", calls[2], {"capability_id": capability, "location_ref": placed, "operation": "show"}),
+        _call("map", calls[3], {"expected_collection_revision": 0, "actions": [
+            {"action": "set_basemap", "capability_id": "osm_default"},
+            {"action": "add_evidence_layer", "capability_id": capability, "evidence_ref": "evidence-1"},
+        ]}),
+    ])
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="raster", conversation_id="raster", user_message=message,
+        context_hydrated=True,
+    )
+    await make_loop(model, providers, _PlaceResolver(), MemoryEvidence()).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+    return state, [request.capability_id for _, request in providers.requests]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_coverage_rejection_hands_over_to_the_covering_equivalent_and_maps_it() -> None:
+    # S16: NOAA radar covers only the US; its declared equivalent shows Tokyo.
+    route = {
+        "primary_domain": "data_retrieval", "secondary_domains": ["map_rendering"], "task_mode": "execute",
+        "presentation": "map", "location_mode": "target", "target_refs": ["Tokyo"], "operation": "show",
+        "capability_queries": ["weather radar"], "explicit_capability_ids": [],
+        "temporal_scope": {"mode": "current"},
+    }
+    state, fetched = await _raster_map_run(
+        "Show the current weather radar over Tokyo.", route, "Tokyo", "rainviewer_precipitation_radar",
+        first_try="noaa_radar",
+    )
+
+    rejection = next(item for item in state.tool_results if item.status == "failed")
+    assert rejection.error is not None and rejection.error.recovery == "choose_alternate_tool"
+    assert "RainViewer" in rejection.error.message and "only covers United States" in rejection.error.message
+    assert fetched == ["rainviewer_precipitation_radar"]
+    assert state.prepared_map_session is not None
+    assert [item.capability_id for item in state.prepared_map_session.overlay_collection.instances] == [
+        "rainviewer_precipitation_radar"
+    ]
+    assert [item.tool_name for item in state.tool_results if item.status == "failed"] == ["describe_geospatial_capability"]
+    summary = AgentLoop.completion_summary(state)
+    assert len(summary.substitutions) == 1
+    rejected_name, coverage, alternative_name = summary.substitutions[0]
+    sentence = f"{rejected_name} only covers {coverage}, so {alternative_name} is shown instead."
+    assert "RainViewer" in alternative_name and coverage == "United States"
+    assert summary.disclosure().startswith(sentence)
+    assert AgentLoop._with_disclosure(state, "The map is ready.").startswith("The map is ready.\n\n" + sentence)
+    stated = f"{rejected_name} is US-only; {alternative_name} is shown."
+    assert sentence not in AgentLoop._with_disclosure(state, stated)
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_imagery_only_evidence_on_an_analysis_route_is_mapped_and_the_analysis_disclosed_unsupported() -> None:
+    # S13: the only keyless fire source is raster imagery, so the hotspot
+    # analysis cannot be computed; the layer is still shown, without any
+    # unexposed or invalid tool call, and the answer discloses the gap.
+    route = {
+        "primary_domain": "data_retrieval", "secondary_domains": ["map_rendering"], "task_mode": "execute",
+        "presentation": "map", "location_mode": "search_area", "target_refs": ["Portugal"], "operation": "show",
+        "capability_queries": ["wildfire hotspots"], "explicit_capability_ids": [],
+        "analysis": {"kind": "hotspot", "metric": "wildfire hotspot intensity", "top_k": 25},
+        "temporal_scope": {"mode": "current", "granularity": "day"},
+    }
+    state, _ = await _raster_map_run(
+        "Show me the current wildfire hotspots in Portugal on the map.", route, "Portugal",
+        "MODIS_Combined_Thermal_Anomalies_Fire",
+    )
+
+    assert state.capability_ids == ["MODIS_Combined_Thermal_Anomalies_Fire"]
+    assert [item.status for item in state.tool_results] == ["success"] * 4
+    assert state.prepared_map_session is not None
+    assert [item.capability_id for item in state.prepared_map_session.overlay_collection.instances] == [
+        "MODIS_Combined_Thermal_Anomalies_Fire"
+    ]
+    summary = AgentLoop.completion_summary(state)
+    assert {item.kind: item.status for item in summary.obligations if item.kind in {"data", "analysis"}} == {
+        "data": "met", "analysis": "unsupported",
+    }
+    assert "Only map imagery was available" in summary.disclosure()
+    assert set(AgentLoop._pending_native_requirements(state)) <= {"render_verified"}
+
+
+###############################################################################
 def _executions(state: AgentRunState) -> list[ToolResult]:
     return [item for item in state.tool_results if item.tool_name == "execute_geospatial_capability"]
 
@@ -1999,3 +2112,134 @@ async def test_map_follow_up_to_a_text_answer_is_rerouted_to_the_place_and_gets_
     assert second.route is not None and second.route.target_refs == ["Paris"]
     assert second.prepared_map_session is not None
     assert second.prepared_map_session.resolved_location.label == "Paris"
+
+
+###############################################################################
+class _OffScopeProvider(DiscoveryProvider):
+
+    # -------------------------------------------------------------------------
+    async def fetch(self, provider: str, request: Any) -> ProviderResponse:
+        response = await super().fetch(provider, request)
+        coverage = {**(response.coverage or {}), "temporal_scope_satisfied": False}
+        return replace(response, coverage=coverage)
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_text_answer_ends_the_run_when_no_exposed_tool_can_close_the_pending_scope() -> None:
+    # S06: data was fetched but judged outside the requested window, and only
+    # describe_geospatial_capability remained exposed. Corrections cannot help.
+    model = _ScriptedProvider([
+        _call("route", "route_request", {**_city_weather_route("wind"), "target_refs": ["Paris"], "operation": "inspect"}),
+        _call("resolve", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
+        _call("execute", "execute_geospatial_capability",
+              {"capability_id": "openmeteo_weather_forecast", "location_ref": "Paris"}),
+        *(LLMResult(content="It is breezy in Paris.") for _ in range(4)),
+    ])
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="off-scope", conversation_id="off-scope",
+        user_message="How windy is it in Paris right now?", context_hydrated=True,
+    )
+    result = await make_loop(model, _OffScopeProvider(), CityResolver()).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+
+    assert AgentLoop._pending_native_requirements(state) == ["temporal_scope_applied"]
+    assert result.stopped_reason == "insufficient_evidence"
+    assert state.no_progress_corrections == 0
+    assert state.model_calls == 4
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize("complies", [True, False])
+async def test_stored_evidence_follow_up_gets_one_targeted_correction(complies: bool) -> None:
+    # S12: "which of the two is warmer" over stored evidence needs one
+    # transform_evidence; a model that stops without it is told exactly that
+    # once, then its answer stands instead of repeating blind corrections.
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _city_weather_route("temperature")),
+        _call("resolve-paris", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
+        _call("resolve-berlin", "resolve_geospatial_location", {"query": "Berlin", "target_id": "Berlin"}),
+        *_city_executions("temperature"),
+        *(LLMResult(content="Paris 9 C, Berlin 9 C.") for _ in range(3)),
+    ], message="What are today's temperatures in Paris and Berlin?",
+        providers=providers, evidence=evidence, request_id="t1")
+    fetched = len(providers.requests)
+    refs = list(first.evidence_refs)
+
+    model = _ScriptedProvider([
+        _call("route", "route_request", {
+            "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text", "location_mode": "none",
+            "operation": "inspect", "analysis": {"kind": "rank", "metric": "temperature", "top_k": 2}}),
+        LLMResult(content="Paris is warmer."),
+        *([_call("transform", "transform_evidence", {"evidence_refs": refs, "operations": [
+            {"op": "sort", "field": "precipitation_sum_mm", "descending": True}, {"op": "limit", "value": 2}]}),
+           LLMResult(content="Paris is warmer.")] if complies else [LLMResult(content="Paris is warmer.")] * 3),
+    ])
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="t2", conversation_id="ledger", user_message="Which is warmer?",
+        context_hydrated=True, location_refs=dict(first.location_refs), evidence_refs=refs,
+        prior_tasks=list(first.prior_tasks),
+    )
+    result = await make_loop(model, providers, CityResolver(), evidence).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+
+    correction = next(item for item in state.relevant_tool_outcomes if item["observation_type"] == "pending_requirements")
+    assert "transform_evidence" in correction["tools_that_close_pending"]
+    assert set(correction["evidence_refs"]) <= set(refs) and correction["evidence_refs"]
+    assert state.no_progress_corrections == 1
+    assert len(providers.requests) == fetched
+    assert [item.tool_name for item in state.tool_results].count("transform_evidence") == int(complies)
+    assert result.stopped_reason == ("goal_satisfied" if complies else "insufficient_evidence")
+    assert state.model_calls == (4 if complies else 3)
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_remove_layer_and_show_city_treats_the_layer_label_as_a_layer_not_a_place() -> None:
+    # S16-T2: the route keeps the shown layer's label next to the city; the label
+    # is a layer on the map, so it must not have to resolve as a place.
+    radar = {
+        "primary_domain": "data_retrieval", "secondary_domains": ["map_rendering"], "task_mode": "execute",
+        "presentation": "map", "location_mode": "target", "target_refs": ["Tokyo"], "operation": "show",
+        "capability_queries": ["weather radar"], "explicit_capability_ids": [],
+        "temporal_scope": {"mode": "current"},
+    }
+    first, _ = await _raster_map_run(
+        "Show the current weather radar over Tokyo.", radar, "Tokyo", "rainviewer_precipitation_radar",
+        first_try="noaa_radar")
+    assert first.prepared_map_session is not None
+    layer = first.prepared_map_session.overlay_collection.instances[0]
+
+    providers = _FakeProviderRegistry()
+    second = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="t2", conversation_id="radar-follow-up",
+        user_message="Remove that layer and just show Tokyo.", context_hydrated=True,
+        location_refs=dict(first.location_refs),
+        prior_tasks=merge_ledger([], ledger_outcomes(first, AgentLoop.completion_summary(first), now=datetime.now(UTC))),
+        active_map_session=first.prepared_map_session,
+    )
+    model = _ScriptedProvider([
+        _call("route", "route_request", {
+            "primary_domain": "map_state", "task_mode": "execute", "presentation": "map",
+            "location_mode": "target", "operation": "hide_layer", "target_refs": [layer.label, "Tokyo"],
+        }),
+        _call("resolve", "resolve_geospatial_location", {"query": "Tokyo", "target_id": "Tokyo"}),
+        _call("map", "apply_map_plan", {"expected_collection_revision": first.prepared_map_session.overlay_collection.revision, "actions": [
+            {"action": "remove_layer", "instance_id": layer.instance_id},
+            {"action": "set_viewport", "strategy": "fit_location"},
+        ]}),
+        *(LLMResult(content="The radar layer is removed and the map shows Tokyo.") for _ in range(3)),
+    ])
+    await make_loop(model, providers, _PlaceResolver(), MemoryEvidence()).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=second, budget=AgentExecutionBudget(total_seconds=10)))
+
+    assert providers.requests == []
+    assert second.prepared_map_session is not None
+    assert second.prepared_map_session.overlay_collection.instances == []
+    assert second.prepared_map_session.resolved_location.label == "Tokyo, Japan"
+    assert second.termination_reason == "awaiting_render"
+    # No data was requested, so the browser check must not demand a data layer per target.
+    contract = presentation_contract(second, second.prepared_map_session)
+    assert contract is None or contract.findings == []

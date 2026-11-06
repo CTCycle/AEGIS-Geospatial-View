@@ -130,6 +130,6 @@
     "limitations": [
       "Coverage is limited to the CONUS radar mosaic exposed by the public NOAA service."
     ],
-    "fallback_ids": []
+    "fallback_ids": ["rainviewer_precipitation_radar"]
   }
 }

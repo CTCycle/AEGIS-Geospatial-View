@@ -9,6 +9,7 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tools import RegisteredTool
 from server.services.agent.basemap_intent import names_centre, refers_to_layer
 from server.services.agent.completion import (
+    analysis_unsupported,
     requested_transform_unmet,
     uncovered_data_obligations,
     uncovered_route_targets,
@@ -18,7 +19,11 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 
 if TYPE_CHECKING:
-    from server.domain.agent.capability_route import AgentRunState, CapabilityRoute
+    from server.domain.agent.capability_route import (
+        AgentPhase,
+        AgentRunState,
+        CapabilityRoute,
+    )
     from server.contracts.geospatial import MapSession
 
 ###############################################################################
@@ -60,18 +65,24 @@ class ToolRegistry:
         return self._registered_tools.get(str(name).strip())
 
     # -------------------------------------------------------------------------
-    def expose(self, state: "AgentRunState") -> list[LLMToolDefinition]:
-        """Return only tools valid for the current native run state."""
+    def expose(
+        self, state: "AgentRunState", *, phase: "AgentPhase | None" = None
+    ) -> list[LLMToolDefinition]:
+        """Return only tools valid for the current native run state.
 
+        ``phase`` previews the exposure of another phase without recording it.
+        """
+
+        current_phase = phase or state.phase
         exposed: list[LLMToolDefinition] = []
         active_map_update = _is_active_map_update(state)
         for registered in self._registered_tools.values():
             if (
                 registered.visibility == "internal"
-                and state.phase.value != "route_request"
+                and current_phase.value != "route_request"
             ):
                 continue
-            if state.phase not in registered.phases:
+            if current_phase not in registered.phases:
                 continue
             if not _task_mode_allows_tool(registered, state):
                 continue
@@ -118,7 +129,7 @@ class ToolRegistry:
                     parameters_json_schema=schema,
                 )
             exposed.append(definition)
-            if len(state.exposure_trace) < 64:
+            if phase is None and len(state.exposure_trace) < 64:
                 state.exposure_trace.append(
                     {
                         "iteration": state.current_iteration,
@@ -281,6 +292,7 @@ def unresolved_route_targets(state: "AgentRunState") -> list[str]:
     place ("Brandenburg Gate") whose own resolution failed or was ambiguous.
     """
 
+    session = state.active_map_session
     return [
         str(target)
         for target in _route_location_targets(state)
@@ -288,6 +300,8 @@ def unresolved_route_targets(state: "AgentRunState") -> list[str]:
             location_ref_matches(str(target), str(key), location.label)
             for key, location in state.location_refs.items()
         )
+        # A target that spells out a layer already on the map is that layer.
+        and not (session is not None and _spells_layer(str(target), session))
     ]
 
 ###############################################################################
@@ -355,6 +369,18 @@ def _names_layer(target: str, session: "MapSession") -> bool:
     folded = target.casefold()
     return any(
         folded in name.casefold() or name.casefold() in folded
+        for instance in session.overlay_collection.instances
+        for name in (instance.instance_id, instance.capability_id, instance.label)
+        if name
+    )
+
+###############################################################################
+def _spells_layer(target: str, session: "MapSession") -> bool:
+    """Whether the target contains the full label or id of a layer on the map."""
+
+    folded = target.casefold()
+    return any(
+        name.casefold() in folded
         for instance in session.overlay_collection.instances
         for name in (instance.instance_id, instance.capability_id, instance.label)
         if name
@@ -484,7 +510,7 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
 ###############################################################################
 def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
-    if route is None:
+    if route is None or analysis_unsupported(state):
         return False
     return (route.analysis is not None or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
             or route.operation == "inspect_evidence")
@@ -519,6 +545,8 @@ def _history_recall_required(state: "AgentRunState") -> bool:
 ###############################################################################
 def _data_obligation_unmet(state: "AgentRunState") -> bool:
     if state.route is not None and state.route.analysis is not None:
+        if analysis_unsupported(state):
+            return False
         ids = {result.metadata.capability_id for result in state.tool_results
                if result.tool_name == "execute_geospatial_capability"
                and result.status in {"success", "partial", "valid_empty"}
@@ -573,7 +601,7 @@ def follow_up_investigation_open(state: "AgentRunState") -> bool:
 
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:
-    if state.route is None or state.route.analysis is None:
+    if state.route is None or state.route.analysis is None or analysis_unsupported(state):
         return True
     return any(
         result.tool_name == "transform_evidence"

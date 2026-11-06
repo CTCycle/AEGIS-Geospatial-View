@@ -91,10 +91,12 @@ from server.services.agent.completion import (
     build_completion_summary,
     data_verified_empty,
     describe_requirements,
+    evidence_coordinates,
     evidence_numbers,
     imagery_only_note,
     key_names_variable,
     layer_edit_count,
+    map_layer_counts,
     needs_numeric_values,
     prior_evidence_numbers,
     requested_transform_unmet,
@@ -190,6 +192,38 @@ _LIMIT_LABELS = {
     "transition_budget_exhausted": "state-transition limit",
     "no_progress": "repetition guard",
 }
+
+# Tools whose results can move each completion requirement. Scope checks are
+# judged on evidence, so only evidence-producing tools can close them.
+_SCOPE_EVIDENCE_TOOLS = frozenset(
+    {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}
+)
+_REQUIREMENT_TOOLS: dict[str, frozenset[str]] = {
+    "location_resolved": frozenset({"resolve_geospatial_location"}),
+    "search_area_bound": frozenset({"resolve_geospatial_location"}),
+    "capabilities_discovered": frozenset({"discover_geospatial_capabilities"}),
+    "result_locations_derived": frozenset({"transform_evidence"}),
+    "requested_transform_applied": frozenset({"transform_evidence"}),
+    "measurement_computed": frozenset({"measure_geospatial"}),
+    "evidence_inspected": frozenset({"inspect_evidence"}),
+    "required_data_retrieved": _SCOPE_EVIDENCE_TOOLS,
+    "temporal_scope_applied": _SCOPE_EVIDENCE_TOOLS | {"apply_map_plan"},
+    "spatial_scope_applied": _SCOPE_EVIDENCE_TOOLS | {"apply_map_plan"},
+    "map_candidate_prepared": frozenset({"apply_map_plan"}),
+    "locations_marked": frozenset({"apply_map_plan"}),
+    "render_verified": frozenset({"apply_map_plan"}),
+}
+
+###############################################################################
+def _layer_count_text(count: tuple[int, int] | None) -> str:
+    """" (91 records)" for a complete layer, " (25 of 91 records shown)" for a cut one."""
+
+    if count is None:
+        return ""
+    shown, total = count
+    if shown < total:
+        return f" ({shown} of {total} records shown)"
+    return f" ({total} record{'s' if total != 1 else ''})"
 
 ###############################################################################
 class AgentProvider(Protocol):
@@ -895,8 +929,28 @@ class AgentLoop:
             or state.no_progress_corrections >= request.max_no_progress_corrections
         ):
             return False
+        pending = self._pending_native_requirements(state)
+        last = state.relevant_tool_outcomes[-1] if state.relevant_tool_outcomes else {}
+        if (
+            pending
+            and state.no_progress_corrections
+            and last.get("observation_type") == "pending_requirements"
+            and last.get("pending_requirements") == pending
+        ):
+            # The model already got a correction naming exactly this gap and
+            # still issued no tool call: a repeat only spends another full
+            # context on the same answer.
+            return False
         state.no_progress_corrections += 1
-        correction = self._no_progress_correction(state)
+        correction = self._no_progress_correction(
+            state,
+            [
+                tool.name
+                for tool in self.tool_registry.expose(
+                    state, phase=AgentPhase.BUILD_TOOL_CONTEXT
+                )
+            ],
+        )
         state.relevant_tool_outcomes.append(correction)
         messages.append(
             {
@@ -1330,10 +1384,11 @@ class AgentLoop:
         basemap_label = str(
             basemap.get("label") or basemap.get("name") or session.basemap_id
         ).strip()
+        counts = map_layer_counts(state, session)
         layers = [
-            str(instance.label or instance.capability_id).strip()
+            label + _layer_count_text(counts.get(instance.instance_id))
             for instance in session.overlay_collection.instances
-            if instance.visible
+            if instance.visible and (label := str(instance.label or instance.capability_id).strip())
         ]
         marked = AgentLoop._marked_place_names(session)
         if marked:
@@ -1500,7 +1555,13 @@ class AgentLoop:
     def _with_disclosure(state: AgentRunState, text: str) -> str:
         """Append what the user did not get, unless the text already says it."""
 
-        note = AgentLoop.completion_summary(state).disclosure()
+        summary = AgentLoop.completion_summary(state)
+        lowered = text.casefold()
+        summary.substitutions = [
+            item for item in summary.substitutions
+            if not (item[0].casefold() in lowered and item[2].casefold() in lowered)
+        ]
+        note = summary.disclosure()
         return f"{text.rstrip()}\n\n{note}" if note and note not in text else text
 
     # -------------------------------------------------------------------------
@@ -1718,9 +1779,12 @@ class AgentLoop:
                 for group in item.cite_groups
             ],
             coordinates=[
-                value
-                for location in state.location_refs.values()
-                for value in (location.latitude, location.longitude)
+                *(
+                    value
+                    for location in state.location_refs.values()
+                    for value in (location.latitude, location.longitude)
+                ),
+                *evidence_coordinates(state),
             ],
             prior_numbers=prior_evidence_numbers(state),
         )
@@ -3786,7 +3850,9 @@ class AgentLoop:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _no_progress_correction(state: AgentRunState) -> dict[str, Any]:
+    def _no_progress_correction(
+        state: AgentRunState, tool_names: list[str]
+    ) -> dict[str, Any]:
         pending = AgentLoop._pending_native_requirements(state)
         render_failure = AgentLoop._first_render_failure(state)
         if render_failure is not None:
@@ -3816,7 +3882,7 @@ class AgentLoop:
                     "map plan or choose a supported renderable source."
                 ),
             }
-        return {
+        correction: dict[str, Any] = {
             "observation_type": "pending_requirements",
             "status": "action_required",
             "pending_requirements": pending,
@@ -3825,6 +3891,12 @@ class AgentLoop:
                 "contract. Select and execute the next required tool action."
             ),
         }
+        closing = AgentLoop._tools_closing_requirements(pending, tool_names)
+        if closing:
+            correction["tools_that_close_pending"] = closing
+        if state.evidence_refs:
+            correction["evidence_refs"] = list(state.evidence_refs[-4:])
+        return correction
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -4074,8 +4146,12 @@ class AgentLoop:
                 # which place or data to show is a clarification, not a stall.
                 return "clarification_required", text
             if pending:
+                # A correction only helps when an exposed tool can close the
+                # gap; otherwise the answer is the truthful partial outcome.
                 return (
-                    "no_progress" if tools else "insufficient_evidence",
+                    "no_progress"
+                    if AgentLoop._tools_closing_requirements(pending, tools)
+                    else "insufficient_evidence",
                     text,
                 )
             if route.presentation in {"map", "both"}:
@@ -4651,6 +4727,25 @@ class AgentLoop:
             render_verified=state.render_verified,
         )
         AgentLoop._initialize_task_state_for_route(state, route)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _tools_closing_requirements(
+        pending: list[str], tool_names: list[str]
+    ) -> list[str]:
+        """Exposed tools whose results can move a pending requirement.
+
+        A requirement outside the table is treated as closable by any tool,
+        so an unknown obligation never ends a run early.
+        """
+
+        closing: set[str] = set()
+        for requirement in pending:
+            tools = _REQUIREMENT_TOOLS.get(requirement)
+            if tools is None:
+                return list(tool_names)
+            closing |= tools
+        return [name for name in tool_names if name in closing]
 
     # -------------------------------------------------------------------------
     @staticmethod
