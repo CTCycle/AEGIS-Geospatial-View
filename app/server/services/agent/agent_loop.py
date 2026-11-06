@@ -1732,6 +1732,7 @@ class AgentLoop:
             kind="finalization_completed",
             outcome="answer_replaced",
             violations=violations,
+            rejected_answer=candidate,
         )
         return ""
 
@@ -1767,8 +1768,13 @@ class AgentLoop:
         kind: Literal["finalization_started", "finalization_completed"],
         outcome: str | None = None,
         violations: list[str] | None = None,
+        rejected_answer: str | None = None,
     ) -> None:
-        """Expose the tools-disabled finalization boundary without content."""
+        """Expose the tools-disabled finalization boundary.
+
+        The only content is an answer the gate rejected, which no other record
+        keeps and which replaying a gate decision needs.
+        """
 
         state = request.state
         payload: dict[str, Any] = {
@@ -1781,6 +1787,8 @@ class AgentLoop:
             payload["outcome"] = outcome
         if violations:
             payload["final_answer_violations"] = violations
+        if rejected_answer is not None:
+            payload["rejected_answer"] = rejected_answer
         await self._emit_trace(
             request,
             AgentTraceEvent(

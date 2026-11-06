@@ -6,10 +6,11 @@ Read-only against the runtime database. Run from the repository root:
         assets/QA/agent-loop-reliability-20261105/extract_final_answer_corpus.py
 
 A case pairs one run's last checkpoint (the inputs of the gate) with an answer
-and a human verdict. The run events never store the model text of a replaced
-answer, only its violations, so each case states where its candidate came from:
+and a human verdict. Runs up to r5 stored only the violations of a replaced
+answer, not its text (later runs keep it as ``rejected_answer`` in the
+finalization trace), so each case states where its candidate came from:
 
-- ``recorded``: this run's own delivered model text, server disclosure removed.
+- ``recorded``: this run's own model text, rejected or delivered (server disclosure removed).
 - ``other_sample``: the model text another recorded run gave to the same request.
 - ``reconstructed``: minimal text around the fragment the recorded violation quotes.
 - ``synthetic_guard``: invented false claim that guards a loosened check.
@@ -86,7 +87,7 @@ class Store:
         ).fetchone()
         run: dict[str, Any] = {
             "id": run_id, "request": request, "answer": "", "state": None,
-            "outcomes": [], "reasons": [], "violations": [],
+            "outcomes": [], "reasons": [], "violations": [], "rejected_answer": "",
         }
         rows = self.db.execute(
             "select type, payload_json from agent_run_events where run_id = ? order by sequence", (run_id,)
@@ -104,12 +105,13 @@ class Store:
                 else:
                     run["reasons"].append(detail.get("reason"))
                 run["violations"].extend(detail.get("final_answer_violations", []))
+                run["rejected_answer"] = detail.get("rejected_answer") or run["rejected_answer"]
         return run
 
     # -------------------------------------------------------------------------
     def model_text(self, prefix: str) -> str:
         run = self.run(prefix)
-        return _DISCLOSURE_TAIL.sub("", run["answer"]).strip()
+        return run["rejected_answer"] or _DISCLOSURE_TAIL.sub("", run["answer"]).strip()
 
 
 ###############################################################################

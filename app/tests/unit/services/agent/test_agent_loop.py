@@ -2121,6 +2121,7 @@ async def test_completed_request_stores_the_deterministic_text_when_the_answer_o
     assert "fully completed" not in answer
     replaced = [e for e in events if e.payload.get("outcome") == "answer_replaced"]
     assert replaced and replaced[0].payload["final_answer_violations"]
+    assert replaced[0].payload["rejected_answer"] == "Everything was fully completed for Rome."
 
 ###############################################################################
 @pytest.mark.asyncio
