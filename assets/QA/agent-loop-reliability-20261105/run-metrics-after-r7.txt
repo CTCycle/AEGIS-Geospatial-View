@@ -1,0 +1,36 @@
+# run-metrics-after-r7: develop@d7d266af + uncommitted R12 (batches 1-3 + map_layer_counts fix), 2026-11-06.
+# Lines 1-26 are the judged runs (one per scenario turn). PRE-FIX: S08-T1 before the map_layer_counts lookup fix (backend restarted). PROBE-A: after the layer-label fix only; PROBE-B: after all post-suite fixes (layer label, record coordinates, evidence-gated per-target layers, substitution disclosure).
+0bb2cb 04a31b completed not_required dur=13s calls=5 tok=20553/700 tools=3 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | What is the current temperature in Zurich? I 
+2bf2b9 9f8944 completed ready dur=20s calls=7 tok=52773/1572 tools=7 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Compare today's temperatures in Lugano and Mi
+e50dd6 b01fd6 completed ready dur=5s calls=2 tok=5873/189 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show the Brandenburg Gate on the map.
+5717ca 7b9055 completed ready dur=6s calls=2 tok=5826/142 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me Rome on the map.
+8a0aff a3b06c completed not_required dur=2s calls=1 tok=2854/86 tools=1 maps=0 failed=['resolve_geospatial_location:failed'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me Springfield.
+8a0aff 792615 completed ready dur=12s calls=4 tok=15444/398 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | The one in Massachusetts.
+ddea34 fff743 completed not_required dur=25s calls=5 tok=23528/1084 tools=5 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | How windy is it in Wellington right now, and 
+054d62 788c83 completed failed dur=11s calls=5 tok=24532/716 tools=3 maps=0 failed=['execute_geospatial_capability:valid_empty'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show earthquakes of magnitude 15 or higher fr
+10ecac 4f99ea completed ready dur=21s calls=7 tok=37398/1390 tools=4 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show earthquakes of magnitude 4.5 or higher i
+10ecac b2956e completed not_required dur=8s calls=3 tok=23053/469 tools=1 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Which one was strongest?
+ee0bb8 472be5 completed not_required dur=19s calls=5 tok=28990/1314 tools=8 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | What are today's temperatures in Paris, Berli
+ee0bb8 0fb3bb completed not_required dur=26s calls=4 tok=66683/1259 tools=5 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Now compare precipitation instead.
+1b7171 211183 completed ready dur=13s calls=6 tok=33679/1099 tools=4 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show earthquakes of magnitude 5 or higher in 
+1b7171 bc7c89 completed ready dur=9s calls=4 tok=33684/905 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Same thing but only the last 24 hours.
+844f22 346837 completed ready dur=4s calls=2 tok=5812/157 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me Lisbon on the map.
+844f22 3ed493 completed ready dur=4s calls=2 tok=11757/121 tools=2 maps=2 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me Lisbon on the map.
+7a98e7 b1515e completed ready dur=4s calls=2 tok=5808/140 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me Vienna on the map.
+7a98e7 6325a1 completed not_required dur=10s calls=4 tok=26996/714 tools=3 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | What is the temperature in Vienna right now?
+7a98e7 7bf991 completed not_required dur=9s calls=4 tok=36582/645 tools=2 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | And in Prague?
+7a98e7 2e0f0a completed not_required dur=12s calls=5 tok=66630/764 tools=1 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Which of the two is warmer, and by how many d
+7a98e7 6c9a32 completed ready dur=7s calls=3 tok=39810/328 tools=1 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Now show Prague on the map.
+533b82 693fbd completed ready dur=18s calls=6 tok=29516/1058 tools=4 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show me the current wildfire hotspots in Port
+535375 19cca0 completed not_required dur=3s calls=2 tok=5267/114 tools=0 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Write a haiku about autumn.
+be3aa3 36b6ba completed ready dur=13s calls=3 tok=9902/446 tools=2 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show 46.0037, 8.9511 on the map and tell me w
+35ca63 93a378 completed ready dur=19s calls=7 tok=39885/1024 tools=5 maps=1 failed=['describe_geospatial_capability:failed'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show the current weather radar over Tokyo.
+35ca63 282c91 completed failed dur=17s calls=7 tok=46663/893 tools=3 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Remove that layer and just show Tokyo.
+PRE-FIX 386562 85fd49 completed ready dur=15s calls=6 tok=45118/1222 tools=5 maps=1 failed=['execute_geospatial_capability:failed'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show earthquakes of magnitude 4.5 or higher i
+PROBE-A 6a39fa 276f30 completed ready dur=12s calls=7 tok=39899/970 tools=5 maps=1 failed=['describe_geospatial_capability:failed'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show the current weather radar over Tokyo.
+PROBE-A 6a39fa 6fb728 completed failed dur=11s calls=7 tok=55366/711 tools=1 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Remove that layer and just show Tokyo.
+PROBE-B be98be f22c3b completed ready dur=20s calls=7 tok=39850/972 tools=5 maps=1 failed=['describe_geospatial_capability:failed'] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show the current weather radar over Tokyo.
+PROBE-B be98be 50278e completed ready dur=12s calls=4 tok=26997/567 tools=1 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Remove that layer and just show Tokyo.
+PROBE-B 8fddf3 44deb6 completed ready dur=22s calls=6 tok=32497/979 tools=4 maps=1 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Show earthquakes of magnitude 4.5 or higher i
+PROBE-B 8fddf3 28e8eb completed not_required dur=9s calls=3 tok=22672/486 tools=1 maps=0 failed=[] prov=[('opencode-go', 'deepseek-v4.1-flash')] | Which one was strongest?
+# judged totals: calls=107 tokens in=699498 out=17727
