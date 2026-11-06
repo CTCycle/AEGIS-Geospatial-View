@@ -2,6 +2,13 @@
 
 Last updated: 2026-11-06
 
+## 2026-11-06 agent-loop reliability re-run after remediation R9-R10 (`develop@10678b20`)
+
+The [after-r5 report](../../QA/agent-loop-reliability-20261105/after-r5.md) compares baseline through `10678b20` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no 429, no data-provider rate limit).
+- Live UI **PARTIAL**: 12 PASS / 4 FAIL (fail: S12, S14, S15, S16); obligations 63 / 67 (r4 63). Firm false successes 0. Invalid tool calls 4 (r4 6). Tokens 742k in (best so far).
+- Fixed: S13 unrelated IMERG fetch (2 of 2), S09 unrequested maps (T2 66.9k tokens), S12-T4 on the judged run (probe failed: T3 discovery dead end, T4 fallback).
+- New regressions (intermittent, 1 of 2 samples each): valid answers replaced by fallback text in S14 ("did not match the verified results") and S15 ("Not delivered: the name of the place at ."), S12-T5 "Not delivered: the place Prague" with the map on Prague.
+
 ## 2026-11-06 agent-loop reliability re-run after remediation R7-R8 (`develop@a23254e4`)
 
 The [after-r4 report](../../QA/agent-loop-reliability-20261105/after-r4.md) compares baseline, `6c954aea`, `6e3404c8`, `080cc59a` and `a23254e4` on the exact lane `opencode-go / deepseek-v4.1-flash` (26 judged runs, no 429, no data-provider rate limit).
