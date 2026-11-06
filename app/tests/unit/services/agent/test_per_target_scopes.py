@@ -422,6 +422,9 @@ def test_a_global_target_is_always_in_view_and_a_small_extent_is_a_fine_place() 
     city_view = [13.2, 52.45, 13.55, 52.6]
     assert PresentationContract(targets=[gate]).violations(city_view)
     assert not PresentationContract(targets=[gate]).violations([13.37, 52.51, 13.385, 52.522])
+    # S03: the ~10 km wide view that used to pass is still city scale.
+    s03_view = [13.3127, 52.4886, 13.4427, 52.5471]
+    assert PresentationContract(targets=[gate]).violations(s03_view)
 
 
 ###############################################################################

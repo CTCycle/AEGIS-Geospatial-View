@@ -15,7 +15,11 @@ FINE_LOCATION_TYPES = frozenset({
     "attraction", "monument", "building",
 })
 LOCAL_LOCATION_TYPES = frozenset({"neighborhood", "district"})
-MAX_FINE_VIEW_SPAN_DEGREES = 0.15
+# Wide enough for a street-level fit on a landscape map (the long side of the
+# view), narrow enough that a city-scale view of a landmark never passes.
+MAX_FINE_VIEW_SPAN_DEGREES = 0.06
+# Width of the box a fine place is framed in; the map widens it to its aspect.
+FINE_PLACE_FRAME_DEGREES = 0.01
 # Geocoders name the same kind of place differently; a result whose own extent
 # is this small is fine-grained whatever its type is called.
 FINE_PLACE_EXTENT_DEGREES = 0.02
@@ -34,6 +38,18 @@ MapState = Literal["rendered", "failed", "none"]
 ObligationStatus = Literal["met", "unmet", "failed"]
 
 ###############################################################################
+def is_fine_place(location_type: str | None, bbox: list[float] | None) -> bool:
+    """Whether a place must be framed at its own scale (landmark, address...)."""
+
+    if location_type in FINE_LOCATION_TYPES:
+        return True
+    return (
+        bbox is not None
+        and location_type not in AREA_LOCATION_TYPES
+        and max(bbox[2] - bbox[0], bbox[3] - bbox[1]) <= FINE_PLACE_EXTENT_DEGREES
+    )
+
+###############################################################################
 class ContractTarget(BaseModel):
     """One requested place the committed view must show."""
 
@@ -49,13 +65,7 @@ class ContractTarget(BaseModel):
     # -------------------------------------------------------------------------
     @property
     def is_fine(self) -> bool:
-        if self.location_type in FINE_LOCATION_TYPES:
-            return True
-        return (
-            self.bbox is not None
-            and self.location_type not in AREA_LOCATION_TYPES
-            and max(self.bbox[2] - self.bbox[0], self.bbox[3] - self.bbox[1]) <= FINE_PLACE_EXTENT_DEGREES
-        )
+        return is_fine_place(self.location_type, self.bbox)
 
     # -------------------------------------------------------------------------
     @property

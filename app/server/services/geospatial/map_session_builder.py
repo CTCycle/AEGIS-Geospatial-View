@@ -32,6 +32,10 @@ from server.domain.agent.map_plan import (
     SetViewportAction,
 )
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.presentation_contract import (
+    FINE_PLACE_FRAME_DEGREES,
+    is_fine_place,
+)
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.raster_tiles import (
@@ -973,6 +977,14 @@ def _marker_name(ref: str, label: str) -> str:
 ###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     bbox = _usable_location_bbox(location)
+    own_bbox = _valid_bbox(location.bbox)
+    if is_fine_place(location.location_type, own_bbox):
+        # A landmark or address is framed at street level by construction: a
+        # box-less viewport would fall back to the default city-scale radius.
+        bbox = _with_min_span(
+            own_bbox or [location.longitude, location.latitude] * 2,
+            FINE_PLACE_FRAME_DEGREES,
+        )
     return ViewportPolicy(
         center_latitude=location.latitude,
         center_longitude=location.longitude,

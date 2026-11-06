@@ -9,6 +9,12 @@ from server.contracts.geospatial import MapSession, OverlayCollectionState, View
 from server.contracts.events import RunEventType
 from server.repositories.agent_runs import AgentRunControl
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.domain.agent.presentation_contract import (
+    FINE_PLACE_FRAME_DEGREES,
+    MAX_FINE_VIEW_SPAN_DEGREES,
+    ContractTarget,
+    PresentationContract,
+)
 from server.services.geospatial.map_session_builder import _geojson_render_data, _viewport_for_location
 
 # --- test_agent_run_orchestrator.py ---
@@ -444,20 +450,30 @@ def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     assert viewport.bbox is None
 
 ###############################################################################
-def test_point_like_feature_bbox_keeps_a_usable_context_viewport() -> None:
+def test_a_landmark_with_a_point_like_bbox_is_framed_at_street_level() -> None:
+    # S03: the Brandenburg Gate bbox is smaller than the minimum usable extent,
+    # which used to leave the viewport without a box and the map at city scale.
     location = ResolvedLocation(
-        label="Great Barrier Reef, Australia",
-        latitude=-16.35,
-        longitude=145.9,
-        location_type="reef",
-        bbox=[145.89995, -16.35005, 145.90005, -16.34995],
+        label="Brandenburg Gate, Berlin, Germany",
+        latitude=52.5162699,
+        longitude=13.3777034,
+        location_type="gate",
+        bbox=[13.3775798, 52.516117, 13.3778251, 52.5164328],
     )
 
     viewport = _viewport_for_location(location)
 
-    assert viewport.center_latitude == location.latitude
-    assert viewport.center_longitude == location.longitude
-    assert viewport.bbox is None
+    assert viewport.bbox is not None
+    span = max(viewport.bbox[2] - viewport.bbox[0], viewport.bbox[3] - viewport.bbox[1])
+    assert FINE_PLACE_FRAME_DEGREES <= span <= MAX_FINE_VIEW_SPAN_DEGREES
+    assert viewport.bbox[0] < location.longitude < viewport.bbox[2]
+    assert viewport.bbox[1] < location.latitude < viewport.bbox[3]
+    assert not PresentationContract(
+        targets=[ContractTarget(
+            ref="gate", label=location.label, latitude=location.latitude,
+            longitude=location.longitude, location_type=location.location_type, bbox=location.bbox,
+        )]
+    ).violations(viewport.bbox)
 
 ###############################################################################
 def test_normalized_polygon_feature_is_converted_to_renderable_geojson() -> None:

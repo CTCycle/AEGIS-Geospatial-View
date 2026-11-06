@@ -551,12 +551,18 @@ class CapabilityRouter:
             for ref in proposed.target_refs
             if not refers_to_basemap(ref, basemaps) and not refers_to_layer(ref)
         ]
-        if basemaps and active_state.active_map_session is None and not places:
-            # "Never mind, just show Tokyo" after an earlier turn resolved Tokyo:
-            # the place the message names again is the new map's target.
-            places = list(dict.fromkeys(
-                name for _, name in places_named_in(user_message, active_state.location_refs)
-            ))
+        if basemaps and active_state.active_map_session is None:
+            # "Remove that layer and just show Tokyo" after an earlier turn
+            # resolved Tokyo: a place the message names again is the new map's
+            # target, and a model target the message never mentions (the
+            # removed layer's subject, "weather radar") is not a place.
+            named = [name for _, name in places_named_in(user_message, active_state.location_refs)]
+            if named:
+                message_words = set(normalize_target_key(user_message).split())
+                places = list(dict.fromkeys([
+                    *named,
+                    *(ref for ref in places if set(normalize_target_key(ref).split()) <= message_words),
+                ]))
         if basemaps and active_state.active_map_session is None and places:
             # With no map yet, a named place makes this a new map (for example
             # the answer to "Which place should I show?"); the requested style
