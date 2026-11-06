@@ -9,6 +9,7 @@ import re
 from pydantic import ValidationError
 
 from server.common.logging_handlers import log_unexpected_failure
+from server.common.identifiers import COORDINATE_PAIR_RE, location_ref_matches, parse_coordinate_pair
 from server.common.typing import json_object
 from server.contracts.geospatial import ClientMapView
 from server.contracts.location import LocationSignal
@@ -62,10 +63,6 @@ _CURRENT_VIEW_NAMES = frozenset({"current map view", "current view"})
 CURRENT_VIEW_LABEL = "Current map view"
 CURRENT_VIEW_SOURCE = "client_map_view"
 
-_COORDINATE_PAIR_RE = re.compile(
-    r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
-    r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
-)
 _MONTH_BEFORE_RE = re.compile(
     r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|"
     r"aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s*$",
@@ -97,7 +94,8 @@ class LocationToolHandler:
         started = time.perf_counter()
         target_key = _target_key(request)
         if request.query is None and request.target_id in state.location_refs:
-            location = state.location_refs[request.target_id]
+            location = await self._identified(state, target_key, state.location_refs[request.target_id])
+            state.location_refs[request.target_id] = location
             return _success(
                 location=location,
                 target_key=target_key,
@@ -142,13 +140,13 @@ class LocationToolHandler:
                 started=started,
             )
 
-        coordinates = _parse_coordinate_pair(query)
+        coordinates = parse_coordinate_pair(query)
         coordinate_source = "model"
         text_coordinate_match = _search_text_coordinates(state.user_message)
         if coordinates is None and text_coordinate_match is not None:
             coordinates = _parse_coordinate_pair_from_text(state.user_message)
             coordinate_source = "text"
-        query_coordinate_match = _COORDINATE_PAIR_RE.fullmatch(query)
+        query_coordinate_match = COORDINATE_PAIR_RE.fullmatch(query)
         if coordinates is None:
             invalid_coordinate_text: str | None = None
             if query_coordinate_match is not None:
@@ -230,8 +228,33 @@ class LocationToolHandler:
                 },
                 started=started,
             )
+        result = await self._identified(state, target_key, result)
         state.location_refs[target_key] = result
         return _success(location=result, target_key=target_key, started=started)
+
+    # -------------------------------------------------------------------------
+    async def _identified(
+        self, state: AgentRunState, target_key: str, location: ResolvedLocation
+    ) -> ResolvedLocation:
+        """Reverse-geocode a coordinate target the request asks to identify.
+
+        Only an identification obligation naming this target (or naming no
+        target) asks for the place's name; other coordinates stay bare.
+        """
+
+        if location.location_type != "coordinates" or location.reverse_geocoded_name():
+            return location
+        obligations = state.goal.obligations if state.goal is not None else []
+        if not any(
+            item.kind == "identification"
+            and (
+                not item.target_ids
+                or any(location_ref_matches(target, target_key, location.label) for target in item.target_ids)
+            )
+            for item in obligations
+        ):
+            return location
+        return await self.resolver.reverse_geocode(location) or location
 
     # -------------------------------------------------------------------------
     async def _prefer_prominent_landmark(
@@ -324,16 +347,6 @@ def _retain_user_stated_location_components(query: str, user_message: str) -> st
     return ", ".join(retained)
 
 ###############################################################################
-def _parse_coordinate_pair(query: str) -> tuple[float, float] | None:
-    match = _COORDINATE_PAIR_RE.fullmatch(query)
-    if match is None:
-        return None
-    latitude, longitude = (float(value) for value in match.groups())
-    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
-        return None
-    return latitude, longitude
-
-###############################################################################
 def _search_text_coordinates(text: str) -> re.Match[str] | None:
     """Find a coordinate pair in free text, ignoring calendar dates ("March 7, 2024")."""
 
@@ -378,14 +391,16 @@ def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
 def _success(
     *, location: ResolvedLocation, target_key: str, started: float
 ) -> ToolResult:
+    place = location.reverse_geocoded_name()
     return ToolResult(
         call_id="handler-call",
         tool_name="resolve_geospatial_location",
         status="success",
-        summary=f"Resolved {location.label}.",
+        summary=f"Resolved {location.label}" + (f": {place}." if place else "."),
         data={
             "target_id": target_key,
             "label": location.label,
+            **({"place": place} if place else {}),
             "coordinates": [location.longitude, location.latitude],
             "location_type": location.location_type,
             "bbox": location.bbox,

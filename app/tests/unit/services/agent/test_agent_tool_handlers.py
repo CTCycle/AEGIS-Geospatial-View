@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from typing import Any
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import CapabilityRoute, AgentPhase, AgentRunState
+from server.domain.agent.capability_route import AgentGoal, CapabilityRoute, AgentPhase, AgentRunState, derive_request_obligations
 from server.domain.agent.decision import ResolvedLocation, ClarificationRequest
 from server.services.agent.tool_definitions import CapabilityDiscoveryInput, ResolveLocationInput
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
@@ -11,6 +11,8 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from pydantic import ValidationError
 from server.services.agent.location_resolver import NO_CANDIDATE_REASON, LocationResolver
 from server.services.agent.tool_handlers.location import LocationToolHandler
+from server.services.agent.completion import build_completion_summary
+from server.services.agent.final_answer_check import check_final_answer
 
 # --- test_catalog_tool_handler.py ---
 
@@ -235,6 +237,72 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
     location = state.location_refs["46.0037, 8.9511"]
     assert location.latitude == 46.0037
     assert location.longitude == 8.9511
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "address", [{"city": "Lugano", "county": "Lugano", "state": "Ticino", "country": "Switzerland"}, None]
+)
+async def test_coordinates_to_identify_are_reverse_geocoded_and_the_answer_must_name_them(
+    address: dict[str, str] | None,
+) -> None:
+    # S15: "Show 46.0037, 8.9511 on the map and tell me what place that is."
+    target = "46.0037, 8.9511"
+    route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="both",
+        location_mode="target",
+        target_refs=[target],
+    )
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message="Show 46.0037, 8.9511 on the map and tell me what place that is.",
+    )
+    state.goal = AgentGoal(
+        goal=state.user_message,
+        task_mode="execute",
+        presentation="both",
+        operation="show",
+        location_mode="target",
+        target_ids=[target],
+        obligations=derive_request_obligations(
+            route,
+            target_ids=[target],
+            target_requirements=[],
+            requirements=["location_resolved", "map_candidate_prepared"],
+            data_variables=[],
+        ),
+    )
+
+    ###############################################################################
+    class ReverseGeocoder:
+
+        # -------------------------------------------------------------------------
+        def perform_reverse_request(self, _params: dict[str, str]) -> dict[str, Any] | None:
+            return {"address": address} if address else None
+
+    result = await LocationToolHandler(
+        resolver=LocationResolver(nominatim_service=ReverseGeocoder())  # type: ignore[arg-type]
+    ).resolve(ResolveLocationInput(query=target, expected_location_type="coordinates"), state)
+    summary = build_completion_summary(state, {"location_resolved": True})
+    identification = next(item for item in summary.obligations if item.kind == "identification")
+
+    if address is None:
+        assert result.summary == "Resolved 46.0037, 8.9511."
+        assert identification.status == "unmet"
+        assert "the name of the place at 46.0037, 8.9511" in summary.disclosure()
+        return
+    assert result.summary == "Resolved 46.0037, 8.9511: Lugano, Ticino, Switzerland."
+    assert identification.status == "met"
+    assert identification.values == ["Lugano, Ticino, Switzerland"]
+    assert check_final_answer(
+        "The map now shows 46.0037, 8.9511.",
+        target_names=[target],
+        required_targets=[identification.answer_must_name],
+    ) == ["does not name the requested place 'Lugano'"]
 
 ###############################################################################
 @pytest.mark.asyncio

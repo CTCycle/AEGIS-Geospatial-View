@@ -6,12 +6,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from server.common.typing import is_json_array
+from server.common.typing import is_json_array, json_array, json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.policies import ToolAuthorizationResult
 from server.domain.agent.tools import RegisteredTool
-from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.capability_registry import CapabilityRegistry, coverage_matches
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -127,22 +128,18 @@ class PolicyEngine:
                     metadata={"code": "capability_unavailable"},
                 )
 
-        coverage = str(capability.get("coverage") or "").strip().casefold()
         location = self._location_for_arguments(arguments, state)
-        country = str(getattr(location, "country", "") or "").strip().casefold()
-        if coverage == "united-states" and country and country not in {
-            "us",
-            "usa",
-            "united states",
-            "united states of america",
-        }:
+        coverage = _declared_coverage(capability)
+        if location is not None and not coverage_matches(coverage, location):
+            alternative = self._covering_alternative(capability, location, state)
             return ToolAuthorizationResult(
                 allowed=False,
-                reason="Capability is outside its declared geographic coverage.",
+                reason=_coverage_explanation(capability, coverage, location, alternative),
                 metadata={
                     "code": "unavailable_coverage",
                     "coverage": coverage,
-                    "country": country,
+                    "country": location.country or "",
+                    "alternative_id": str(alternative.get("id") or "") if alternative else "",
                 },
             )
 
@@ -184,8 +181,44 @@ class PolicyEngine:
         return bool(tool.domains.intersection(route_domains))
 
     # -------------------------------------------------------------------------
+    def _covering_alternative(
+        self,
+        capability: dict[str, Any],
+        location: ResolvedLocation,
+        state: AgentRunState,
+    ) -> dict[str, Any] | None:
+        """Return the next eligible source for the same phenomenon at ``location``.
+
+        Candidates are the manifest's own ``fallback_ids`` and then the run's
+        ranked shortlist; one qualifies when it is enabled and accessible, not
+        excluded, covers the place, and shares a routing hint (the phenomenon,
+        such as radar or precipitation) with the rejected capability.
+        """
+
+        if self.capability_registry is None:
+            return None
+        rejected_id = str(capability.get("id") or "")
+        phenomena = _routing_hints(capability)
+        contract = json_object(capability.get("executionContract"))
+        fallback_ids = [str(item) for item in json_array(contract.get("fallback_ids"))]
+        for candidate_id in dict.fromkeys([*fallback_ids, *state.capability_ids]):
+            if candidate_id == rejected_id or candidate_id in state.excluded_capability_ids:
+                continue
+            candidate = self.capability_registry.get_capability(candidate_id)
+            if candidate is None or not phenomena & _routing_hints(candidate):
+                continue
+            if self.runtime_registry is not None and not (
+                self.runtime_registry.is_enabled(candidate_id)
+                and self.runtime_registry.access_available(candidate_id)
+            ):
+                continue
+            if coverage_matches(_declared_coverage(candidate), location):
+                return candidate
+        return None
+
+    # -------------------------------------------------------------------------
     @staticmethod
-    def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> Any | None:
+    def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> ResolvedLocation | None:
         location_ref = str(getattr(arguments, "location_ref", "") or "").strip()
         if location_ref:
             for key, location in state.location_refs.items():
@@ -198,6 +231,47 @@ class PolicyEngine:
             return state.active_map_session.resolved_location
         return None
 
+
+###############################################################################
+def _declared_coverage(capability: dict[str, Any]) -> str:
+    contract = json_object(capability.get("executionContract"))
+    return str(contract.get("coverage") or capability.get("coverage") or "").strip()
+
+###############################################################################
+def _routing_hints(capability: dict[str, Any]) -> set[str]:
+    hints = json_array(json_object(capability.get("agenticUse")).get("plannerHints"))
+    return {str(item).strip().casefold() for item in hints if str(item).strip()}
+
+###############################################################################
+def _capability_name(capability: dict[str, Any]) -> str:
+    label = json_object(capability.get("metadata")).get("label")
+    return str(capability.get("name") or label or capability.get("id") or "This source")
+
+###############################################################################
+def _coverage_explanation(
+    capability: dict[str, Any],
+    coverage: str,
+    location: ResolvedLocation,
+    alternative: dict[str, Any] | None,
+) -> str:
+    """User-facing reason a source cannot serve a place, with the next option."""
+
+    words = coverage.replace("-", " ").replace("_", " ").split()
+    region = " ".join(word.upper() if len(word) <= 3 else word.capitalize() for word in words)
+    place = location.label
+    text = (
+        f"{_capability_name(capability)} only covers {region or 'a limited area'}, "
+        f"so it has no data for {place}."
+    )
+    if alternative is not None:
+        return (
+            f"{text} {_capability_name(alternative)} covers {place} for the same kind "
+            "of data. Should I use it instead?"
+        )
+    return (
+        f"{text} No other source shortlisted for this request covers {place}. "
+        "Which other data should I show there?"
+    )
 
 ###############################################################################
 def route_allows_capability_execution(route: Any) -> bool:

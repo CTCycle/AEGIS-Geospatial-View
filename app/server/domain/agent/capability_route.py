@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from server.common.identifiers import location_ref_matches, normalize_target_key
+from server.common.identifiers import location_ref_matches, normalize_target_key, parse_coordinate_pair
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
@@ -27,7 +27,8 @@ class AgentAnalysisIntent(BaseModel):
     order: str = Field(default="descending", max_length=40)
     top_k: int = Field(default=5, ge=1, le=25)
 
-ObligationKind = Literal["location", "data", "analysis", "presentation"]
+# "identification": name or describe a place, e.g. what place coordinates are.
+ObligationKind = Literal["location", "data", "analysis", "presentation", "identification"]
 
 ###############################################################################
 class RouteObligation(BaseModel):
@@ -79,8 +80,8 @@ class CapabilityRoute(BaseModel):
         max_length=16,
         description=(
             "Every explicit part of the latest request, so none is dropped: kind "
-            "location (a place), data (values), analysis (comparison/ranking) or "
-            "presentation (shown on the map)."
+            "location (a place), data (values), analysis (comparison/ranking), "
+            "presentation (shown on the map) or identification (name a place)."
         ),
     )
 
@@ -499,6 +500,8 @@ OBLIGATION_REQUIREMENTS: dict[ObligationKind, tuple[str, ...]] = {
         "evidence_inspected",
     ),
     "presentation": ("map_candidate_prepared",),
+    # The place is named by its resolution (a reverse geocode for coordinates).
+    "identification": ("location_resolved", "search_area_bound"),
 }
 
 ###############################################################################
@@ -518,6 +521,23 @@ def same_target(left: str, right: str) -> bool:
         or location_ref_matches(left, right, None)
         or location_ref_matches(right, left, None)
     )
+
+###############################################################################
+def places_named_in(message: str, locations: dict[str, ResolvedLocation]) -> list[tuple[str, str]]:
+    """Return (key, name) of each resolved place the message names again.
+
+    A place counts as named when its leading label part ("Tokyo" of "Tokyo,
+    Japan") appears as whole words in the message.
+    """
+
+    text = f" {normalize_target_key(message)} "
+    named: list[tuple[str, str]] = []
+    for key, location in locations.items():
+        name = (location.label or str(key)).split(",")[0].strip()
+        normalized = normalize_target_key(name)
+        if len(normalized) >= 3 and f" {normalized} " in text:
+            named.append((str(key), name))
+    return named
 
 ###############################################################################
 def derive_request_obligations(
@@ -592,6 +612,17 @@ def derive_request_obligations(
                 target_ids=list(target_ids),
                 variable=route.analysis.metric if route.analysis else None,
             )
+        )
+    if route.presentation in {"text", "both"} and route.location_mode != "none":
+        # A text answer about bare coordinates must say where they are.
+        obligations.extend(
+            RequestObligation(
+                id=f"identification:{_safe_task_id(target)}",
+                kind="identification",
+                target_ids=[target],
+            )
+            for target in target_ids
+            if parse_coordinate_pair(target) is not None
         )
     if route.presentation in {"map", "both"}:
         obligations.append(
@@ -687,8 +718,9 @@ def dropped_obligations(
 ) -> list[RequestObligation]:
     """Return prior required obligations a revised goal no longer carries.
 
-    A location or data obligation is kept only when the revision still names
-    each of its places; analysis and presentation only need the same kind.
+    A location, data or identification obligation is kept only when the
+    revision still names each of its places; analysis and presentation only
+    need the same kind.
     """
 
     dropped: list[RequestObligation] = []
@@ -699,7 +731,7 @@ def dropped_obligations(
         if not same_kind:
             dropped.append(item)
             continue
-        if item.kind in {"location", "data"} and not all(
+        if item.kind in {"location", "data", "identification"} and not all(
             any(same_target(target, other_target) for other in same_kind for other_target in other.target_ids)
             for target in item.target_ids
         ):

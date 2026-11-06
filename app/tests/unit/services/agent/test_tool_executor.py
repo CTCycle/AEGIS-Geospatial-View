@@ -51,9 +51,11 @@ class _Policy:
         self,
         allowed: bool = True,
         reason: str = "blocked",
+        code: str = "policy_rejection",
     ) -> None:
         self.allowed = allowed
         self.reason = reason
+        self.code = code
 
     # -------------------------------------------------------------------------
     def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
@@ -62,7 +64,7 @@ class _Policy:
             type(
                 "Authorization",
                 (),
-                {"allowed": self.allowed, "reason": self.reason},
+                {"allowed": self.allowed, "reason": self.reason, "metadata": {"code": self.code}},
             )(),
         )
 
@@ -406,7 +408,8 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
             tool_registry=policy_registry,
             policy_engine=_Policy(
                 False,
-                reason="Capability is outside its declared geographic coverage.",
+                reason="NOAA Radar only covers United States, so it has no data for Tokyo, Japan.",
+                code="unavailable_coverage",
             ),
         ).execute_tool(
             LLMToolCall(id="coverage", name="test_tool", arguments={"value": 1}),

@@ -5,6 +5,12 @@ from __future__ import annotations
 import re
 import unicodedata
 
+# "46.0037, 8.9511": a bare latitude/longitude pair (bounds checked separately).
+COORDINATE_PAIR_RE = re.compile(
+    r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
+    r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
+)
+
 ###############################################################################
 def normalize_target_key(value: str) -> str:
     """Return a punctuation- and accent-insensitive target identity."""
@@ -52,4 +58,22 @@ def _matches(requested: str, key: str, label: str | None) -> bool:
     return False
 
 
-__all__ = ["location_ref_matches", "normalize_target_key"]
+###############################################################################
+def parse_coordinate_pair(value: str) -> tuple[float, float] | None:
+    """Return (latitude, longitude) when ``value`` is a valid coordinate pair."""
+
+    match = COORDINATE_PAIR_RE.fullmatch(value)
+    if match is None:
+        return None
+    latitude, longitude = (float(item) for item in match.groups())
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return None
+    return latitude, longitude
+
+
+__all__ = [
+    "COORDINATE_PAIR_RE",
+    "location_ref_matches",
+    "normalize_target_key",
+    "parse_coordinate_pair",
+]

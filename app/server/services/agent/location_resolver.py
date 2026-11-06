@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from difflib import SequenceMatcher
 from typing import Any, cast
 
-from server.common.typing import json_object
+from server.common.typing import is_json_object, json_object
 
 from typing import Sequence
 
@@ -14,6 +15,7 @@ from server.domain.agent.decision import (
     ClarificationRequest,
     LocationHierarchy,
     LocationHierarchyEntry,
+    REVERSE_GEOCODER_SOURCE,
     LocationResolutionProvenance,
     ResolvedLocation,
 )
@@ -200,6 +202,76 @@ class LocationResolver:
     def __init__(self, *, nominatim_service: NominatimService | None = None) -> None:
         self.nominatim_service = nominatim_service or NominatimService()
         self._catalog_codes: dict[str, str] | None = None
+
+    # -------------------------------------------------------------------------
+    async def reverse_geocode(self, location: ResolvedLocation) -> ResolvedLocation | None:
+        """Name the place at ``location``: its settlement, region and country.
+
+        Uses the resolver's keyless Nominatim service, whose request pacing,
+        User-Agent and cache follow the provider usage policy, at settlement
+        zoom (the parameters ``NominatimService.reverse_place`` uses, so both
+        share one cached response).  Returns ``location`` with ``city``,
+        ``country`` and the names as hierarchy parents, or None when the
+        geocoder names nothing there (open sea, outage).
+        """
+
+        params = {
+            "lat": f"{location.latitude:.5f}",
+            "lon": f"{location.longitude:.5f}",
+            "format": "jsonv2",
+            "zoom": "10",
+            "addressdetails": "1",
+            "accept-language": "en",
+        }
+        response = await asyncio.to_thread(self.nominatim_service.perform_reverse_request, params)
+        address = response.get("address") if response else None
+        if not is_json_object(address):
+            return None
+
+        def component(*keys: str) -> str | None:
+            return next((str(address[key]).strip() for key in keys if str(address.get(key) or "").strip()), None)
+
+        names = [
+            (kind, value)
+            for kind, value in (
+                ("city", component("city", "town", "village", "municipality", "hamlet")),
+                ("region", component("state", "region", "province", "county")),
+                ("country", component("country")),
+            )
+            if value
+        ]
+        if not names:
+            return None
+        target = (
+            location.hierarchy.target
+            if location.hierarchy is not None
+            else LocationHierarchyEntry(
+                signal_type=location.location_type or "coordinates",
+                raw_value=location.label,
+                normalized_value=location.label,
+                confidence=location.confidence,
+                source=location.source,
+            )
+        )
+        parents = [
+            LocationHierarchyEntry(
+                signal_type=kind,
+                raw_value=value,
+                normalized_value=value,
+                confidence=location.confidence,
+                source=REVERSE_GEOCODER_SOURCE,
+                canonical_label=value,
+            )
+            for kind, value in names
+        ]
+        found = dict(names)
+        return location.model_copy(
+            update={
+                "city": found.get("city"),
+                "country": found.get("country"),
+                "hierarchy": LocationHierarchy(target=target, parents=parents),
+            }
+        )
 
     # -------------------------------------------------------------------------
     async def resolve_location_signals(

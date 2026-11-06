@@ -15,6 +15,7 @@ from server.domain.agent.capability_route import (
     CapabilityRoute,
     CapabilityRouteDecision,
     RouteObligation,
+    places_named_in,
 )
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.map_plan import is_mark_locations_operation
@@ -535,6 +536,12 @@ class CapabilityRouter:
             for ref in proposed.target_refs
             if not refers_to_basemap(ref, basemaps) and not refers_to_layer(ref)
         ]
+        if basemaps and active_state.active_map_session is None and not places:
+            # "Never mind, just show Tokyo" after an earlier turn resolved Tokyo:
+            # the place the message names again is the new map's target.
+            places = list(dict.fromkeys(
+                name for _, name in places_named_in(user_message, active_state.location_refs)
+            ))
         if basemaps and active_state.active_map_session is None and places:
             # With no map yet, a named place makes this a new map (for example
             # the answer to "Which place should I show?"); the requested style

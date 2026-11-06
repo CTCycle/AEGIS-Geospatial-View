@@ -65,6 +65,18 @@ scope/time requirements, requested operation, and presentation requirement.
 The model may choose among eligible capabilities, but it cannot remove
 application-owned completion obligations.
 
+Coordinates are resolved without geocoder egress, except a coordinate
+target that an `identification` obligation names: `resolve_geospatial_location`
+then calls `LocationResolver.reverse_geocode`, which asks the same keyless
+Nominatim service (its request pacing, User-Agent and cache follow the
+provider usage policy; the parameters match `reverse_place`, so both share a
+cached response) for the settlement, region and country at settlement zoom.
+The names become the location's `city`, `country` and hierarchy parents with
+source `reverse_geocoder` (`ResolvedLocation.reverse_geocoded_name()`), and
+the tool result says `Resolved 46.0037, 8.9511: Lugano, Ticino, Switzerland.`
+The identification obligation is met only by that evidence, never by the
+coordinates alone.
+
 Location resolution is hierarchical and deterministic where evidence permits:
 coordinates take precedence, followed by address/POI/street, district or
 neighborhood, city or municipality, region/state, and country. A requested
@@ -103,13 +115,17 @@ deterministic step between route validation and the first tool call.
   model declares every explicit part of the request as a `RouteObligation`
   (`kind`, `target_refs`, `variable`, `required`).
 - `AgentGoal.obligations` holds the server-normalized `RequestObligation`
-  list (`id`, `kind` in `location|data|analysis|presentation`, `target_ids`,
+  list (`id`, `kind` in `location|data|analysis|presentation|identification`, `target_ids`,
   optional `variable`, optional per-target `temporal_scope`, `required`;
   at most 32). `derive_request_obligations` builds it from the validated
   route: one location obligation per target, one data obligation per target
   and variable when provider data is required, an analysis obligation for a
   route analysis or measurement, and a map presentation obligation. A
-  declared part that none of these expresses is kept as its own obligation.
+  coordinate-pair target of a route that answers in text (`text` or `both`)
+  also gets an `identification` obligation: an answer about bare coordinates
+  must say where they are. The routing model can declare `identification`
+  for any place it is asked to name or describe. A declared part that none of
+  these expresses is kept as its own obligation.
   Map-state targets name map content, not places, and get no location
   obligation.
 - `CapabilityRouter.validate_route` drops a declared part only when one of
@@ -172,7 +188,10 @@ true because it sounds finished. Two server-owned structures separate the two.
   obligations, map content described without a verified map, temperature,
   wind, pressure and magnitude values the evidence does not support (a datum,
   a difference of two data or a unit conversion), undisclosed truncation, and
-  a coordinate target whose reverse-geocoded place the answer never names, and
+  an identified place the answer never names (a met `identification`
+  outcome carries the full name in `values` and its spellings in
+  `answer_must_name`, which feed `required_targets`; an unmet one is
+  undelivered and must be disclosed), and
   a count of mapped records ("all 205 events") in a map sentence that exceeds
   the rendered feature count or equals a truncated layer's total.
   A rejected answer is replaced by deterministic text, and the finalizers
@@ -252,7 +271,12 @@ request obligation's outcome: `task_id` (the obligation id, e.g.
 - **Route carry-over.** Besides the projection change, the pre-tool intent
   check rejects a route whose target is an earlier turn's data subject (for
   example "weather radar" after "Remove that layer and just show Tokyo")
-  with `prior_subject_used_as_place`; the single route revision is asked for
+  with `prior_subject_used_as_place`. A map-state route with no map yet whose
+  targets are only layers ("Never mind, just show Tokyo" after the radar was
+  unavailable) becomes a new map of the already resolved places the message
+  names again (`places_named_in` over the conversation's resolved locations,
+  shared with the `known_place_missing_from_targets` check) instead of asking
+  which place to show; the single route revision is asked for
   place targets only, and the misread target is not counted as a dropped
   obligation.
 
@@ -301,6 +325,20 @@ The registry has one `RegisteredTool` contract and one `ToolExecutor` boundary.
 The executor validates policy and arguments, binds server-owned geography/time
 parameters, checks and accounts for budgets, applies the resolved timeout,
 records a trace span, invokes the handler, and normalizes the result.
+
+A capability whose declared coverage (`executionContract.coverage`, else
+`coverage`) excludes the resolved place is rejected by `PolicyEngine` with the
+same `coverage_matches` rule the shortlist applies (code
+`unavailable_coverage`, recovery `request_user_input`). The reason is the
+user-facing answer, not a policy string: it names the source, the area it
+covers, and the place. It also offers the next eligible source for the same
+phenomenon, which is the first of the manifest's `fallback_ids` and then the
+run's ranked shortlist that is enabled, accessible, not excluded, covers the
+place, and shares a `plannerHints` entry ("NOAA Radar only covers United
+States, so it has no data for Tokyo, Japan. RainViewer Recent Precipitation
+Radar covers Tokyo, Japan for the same kind of data. Should I use it
+instead?"). Without one, the reply says no other shortlisted source covers
+the place.
 
 ### Responsibility-driven exposure
 

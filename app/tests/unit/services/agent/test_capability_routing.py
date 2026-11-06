@@ -1108,6 +1108,31 @@ def test_layer_edit_without_a_map_is_not_searched_as_a_place() -> None:
     assert "no layer to change" in str(decision.clarification_question)
 
 ###############################################################################
+def test_layer_edit_without_a_map_shows_a_known_place_the_message_names() -> None:
+    # S16-T2: the radar was unavailable, so no map exists; Tokyo was resolved
+    # in the earlier turn and the follow-up names it again.
+    state = _state()
+    state.location_refs = {
+        "tokyo": ResolvedLocation(label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan")
+    }
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            presentation="map",
+            location_mode="none",
+            operation="remove",
+            target_refs=["that layer"],
+        ),
+        user_message="Never mind, just show Tokyo on the map.",
+        active_state=state,
+    )
+
+    assert decision.status != "clarification"
+    assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
+    assert decision.route.target_refs == ["Tokyo"]
+    assert "map_state_without_map_becomes_new_map" in decision.reason_codes
+
+###############################################################################
 def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> None:
     state = _state()
     state.active_map_session = cast(

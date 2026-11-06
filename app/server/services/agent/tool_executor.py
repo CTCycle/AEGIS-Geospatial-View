@@ -13,7 +13,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ValidationError
 
 from server.common.logging_handlers import log_unexpected_failure
-from server.common.typing import is_json_object
+from server.common.typing import is_json_object, json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.reliability import (
@@ -490,10 +490,11 @@ class ToolExecutor:
 
         authorization = self._authorize(registered, arguments, state)
         if not authorization[0]:
+            # A place outside a source's coverage is the user's call (another
+            # source or another place); other rejections are the model's.
             recovery = (
                 "request_user_input"
-                if authorization[1]
-                == "Capability is outside its declared geographic coverage."
+                if authorization[2] == "unavailable_coverage"
                 else "choose_alternate_tool"
             )
             return self._failure(
@@ -593,12 +594,15 @@ class ToolExecutor:
         tool: RegisteredTool,
         arguments: BaseModel,
         state: AgentRunState,
-    ) -> tuple[bool, str | None]:
+    ) -> tuple[bool, str | None, str | None]:
+        """Return (allowed, reason, policy code)."""
+
         authorize = getattr(self.policy_engine, "authorize", None)
         if callable(authorize):
             result = authorize(tool, arguments, state)
             allowed = bool(getattr(result, "allowed", False))
-            return allowed, getattr(result, "reason", None)
+            code = json_object(getattr(result, "metadata", None)).get("code")
+            return allowed, getattr(result, "reason", None), str(code) if code else None
         if state.route is not None:
             route_domains = {
                 state.route.primary_domain,
@@ -610,13 +614,13 @@ class ToolExecutor:
                 and CapabilityDomain.MIXED not in tool.domains
                 and not tool.domains.intersection(route_domains)
             ):
-                return False, "Tool is outside the validated capability route."
+                return False, "Tool is outside the validated capability route.", None
         capability_id = getattr(arguments, "capability_id", None)
         if capability_id and capability_id in state.excluded_capability_ids:
-            return False, "Capability was excluded after a failed attempt in this run."
+            return False, "Capability was excluded after a failed attempt in this run.", None
         if capability_id and state.capability_ids and capability_id not in state.capability_ids:
-            return False, "Capability is outside the validated shortlist."
-        return True, None
+            return False, "Capability is outside the validated shortlist.", None
+        return True, None, None
 
     # -------------------------------------------------------------------------
     @staticmethod

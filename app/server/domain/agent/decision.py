@@ -7,6 +7,9 @@ from server.common.time import utc_now
 
 """Location-resolution value objects used by the native agent boundary."""
 
+# Hierarchy source of the names a reverse geocode gave a coordinate location.
+REVERSE_GEOCODER_SOURCE = "reverse_geocoder"
+
 ###############################################################################
 class ClarificationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -71,3 +74,15 @@ class ResolvedLocation(BaseModel):
     wikidata_id: str | None = Field(default=None, pattern=r"^Q\d+$")
     provenance: LocationResolutionProvenance | None = None
     hierarchy: LocationHierarchy | None = None
+
+    # -------------------------------------------------------------------------
+    def reverse_geocoded_name(self) -> str | None:
+        """The place a reverse geocode named here, e.g. "Lugano, Ticino, Switzerland"."""
+
+        parents = self.hierarchy.parents if self.hierarchy is not None else []
+        names = [
+            item.canonical_label
+            for item in parents
+            if item.source == REVERSE_GEOCODER_SOURCE and item.canonical_label
+        ]
+        return ", ".join(names) or None

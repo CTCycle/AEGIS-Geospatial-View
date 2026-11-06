@@ -773,7 +773,7 @@ class CapabilityRegistry:
                 continue
             if _avoid_when_conflicts(item, normalized_queries, location):
                 continue
-            if location is not None and not _coverage_matches(
+            if location is not None and not coverage_matches(
                 str(contract.get("coverage") or item.get("coverage") or ""),
                 location,
             ):
@@ -1075,7 +1075,7 @@ def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
     return is_json_object(metadata.get("execution_contract"))
 
 ###############################################################################
-def _coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
+def coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     """Reject a known incompatible jurisdiction, but preserve unknown coverage."""
 
     normalized = re.sub(r"[^a-z0-9]+", " ", coverage.casefold()).strip()

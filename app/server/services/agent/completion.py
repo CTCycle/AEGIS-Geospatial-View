@@ -941,15 +941,20 @@ def _obligation_result(state: AgentRunState, kind: ObligationKind, target: str |
     return candidates[-1] if candidates else None
 
 ###############################################################################
-def _coordinate_place_name(state: AgentRunState, targets: list[str]) -> str | None:
-    """Name the place a coordinate target resolved to, when it has a name."""
+def _identified_place(state: AgentRunState, target: str) -> tuple[str, str] | None:
+    """Return (full name, short name) of the place a target was identified as.
 
-    for ref in targets:
-        for key, location in state.location_refs.items():
-            if location.location_type == "coordinates" and location_ref_matches(ref, str(key), location.label):
-                name = location.city or location.label.split(",")[0].strip()
-                if any(character.isalpha() for character in name):
-                    return name
+    A coordinate target is identified only by its reverse geocode; a named
+    target by its own resolution.
+    """
+
+    for key, location in state.location_refs.items():
+        if not location_ref_matches(target, str(key), location.label):
+            continue
+        if location.location_type == "coordinates":
+            full = location.reverse_geocoded_name()
+            return (full, full.split(",")[0].strip()) if full else None
+        return location.label, location.label.split(",")[0].strip()
     return None
 
 ###############################################################################
@@ -959,6 +964,8 @@ def _obligation_label(obligation: RequestObligation) -> str:
         return "the requested map"
     if obligation.kind == "location":
         return f"the place {places}"
+    if obligation.kind == "identification":
+        return f"the name of the place at {places}"
     if obligation.kind == "data":
         subject = f"{obligation.variable} data" if obligation.variable else "the requested data"
         return f"{subject} for {places}" if places else subject
@@ -993,13 +1000,24 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         status: ObligationStatus
         if obligation.kind == "presentation":
             status = "met" if map_state == "rendered" else "failed" if map_state == "failed" else "unmet"
+        elif obligation.kind == "identification":
+            # Met only by resolution evidence that names every target place;
+            # the answer must then name it too.
+            places = [
+                _identified_place(state, target)
+                for target in (obligation.target_ids or (goal.target_ids if goal is not None else []))
+            ]
+            named = [item for item in places if item is not None]
+            status = "met" if named and len(named) == len(places) else "unmet"
+            if status == "met":
+                values = [full for full, _ in named][:8]
+                # Spellings that name the (first) identified place.
+                must_name = list(dict.fromkeys([named[0][1], named[0][0]]))
         else:
             requirement = obligation_requirement(obligation.kind, requirements)
             target = obligation.target_ids[0] if obligation.target_ids else None
             if requirement is None:
-                place = _coordinate_place_name(state, obligation.target_ids)
-                status = "met" if place else "unmet"
-                must_name = [place] if place else []
+                status = "unmet"
             elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
                 status = "failed"
             else:
@@ -1063,7 +1081,7 @@ def ledger_outcomes(
         )
         if obligation.kind == "location":
             dependencies: list[str] = []
-        elif obligation.kind == "data":
+        elif obligation.kind in {"data", "identification"}:
             dependencies = [
                 item.id
                 for item in required

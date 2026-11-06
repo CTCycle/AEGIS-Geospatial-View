@@ -38,6 +38,7 @@ from server.domain.agent.capability_route import (
     TaskStatus,
     derive_request_obligations,
     dropped_obligations,
+    places_named_in,
     same_target,
     unrouted_obligations,
 )
@@ -1335,6 +1336,14 @@ class AgentLoop:
         text = "The map now shows " + (place or "the requested area")
         text += f" on the {basemap_label} basemap" if basemap_label else ""
         text += f" with {', '.join(layers)}." if layers else "."
+        identified = [
+            value
+            for item in AgentLoop.completion_summary(state).obligations
+            if item.kind == "identification" and item.status == "met"
+            for value in item.values
+        ]
+        if identified:
+            text += f" Identified place: {'; '.join(identified)}."
         findings = AgentLoop._evidence_findings(state)
         return f"{text}\n\n{findings}" if findings else text
 
@@ -2328,20 +2337,15 @@ class AgentLoop:
         violation = unrouted_obligations(goal, state.completion_requirements)
         if violation is not None or route.location_mode != "target" or not goal.target_ids:
             return violation
-        message = f" {normalize_target_key(state.user_message)} "
         omitted: list[RequestObligation] = []
-        for key, location in state.location_refs.items():
-            name = (location.label or str(key)).split(",")[0].strip()
+        for key, name in places_named_in(state.user_message, state.location_refs):
+            location = state.location_refs[key]
             normalized = normalize_target_key(name)
-            if (
-                len(normalized) < 3
-                or f" {normalized} " not in message
-                or any(
-                    location_ref_matches(target, str(key), location.label)
-                    or same_target(target, name)
-                    or f" {normalized} " in f" {normalize_target_key(target)} "
-                    for target in goal.target_ids
-                )
+            if any(
+                location_ref_matches(target, key, location.label)
+                or same_target(target, name)
+                or f" {normalized} " in f" {normalize_target_key(target)} "
+                for target in goal.target_ids
             ):
                 continue
             omitted.append(
