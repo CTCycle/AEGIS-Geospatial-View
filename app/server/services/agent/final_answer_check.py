@@ -59,6 +59,8 @@ _LAYER_EDIT_CLAIM = re.compile(
 _LAYER_WORD = re.compile(r"\b(?:layers?|overlays?)\b", re.IGNORECASE)
 _ANY_NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?!\w)")
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
+# "can be shown on the map" offers a map; it does not describe one.
+_OFFER = re.compile(r"\b(?:can|could|may|might|would)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
 
 # -----------------------------------------------------------------------------
@@ -110,6 +112,8 @@ def check_final_answer(
     truncations: Sequence[tuple[int, int]] = (),
     layer_edits: int | None = None,
     cite_groups: Sequence[Sequence[float]] = (),
+    coordinates: Sequence[float] = (),
+    prior_numbers: Sequence[float] = (),
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -129,7 +133,10 @@ def check_final_answer(
     ``layer_edits`` counts the layers the committed map-state diff removed or
     hid (``None`` skips the claim check); and ``cite_groups`` are the figures an
     analysis answer must cite: one of each group, or, for several groups, the
-    difference between two of them.
+    difference between two of them; ``coordinates`` are the resolved places'
+    latitudes and longitudes, which a number with a bare degree sign may cite;
+    and ``prior_numbers`` are values earlier turns verified, which an answer may
+    repeat but not derive from (their long series would support any difference).
     """
 
     violations: list[str] = []
@@ -182,7 +189,8 @@ def check_final_answer(
 
     if map_rendered is False:
         for match in _MAP_CLAIM.finditer(text):
-            if not _NEGATION.search(text[max(0, match.start() - 24) : match.start()]):
+            before = text[max(0, match.start() - 24) : match.start()]
+            if not _NEGATION.search(before) and not _OFFER.search(before):
                 violations.append(f"describes map content ({match.group(0)!r}) but no map was verified")
                 break
 
@@ -204,7 +212,10 @@ def check_final_answer(
     if evidence_numbers:
         for match in _UNIT_NUMBER.finditer(text):
             raw = match.group("n") or match.group("m")
-            if not value_is_supported(raw, match.group("unit") or "", evidence_numbers):
+            unit = match.group("unit") or ""
+            if (unit == "°" and _cites_any([raw], coordinates)) or _cites_any([raw], prior_numbers):
+                continue
+            if not value_is_supported(raw, unit, evidence_numbers):
                 violations.append(f"cites {match.group(0)!r}, which the evidence does not support")
                 break
 

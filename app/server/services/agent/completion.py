@@ -778,6 +778,18 @@ def evidence_numbers(state: AgentRunState) -> list[float]:
     return numbers[:_MAX_EVIDENCE_NUMBERS]
 
 ###############################################################################
+def prior_evidence_numbers(state: AgentRunState) -> list[float]:
+    """Numbers of the earlier turns' evidence summaries this run's context shows."""
+
+    numbers = [
+        value
+        for item in state.relevant_tool_outcomes
+        if item.get("evidence_id")
+        for _, value in _numeric_leaves(item.get("summary"))
+    ]
+    return numbers[:_MAX_EVIDENCE_NUMBERS]
+
+###############################################################################
 def key_names_variable(key: str, variable: str | None) -> bool:
     """Whether a payload key names the variable.
 
@@ -1089,14 +1101,33 @@ def _identified_place(state: AgentRunState, target: str) -> tuple[str, str] | No
     return None
 
 ###############################################################################
+def _identification_places(
+    state: AgentRunState, targets: list[str]
+) -> list[tuple[str, str] | None]:
+    """Return the places an identification obligation asks to name.
+
+    One naming no target asks about the coordinates the run was given, like
+    the reverse geocode it triggers: the latest coordinates the run identified.
+    """
+
+    if targets:
+        return [_identified_place(state, target) for target in targets]
+    names = [
+        name
+        for location in state.location_refs.values()
+        if location.location_type == "coordinates" and (name := location.reverse_geocoded_name())
+    ]
+    return [(names[-1], names[-1].split(",")[0].strip())] if names else []
+
+###############################################################################
 def _obligation_label(obligation: RequestObligation) -> str:
     places = ", ".join(obligation.target_ids)
     if obligation.kind == "presentation":
         return "the requested map"
     if obligation.kind == "location":
-        return f"the place {places}"
+        return f"the place {places}" if places else "the requested place"
     if obligation.kind == "identification":
-        return f"the name of the place at {places}"
+        return f"the name of the place at {places}" if places else "the name of the requested place"
     if obligation.kind == "data":
         subject = f"{obligation.variable} data" if obligation.variable else "the requested data"
         return f"{subject} for {places}" if places else subject
@@ -1122,7 +1153,9 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
             findings = [failure.failure_summary]
     uncovered = uncovered_route_targets(state)
     outcomes: list[ObligationOutcome] = []
-    for obligation in (goal.obligations if goal is not None else []):
+    # An answer-mode route has no tools to satisfy an obligation with and skips
+    # the pre-tool obligation check, so what its model declared decides nothing.
+    for obligation in (goal.obligations if goal is not None and goal.task_mode != "answer" else []):
         if not obligation.required:
             continue
         evidence_ref: str | None = None
@@ -1135,10 +1168,9 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         elif obligation.kind == "identification":
             # Met only by resolution evidence that names every target place;
             # the answer must then name it too.
-            places = [
-                _identified_place(state, target)
-                for target in (obligation.target_ids or (goal.target_ids if goal is not None else []))
-            ]
+            places = _identification_places(
+                state, obligation.target_ids or (goal.target_ids if goal is not None else [])
+            )
             named = [item for item in places if item is not None]
             status = "met" if named and len(named) == len(places) else "unmet"
             if status == "met":
@@ -1148,7 +1180,15 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         else:
             requirement = obligation_requirement(obligation.kind, requirements)
             target = obligation.target_ids[0] if obligation.target_ids else None
-            if requirement is None:
+            if requirement is None and obligation.kind == "location":
+                # Always routed, even on a contract that resolves nothing (a
+                # recenter on a known place): the place is delivered once known.
+                known = bool(obligation.target_ids) and all(
+                    any(location_ref_matches(target, str(key), item.label) for key, item in state.location_refs.items())
+                    for target in obligation.target_ids
+                )
+                status = "met" if known else "unmet"
+            elif requirement is None:
                 status = "unmet"
             elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
                 status = "failed"
@@ -1314,6 +1354,7 @@ __all__ = [
     "build_completion_summary",
     "data_verified_empty",
     "evidence_numbers",
+    "prior_evidence_numbers",
     "presentation_contract",
     "describe_requirements",
     "RASTER_ONLY_CODE",

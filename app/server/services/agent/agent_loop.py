@@ -96,6 +96,7 @@ from server.services.agent.completion import (
     key_names_variable,
     layer_edit_count,
     needs_numeric_values,
+    prior_evidence_numbers,
     requested_transform_unmet,
     unmarked_route_targets,
 )
@@ -1716,6 +1717,12 @@ class AgentLoop:
                 if item.kind == "analysis" and item.status == "met"
                 for group in item.cite_groups
             ],
+            coordinates=[
+                value
+                for location in state.location_refs.values()
+                for value in (location.latitude, location.longitude)
+            ],
+            prior_numbers=prior_evidence_numbers(state),
         )
         if not violations:
             return candidate
