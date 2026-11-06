@@ -592,6 +592,56 @@ async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view
     ]
 
 ###############################################################################
+class _TimeWindowRepository(_TwoCityEvidenceRepository):
+    """Two queries of one capability and place that differ only in time window."""
+
+    POINTS = {"evidence:old": (8.54, 47.37), "evidence:new": (8.55, 47.38)}
+
+    # -------------------------------------------------------------------------
+    def get_summary(
+        self, evidence_id: str, *, conversation_id: str | None = None
+    ) -> AgentEvidenceSummary | None:
+        summary = super().get_summary(evidence_id, conversation_id=conversation_id)
+        if summary is None:
+            return None
+        window = "2026-10-01" if evidence_id == "evidence:old" else "2026-11-05"
+        query = {"operation": "list", "location_ref": "zurich", "start_time_iso": window}
+        return summary.model_copy(update={"summary": {**summary.summary, "query": query}})
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_requery_with_a_new_time_window_replaces_the_earlier_layer() -> None:
+    state = _state()
+    state.evidence_refs = ["evidence:old", "evidence:new"]
+    service = MapPlanService(
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        evidence_repository=_TimeWindowRepository(),
+    )
+    context = ToolExecutionContext(conversation_id="conversation-1")
+
+    def plan(ref: str, revision: int) -> MapPlan:
+        return MapPlan(
+            expected_collection_revision=revision,
+            actions=[AddEvidenceLayerAction(
+                action="add_evidence_layer", evidence_ref=ref, capability_id="places:hospitals"
+            )],
+        )
+
+    await service.apply(plan("evidence:old", 0), state, context)
+    assert state.prepared_map_session is not None
+    state.active_map_session = state.prepared_map_session
+    revision = state.active_map_session.overlay_collection.revision
+
+    result = await service.apply(plan("evidence:new", revision), state, context)
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    assert [
+        item.descriptor["evidence_ref"]
+        for item in state.prepared_map_session.overlay_collection.instances
+    ] == ["evidence:new"]
+
+###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     state = _state()

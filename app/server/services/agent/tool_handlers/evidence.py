@@ -90,6 +90,8 @@ class EvidenceToolHandler:
             fields=request.fields,
             cursor=request.cursor,
             limit=request.limit,
+            sort_by=request.sort_by,
+            ascending=request.ascending,
         )
         capability_id, coverage = _inherited_assessment([{
             **summary.provenance,
@@ -330,8 +332,16 @@ def _inspect_payload(
     fields: list[str],
     cursor: str | None,
     limit: int,
+    sort_by: str | None = None,
+    ascending: bool = False,
 ) -> dict[str, Any]:
     records = _records_from_payload(payload)
+    if sort_by:
+        # Rank before projecting so the sort field need not be returned.
+        present = [item for item in records if _properties(item).get(sort_by) is not None]
+        missing = [item for item in records if _properties(item).get(sort_by) is None]
+        present.sort(key=lambda item: _sort_key(_properties(item).get(sort_by)), reverse=not ascending)
+        records = present + missing
     if fields:
         records = [
             {key: properties[key] for key in fields if key in properties}

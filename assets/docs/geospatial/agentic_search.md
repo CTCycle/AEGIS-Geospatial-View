@@ -152,8 +152,10 @@ true because it sounds finished. Two server-owned structures separate the two.
   `mark_locations.annotations` value labels, which `apply_map_plan` rejects when
   a number is not in the run's evidence).
 - `RenderCompletionService.acknowledge` evaluates the contract against the
-  browser viewport of a `ready` acknowledgment: every target must be inside the
-  view, and a fine place (landmark, address, station, street...) or local one
+  browser viewport of a `ready` acknowledgment: every point target's centre must
+  be inside the view, while an area or global scope (`AREA_LOCATION_TYPES`) is
+  judged by `results_in_viewport` of the rendered result extent (at least 0.5),
+  never by its arbitrary centre; and a fine place (landmark, address, station, street...) or local one
   (district, neighbourhood) must be framed at its own scale rather than as its
   parent city. A violation turns the acknowledgment into a failed observation
   (`failure_stage: "presentation_contract"`) with a compact reason, which
@@ -170,7 +172,9 @@ true because it sounds finished. Two server-owned structures separate the two.
   obligations, map content described without a verified map, temperature,
   wind, pressure and magnitude values the evidence does not support (a datum,
   a difference of two data or a unit conversion), undisclosed truncation, and
-  a coordinate target whose reverse-geocoded place the answer never names.
+  a coordinate target whose reverse-geocoded place the answer never names, and
+  a count of mapped records ("all 205 events") in a map sentence that exceeds
+  the rendered feature count or equals a truncated layer's total.
   A rejected answer is replaced by deterministic text, and the finalizers
   append the summary's disclosure.
 - Once every requested data query is verified empty (`data_verified_empty`),
@@ -278,6 +282,13 @@ tool. The model-visible action names are:
 - `measure_geospatial`
 - `apply_map_plan`
 - `search_conversation_history` (conditional history-repository registration)
+
+`inspect_evidence` pages accept `sort_by`/`ascending`, so a top-k or "strongest"
+question over stored evidence is one inspection, with no derived dataset.
+`apply_map_plan` removes a committed layer when the plan adds a layer of the
+same capability whose evidence has the same query subject (operation, place,
+bbox, radius) but another time window or filter; a plan with `remove_layer`,
+`keep_only_layers` or several layers of one capability keeps its own choice.
 
 `transform_evidence` is the runtime name. `discover_geospatial_capabilities`
 is the generic model-facing capability-discovery boundary.

@@ -155,3 +155,11 @@ def test_a_truncated_layer_must_be_disclosed() -> None:
     assert not check_final_answer(
         "There were 205 earthquakes; the map shows 25.", target_names=[], truncations=[(25, 205)],
     )
+
+
+###############################################################################
+def test_a_count_claim_about_the_map_may_not_exceed_what_rendered() -> None:
+    kwargs = {"target_names": [], "feature_count": 25, "truncations": [(25, 205)]}
+    assert check_final_answer("The map shows all 205 events.", **kwargs)
+    assert not check_final_answer("The map shows only 25 of the 205 events.", **kwargs)
+    assert not check_final_answer("USGS reported 205 events; the map shows 25.", **kwargs)

@@ -16,6 +16,12 @@ FINE_LOCATION_TYPES = frozenset({
 LOCAL_LOCATION_TYPES = frozenset({"neighborhood", "district"})
 MAX_FINE_VIEW_SPAN_DEGREES = 0.15
 MAX_LOCAL_VIEW_SPAN_DEGREES = 0.6
+# Scopes whose centre point says nothing about what must be visible.
+AREA_LOCATION_TYPES = frozenset({
+    "country", "state", "province", "region", "macro_region", "continent",
+    "ocean", "sea", "viewport", "global", "world",
+})
+MIN_RESULTS_IN_VIEW = 0.5
 
 MapState = Literal["rendered", "failed", "none"]
 ObligationStatus = Literal["met", "unmet", "failed"]
@@ -48,8 +54,15 @@ class PresentationContract(BaseModel):
     findings: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
 
     # -------------------------------------------------------------------------
-    def view_findings(self, viewport: list[float] | None) -> list[str]:
-        """Targets outside the viewport, and fine places framed too coarsely."""
+    def view_findings(
+        self, viewport: list[float] | None, results_in_viewport: float | None = None
+    ) -> list[str]:
+        """Targets outside the viewport, and fine places framed too coarsely.
+
+        A point place must have its centre in view. An area or global scope has
+        no meaningful centre, so it is judged by the share of the rendered
+        result extent in view (unknown means no evidence of a failure).
+        """
 
         if viewport is None or len(viewport) != 4:
             return []
@@ -58,7 +71,11 @@ class PresentationContract(BaseModel):
         out_of_view = [
             target.label or target.ref
             for target in self.targets
-            if not (west <= target.longitude <= east and south <= target.latitude <= north)
+            if (
+                (results_in_viewport is not None and results_in_viewport < MIN_RESULTS_IN_VIEW)
+                if target.location_type in AREA_LOCATION_TYPES
+                else not (west <= target.longitude <= east and south <= target.latitude <= north)
+            )
         ]
         coarse = [
             target.label or target.ref
@@ -81,8 +98,10 @@ class PresentationContract(BaseModel):
         return findings
 
     # -------------------------------------------------------------------------
-    def violations(self, viewport: list[float] | None) -> list[str]:
-        return [*self.findings, *self.view_findings(viewport)]
+    def violations(
+        self, viewport: list[float] | None, results_in_viewport: float | None = None
+    ) -> list[str]:
+        return [*self.findings, *self.view_findings(viewport, results_in_viewport)]
 
 ###############################################################################
 class ObligationOutcome(BaseModel):

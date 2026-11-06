@@ -24,6 +24,7 @@ from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
 from server.domain.geospatial.providers import ProviderResponse
 from server.services.agent.agent_loop import AgentLoop, AgentLoopRequest
 from server.services.agent.capability_router import CapabilityRouter
+from server.domain.agent.presentation_contract import ContractTarget, PresentationContract
 from server.services.agent.completion import CompletionEvaluator, build_completion_summary, presentation_contract
 from server.services.agent.native_tools import register_agent_tools
 from server.services.agent.policy_engine import PolicyEngine
@@ -392,3 +393,14 @@ def test_contract_rejects_a_ready_acknowledgment_that_misses_a_place() -> None:
     with pytest.raises(ValueError, match="Presentation contract failed"):
         enforce(presentation, ack([12.0, 41.5, 13.0, 42.3]))
     enforce(presentation, ack([8.5, 41.0, 13.0, 46.0]))
+
+
+###############################################################################
+def test_an_area_scope_is_judged_by_its_results_not_its_centre() -> None:
+    contract = PresentationContract(targets=[ContractTarget(
+        ref="world", label="World", latitude=0.0, longitude=0.0, location_type="macro_region",
+    )])
+    far_from_centre = [100.0, 10.0, 140.0, 40.0]
+    assert not contract.violations(far_from_centre, 0.9)
+    assert contract.violations(far_from_centre, 0.1)
+    assert not contract.violations(far_from_centre)

@@ -681,7 +681,13 @@ class RenderCompletionService:
         ):
             return
         violations = PresentationContract.model_validate(stored).violations(
-            payload.viewport_bounds
+            payload.viewport_bounds,
+            _visible_fraction(
+                payload.viewport_bounds,
+                _json_object(
+                    _json_object(presentation.get("pending_response")).get("map_session")
+                ).get("bounds"),
+            ),
         )
         if violations:
             raise ValueError(f"{CONTRACT_FAILURE_PREFIX} " + "; ".join(violations))

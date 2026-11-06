@@ -1497,3 +1497,12 @@ def test_unscoped_country_target_is_queried_as_its_area(location_type: str, expe
 
     assert (extent.kind if extent is not None and extent.bbox else None) == expected
 
+
+
+###############################################################################
+def test_inspecting_evidence_can_rank_records_without_a_derived_dataset() -> None:
+    from server.services.agent.tool_handlers.evidence import _inspect_payload
+
+    payload = {"features": [{"properties": {"place": name, "mag": mag}} for name, mag in (("a", 4.1), ("b", 6.1), ("c", 5.2))]}
+    top = _inspect_payload(payload, view="page", fields=["place"], cursor=None, limit=2, sort_by="mag")
+    assert [item["place"] for item in top["records"]] == ["b", "c"]

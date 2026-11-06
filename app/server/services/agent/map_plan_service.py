@@ -17,8 +17,11 @@ from server.domain.agent.evidence import AgentEvidenceEnvelope
 from server.domain.agent.task_ledger import map_fingerprint
 from server.domain.agent.map_plan import (
     AddEvidenceLayerAction,
+    KeepOnlyLayersAction,
+    MapAction,
     MapPlan,
     MarkLocationsAction,
+    RemoveLayerAction,
     SetBasemapAction,
     SetViewportAction,
 )
@@ -60,6 +63,19 @@ def _ungrounded_annotation(plan: MapPlan, state: AgentRunState) -> str | None:
                 if not value_is_supported(raw, "", numbers):
                     return label
     return None
+
+
+###############################################################################
+def _query_subject(summary: dict[str, Any]) -> tuple[str, ...] | None:
+    """What a data query was about, independent of its time window and filters."""
+
+    query = json_object(summary.get("query"))
+    if not query:
+        return None
+    return tuple(
+        json.dumps(query.get(key), sort_keys=True)
+        for key in ("operation", "location_ref", "resolved_location", "bbox", "radius_m")
+    )
 
 
 ###############################################################################
@@ -298,6 +314,10 @@ class MapPlanService:
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
             evidence = self._evidence_for_plan(effective_plan, state, context)
+            effective_actions = [
+                *self._superseded_layer_removals(effective_actions, evidence, active_session, context),
+                *effective_actions,
+            ]
             candidate = await self.session_builder.build(
                 location=location,
                 evidence=evidence,
@@ -438,6 +458,58 @@ class MapPlanService:
                 evidence_refs=list(dict.fromkeys(evidence_refs)),
             ),
         )
+
+    # -------------------------------------------------------------------------
+    def _superseded_layer_removals(
+        self,
+        actions: list[MapAction],
+        evidence: list[AgentEvidenceEnvelope],
+        active_session: MapSession | None,
+        context: ToolExecutionContext,
+    ) -> list[RemoveLayerAction]:
+        """Remove committed layers a new layer of the same query subject replaces.
+
+        A follow-up that re-queries one capability for one place with another
+        time window or filter must replace that earlier layer, not stack on it.
+        A plan that manages layers itself (remove or keep-only) or adds several
+        layers of one capability keeps the model's explicit choice.
+        """
+
+        repository = self.evidence_repository
+        if active_session is None or repository is None:
+            return []
+        if any(isinstance(action, (RemoveLayerAction, KeepOnlyLayersAction)) for action in actions):
+            return []
+        added = [action for action in actions if isinstance(action, AddEvidenceLayerAction)]
+        capabilities = [action.capability_id for action in added]
+        if len(set(capabilities)) != len(capabilities):
+            return []
+        subjects = {
+            item.evidence_ref: _query_subject(item.summary)
+            for item in evidence
+            if item.evidence_ref
+        }
+        removals: list[RemoveLayerAction] = []
+        for instance in active_session.overlay_collection.instances:
+            old_ref = str(instance.descriptor.get("evidence_ref") or "")
+            if not old_ref:
+                continue
+            replacement = next(
+                (
+                    action
+                    for action in added
+                    if action.capability_id == instance.capability_id
+                    and action.evidence_ref != old_ref
+                ),
+                None,
+            )
+            if replacement is None:
+                continue
+            old = repository.get_summary(old_ref, conversation_id=context.conversation_id)
+            old_subject = _query_subject(dict(old.summary)) if old is not None else None
+            if old_subject is not None and old_subject == subjects.get(replacement.evidence_ref):
+                removals.append(RemoveLayerAction(action="remove_layer", instance_id=instance.instance_id))
+        return removals
 
     # -------------------------------------------------------------------------
     @staticmethod

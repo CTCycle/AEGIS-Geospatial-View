@@ -14,6 +14,18 @@ _COUNT_CLAIM = re.compile(
     re.IGNORECASE,
 )
 _LAYER_NOUNS = {"layer", "layers", "overlay", "overlays"}
+# A count of mapped records ("all 205 events", "25 features") claimed in a
+# sentence that says it is on the map. The number may not exceed what rendered.
+_MAP_ITEM_CLAIM = re.compile(
+    r"(?<!\bof )(?<!\bof the )(?<!\bout of )\b(?P<n>\d[\d,]*)\s+"
+    r"(?:[a-z-]+\s+){0,2}?(?:events?|features?|records?|results?|points?|items?|"
+    r"earthquakes?|quakes?|incidents?|sites?|stations?|observations?)\b",
+    re.IGNORECASE,
+)
+_MAP_CONTEXT = re.compile(
+    r"\b(?:map|plotted|rendered|displayed|drawn|markers?|pins?|layer)\b", re.IGNORECASE
+)
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?;])\s+|\n+")
 _COMPLETENESS = re.compile(
     r"\b(complete|completed|completely|fully|successfully|everything|"
     r"all (?:the )?requested)\b",
@@ -112,6 +124,19 @@ def check_final_answer(
         verified = layer_count if match.group("noun").lower() in _LAYER_NOUNS else feature_count
         if verified is not None and claimed > verified:
             violations.append(f"claims {match.group(0)!r} but only {verified} verified")
+
+    for sentence in _SENTENCE_BREAK.split(text):
+        if not _MAP_CONTEXT.search(sentence) or _TRUNCATION_DISCLOSURE.search(sentence):
+            continue
+        for match in _MAP_ITEM_CLAIM.finditer(sentence):
+            claimed = int(match.group("n").replace(",", ""))
+            cut_total = any(claimed == total > shown for shown, total in truncations)
+            if cut_total or (feature_count is not None and claimed > feature_count):
+                violations.append(
+                    f"claims {match.group(0)!r} on the map but the map shows "
+                    f"{feature_count if feature_count is not None else 'fewer'}"
+                )
+                break
 
     for spellings in required_targets:
         if spellings and not any(_mentions(text, spelling) for spelling in spellings):

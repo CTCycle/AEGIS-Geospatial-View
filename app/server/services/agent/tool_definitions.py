@@ -165,6 +165,10 @@ class InspectEvidenceInput(StrictToolInput):
     fields: list[str] = Field(default_factory=list, max_length=32)
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)
+    # Rank a record page by one field (largest first unless ascending), so a
+    # top-k question needs no derived dataset.
+    sort_by: str | None = Field(default=None, min_length=1, max_length=200)
+    ascending: bool = False
 
 ###############################################################################
 class AttributeFilterOperation(StrictToolInput):

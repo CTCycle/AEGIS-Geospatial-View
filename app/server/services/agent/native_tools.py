@@ -335,7 +335,12 @@ def register_agent_tools(
         ),
         _registration(
             name="inspect_evidence",
-            description="Inspect bounded metadata or samples from stored evidence.",
+            description=(
+                "Inspect bounded metadata, statistics (min, max and the "
+                "record at each extreme) or record pages from stored "
+                "evidence. Set sort_by on a page to read the top records by "
+                "one field without creating derived evidence."
+            ),
             input_model=InspectEvidenceInput,
             handler=evidence.inspect,
             domains=_DATA,
