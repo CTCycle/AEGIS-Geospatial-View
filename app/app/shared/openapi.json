@@ -1,0 +1,7368 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AEGIS API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/chat/turn": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Chat Turn",
+        "operationId": "chat_turn_api_chat_turn_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatTurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ChatTurnResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AgentRunAcceptedResponse"
+                    }
+                  ],
+                  "title": "Response Chat Turn Api Chat Turn Post"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The run was accepted and is still executing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with an active run."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/attachments": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Create Chat Attachment",
+        "description": "Hold one user image for the next run start that references it.",
+        "operationId": "create_chat_attachment_api_chat_attachments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatAttachmentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/models": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Models",
+        "operationId": "get_models_api_chat_models_get",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelLibraryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/settings": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_api_chat_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Update Settings",
+        "operationId": "update_settings_api_chat_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/models/ollama/refresh": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Refresh Ollama Models",
+        "operationId": "refresh_ollama_models_api_chat_models_ollama_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OllamaRefreshResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/models/ollama/pull": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Pull Ollama Model",
+        "operationId": "pull_ollama_model_api_chat_models_ollama_pull_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OllamaPullRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OllamaPullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/models/ollama/health": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Check Ollama Health",
+        "operationId": "check_ollama_health_api_chat_models_ollama_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OllamaHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Create Conversation",
+        "operationId": "create_conversation_api_conversations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List Conversations",
+        "operationId": "list_conversations_api_conversations_get",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Conversation Snapshot",
+        "operationId": "get_conversation_snapshot_api_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSnapshotResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Run Status",
+        "description": "Return active or terminal run state for 202 polling clients.",
+        "operationId": "get_run_status_api_conversations__conversation_id__runs__run_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunSnapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/runs/{run_id}/trace": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Run Trace",
+        "operationId": "get_run_trace_api_conversations__conversation_id__runs__run_id__trace_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "run_version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Version"
+            }
+          },
+          {
+            "name": "after_sequence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After Sequence"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "include_internal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Internal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunTraceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/capabilities": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Geospatial Capabilities",
+        "operationId": "get_geospatial_capabilities_api_geospatial_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/layers": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Geospatial Layers",
+        "operationId": "get_geospatial_layers_api_geospatial_layers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialLayersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/layers/{layer_id}/features": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Layer Features",
+        "operationId": "get_layer_features_api_geospatial_layers__layer_id__features_get",
+        "parameters": [
+          {
+            "name": "layer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Layer Id"
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bbox"
+            }
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Zoom"
+            }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time"
+            }
+          },
+          {
+            "name": "live",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Live"
+            }
+          },
+          {
+            "name": "incidents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incidents"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialProviderPayloadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/layers/{layer_id}/geojson": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Layer Geojson",
+        "operationId": "get_layer_geojson_api_geospatial_layers__layer_id__geojson_get",
+        "parameters": [
+          {
+            "name": "layer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Layer Id"
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bbox"
+            }
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Zoom"
+            }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time"
+            }
+          },
+          {
+            "name": "live",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Live"
+            }
+          },
+          {
+            "name": "incidents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incidents"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Layer Geojson Api Geospatial Layers  Layer Id  Geojson Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Proxy Capability Tile",
+        "operationId": "proxy_capability_tile_api_geospatial_tiles__capability_id___z___x___y__png_get",
+        "parameters": [
+          {
+            "name": "capability_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Capability Id"
+            }
+          },
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Z"
+            }
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "X"
+            }
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Y"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Proxy Tomtom Tile",
+        "operationId": "proxy_tomtom_tile_api_geospatial_proxy_tomtom__kind___z___x___y__png_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Z"
+            }
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "X"
+            }
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Y"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/render-captures": {
+      "post": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Store Render Capture",
+        "operationId": "store_render_capture_api_geospatial_render_captures_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderCaptureCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderCaptureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/cameras": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Geospatial Cameras",
+        "operationId": "get_geospatial_cameras_api_geospatial_cameras_get",
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bbox"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "camera_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialProviderPayloadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/cameras.geojson": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Geospatial Cameras Geojson",
+        "operationId": "get_geospatial_cameras_geojson_api_geospatial_cameras_geojson_get",
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bbox"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "camera_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Geospatial Cameras Geojson Api Geospatial Cameras Geojson Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/sources/{provider_id}/credential-status": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Credential Status",
+        "operationId": "get_credential_status_api_geospatial_sources__provider_id__credential_status_get",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialCredentialStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geospatial/providers/account-setup": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Get Provider Account Setups",
+        "operationId": "get_provider_account_setups_api_geospatial_providers_account_setup_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialProviderAccountSetupListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/runtime": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Runtime Settings",
+        "operationId": "get_runtime_settings_api_settings_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Runtime Settings",
+        "operationId": "update_runtime_settings_api_settings_runtime_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/database": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Database Settings",
+        "operationId": "get_database_settings_api_settings_database_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Switch Database",
+        "operationId": "switch_database_api_settings_database_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/database/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Database Connection",
+        "operationId": "test_database_connection_api_settings_database_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseConnectionTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActiveConversationRunSnapshot": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "presentation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentation"
+          },
+          "current_iteration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Iteration"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_version",
+          "state"
+        ],
+        "title": "ActiveConversationRunSnapshot"
+      },
+      "AgentAnalysisIntent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rank",
+              "hotspot",
+              "threshold"
+            ],
+            "title": "Kind"
+          },
+          "metric": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Metric"
+          },
+          "order": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Order",
+            "default": "descending"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "metric"
+        ],
+        "title": "AgentAnalysisIntent",
+        "description": "Provider-neutral analysis selected from the user's objective."
+      },
+      "AgentGoal": {
+        "properties": {
+          "goal": {
+            "type": "string",
+            "title": "Goal"
+          },
+          "task_mode": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "execute",
+              "clarify"
+            ],
+            "title": "Task Mode"
+          },
+          "presentation": {
+            "type": "string",
+            "enum": [
+              "text",
+              "map",
+              "both"
+            ],
+            "title": "Presentation"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "target",
+              "search_area"
+            ],
+            "title": "Location Mode"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentAnalysisIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Ids"
+          },
+          "temporal_scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Temporal Scope"
+          },
+          "spatial_scope": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Spatial Scope"
+          },
+          "target_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRequirement"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Requirements"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "obligations": {
+            "items": {
+              "$ref": "#/components/schemas/RequestObligation"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Obligations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "goal",
+          "task_mode",
+          "presentation",
+          "operation",
+          "location_mode"
+        ],
+        "title": "AgentGoal",
+        "description": "Server-owned goal details derived from a validated native route."
+      },
+      "AgentRunAcceptedResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "status_url": {
+            "type": "string",
+            "title": "Status Url"
+          },
+          "realtime_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realtime Url"
+          },
+          "terminal": {
+            "type": "boolean",
+            "title": "Terminal",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id",
+          "run_version",
+          "state",
+          "status_url"
+        ],
+        "title": "AgentRunAcceptedResponse",
+        "description": "Stable response for work accepted outside the synchronous window."
+      },
+      "AgentRunSnapshot": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "original_request": {
+            "type": "string",
+            "title": "Original Request"
+          },
+          "aggregated_request": {
+            "type": "string",
+            "title": "Aggregated Request"
+          },
+          "active_run_version": {
+            "type": "integer",
+            "title": "Active Run Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "request_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Timezone"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "presentation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentation"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "current_iteration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Iteration"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id",
+          "original_request",
+          "aggregated_request",
+          "active_run_version",
+          "state",
+          "created_at"
+        ],
+        "title": "AgentRunSnapshot"
+      },
+      "AgentRunState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "updating",
+          "waiting_for_clarification",
+          "awaiting_render",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "AgentRunState"
+      },
+      "AgentSpatialScope": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "point",
+              "bbox",
+              "radius",
+              "administrative_geometry",
+              "feature_geometry",
+              "viewport"
+            ],
+            "title": "Kind"
+          },
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "at",
+              "in",
+              "near",
+              "around",
+              "within_distance",
+              "along",
+              "visible_area",
+              "here"
+            ],
+            "title": "Relationship",
+            "default": "at"
+          },
+          "target_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Refs"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "AgentSpatialScope",
+        "description": "Provider-neutral spatial intent; coordinates remain server-owned."
+      },
+      "AgentTask": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Task Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "blocked",
+              "cancelled",
+              "superseded"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Task Id"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Dependencies"
+          },
+          "requirement_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Name"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "obligation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Obligation Id"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_id",
+          "description"
+        ],
+        "title": "AgentTask",
+        "description": "One lightweight, run-scoped obligation.\n\nTasks are operational state, not a second planner.  The native loop owns\ntheir status and the model receives only the bounded projection embedded\nin :class:`AgentTaskState`."
+      },
+      "AgentTaskState": {
+        "properties": {
+          "root_task_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Root Task Id"
+          },
+          "active_task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Task Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "blocked",
+              "cancelled",
+              "superseded"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "current_iteration": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Current Iteration",
+            "default": 0
+          },
+          "max_iterations": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Iterations",
+            "default": 1
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTask"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Tasks"
+          },
+          "completion_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionRequirement"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Completion Requirements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root_task_id"
+        ],
+        "title": "AgentTaskState",
+        "description": "Typed projection of the run-scoped task ledger.\n\nThe durable ``AgentRunState.task_state`` JSON object carries both the\nconversation-state projection and this task ledger, so the typed view\ndeliberately ignores the conversation keys and claims its own namespace."
+      },
+      "AgentTemporalScope": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "current",
+              "historical",
+              "forecast",
+              "none"
+            ],
+            "title": "Mode",
+            "default": "none"
+          },
+          "reference_time_iso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Time Iso"
+          },
+          "start_time_iso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time Iso"
+          },
+          "end_time_iso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Iso"
+          },
+          "granularity": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Granularity",
+            "default": "none"
+          },
+          "aggregation": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Aggregation",
+            "default": "none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentTemporalScope",
+        "description": "Provider-neutral temporal intent selected during route bootstrap."
+      },
+      "AgentToolResultSummary": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "title": "Call Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "valid_empty",
+              "partial",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "map_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map Candidate Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolExecutionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "call_id",
+          "tool_name",
+          "status",
+          "summary"
+        ],
+        "title": "AgentToolResultSummary",
+        "description": "Bounded model-independent summary of one native tool result."
+      },
+      "CapabilityDomain": {
+        "type": "string",
+        "enum": [
+          "conversation",
+          "place_search",
+          "data_retrieval",
+          "spatial_analysis",
+          "routing",
+          "map_rendering",
+          "map_state",
+          "provider_discovery",
+          "mixed"
+        ],
+        "title": "CapabilityDomain"
+      },
+      "CapabilityRoute": {
+        "properties": {
+          "primary_domain": {
+            "$ref": "#/components/schemas/CapabilityDomain"
+          },
+          "secondary_domains": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDomain"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Secondary Domains"
+          },
+          "task_mode": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "execute",
+              "clarify"
+            ],
+            "title": "Task Mode"
+          },
+          "presentation": {
+            "type": "string",
+            "enum": [
+              "text",
+              "map",
+              "both"
+            ],
+            "title": "Presentation"
+          },
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "target",
+              "search_area"
+            ],
+            "title": "Location Mode",
+            "default": "none"
+          },
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentAnalysisIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capability_queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Capability Queries"
+          },
+          "explicit_capability_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Explicit Capability Ids"
+          },
+          "clarification_question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification Question"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "target_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Refs"
+          },
+          "temporal_scope": {
+            "$ref": "#/components/schemas/AgentTemporalScope"
+          },
+          "spatial_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSpatialScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/TargetRequirement"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Requirements"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "obligations": {
+            "items": {
+              "$ref": "#/components/schemas/RouteObligation"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Obligations",
+            "description": "Every explicit part of the latest request, so none is dropped: kind location (a place), data (values), analysis (comparison/ranking) or presentation (shown on the map)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "primary_domain",
+          "task_mode",
+          "presentation"
+        ],
+        "title": "CapabilityRoute"
+      },
+      "ChatAttachmentCreateRequest": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Conversation Id"
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "default": "image/jpeg"
+          },
+          "image_base64": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Image Base64"
+          },
+          "width": {
+            "type": "integer",
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "image_base64",
+          "width",
+          "height"
+        ],
+        "title": "ChatAttachmentCreateRequest"
+      },
+      "ChatAttachmentResponse": {
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "title": "Attachment Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attachment_id",
+          "expires_in_seconds"
+        ],
+        "title": "ChatAttachmentResponse"
+      },
+      "ChatOperationResult": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "map_session",
+              "direct_answer",
+              "capability_catalog",
+              "clarification",
+              "rejection",
+              "error"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial",
+              "pending",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "direct_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Result"
+          },
+          "provider_error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Error"
+          },
+          "failure_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_capability",
+                  "provider_api",
+                  "provider_failure",
+                  "internal_error",
+                  "schema_definition",
+                  "response_parsing",
+                  "context_limit",
+                  "insufficient_evidence",
+                  "model_budget_exhausted",
+                  "tool_budget_exhausted",
+                  "transition_budget_exhausted",
+                  "iteration_budget_exhausted",
+                  "run_deadline_exhausted",
+                  "no_progress",
+                  "render_recovery_exhausted",
+                  "cancelled",
+                  "superseded"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Category"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "status",
+          "message"
+        ],
+        "title": "ChatOperationResult"
+      },
+      "ChatTurnRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "datetime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datetime"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "attachment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachment Id"
+          },
+          "map_view": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientMapView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message",
+          "conversation_id"
+        ],
+        "title": "ChatTurnRequest"
+      },
+      "ChatTurnResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "assistant_message": {
+            "type": "string",
+            "title": "Assistant Message"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/ChatOperationResult"
+          },
+          "tool_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Payload"
+          },
+          "map_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memory_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Memory Snapshot"
+          },
+          "context_usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContextUsageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Revision"
+          },
+          "execution_trace": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Trace"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CapabilityRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentGoal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion_contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompletionContract"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_requested",
+              "prepared",
+              "prepared_unverified",
+              "ready",
+              "failed"
+            ],
+            "title": "Presentation Status",
+            "default": "not_requested"
+          },
+          "tool_results": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolResultSummary"
+            },
+            "type": "array",
+            "title": "Tool Results"
+          },
+          "conversation_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "conversation_id",
+          "assistant_message",
+          "operation"
+        ],
+        "title": "ChatTurnResponse",
+        "description": "Canonical public response for one native agent turn."
+      },
+      "ClientMapOverlayState": {
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Instance Id"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible"
+          },
+          "opacity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Opacity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instance_id",
+          "visible",
+          "opacity"
+        ],
+        "title": "ClientMapOverlayState"
+      },
+      "ClientMapView": {
+        "properties": {
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bounds"
+          },
+          "center": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Center"
+          },
+          "zoom": {
+            "type": "number",
+            "maximum": 24.0,
+            "minimum": 0.0,
+            "title": "Zoom"
+          },
+          "basemap_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basemap Id"
+          },
+          "overlays": {
+            "items": {
+              "$ref": "#/components/schemas/ClientMapOverlayState"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Overlays"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bounds",
+          "center",
+          "zoom"
+        ],
+        "title": "ClientMapView",
+        "description": "The map view the user sees when sending a request (client-reported)."
+      },
+      "CompletionContract": {
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "data_requirement": {
+            "type": "string",
+            "enum": [
+              "none",
+              "provider_data"
+            ],
+            "title": "Data Requirement",
+            "default": "none"
+          },
+          "requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Requirements"
+          },
+          "location_required": {
+            "type": "boolean",
+            "title": "Location Required",
+            "default": false
+          },
+          "evidence_required": {
+            "type": "boolean",
+            "title": "Evidence Required",
+            "default": false
+          },
+          "data_obligations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Data Obligations"
+          },
+          "map_preparation_required": {
+            "type": "boolean",
+            "title": "Map Preparation Required",
+            "default": false
+          },
+          "temporal_scope_required": {
+            "type": "boolean",
+            "title": "Temporal Scope Required",
+            "default": false
+          },
+          "spatial_scope_required": {
+            "type": "boolean",
+            "title": "Spatial Scope Required",
+            "default": false
+          },
+          "render_verification_required": {
+            "type": "boolean",
+            "title": "Render Verification Required",
+            "default": false
+          },
+          "render_verified": {
+            "type": "boolean",
+            "title": "Render Verified",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation"
+        ],
+        "title": "CompletionContract",
+        "description": "Deterministic obligations the native loop must satisfy."
+      },
+      "CompletionRequirement": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "location",
+                  "capability_discovery",
+                  "provider_data",
+                  "evidence_inspection",
+                  "evidence_analysis",
+                  "temporal_scope",
+                  "spatial_scope",
+                  "map_candidate",
+                  "render_ack",
+                  "final_text"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "satisfied",
+              "failed",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CompletionRequirement",
+        "description": "One server-owned obligation in a native run or render handshake."
+      },
+      "ContextUsageResponse": {
+        "properties": {
+          "estimated_input_tokens": {
+            "type": "integer",
+            "title": "Estimated Input Tokens"
+          },
+          "selected_context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Context Window"
+          },
+          "model_context_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Context Limit"
+          },
+          "usage_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Percent"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "reported_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Input Tokens"
+          },
+          "reported_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Output Tokens"
+          },
+          "reserved_output_tokens": {
+            "type": "integer",
+            "title": "Reserved Output Tokens",
+            "default": 0
+          },
+          "tool_schema_tokens": {
+            "type": "integer",
+            "title": "Tool Schema Tokens",
+            "default": 0
+          },
+          "response_schema_tokens": {
+            "type": "integer",
+            "title": "Response Schema Tokens",
+            "default": 0
+          },
+          "safety_margin_tokens": {
+            "type": "integer",
+            "title": "Safety Margin Tokens",
+            "default": 512
+          },
+          "usage_source": {
+            "type": "string",
+            "enum": [
+              "not_measured",
+              "estimated",
+              "provider_reported",
+              "hybrid"
+            ],
+            "title": "Usage Source",
+            "default": "estimated"
+          },
+          "usable_prompt_budget_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usable Prompt Budget Tokens"
+          },
+          "current_conversation_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Conversation Tokens"
+          },
+          "expected_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
+            "default": "unknown"
+          },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
+            "default": "unknown"
+          },
+          "compaction_applied": {
+            "type": "boolean",
+            "title": "Compaction Applied",
+            "default": false
+          },
+          "phases": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Phases"
+          },
+          "peak_request_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Request Tokens"
+          },
+          "total_input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Input Tokens"
+          },
+          "total_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Output Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "estimated_input_tokens",
+          "usage_percent",
+          "provider",
+          "model"
+        ],
+        "title": "ContextUsageResponse"
+      },
+      "ConversationCreateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConversationCreateRequest"
+      },
+      "ConversationCreateResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "ConversationCreateResponse"
+      },
+      "ConversationListResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "type": "array",
+            "title": "Conversations"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "default": 0
+          },
+          "pagination": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Pagination"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConversationListResponse"
+      },
+      "ConversationMessageSnapshot": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "system",
+              "tool"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ConversationMessageSnapshot"
+      },
+      "ConversationRunSummary": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "active_run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Active Run Version"
+          },
+          "original_request": {
+            "type": "string",
+            "title": "Original Request"
+          },
+          "aggregated_request": {
+            "type": "string",
+            "title": "Aggregated Request"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentRunState"
+          },
+          "request_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Timezone"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "presentation_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "ready",
+              "failed",
+              "render_timeout"
+            ],
+            "title": "Presentation Status",
+            "default": "not_required"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "current_iteration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Iteration"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id",
+          "run_version",
+          "active_run_version",
+          "original_request",
+          "aggregated_request",
+          "state"
+        ],
+        "title": "ConversationRunSummary",
+        "description": "Bounded operational summary of one persisted native run."
+      },
+      "ConversationSnapshotResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "context_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Context Revision"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageSnapshot"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "conversation_state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "memory_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Memory Snapshot"
+          },
+          "map_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveConversationRunSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recent_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationRunSummary"
+            },
+            "type": "array",
+            "title": "Recent Runs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "context_revision",
+          "conversation_state"
+        ],
+        "title": "ConversationSnapshotResponse"
+      },
+      "ConversationState": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 2,
+            "title": "Schema Version",
+            "default": 2
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision",
+            "default": 0
+          },
+          "active_directives": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Active Directives"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "summary_through_turn_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Summary Through Turn Index",
+            "default": 0
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentGoal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CapabilityRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "constraints": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Constraints"
+          },
+          "resolved_locations": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ResolvedLocation"
+            },
+            "type": "object",
+            "title": "Resolved Locations"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "committed_map_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MapSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending_clarification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingClarification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "ConversationState",
+        "description": "Revisioned, durable state shared by all turns in one conversation."
+      },
+      "ConversationSummary": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "context_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Context Revision"
+          },
+          "message_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Message Count",
+            "default": 0
+          },
+          "last_message_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message Preview"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "active_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveConversationRunSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "context_revision"
+        ],
+        "title": "ConversationSummary",
+        "description": "Searchable, bounded conversation listing item."
+      },
+      "DatabaseConnectionTestResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "backend": {
+            "type": "string",
+            "const": "sqlite",
+            "title": "Backend"
+          },
+          "database_path": {
+            "type": "string",
+            "title": "Database Path"
+          },
+          "schema_status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "upgradable",
+              "empty"
+            ],
+            "title": "Schema Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "backend",
+          "database_path",
+          "schema_status",
+          "message"
+        ],
+        "title": "DatabaseConnectionTestResponse"
+      },
+      "DatabaseSettingsRequest": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "const": "sqlite",
+            "title": "Backend",
+            "default": "sqlite"
+          },
+          "database_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Database Path"
+          },
+          "sqlite_lock_timeout_seconds": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sqlite Lock Timeout Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "database_path",
+          "sqlite_lock_timeout_seconds"
+        ],
+        "title": "DatabaseSettingsRequest"
+      },
+      "DatabaseSettingsResponse": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "const": "sqlite",
+            "title": "Backend"
+          },
+          "database_path": {
+            "type": "string",
+            "title": "Database Path"
+          },
+          "sqlite_lock_timeout_seconds": {
+            "type": "integer",
+            "title": "Sqlite Lock Timeout Seconds"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "backend",
+          "database_path",
+          "sqlite_lock_timeout_seconds"
+        ],
+        "title": "DatabaseSettingsResponse"
+      },
+      "GeospatialCatalogResponse": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "providers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "basemaps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Basemaps"
+          },
+          "overlays": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Overlays"
+          },
+          "cameras": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Cameras"
+          },
+          "transit": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Transit"
+          },
+          "tools": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GeospatialCatalogResponse"
+      },
+      "GeospatialCredentialStatusResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "required",
+          "configured"
+        ],
+        "title": "GeospatialCredentialStatusResponse"
+      },
+      "GeospatialLayersResponse": {
+        "properties": {
+          "basemaps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Basemaps"
+          },
+          "overlays": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Overlays"
+          },
+          "cameras": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Cameras"
+          },
+          "transit": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Transit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GeospatialLayersResponse"
+      },
+      "GeospatialProviderAccountSetupListResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/GeospatialProviderAccountSetupResponse"
+            },
+            "type": "array",
+            "title": "Providers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GeospatialProviderAccountSetupListResponse"
+      },
+      "GeospatialProviderAccountSetupResponse": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "requires_credentials": {
+            "type": "boolean",
+            "title": "Requires Credentials"
+          },
+          "auth_mode": {
+            "type": "string",
+            "title": "Auth Mode"
+          },
+          "docs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs Url"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "default": false
+          },
+          "instructions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Instructions"
+          },
+          "automation": {
+            "$ref": "#/components/schemas/GeospatialProviderSignupAutomation"
+          },
+          "credential_storage_key": {
+            "type": "string",
+            "title": "Credential Storage Key"
+          },
+          "credential_label": {
+            "type": "string",
+            "title": "Credential Label"
+          },
+          "key_format_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Format Hint"
+          },
+          "validation_supported": {
+            "type": "boolean",
+            "title": "Validation Supported",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_id",
+          "name",
+          "requires_credentials",
+          "auth_mode",
+          "automation",
+          "credential_storage_key",
+          "credential_label"
+        ],
+        "title": "GeospatialProviderAccountSetupResponse"
+      },
+      "GeospatialProviderPayloadResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "payload": {
+            "title": "Payload"
+          },
+          "attribution": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attribution"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "result_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Type"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "observation_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Time"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "spatial_resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spatial Resolution"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Units"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "provider"
+        ],
+        "title": "GeospatialProviderPayloadResponse"
+      },
+      "GeospatialProviderSignupAutomation": {
+        "properties": {
+          "support": {
+            "type": "string",
+            "enum": [
+              "manual_only",
+              "guided_playwright",
+              "agent_assisted",
+              "unsupported"
+            ],
+            "title": "Support"
+          },
+          "signup_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Url"
+          },
+          "developer_portal_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Developer Portal Url"
+          },
+          "docs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs Url"
+          },
+          "required_fields": {
+            "items": {
+              "$ref": "#/components/schemas/GeospatialProviderSignupField"
+            },
+            "type": "array",
+            "title": "Required Fields"
+          },
+          "user_action_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "User Action Notes"
+          },
+          "safety_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Safety Notes"
+          },
+          "experimental": {
+            "type": "boolean",
+            "title": "Experimental",
+            "default": true
+          },
+          "experimental_label": {
+            "type": "string",
+            "title": "Experimental Label",
+            "default": "Experimental guided setup"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "support"
+        ],
+        "title": "GeospatialProviderSignupAutomation"
+      },
+      "GeospatialProviderSignupField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "field_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "email",
+              "textarea",
+              "select"
+            ],
+            "title": "Field Type",
+            "default": "text"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive",
+            "default": false
+          },
+          "help_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "GeospatialProviderSignupField"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InspectionField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": "general"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "title": "InspectionField",
+        "description": "A bounded, allowlisted scalar exposed by the map inspection UI."
+      },
+      "JsonAgentExecutionSettings": {
+        "properties": {
+          "initial_run_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "minimum": 1.0,
+            "title": "Initial Run Seconds",
+            "default": 300.0
+          },
+          "simple_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "minimum": 1.0,
+            "title": "Simple Seconds",
+            "default": 450.0
+          },
+          "complex_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "minimum": 1.0,
+            "title": "Complex Seconds",
+            "default": 600.0
+          },
+          "context_assembly_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Context Assembly Seconds",
+            "default": 5.0
+          },
+          "native_model_call_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 0.1,
+            "title": "Native Model Call Seconds",
+            "default": 120.0
+          },
+          "tool_execution_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 0.1,
+            "title": "Tool Execution Seconds",
+            "default": 90.0
+          },
+          "tool_absolute_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 0.1,
+            "title": "Tool Absolute Seconds",
+            "default": 120.0
+          },
+          "map_assembly_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Map Assembly Seconds",
+            "default": 20.0
+          },
+          "persistence_seconds": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Persistence Seconds",
+            "default": 5.0
+          },
+          "render_ack_seconds": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 0.1,
+            "title": "Render Ack Seconds",
+            "default": 120.0
+          },
+          "max_tool_result_chars": {
+            "type": "integer",
+            "maximum": 500000.0,
+            "minimum": 128.0,
+            "title": "Max Tool Result Chars",
+            "default": 16384
+          },
+          "max_iterations": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Iterations",
+            "default": 40
+          },
+          "max_render_attempts": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Render Attempts",
+            "default": 5
+          },
+          "max_discovery_attempts": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Discovery Attempts",
+            "default": 4
+          },
+          "max_no_progress_corrections": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max No Progress Corrections",
+            "default": 3
+          },
+          "max_unproductive_steps": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Unproductive Steps",
+            "default": 5
+          },
+          "simple_max_model_calls": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Simple Max Model Calls",
+            "default": 12
+          },
+          "complex_max_model_calls": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Complex Max Model Calls",
+            "default": 30
+          },
+          "simple_max_tool_calls": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Simple Max Tool Calls",
+            "default": 20
+          },
+          "complex_max_tool_calls": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Complex Max Tool Calls",
+            "default": 60
+          },
+          "simple_max_state_transitions": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Simple Max State Transitions",
+            "default": 100
+          },
+          "complex_max_state_transitions": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Complex Max State Transitions",
+            "default": 200
+          },
+          "max_parallel_tool_calls": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Max Parallel Tool Calls",
+            "default": 8
+          },
+          "max_consecutive_tool_failures": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Consecutive Tool Failures",
+            "default": 5
+          },
+          "max_same_failed_fingerprint": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Same Failed Fingerprint",
+            "default": 3
+          },
+          "max_route_corrections": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Route Corrections",
+            "default": 2
+          },
+          "max_validation_corrections": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Max Validation Corrections",
+            "default": 4
+          },
+          "model_max_attempts": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Model Max Attempts",
+            "default": 3
+          },
+          "provider_max_attempts": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Provider Max Attempts",
+            "default": 3
+          },
+          "retry_backoff_base_seconds": {
+            "type": "number",
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "Retry Backoff Base Seconds",
+            "default": 0.25
+          },
+          "retry_backoff_max_seconds": {
+            "type": "number",
+            "maximum": 120.0,
+            "minimum": 0.0,
+            "title": "Retry Backoff Max Seconds",
+            "default": 2.0
+          },
+          "provider_request_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 0.1,
+            "title": "Provider Request Seconds",
+            "default": 30.0
+          },
+          "vision_policy": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "always",
+              "on_failure",
+              "final_check"
+            ],
+            "title": "Vision Policy",
+            "default": "disabled"
+          },
+          "vision_max_calls": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Vision Max Calls",
+            "default": 2
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 262144.0,
+            "minimum": 1024.0,
+            "title": "Max Output Tokens",
+            "default": 32768
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonAgentExecutionSettings"
+      },
+      "JsonChatRuntimeSettings": {
+        "properties": {
+          "max_history_messages": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max History Messages",
+            "default": 24
+          },
+          "application_timezone": {
+            "type": "string",
+            "title": "Application Timezone",
+            "default": "UTC"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonChatRuntimeSettings"
+      },
+      "JsonGIBSSettings": {
+        "properties": {
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-GIBS/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 20.0
+          },
+          "capabilities_ttl_s": {
+            "type": "number",
+            "minimum": 60.0,
+            "title": "Capabilities Ttl S",
+            "default": 21600.0
+          },
+          "max_cache_entries": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Cache Entries",
+            "default": 24
+          },
+          "bbox_precision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Bbox Precision",
+            "default": 6
+          },
+          "wms_base_endpoints": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Wms Base Endpoints"
+          },
+          "retry_backoff_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "title": "Retry Backoff S",
+            "default": 2.0
+          },
+          "min_visual_radius_m": {
+            "type": "number",
+            "minimum": 1000.0,
+            "title": "Min Visual Radius M",
+            "default": 20000.0
+          },
+          "image_width": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 512.0,
+            "title": "Image Width",
+            "default": 1024
+          },
+          "image_height": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 512.0,
+            "title": "Image Height",
+            "default": 1024
+          },
+          "default_layer": {
+            "type": "string",
+            "title": "Default Layer",
+            "default": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+          },
+          "capabilities_endpoints": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Capabilities Endpoints"
+          },
+          "ows_namespaces": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Ows Namespaces"
+          },
+          "layer_sync_user_agent": {
+            "type": "string",
+            "title": "Layer Sync User Agent",
+            "default": "AEGIS-GIBS-LayerSync/1.0"
+          },
+          "layer_sync_timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Layer Sync Timeout",
+            "default": 30.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonGIBSSettings"
+      },
+      "JsonGeospatialSettings": {
+        "properties": {
+          "min_timeline_year": {
+            "type": "integer",
+            "maximum": 9999.0,
+            "minimum": 1.0,
+            "title": "Min Timeline Year",
+            "default": 1900
+          },
+          "max_lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Max Lat",
+            "default": 90.0
+          },
+          "min_lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Min Lat",
+            "default": -90.0
+          },
+          "max_lon": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Max Lon",
+            "default": 180.0
+          },
+          "min_lon": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Min Lon",
+            "default": -180.0
+          },
+          "max_mercator_extent": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Mercator Extent",
+            "default": 20037508.3427892
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonGeospatialSettings"
+      },
+      "JsonMapSettings": {
+        "properties": {
+          "default_size_m": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Default Size M",
+            "default": 500.0
+          },
+          "render_delay_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Render Delay S",
+            "default": 1.0
+          },
+          "tiles": {
+            "type": "string",
+            "title": "Tiles",
+            "default": "OpenStreetMap"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonMapSettings"
+      },
+      "JsonNominatimSettings": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://nominatim.openstreetmap.org/search"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 10.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonNominatimSettings"
+      },
+      "JsonOpenMeteoSettings": {
+        "properties": {
+          "weather_base_url": {
+            "type": "string",
+            "title": "Weather Base Url",
+            "default": "https://api.open-meteo.com/v1/forecast"
+          },
+          "air_quality_base_url": {
+            "type": "string",
+            "title": "Air Quality Base Url",
+            "default": "https://air-quality-api.open-meteo.com/v1/air-quality"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-OpenMeteo/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 15.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 600.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.15
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonOpenMeteoSettings"
+      },
+      "JsonOverpassSettings": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://overpass-api.de/api/interpreter"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-Overpass/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 20.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 600.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.2
+          },
+          "default_radius_m": {
+            "type": "number",
+            "minimum": 100.0,
+            "title": "Default Radius M",
+            "default": 2500.0
+          },
+          "default_limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Default Limit",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonOverpassSettings"
+      },
+      "JsonRainViewerSettings": {
+        "properties": {
+          "metadata_url": {
+            "type": "string",
+            "title": "Metadata Url",
+            "default": "https://api.rainviewer.com/public/weather-maps.json"
+          },
+          "user_agent": {
+            "type": "string",
+            "title": "User Agent",
+            "default": "AEGIS-RainViewer/1.0"
+          },
+          "timeout": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Timeout",
+            "default": 15.0
+          },
+          "cache_ttl_s": {
+            "type": "number",
+            "minimum": 30.0,
+            "title": "Cache Ttl S",
+            "default": 300.0
+          },
+          "min_call_interval_s": {
+            "type": "number",
+            "minimum": 0.05,
+            "title": "Min Call Interval S",
+            "default": 0.2
+          },
+          "tile_color_scheme": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Tile Color Scheme",
+            "default": 2
+          },
+          "tile_smooth": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Tile Smooth",
+            "default": 1
+          },
+          "tile_snow": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Tile Snow",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JsonRainViewerSettings"
+      },
+      "LocationHierarchy": {
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/LocationHierarchyEntry"
+          },
+          "parents": {
+            "items": {
+              "$ref": "#/components/schemas/LocationHierarchyEntry"
+            },
+            "type": "array",
+            "title": "Parents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "title": "LocationHierarchy",
+        "description": "The single target and its geographic parent context."
+      },
+      "LocationHierarchyEntry": {
+        "properties": {
+          "signal_type": {
+            "type": "string",
+            "title": "Signal Type"
+          },
+          "raw_value": {
+            "type": "string",
+            "title": "Raw Value"
+          },
+          "normalized_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized Value"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "text"
+          },
+          "canonical_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "signal_type",
+          "raw_value"
+        ],
+        "title": "LocationHierarchyEntry",
+        "description": "One user/entity signal retained in the resolved location hierarchy."
+      },
+      "LocationResolutionProvenance": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "result_status": {
+            "type": "string",
+            "title": "Result Status",
+            "default": "ok"
+          },
+          "result_type": {
+            "type": "string",
+            "title": "Result Type",
+            "default": "location"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "LocationResolutionProvenance",
+        "description": "Provider evidence for a location resolved outside the tool registry."
+      },
+      "MapInspection": {
+        "properties": {
+          "inspection_id": {
+            "type": "string",
+            "title": "Inspection Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "association": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "location",
+              "overlay",
+              "non_spatial"
+            ],
+            "title": "Association"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "feature_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Id"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/InspectionField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inspection_id",
+          "title",
+          "association"
+        ],
+        "title": "MapInspection"
+      },
+      "MapSession": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "resolved_location": {
+            "$ref": "#/components/schemas/ResolvedLocation"
+          },
+          "basemap_id": {
+            "type": "string",
+            "title": "Basemap Id"
+          },
+          "viewport": {
+            "$ref": "#/components/schemas/ViewportPolicy"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "center": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Center"
+          },
+          "bounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bounds"
+          },
+          "basemap": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basemap"
+          },
+          "compliance_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Compliance Warnings"
+          },
+          "overlay_collection": {
+            "$ref": "#/components/schemas/OverlayCollectionState"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "resolved_location",
+          "basemap_id",
+          "viewport",
+          "overlay_collection"
+        ],
+        "title": "MapSession"
+      },
+      "ModelCardDescriptor": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "supports_tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tools"
+          },
+          "supports_structured_output": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Structured Output"
+          },
+          "supports_vision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Vision"
+          },
+          "supports_embeddings": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Embeddings"
+          },
+          "tool_support_source": {
+            "type": "string",
+            "title": "Tool Support Source",
+            "default": "unknown"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "agent_selection_disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Selection Disabled Reason"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "maximum_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
+            "default": "unknown"
+          },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
+            "default": "unknown"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "provider"
+        ],
+        "title": "ModelCardDescriptor"
+      },
+      "ModelLibraryResponse": {
+        "properties": {
+          "cloud": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCardDescriptor"
+            },
+            "type": "array",
+            "title": "Cloud"
+          },
+          "local": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCardDescriptor"
+            },
+            "type": "array",
+            "title": "Local"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelLibrarySourceStatus"
+            },
+            "type": "object",
+            "title": "Sources"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ModelLibraryResponse"
+      },
+      "ModelLibrarySourceStatus": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reachable"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "model_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "ModelLibrarySourceStatus"
+      },
+      "ModelSettingsResponse": {
+        "properties": {
+          "active_provider_mode": {
+            "type": "string",
+            "enum": [
+              "local",
+              "cloud"
+            ],
+            "title": "Active Provider Mode"
+          },
+          "agent_model_provider": {
+            "type": "string",
+            "title": "Agent Model Provider"
+          },
+          "agent_model_name": {
+            "type": "string",
+            "title": "Agent Model Name"
+          },
+          "ollama_url": {
+            "type": "string",
+            "title": "Ollama Url"
+          },
+          "openai_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openai Base Url"
+          },
+          "google_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Base Url"
+          },
+          "deepseek_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deepseek Base Url"
+          },
+          "credentials": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Credentials"
+          },
+          "credential_health": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Credential Health"
+          },
+          "selected_model_context": {
+            "$ref": "#/components/schemas/SelectedModelContextResponse"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "active_provider_mode",
+          "agent_model_provider",
+          "agent_model_name",
+          "ollama_url",
+          "credentials",
+          "selected_model_context"
+        ],
+        "title": "ModelSettingsResponse"
+      },
+      "ModelSettingsUpdateRequest": {
+        "properties": {
+          "active_provider_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "cloud"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Provider Mode"
+          },
+          "agent_model_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Model Provider"
+          },
+          "agent_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Model Name"
+          },
+          "ollama_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Url"
+          },
+          "openai_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openai Base Url"
+          },
+          "google_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Base Url"
+          },
+          "deepseek_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deepseek Base Url"
+          },
+          "credentials": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Credentials"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ModelSettingsUpdateRequest"
+      },
+      "OllamaHealthResponse": {
+        "properties": {
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "OllamaHealthResponse"
+      },
+      "OllamaPullRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "OllamaPullRequest"
+      },
+      "OllamaPullResponse": {
+        "properties": {},
+        "additionalProperties": true,
+        "type": "object",
+        "title": "OllamaPullResponse"
+      },
+      "OllamaRefreshResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "library_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Library Models"
+          },
+          "local_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Local Models"
+          },
+          "local_model_capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCardDescriptor"
+            },
+            "type": "array",
+            "title": "Local Model Capabilities"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "OllamaRefreshResponse"
+      },
+      "OverlayCollectionState": {
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "default": "active-map"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision",
+            "default": 0
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/OverlayInstance"
+            },
+            "type": "array",
+            "title": "Instances"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlayCollectionState"
+      },
+      "OverlayInstance": {
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "title": "Instance Id"
+          },
+          "capability_id": {
+            "type": "string",
+            "title": "Capability Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "overlay_type": {
+            "type": "string",
+            "title": "Overlay Type"
+          },
+          "rendering_mode": {
+            "type": "string",
+            "title": "Rendering Mode"
+          },
+          "scope_key": {
+            "type": "string",
+            "title": "Scope Key",
+            "default": "global"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "resolved_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "viewport": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "opacity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Opacity",
+            "default": 1.0
+          },
+          "render_variant": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Render Variant"
+          },
+          "descriptor": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Descriptor"
+          },
+          "inspections": {
+            "items": {
+              "$ref": "#/components/schemas/MapInspection"
+            },
+            "type": "array",
+            "title": "Inspections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instance_id",
+          "capability_id",
+          "label",
+          "provider",
+          "overlay_type",
+          "rendering_mode"
+        ],
+        "title": "OverlayInstance",
+        "description": "Stable capability instance rendered on a map at one scoped location."
+      },
+      "PendingClarification": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "source_turn_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Source Turn Index",
+            "default": 0
+          },
+          "source_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Request Id"
+          },
+          "scope": {
+            "type": "string",
+            "const": "current_request",
+            "title": "Scope",
+            "default": "current_request"
+          },
+          "scope_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "title": "Scope Terms"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "generic",
+              "infrastructure_subtype"
+            ],
+            "title": "Kind",
+            "default": "generic"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Options"
+          },
+          "selected_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Option"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "deferred",
+              "answered"
+            ],
+            "title": "Status",
+            "default": "active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "PendingClarification",
+        "description": "A clarification tied to the request that produced it.\n\nThis record is the durable source of truth: status and source terms let a\nlater turn consume the clarification without making it a global blocker\nfor unrelated work."
+      },
+      "RenderCaptureCreateRequest": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "map_session_id": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Map Session Id"
+          },
+          "collection_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Collection Revision"
+          },
+          "mime_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "default": "image/jpeg"
+          },
+          "image_base64": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Image Base64"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Height"
+          },
+          "viewport_bounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport Bounds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_version",
+          "map_session_id",
+          "collection_revision",
+          "image_base64",
+          "width",
+          "height"
+        ],
+        "title": "RenderCaptureCreateRequest"
+      },
+      "RenderCaptureResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "map_session_id": {
+            "type": "string",
+            "title": "Map Session Id"
+          },
+          "collection_revision": {
+            "type": "integer",
+            "title": "Collection Revision"
+          },
+          "stored": {
+            "type": "boolean",
+            "title": "Stored"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "map_session_id",
+          "collection_revision",
+          "stored"
+        ],
+        "title": "RenderCaptureResponse"
+      },
+      "RequestObligation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "location",
+              "data",
+              "analysis",
+              "presentation"
+            ],
+            "title": "Kind"
+          },
+          "target_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Ids"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "temporal_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTemporalScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "RequestObligation",
+        "description": "One server-normalized part of the request the run must honour.\n\nDerived from the validated route (targets, data needs, analysis and\npresentation) plus the parts the routing model declared, so tasks,\ncoverage checks and completion read the same obligations."
+      },
+      "ResolvedLocation": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "resolver"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "location_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Type"
+          },
+          "location_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Class"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "bbox_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox Source"
+          },
+          "wikidata_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^Q\\d+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wikidata Id"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationResolutionProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hierarchy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationHierarchy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "latitude",
+          "longitude"
+        ],
+        "title": "ResolvedLocation"
+      },
+      "RouteObligation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "location",
+              "data",
+              "analysis",
+              "presentation"
+            ],
+            "title": "Kind"
+          },
+          "target_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Target Refs"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "RouteObligation"
+      },
+      "RunTraceEntry": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Run Version"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "user",
+              "internal"
+            ],
+            "title": "Visibility"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id"
+          },
+          "iteration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iteration"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "retryable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryable"
+          },
+          "error": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "sequence",
+          "conversation_id",
+          "run_id",
+          "run_version",
+          "type",
+          "visibility",
+          "timestamp",
+          "kind"
+        ],
+        "title": "RunTraceEntry",
+        "description": "Redacted operational trace row; never a chain-of-thought contract."
+      },
+      "RunTraceResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Version"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RunTraceEntry"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "default": 0
+          },
+          "pagination": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Pagination"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "run_id"
+        ],
+        "title": "RunTraceResponse"
+      },
+      "RuntimeSettingsResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "nominatim": {
+            "$ref": "#/components/schemas/JsonNominatimSettings"
+          },
+          "geospatial": {
+            "$ref": "#/components/schemas/JsonGeospatialSettings"
+          },
+          "map": {
+            "$ref": "#/components/schemas/JsonMapSettings"
+          },
+          "chat": {
+            "$ref": "#/components/schemas/JsonChatRuntimeSettings"
+          },
+          "openmeteo": {
+            "$ref": "#/components/schemas/JsonOpenMeteoSettings"
+          },
+          "overpass": {
+            "$ref": "#/components/schemas/JsonOverpassSettings"
+          },
+          "rainviewer": {
+            "$ref": "#/components/schemas/JsonRainViewerSettings"
+          },
+          "gibs": {
+            "$ref": "#/components/schemas/JsonGIBSSettings"
+          },
+          "agent_execution": {
+            "$ref": "#/components/schemas/JsonAgentExecutionSettings"
+          },
+          "restart_required": {
+            "type": "boolean",
+            "title": "Restart Required",
+            "default": false
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nominatim",
+          "geospatial",
+          "map",
+          "chat",
+          "openmeteo",
+          "overpass",
+          "rainviewer",
+          "gibs",
+          "agent_execution"
+        ],
+        "title": "RuntimeSettingsResponse"
+      },
+      "RuntimeSettingsUpdateRequest": {
+        "properties": {
+          "nominatim": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nominatim"
+          },
+          "geospatial": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geospatial"
+          },
+          "map": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Map"
+          },
+          "chat": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat"
+          },
+          "openmeteo": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openmeteo"
+          },
+          "overpass": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overpass"
+          },
+          "rainviewer": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rainviewer"
+          },
+          "gibs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gibs"
+          },
+          "agent_execution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Execution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RuntimeSettingsUpdateRequest",
+        "description": "A strict top-level partial update; nested values are validated atomically."
+      },
+      "SelectedModelContextResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "maximum_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
+            "default": "unknown"
+          },
+          "context_metadata_authority": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Context Metadata Authority",
+            "default": "unknown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "SelectedModelContextResponse"
+      },
+      "TargetRequirement": {
+        "properties": {
+          "target_ref": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Target Ref"
+          },
+          "temporal_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTemporalScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spatial_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSpatialScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_ref"
+        ],
+        "title": "TargetRequirement",
+        "description": "Scope that applies to one target only; unset fields use the route's."
+      },
+      "ToolExecutionError": {
+        "properties": {
+          "error_type": {
+            "type": "string",
+            "enum": [
+              "malformed_call",
+              "unknown_tool",
+              "tool_not_exposed",
+              "schema_validation",
+              "semantic_validation",
+              "policy_rejection",
+              "state_conflict",
+              "timeout",
+              "rate_limit",
+              "authentication",
+              "provider_unavailable",
+              "provider_malformed_response",
+              "invalid_tool_output",
+              "internal_error"
+            ],
+            "title": "Error Type"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable"
+          },
+          "recovery": {
+            "type": "string",
+            "enum": [
+              "correct_arguments",
+              "retry_transport",
+              "choose_alternate_tool",
+              "replan",
+              "request_user_input",
+              "terminal"
+            ],
+            "title": "Recovery"
+          },
+          "validation_errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            },
+            "type": "array",
+            "title": "Validation Errors"
+          },
+          "upstream_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 599.0,
+                "minimum": 100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Status"
+          },
+          "timeout_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Origin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error_type",
+          "code",
+          "message",
+          "retryable",
+          "recovery"
+        ],
+        "title": "ToolExecutionError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationIssue": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssue"
+      },
+      "ViewportPolicy": {
+        "properties": {
+          "center_latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Center Latitude"
+          },
+          "center_longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Center Longitude"
+          },
+          "radius_m": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Radius M",
+            "default": 2500.0
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "center_latitude",
+          "center_longitude"
+        ],
+        "title": "ViewportPolicy"
+      }
+    }
+  }
+}
