@@ -86,6 +86,7 @@ from server.services.agent.tool_executor import (
     build_rejection_feedback,
 )
 from server.services.agent.completion import (
+    RASTER_ONLY_CODE,
     CompletionEvaluator,
     build_completion_summary,
     data_verified_empty,
@@ -3826,6 +3827,19 @@ class AgentLoop:
                 "insufficient_evidence",
                 "The requested date has no imagery." + AgentLoop._empty_result_note(state),
             )
+        raster_only = next(
+            (
+                result.error.message
+                for result in results
+                if result.error is not None
+                and result.error.code == RASTER_ONLY_CODE
+                and result.error.recovery == "terminal"
+            ),
+            None,
+        )
+        if raster_only is not None:
+            # No capability can supply records the request needs: answer now.
+            return "insufficient_evidence", raster_only
         if any(result.status != "failed" for result in results):
             if (
                 all(result.status == "valid_empty" for result in results)

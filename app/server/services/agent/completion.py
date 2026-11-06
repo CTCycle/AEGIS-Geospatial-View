@@ -52,6 +52,9 @@ _NUMERIC_AGGREGATIONS = frozenset({
     "maximum", "max", "minimum", "min", "mean", "average", "avg", "sum", "total", "median", "count",
 })
 
+# Error code of a transform on evidence that is raster imagery without records.
+RASTER_ONLY_CODE = "unsupported_evidence_records"
+
 ###############################################################################
 def needs_numeric_values(state: AgentRunState) -> bool:
     """Whether the request asks for computed values, not for imagery.
@@ -1161,6 +1164,7 @@ __all__ = [
     "evidence_numbers",
     "presentation_contract",
     "describe_requirements",
+    "RASTER_ONLY_CODE",
     "imagery_only_note",
     "ledger_outcomes",
     "needs_numeric_values",

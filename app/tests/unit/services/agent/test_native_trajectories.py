@@ -674,6 +674,35 @@ def test_raster_descriptor_does_not_close_numeric_retrieval() -> None:
 
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_transform_on_raster_imagery_fails_fast_and_ends_a_request_for_values() -> None:
+    repo = MemoryEvidence()
+    raster = repo.create(kind="raster_descriptor", media_type="application/json", status="available",
+                         payload={"layer": "fires"}, summary={}, provenance={"provider_id": "gibs"})
+    operations = [{"op": "limit", "value": 1}]
+
+    values = state()  # a ranking route: raster imagery never satisfies it
+    values.evidence_refs = [raster.evidence_id]
+    result = await EvidenceToolHandler(repository=repo).transform(
+        TransformEvidenceInput(evidence_refs=values.evidence_refs, operations=operations), values)
+    assert result.error is not None and result.error.recovery == "terminal"
+    stop = AgentLoop._evaluate_stop(values, values.route, [result], max_consecutive_tool_failures=3,
+                                    max_validation_corrections=3, max_discovery_attempts=3)
+    assert stop == ("insufficient_evidence", result.error.message)
+    assert "imagery" in result.error.message and "Not completed" not in result.error.message
+
+    display = state()
+    display.route.analysis = None  # imagery answers a plain display request
+    display.evidence_refs = [raster.evidence_id]
+    shown = await EvidenceToolHandler(repository=repo).transform(
+        TransformEvidenceInput(evidence_refs=display.evidence_refs, operations=operations), display)
+    assert shown.error is not None and shown.error.recovery == "choose_alternate_tool"
+    assert "apply_map_plan" in shown.error.message
+    assert AgentLoop._evaluate_stop(display, display.route, [shown], max_consecutive_tool_failures=3,
+                                    max_validation_corrections=3, max_discovery_attempts=3) is None
+
+
+###############################################################################
 def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -> None:
     from server.repositories.agent_runs import redact_trace_payload
     intent = {"kind": "rank", "metric": "rain", "order": "descending", "top_k": 5}

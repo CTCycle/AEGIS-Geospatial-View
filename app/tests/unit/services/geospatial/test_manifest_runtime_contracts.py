@@ -28,6 +28,17 @@ def test_population_discovery_includes_keyless_place_facts() -> None:
         assert "wikidata_place_facts" in {item["id"] for item in candidates}, query
 
 
+def test_prose_only_match_does_not_offer_an_unrelated_phenomenon() -> None:
+    # IMERG precipitation mentions "hotspot" only in its descriptive prose.
+    candidates = CapabilityRegistry().shortlist(
+        domains={CapabilityDomain.DATA_RETRIEVAL}, queries=["fire", "hotspots"],
+        explicit_ids=[], runtime_registry=RuntimeRegistry(),
+    )
+    ids = {item["id"] for item in candidates}
+    assert "MODIS_Combined_Thermal_Anomalies_Fire" in ids
+    assert "IMERG_Precipitation_Rate" not in ids
+
+
 ###############################################################################
 class _RuntimeEligibility:
 

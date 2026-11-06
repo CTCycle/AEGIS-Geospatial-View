@@ -394,11 +394,16 @@ class NominatimService:
             "street",
             "station",
         }:
+            # A named object is not a rival to a road of the same name: only
+            # a street, road or address request is about roads.
+            excluded_classes = {"administrative", "boundary"}
+            if expected not in {"address", "road", "street"}:
+                excluded_classes.add("highway")
             same_level_candidates = [
                 candidate
                 for candidate in ranked
                 if str(candidate.get("selected_result_class") or "").lower()
-                not in {"administrative", "boundary"}
+                not in excluded_classes
             ]
         elif expected in {"neighborhood", "neighbourhood", "district"}:
             same_level_candidates = [
@@ -454,10 +459,13 @@ class NominatimService:
         # candidate; this avoids stopping on well-ranked global places while
         # preserving clarification for close candidates such as Cambridge.
         if not has_parent_context:
-            if (
-                not generic_only_query
-                and first_confidence >= 0.8
-                and provider_importance_gap >= 0.25
+            if not generic_only_query and (
+                (first_confidence >= 0.8 and provider_importance_gap >= 0.25)
+                or (
+                    first_confidence >= 0.7
+                    and provider_importance_gap >= 0.15
+                    and second_importance <= 0.75 * first_importance
+                )
             ):
                 return []
             confidence_gap = 0.0

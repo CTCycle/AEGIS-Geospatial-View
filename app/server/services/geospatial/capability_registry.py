@@ -734,6 +734,7 @@ class CapabilityRegistry:
         requested_domains = set(domains)
         candidates: list[dict[str, Any]] = []
         strong_semantic_candidate_ids: set[str] = set()
+        subject_candidate_ids: set[str] = set()
         snapshot = self._ensure_snapshot()
         for item in (
             *snapshot.basemaps,
@@ -824,6 +825,8 @@ class CapabilityRegistry:
             identity_matches = meaningful_queries.intersection(
                 _identity_searchable_text(item)
             )
+            if not has_routing_alias and meaningful_queries.intersection(_subject_terms(item)):
+                subject_candidate_ids.add(capability_id)
             score = (
                 1000.0 - float(explicit_index)
                 if explicit_index is not None
@@ -869,6 +872,19 @@ class CapabilityRegistry:
                 candidate
                 for candidate in candidates
                 if str(candidate.get("id") or "") in strong_semantic_candidate_ids
+                or str(candidate.get("id") or "") in normalized_explicit
+            ]
+
+        # A term in a curated subject field (name, keywords, tags, variables)
+        # names what a capability provides; a term that only occurs in its
+        # descriptive prose ("rainfall hotspot identification") does not.
+        # Once any candidate matches the request's subject, prose-only matches
+        # are unrelated phenomena and are not offered.
+        if subject_candidate_ids and not has_routing_alias:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if str(candidate.get("id") or "") in subject_candidate_ids
                 or str(candidate.get("id") or "") in normalized_explicit
             ]
 
@@ -1238,6 +1254,27 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         for value in values
         for token in _query_tokens(value if is_json_array(value) else [value])
     }
+
+###############################################################################
+def _subject_terms(capability: dict[str, Any]) -> set[str]:
+    """Return the terms of the curated fields that name what a capability provides."""
+
+    agentic_use = json_object(capability.get("agenticUse"))
+    metadata = json_object(capability.get("metadata"))
+    values: list[object] = [
+        capability.get("id"),
+        capability.get("name"),
+        agentic_use.get("plannerHints"),
+        agentic_use.get("intentTags"),
+        metadata.get("keywords"),
+        metadata.get("action_tags"),
+        metadata.get("supported_categories"),
+        metadata.get("variables"),
+        metadata.get("label"),
+    ]
+    return _raw_query_tokens(
+        [item for value in values for item in (value if is_json_array(value) else [value])]
+    )
 
 ###############################################################################
 def _variable_terms(capability: dict[str, Any]) -> set[str]:

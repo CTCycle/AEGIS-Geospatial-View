@@ -65,6 +65,14 @@ scope/time requirements, requested operation, and presentation requirement.
 The model may choose among eligible capabilities, but it cannot remove
 application-owned completion obligations.
 
+An unqualified place name is not ambiguous when one candidate clearly
+dominates: the geocoder's own importance gap (at least 0.25 with confidence
+0.8, or at least 0.15 with confidence 0.7 and a rival under three quarters of
+the leader's importance) selects it, and a named object (landmark, POI,
+station) is never rivalled by a road of the same name unless a street, road or
+address was requested. The resolved label names the chosen candidate; comparable
+candidates (Springfield) still ask.
+
 Coordinates are resolved without geocoder egress, except a coordinate
 target that an `identification` obligation names: `resolve_geospatial_location`
 then calls `LocationResolver.reverse_geocode`, which asks the same keyless
@@ -316,6 +324,16 @@ bbox, radius) but another time window or filter; a plan with `remove_layer`,
 
 `transform_evidence` is the runtime name. `discover_geospatial_capabilities`
 is the generic model-facing capability-discovery boundary.
+When the request's terms name a capability's subject (id, name, keywords,
+tags, planner hints, variables, label), capabilities that match only through
+descriptive prose ("rainfall hotspot identification") are dropped from the
+shortlist, so a fire request never offers a precipitation raster.
+A raster descriptor is renderable imagery, not records: `transform_evidence`
+on it fails at once. For a request for values (`needs_numeric_values`) the
+error is terminal (`unsupported_evidence_records`) and the run answers in prose
+that only imagery exists and can be shown; otherwise the error points to
+`apply_map_plan`.
+
 `discover_geospatial_provider_layers` is also model-facing, but only when the
 route explicitly requests provider-native discovery and the generic manifest
 catalog is insufficient. It is not an interchangeable discovery alternative

@@ -21,6 +21,7 @@ from server.repositories.agent_evidence import (
     AgentEvidenceRepository,
     create_evidence_async,
 )
+from server.services.agent.completion import RASTER_ONLY_CODE, needs_numeric_values
 from server.services.agent.tool_definitions import (
     InspectEvidenceInput,
     TransformEvidenceInput,
@@ -150,9 +151,19 @@ class EvidenceToolHandler:
                 )
             summary, raw = item
             if summary.kind == "raster_descriptor":
+                if needs_numeric_values(state):
+                    return _failure(
+                        tool_name="transform_evidence", code=RASTER_ONLY_CODE,
+                        message=(
+                            "The matching source is map imagery only: it has no point or "
+                            "numeric records, so the requested values could not be computed. "
+                            "The imagery layer can be shown on the map instead."
+                        ),
+                        recovery="terminal", started=started,
+                    )
                 return _failure(
-                    tool_name="transform_evidence", code="unsupported_evidence_records",
-                    message="A raster descriptor has no numeric records to analyze. Retrieve located numeric feature evidence from another capability.",
+                    tool_name="transform_evidence", code=RASTER_ONLY_CODE,
+                    message="This evidence is raster imagery with no records to transform. Show it with apply_map_plan instead.",
                     recovery="choose_alternate_tool", started=started,
                 )
             if summary.status == "failed":

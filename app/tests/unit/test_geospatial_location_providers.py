@@ -297,6 +297,69 @@ def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     ) == []
 
 ###############################################################################
+def _city_candidate(name: str, region: str, country: str, *, lat: float, confidence: float, importance: float) -> dict[str, object]:
+    return {
+        "display_name": f"{name}, {region}, {country}",
+        "lat": lat,
+        "lon": 0.0,
+        "confidence": confidence,
+        "geocoder_importance": importance,
+        "selected_result_type": "city",
+        "selected_result_class": "place",
+        "address": {"city": name, "state": region, "country": country},
+    }
+
+
+def test_nominatim_accepts_a_clearly_more_prominent_city_but_not_a_comparable_one() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+
+    def ambiguous(first_importance: float, second_importance: float) -> list[dict[str, object]]:
+        return service._find_ambiguous_candidates(
+            [
+                _city_candidate("Wellington", "Wellington", "New Zealand", lat=-41.3, confidence=0.75, importance=first_importance),
+                _city_candidate("Wellington", "Texas", "United States", lat=34.8, confidence=0.7, importance=second_importance),
+            ],
+            expected_location_type="city",
+            query="Wellington",
+            has_parent_context=False,
+        )
+
+    assert ambiguous(0.66, 0.46) == []
+    assert len(ambiguous(0.6, 0.55)) == 2
+
+###############################################################################
+def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() -> None:
+    service = NominatimService(user_agent="test-suite", timeout=0.1)
+    ranked = [
+        {
+            "display_name": "Brandenburger Tor, Berlin, Germany",
+            "lat": 52.516,
+            "lon": 13.378,
+            "confidence": 0.7,
+            "geocoder_importance": 0.6,
+            "selected_result_type": "attraction",
+            "selected_result_class": "tourism",
+        },
+        {
+            "display_name": "Brandenburg Gate, Kaliningrad, Russia",
+            "lat": 54.7,
+            "lon": 20.5,
+            "confidence": 0.7,
+            "geocoder_importance": 0.55,
+            "selected_result_type": "residential",
+            "selected_result_class": "highway",
+        },
+    ]
+
+    def ambiguous(expected: str) -> list[dict[str, object]]:
+        return service._find_ambiguous_candidates(
+            ranked, expected_location_type=expected, query="Brandenburg Gate", has_parent_context=False
+        )
+
+    assert ambiguous("landmark") == []
+    assert len(ambiguous("street")) == 2
+
+###############################################################################
 @pytest.mark.parametrize(
     ("query", "major", "minor"),
     [
