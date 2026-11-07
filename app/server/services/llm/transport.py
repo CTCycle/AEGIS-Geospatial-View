@@ -17,6 +17,12 @@ class LLMTransportPolicy:
     max_attempts: int = 2
     retry_backoff_base_seconds: float = 0.25
     retry_backoff_max_seconds: float = 2.0
+    retry_after_max_seconds: float = 20.0
+    # A rate-limited provider usually throttles for longer than its Retry-After
+    # hint; its retries back off 2, 4, 8, 16, 16 s (about 46 s) before giving up.
+    rate_limit_max_attempts: int = 6
+    rate_limit_backoff_base_seconds: float = 2.0
+    rate_limit_backoff_max_seconds: float = 16.0
     proxy: str | None = None
     trust_env: bool = False
 
@@ -31,7 +37,7 @@ class LLMTransportPolicy:
             value = float(getattr(self, name))
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
-        if self.max_attempts < 1:
+        if self.max_attempts < 1 or self.rate_limit_max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         proxy = cast(object, self.proxy)
         if proxy is not None and not isinstance(proxy, str):
@@ -41,6 +47,9 @@ class LLMTransportPolicy:
         for name in (
             "retry_backoff_base_seconds",
             "retry_backoff_max_seconds",
+            "retry_after_max_seconds",
+            "rate_limit_backoff_base_seconds",
+            "rate_limit_backoff_max_seconds",
         ):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0:
@@ -103,14 +112,38 @@ class LLMTransportPolicy:
         return self.request_timeout_seconds
 
     # -------------------------------------------------------------------------
-    def retry_delay(self, attempt: int) -> float:
-        """Return the delay before the next attempt, using bounded exponential backoff."""
+    def attempts_for(self, *, rate_limited: bool) -> int:
+        """Attempts allowed for a failing call; rate limits get the longer schedule."""
+
+        if rate_limited:
+            return max(self.max_attempts, self.rate_limit_max_attempts)
+        return self.max_attempts
+
+    # -------------------------------------------------------------------------
+    def retry_delay(
+        self,
+        attempt: int,
+        retry_after_seconds: float | None = None,
+        *,
+        rate_limited: bool = False,
+    ) -> float:
+        """Return the delay before the next attempt.
+
+        Bounded exponential backoff (the slower rate-limit schedule for a
+        rate-limited call), raised to the provider's Retry-After hint (itself
+        capped by ``retry_after_max_seconds``) when one was supplied.
+        """
 
         exponent = max(0, int(attempt) - 1)
-        return min(
-            self.retry_backoff_max_seconds,
-            self.retry_backoff_base_seconds * (2**exponent),
+        base, ceiling = (
+            (self.rate_limit_backoff_base_seconds, self.rate_limit_backoff_max_seconds)
+            if rate_limited
+            else (self.retry_backoff_base_seconds, self.retry_backoff_max_seconds)
         )
+        backoff = min(ceiling, base * (2**exponent))
+        if retry_after_seconds is None:
+            return backoff
+        return max(backoff, min(retry_after_seconds, self.retry_after_max_seconds))
 
 ###############################################################################
 def close_sync_client(client: object) -> None:

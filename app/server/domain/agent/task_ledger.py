@@ -28,6 +28,9 @@ LEDGER_LIMIT = 32
 DEFAULT_FRESHNESS_SECONDS = 900
 # Entries of the most recent request shown to the model before routing.
 PROJECTED_TASK_LIMIT = 12
+# Unfinished entries of earlier requests shown alongside them.
+PROJECTED_OPEN_LIMIT = 4
+UNRESOLVED_STATUSES = frozenset({"in_progress", "blocked", "failed"})
 
 ###############################################################################
 def map_fingerprint(session: MapSession) -> str:
@@ -57,28 +60,46 @@ def merge_ledger(
 ) -> list[ConversationTask]:
     """Fold one run's outcomes into the ledger and bound it.
 
-    An outcome replaces the entry with the same task id, except that a
-    failed or unfinished attempt never erases a completed result.  Past the
-    limit the oldest completed entries go first, then the oldest of any kind.
+    An outcome replaces its own request's entry for the same task id, and a
+    completed outcome replaces an earlier completed one; a failed or blocked
+    attempt never erases a completed result.  Unfinished work of an earlier
+    request that the outcome takes over is kept as superseded.  Past the
+    limit superseded entries go first, then completed, then the oldest.
     """
 
     merged = list(tasks)
     for outcome in outcomes:
-        index = next(
-            (position for position, item in enumerate(merged) if item.task_id == outcome.task_id),
+        kept: list[ConversationTask] = []
+        record = True
+        for item in merged:
+            if not _replaces(outcome, item):
+                kept.append(item)
+            elif item.status == "completed":
+                if item.task_id != outcome.task_id or outcome.status != "completed":
+                    kept.append(item)
+                    # A worse result of the same run is not recorded at all.
+                    if item.task_id == outcome.task_id and item.source_request_id == outcome.source_request_id:
+                        record = False
+            elif item.source_request_id == outcome.source_request_id:
+                # The same run redoing an obligation replaces only that entry.
+                if item.task_id != outcome.task_id:
+                    kept.append(item)
+            elif item.status in UNRESOLVED_STATUSES:
+                kept.append(item.model_copy(update={"status": "superseded"}))
+            else:
+                kept.append(item)
+        merged = [*kept, outcome] if record else kept
+    while len(merged) > LEDGER_LIMIT:
+        evict = next(
+            (position for position, item in enumerate(merged) if item.status == "superseded"),
             None,
         )
-        if index is None:
-            merged.append(outcome)
-        elif outcome.status == "completed" or merged[index].status != "completed":
-            del merged[index]
-            merged.append(outcome)
-    while len(merged) > LEDGER_LIMIT:
-        oldest_completed = next(
-            (position for position, item in enumerate(merged) if item.status == "completed"),
-            0,
-        )
-        del merged[oldest_completed]
+        if evict is None:
+            evict = next(
+                (position for position, item in enumerate(merged) if item.status == "completed"),
+                0,
+            )
+        del merged[evict]
     return merged
 
 ###############################################################################
@@ -210,19 +231,41 @@ def same_window(
 
 ###############################################################################
 def ledger_view(tasks: list[ConversationTask]) -> list[dict[str, object]]:
-    """Compact pre-route projection: the latest request's entries and known places.
+    """Compact pre-route projection of the ledger.
 
-    Older evidence stays out of the model context; once the new goal is
-    routed, only its compatible entries are offered for reuse.
+    Shows the latest request's entries, known places, and the most recent
+    unfinished work of earlier requests (description, status, reason and
+    targets only), so a follow-up can refer back to it.  Older evidence stays
+    out of the model context; once the new goal is routed, only its
+    compatible entries are offered for reuse.
     """
 
     latest = next((item.source_request_id for item in reversed(tasks)), None)
-    selected = [
-        item
-        for item in tasks
+    current = [
+        position
+        for position, item in enumerate(tasks)
         if item.source_request_id == latest or (item.kind == "location" and item.status == "completed")
     ][-PROJECTED_TASK_LIMIT:]
-    return [_task_view(item) for item in selected]
+    earlier_open = [
+        position
+        for position, item in enumerate(tasks)
+        if item.source_request_id != latest and item.status in UNRESOLVED_STATUSES
+    ][-PROJECTED_OPEN_LIMIT:]
+    return [
+        _open_view(tasks[position]) if position in earlier_open else _task_view(tasks[position])
+        for position in sorted({*current, *earlier_open})
+    ]
+
+###############################################################################
+def _open_view(task: ConversationTask) -> dict[str, object]:
+    view: dict[str, object | None] = {
+        "id": task.task_id,
+        "description": task.description,
+        "status": task.status,
+        "reason": task.reason,
+        "targets": task.target_ids,
+    }
+    return {key: value for key, value in view.items() if value}
 
 ###############################################################################
 def _task_view(task: ConversationTask) -> dict[str, object]:
@@ -239,6 +282,7 @@ def _task_view(task: ConversationTask) -> dict[str, object]:
     view: dict[str, object | None] = {
         "id": task.task_id,
         "status": task.status,
+        "reason": task.reason,
         "targets": task.target_ids,
         "variable": task.variable,
         "capability_id": task.capability_id,
@@ -247,6 +291,24 @@ def _task_view(task: ConversationTask) -> dict[str, object]:
         "evidence_refs": task.evidence_refs,
     }
     return {key: value for key, value in view.items() if value}
+
+###############################################################################
+def _replaces(outcome: ConversationTask, item: ConversationTask) -> bool:
+    """Whether ``outcome`` addresses the same obligation as ``item``."""
+
+    if outcome.task_id == item.task_id:
+        return True
+    # Otherwise only a fully specified obligation: same kind, places and variable.
+    if (
+        outcome.kind != item.kind
+        or not outcome.target_ids
+        or len(outcome.target_ids) != len(item.target_ids)
+        or outcome.variable is None
+    ):
+        return False
+    return all(
+        any(same_target(left, right) for right in item.target_ids) for left in outcome.target_ids
+    ) and _same_variable(item.variable, outcome.variable)
 
 ###############################################################################
 def _same_variable(left: str | None, right: str) -> bool:
@@ -265,6 +327,7 @@ def _instant(value: str) -> datetime:
 __all__ = [
     "DEFAULT_FRESHNESS_SECONDS",
     "LEDGER_LIMIT",
+    "UNRESOLVED_STATUSES",
     "compatible_tasks",
     "complete_presentation",
     "freshness_seconds",

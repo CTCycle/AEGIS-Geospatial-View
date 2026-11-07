@@ -232,7 +232,7 @@ export class RealtimeService {
       const message = this.parseServerMessage(event.data);
       if (!message) {
         this.setState('failed');
-        socket.close(1002, 'invalid_server_message');
+        socket.close(4002, 'invalid_server_message');
         return;
       }
       if (message.correlation_id && (message.type === 'run.ack' || message.type === 'protocol.error')) {
@@ -290,7 +290,7 @@ export class RealtimeService {
           || command.sentGeneration !== this.socketGeneration) {
           return;
         }
-        this.socket?.close(1013, 'command_ack_timeout');
+        this.socket?.close(4013, 'command_ack_timeout');
       }, COMMAND_ACK_TIMEOUT_MS);
     });
   }
@@ -398,7 +398,7 @@ export class RealtimeService {
   }
 
   private isRetryableClose(code: number): boolean {
-    return ![1000, 1002, 1008, 1009, 4404].includes(code);
+    return ![1000, 1002, 1008, 1009, 4002, 4404].includes(code);
   }
 
   private setState(state: RealtimeConnectionState): void {

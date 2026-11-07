@@ -541,6 +541,7 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
         "collection_revision": 3,
         "basemap_id": "basemap:osm",
         "overlay_count": 2,
+        "layer_edits": 0,
         "render_status": "awaiting_render",
     }
     assert "features" not in result.model_dump(mode="json")

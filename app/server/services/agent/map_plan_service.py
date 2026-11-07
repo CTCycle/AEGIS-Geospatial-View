@@ -35,7 +35,7 @@ from server.domain.agent.tool_result import (
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.completion import evidence_numbers
+from server.services.agent.completion import evidence_numbers, layer_edit_count
 from server.services.agent.final_answer_check import value_is_supported
 from server.services.agent.tool_registry import (
     is_active_map_update,
@@ -458,6 +458,8 @@ class MapPlanService:
             "collection_revision": candidate.overlay_collection.revision,
             "basemap_id": candidate.basemap_id,
             "overlay_count": len(candidate.overlay_collection.instances),
+            # The diff to the committed map; it is gone once the render commits.
+            "layer_edits": layer_edit_count(state),
             "render_status": "awaiting_render",
         }
         return ToolResult(

@@ -296,11 +296,31 @@ def _latest_context_usage(
             "total_output_tokens",
         }
         payload = {key: value for key, value in item.items() if key in allowed}
+        payload["phases"] = _phase_usage(trace)
         try:
             return ContextUsageResponse.model_validate(payload)
         except Exception:
             continue
     return None
+
+###############################################################################
+def _phase_usage(trace: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Model calls and input tokens per loop phase (routing, execution, finalization)."""
+
+    phases: dict[str, dict[str, Any]] = {}
+    for item in trace:
+        phase = item.get("call_phase")
+        if not isinstance(phase, str):
+            continue
+        tokens = item.get("reported_input_tokens") or item.get("estimated_input_tokens") or 0
+        tokens = tokens if isinstance(tokens, int) else 0
+        entry = phases.setdefault(
+            phase, {"model_calls": 0, "total_input_tokens": 0, "peak_request_tokens": 0}
+        )
+        entry["model_calls"] += 1
+        entry["total_input_tokens"] += tokens
+        entry["peak_request_tokens"] = max(entry["peak_request_tokens"], tokens)
+    return phases
 
 ###############################################################################
 def _operation(

@@ -28,7 +28,7 @@ from server.contracts.location import LocationSignal
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult, ToolExecutionError
 from server.services.agent.capability_execution import _provider_params
-from server.services.agent.completion import presentation_contract
+from server.services.agent.completion import layer_edit_count, presentation_contract
 from server.services.agent.completion import CompletionEvaluator, ledger_outcomes
 from server.domain.agent.task_ledger import merge_ledger
 from server.services.agent.tool_definitions import ExecuteCapabilityInput, TransformEvidenceInput, CapabilityDiscoveryInput, RouteRequestInput
@@ -492,6 +492,11 @@ async def test_stale_lyon_does_not_bind_italy_search_area() -> None:
     assert result.tool_results[0].tool_name == "resolve_geospatial_location"
     assert any(location.label == "Italy" for location in value.location_refs.values())
     assert not providers.requests
+    # The unfinished data work is recorded as blocked with the stop reason, not dropped.
+    outcomes = ledger_outcomes(value, AgentLoop.completion_summary(value), now=datetime.now(UTC))
+    assert {(item.kind, item.status, item.reason) for item in outcomes} == {
+        ("location", "completed", None), ("data", "blocked", "insufficient_evidence"),
+        ("analysis", "blocked", "insufficient_evidence"), ("presentation", "blocked", "insufficient_evidence")}
 
 
 ###############################################################################
@@ -2151,11 +2156,15 @@ async def test_text_answer_ends_the_run_when_no_exposed_tool_can_close_the_pendi
 
 ###############################################################################
 @pytest.mark.asyncio
-@pytest.mark.parametrize("complies", [True, False])
-async def test_stored_evidence_follow_up_gets_one_targeted_correction(complies: bool) -> None:
+@pytest.mark.parametrize(("complies", "answer", "calls"), [
+    (True, "Paris is warmer.", 4), (True, "Both are at 100 mm.", 3), (False, "Paris is warmer.", 3),
+])
+async def test_stored_evidence_follow_up_gets_one_targeted_correction(complies: bool, answer: str, calls: int) -> None:
     # S12: "which of the two is warmer" over stored evidence needs one
     # transform_evidence; a model that stops without it is told exactly that
     # once, then its answer stands instead of repeating blind corrections.
+    # Once the derivation closes the contract, the held-back answer is final
+    # if it cites the derived figures: no second full-context synthesis.
     providers, evidence = DiscoveryProvider(), MemoryEvidence()
     first = await _turn([
         _call("route", "route_request", _city_weather_route("temperature")),
@@ -2172,10 +2181,10 @@ async def test_stored_evidence_follow_up_gets_one_targeted_correction(complies: 
         _call("route", "route_request", {
             "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text", "location_mode": "none",
             "operation": "inspect", "analysis": {"kind": "rank", "metric": "temperature", "top_k": 2}}),
-        LLMResult(content="Paris is warmer."),
+        LLMResult(content=answer),
         *([_call("transform", "transform_evidence", {"evidence_refs": refs, "operations": [
             {"op": "sort", "field": "precipitation_sum_mm", "descending": True}, {"op": "limit", "value": 2}]}),
-           LLMResult(content="Paris is warmer.")] if complies else [LLMResult(content="Paris is warmer.")] * 3),
+           LLMResult(content="Paris is warmer.")] if complies else [LLMResult(content=answer)] * 3),
     ])
     state = AgentRunState(
         phase=AgentPhase.RECEIVE_REQUEST, request_id="t2", conversation_id="ledger", user_message="Which is warmer?",
@@ -2192,7 +2201,56 @@ async def test_stored_evidence_follow_up_gets_one_targeted_correction(complies: 
     assert len(providers.requests) == fetched
     assert [item.tool_name for item in state.tool_results].count("transform_evidence") == int(complies)
     assert result.stopped_reason == ("goal_satisfied" if complies else "insufficient_evidence")
-    assert state.model_calls == (4 if complies else 3)
+    assert state.model_calls == calls
+    phases = ["routing", "execution", "execution", "finalization"][:calls]
+    assert [item["call_phase"] for item in state.context_usage_trace] == phases
+    if calls == 3 and complies:
+        assert result.final_text == answer
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_failed_derivation_after_the_targeted_correction_does_not_earn_a_second_one() -> None:
+    # The failed transform widens the pending set, so the correction text
+    # would differ and the identical-correction guard alone would allow another
+    # one. Every pending item is still derivable from held evidence, so the one
+    # correction is the cap and the next text stop finalizes.
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _city_weather_route("temperature")),
+        _call("resolve-paris", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
+        _call("resolve-berlin", "resolve_geospatial_location", {"query": "Berlin", "target_id": "Berlin"}),
+        *_city_executions("temperature"),
+        *(LLMResult(content="Paris 9 C, Berlin 9 C.") for _ in range(3)),
+    ], message="What are today's temperatures in Paris and Berlin?",
+        providers=providers, evidence=evidence, request_id="t1")
+    refs = list(first.evidence_refs)
+
+    model = _ScriptedProvider([
+        _call("route", "route_request", {
+            "primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text", "location_mode": "none",
+            "operation": "inspect", "analysis": {"kind": "rank", "metric": "temperature", "top_k": 2}}),
+        LLMResult(content="Paris is warmer."),
+        _call("transform", "transform_evidence", {"evidence_refs": refs, "operations": [
+            {"op": "sort", "field": "no_such_field", "descending": True}, {"op": "limit", "value": 2}]}),
+        *(LLMResult(content="Paris is warmer.") for _ in range(3)),
+    ])
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="t2", conversation_id="ledger", user_message="Which is warmer?",
+        context_hydrated=True, location_refs=dict(first.location_refs), evidence_refs=refs,
+        prior_tasks=list(first.prior_tasks),
+    )
+    result = await make_loop(model, providers, CityResolver(), evidence).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+
+    transform = next(item for item in state.tool_results if item.tool_name == "transform_evidence")
+    assert transform.status == "failed"
+    assert AgentLoop._pending_native_requirements(state) == [
+        "result_locations_derived", "required_data_retrieved", "requested_transform_applied"]
+    assert [item["observation_type"] for item in state.relevant_tool_outcomes].count("pending_requirements") == 1
+    assert state.no_progress_corrections == 1
+    assert state.model_calls == 4
+    assert result.stopped_reason == "insufficient_evidence"
 
 
 ###############################################################################
@@ -2243,3 +2301,11 @@ async def test_remove_layer_and_show_city_treats_the_layer_label_as_a_layer_not_
     # No data was requested, so the browser check must not demand a data layer per target.
     contract = presentation_contract(second, second.prepared_map_session)
     assert contract is None or contract.findings == []
+    # Once the browser commits the edit, the deterministic summary names the
+    # framed place and the answer check still knows a layer was removed.
+    committed = second.model_copy(update={
+        "active_map_session": second.prepared_map_session, "prepared_map_session": None, "render_verified": True,
+    })
+    summary = AgentLoop._verified_map_state_summary(committed) or ""
+    assert "The map is framed on Tokyo, Japan." in summary and "Visible overlays: none." in summary
+    assert layer_edit_count(committed) == 1

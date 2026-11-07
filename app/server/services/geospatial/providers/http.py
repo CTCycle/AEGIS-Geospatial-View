@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import json
 import inspect
-import math
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from email.utils import parsedate_to_datetime
-from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
 from typing import Any, Generator
 from urllib.parse import urlsplit
 
 import httpx
 
+from server.common.time import parse_retry_after
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderError,
@@ -538,26 +536,6 @@ def _valid_content_length(value: str) -> int:
 ###############################################################################
 def _retry_after_seconds(headers: httpx.Headers) -> float | None:
     return parse_retry_after(headers.get("retry-after"))
-
-###############################################################################
-def parse_retry_after(raw: str | None) -> float | None:
-    """Seconds to wait from a Retry-After value: delta-seconds or HTTP-date."""
-
-    if not raw:
-        return None
-    try:
-        seconds = float(raw)
-    except ValueError:
-        pass
-    else:
-        return max(0.0, seconds) if math.isfinite(seconds) else None
-    try:
-        retry_at = parsedate_to_datetime(raw)
-        if retry_at.tzinfo is None:
-            retry_at = retry_at.replace(tzinfo=UTC)
-        return max(0.0, (retry_at.astimezone(UTC) - datetime.now(UTC)).total_seconds())
-    except (TypeError, ValueError, OverflowError):
-        return None
 
 ###############################################################################
 async def fetch_text_url(url: str, headers: dict[str, str] | None = None) -> str:

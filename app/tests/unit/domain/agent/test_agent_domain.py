@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute, ConversationTask
 from server.prompts.capability_route import CAPABILITY_ROUTE_SYSTEM_PROMPT
 from server.domain.agent.conversation import ConversationState, PendingClarification
-from server.domain.agent.task_ledger import LEDGER_LIMIT, merge_ledger
+from server.domain.agent.task_ledger import LEDGER_LIMIT, ledger_view, merge_ledger
 from server.domain.agent.map_plan import MapPlan
 from server.domain.agent.tool_result import ModelObservation, ToolExecutionError, ToolExecutionMetadata, ToolResult, ValidationIssue
 
@@ -387,8 +387,59 @@ def test_task_ledger_is_additive_bounded_and_replaces_the_stale_route_in_the_pro
 
     projection = state.model_copy(update={"tasks": ledger}).context_projection("Just show Tokyo")
     assert "route" not in projection and "goal" not in projection and "tasks" not in projection
+    # The latest request's entries, plus earlier unfinished work in compact form.
     assert projection["conversation_tasks"] == [
+        {"id": "data:city-0", "description": "data", "status": "failed"},
         {"id": f"data:city-{LEDGER_LIMIT}", "status": "completed"}]
+
+
+###############################################################################
+def _ledger_task(task_id: str, status: str, request: str, **extra: object) -> ConversationTask:
+    kind = task_id.split(":")[0]
+    return ConversationTask.model_validate({
+        "task_id": task_id, "description": task_id, "kind": kind, "status": status,
+        "source_request_id": request, **extra})
+
+
+def test_ledger_supersedes_unfinished_work_and_projects_earlier_blocked_tasks() -> None:
+    ledger = merge_ledger([], [
+        _ledger_task("location:paris", "completed", "r1", target_ids=["Paris"]),
+        _ledger_task("data:paris:temperature", "blocked", "r1", reason="tool_budget_exhausted",
+                     target_ids=["Paris"], variable="temperature")])
+    ledger = merge_ledger(ledger, [_ledger_task("data:rome:radar", "completed", "r2", target_ids=["Rome"])])
+
+    # A follow-up sees the earlier blocked work and why it stopped.
+    projected = ConversationState(conversation_id="c", tasks=ledger).context_projection("try that again")
+    assert {"id": "data:paris:temperature", "description": "data:paris:temperature", "status": "blocked",
+            "reason": "tool_budget_exhausted", "targets": ["Paris"]} in projected["conversation_tasks"]
+
+    # A later request taking it over marks it superseded; it is no longer projected as open.
+    ledger = merge_ledger(ledger, [_ledger_task("data:paris:air-temperature", "completed", "r3",
+                                                target_ids=["Paris"], variable="air temperature")])
+    assert [item.status for item in ledger if item.target_ids == ["Paris"] and item.kind == "data"] == [
+        "superseded", "completed"]
+    assert not any(item.get("status") == "blocked" for item in ledger_view(ledger))
+
+    # A later blocked attempt is recorded but never erases the completed result.
+    ledger = merge_ledger(ledger, [_ledger_task("data:paris:air-temperature", "blocked", "r4",
+                                                target_ids=["Paris"], variable="air temperature")])
+    assert [item.status for item in ledger if item.task_id == "data:paris:air-temperature"] == [
+        "completed", "blocked"]
+
+
+def test_ledger_eviction_drops_superseded_then_completed_before_unresolved() -> None:
+    ledger = [
+        _ledger_task("data:open", "blocked", "r0", reason="no_progress"),
+        _ledger_task("data:done", "completed", "r1"),
+        _ledger_task("data:old", "superseded", "r2"),
+        *(_ledger_task(f"data:open-{index}", "blocked", f"r{index + 3}") for index in range(LEDGER_LIMIT - 3)),
+    ]
+    ledger = merge_ledger(ledger, [_ledger_task("data:new", "blocked", "r-a")])
+    assert "data:old" not in {item.task_id for item in ledger}
+    ledger = merge_ledger(ledger, [_ledger_task("data:newer", "blocked", "r-b")])
+    assert len(ledger) == LEDGER_LIMIT
+    assert {"data:old", "data:done"}.isdisjoint(item.task_id for item in ledger)
+    assert ledger[0].task_id == "data:open"
 
 
 def test_route_prompt_reserves_map_presentation_for_map_requests() -> None:

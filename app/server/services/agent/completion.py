@@ -1092,7 +1092,21 @@ def layer_edit_count(state: AgentRunState) -> int:
 
     before = state.active_map_session
     after = state.prepared_map_session
-    if before is None or after is None:
+    if after is None:
+        # After the render commits, the active map is the edited one: the
+        # diff survives only in the map-plan result that prepared it.
+        prepared = next(
+            (
+                item.data
+                for item in reversed(state.tool_results)
+                if item.tool_name == "apply_map_plan" and item.status == "success"
+                and isinstance(item.data, dict) and "layer_edits" in item.data
+            ),
+            None,
+        )
+        edits = prepared.get("layer_edits") if prepared is not None else 0
+        return edits if isinstance(edits, int) else 0
+    if before is None:
         return 0
     kept = {item.instance_id: item for item in after.overlay_collection.instances}
     return sum(
@@ -1345,8 +1359,9 @@ def ledger_outcomes(
     """Conversation-ledger entries for what this run verifiably did.
 
     Only the completion summary decides status: a met obligation completes,
-    a failed one fails, and an unmet one is not recorded, except a map that
-    is prepared and awaiting the browser.  Evidence and capability come from
+    a failed one fails, a map prepared and awaiting the browser stays in
+    progress, and any other unmet one is blocked with the run's stop reason,
+    so a follow-up can see unfinished work.  Evidence and capability come from
     the run's own tool results; a reused result keeps its original fetch
     time, so reuse never extends evidence freshness.
     """
@@ -1364,14 +1379,24 @@ def ledger_outcomes(
         if verdict is None:
             continue
         status: ConversationTaskStatus
+        reason: str | None = None
         if verdict.status == "met":
             status = "completed"
         elif verdict.status == "failed":
             status = "failed"
+            reason = (
+                "requested_transform_unmet"
+                if obligation.kind in {"data", "analysis"} and requested_transform_unmet(state)
+                else "provider_failed"
+            )
         elif obligation.kind == "presentation" and state.prepared_map_session is not None:
             status = "in_progress"
+        elif verdict.status == "unsupported":
+            status, reason = "blocked", "evidence_unsupported"
         else:
-            continue
+            status = "blocked"
+            stop = state.termination_reason
+            reason = stop[:80] if stop and stop != "goal_satisfied" else "unmet"
         target = obligation.target_ids[0] if obligation.target_ids else None
         result = (
             _obligation_result(state, obligation.kind, target)
@@ -1400,6 +1425,7 @@ def ledger_outcomes(
             description=_obligation_label(obligation)[:300],
             kind=obligation.kind,
             status=status,
+            reason=reason,
             dependencies=dependencies[:16],
             target_ids=list(obligation.target_ids),
             capability_id=result.metadata.capability_id if result is not None else None,

@@ -21,6 +21,14 @@ class FakeWebSocket {
   }
 
   close(code = 1000, reason = ''): void {
+    // Browsers reject any client close code other than 1000 or 3000-4999.
+    if (code !== 1000 && (code < 3000 || code > 4999)) {
+      throw new DOMException(`invalid close code ${code}`, 'InvalidAccessError');
+    }
+    this.peerClose(code, reason);
+  }
+
+  peerClose(code: number, reason: string): void {
     this.closeCode = code;
     this.closeReason = reason;
     this.readyState = FakeWebSocket.CLOSED;
@@ -104,7 +112,7 @@ describe('RealtimeService', () => {
     service.connect('conv-1');
     sockets[0].open();
     service.sendRunStart('hello', 'request-1');
-    sockets[0].close(1006, 'network');
+    sockets[0].peerClose(1006, 'network');
     jasmine.clock().tick(500);
     expect(sockets.length).toBe(2);
     sockets[1].open();
@@ -177,7 +185,7 @@ describe('RealtimeService', () => {
       correlation_id: start.message_id,
       payload: { code: 'run_conflict', fatal: false },
     }));
-    sockets[0].close(1006, 'network');
+    sockets[0].peerClose(1006, 'network');
     jasmine.clock().tick(500);
     sockets[1].open();
     const resent = sockets[1].sent
@@ -188,11 +196,28 @@ describe('RealtimeService', () => {
     clockInstalled = false;
   });
 
+  it('reconnects and resends a command whose acknowledgement never arrives', () => {
+    jasmine.clock().install();
+    clockInstalled = true;
+    spyOn(Math, 'random').and.returnValue(0);
+    service.connect('conv-1');
+    sockets[0].open();
+    service.sendRunStart('hello', 'request-1');
+    jasmine.clock().tick(10_000);
+    expect(sockets[0].closeCode).toBe(4013);
+    jasmine.clock().tick(500);
+    sockets[1].open();
+    const resent = sockets[1].sent
+      .map((value) => JSON.parse(value) as { type: string })
+      .filter((command) => command.type === 'run.start');
+    expect(resent.length).toBe(1);
+  });
+
   it('closes the socket when a server envelope cannot be validated', () => {
     service.connect('conv-1');
     sockets[0].open();
     sockets[0].receive('{not-json');
-    expect(sockets[0].closeCode).toBe(1002);
+    expect(sockets[0].closeCode).toBe(4002);
     expect(service.connectionState).toBe('closed');
   });
 

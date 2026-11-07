@@ -15,7 +15,8 @@ from urllib.parse import urlencode
 import httpx
 
 from server.configurations.settings import JsonOpenMeteoSettings, OpenMeteoSettings
-from server.services.geospatial.providers.http import async_http_client, parse_retry_after
+from server.common.time import parse_retry_after
+from server.services.geospatial.providers.http import async_http_client
 
 WEATHER_GRID_BATCH_SIZE = 100
 WEATHER_GRID_BATCH_ATTEMPTS = 2

@@ -450,6 +450,38 @@ def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     assert viewport.bbox is None
 
 ###############################################################################
+def test_country_view_skips_distant_islands_but_keeps_the_data_bbox() -> None:
+    # S13: Nominatim's Portugal box reaches the Azores (lon -32.6), which pushed
+    # mainland Portugal to the right edge of the view.
+    bbox = [-32.6, 29.8, -5.1, 42.2]
+    location = ResolvedLocation(
+        label="Portugal",
+        latitude=39.6,
+        longitude=-8.0,
+        location_type="country",
+        bbox=bbox,
+    )
+
+    viewport = _viewport_for_location(location)
+
+    assert viewport.bbox is not None
+    assert -10.5 < viewport.bbox[0] and viewport.bbox[2] < -5.1
+    assert location.bbox == bbox
+
+###############################################################################
+def test_compact_country_keeps_its_geocoder_bbox_as_the_view() -> None:
+    bbox = [5.9, 45.8, 10.5, 47.8]
+    location = ResolvedLocation(
+        label="Switzerland",
+        latitude=46.8,
+        longitude=8.2,
+        location_type="country",
+        bbox=bbox,
+    )
+
+    assert _viewport_for_location(location).bbox == bbox
+
+###############################################################################
 def test_a_landmark_with_a_point_like_bbox_is_framed_at_street_level() -> None:
     # S03: the Brandenburg Gate bbox is smaller than the minimum usable extent,
     # which used to leave the viewport without a box and the map at city scale.

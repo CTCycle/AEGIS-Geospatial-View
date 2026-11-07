@@ -27,6 +27,7 @@ from server.services.geospatial.providers.nominatim import NominatimProvider
 from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
 from urllib.parse import parse_qs, urlsplit
 from server.services.geospatial.openaq import OpenAQRequestError, OpenAQService
+from server.common.time import parse_retry_after
 from server.services.geospatial.providers import http as provider_http
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
@@ -1360,11 +1361,11 @@ def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
 ###############################################################################
 def test_retry_after_accepts_delta_seconds_and_http_dates() -> None:
     future = format_datetime(datetime.now(UTC) + timedelta(seconds=120), usegmt=True)
-    assert provider_http.parse_retry_after("7") == 7.0
-    assert provider_http.parse_retry_after(future) == pytest.approx(120, abs=2)
-    assert provider_http.parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT") == 0.0
-    assert provider_http.parse_retry_after("soon") is None
-    assert provider_http.parse_retry_after("nan") is None
+    assert parse_retry_after("7") == 7.0
+    assert parse_retry_after(future) == pytest.approx(120, abs=2)
+    assert parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT") == 0.0
+    assert parse_retry_after("soon") is None
+    assert parse_retry_after("nan") is None
 
 ###############################################################################
 def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:

@@ -1763,6 +1763,73 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
 
 ###############################################################################
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("budget_seconds", "failures", "expected_sleeps", "expected_calls"),
+    # One 429 waits its Retry-After; sustained throttling backs off past the
+    # generic attempt limit; a wait beyond the budget fails at once.
+    [(30, 1, [2.0], 2), (120, 4, [2.0, 4.0, 8.0, 16.0], 5), (1, 1, [], 1)],
+)
+async def test_model_retry_honors_provider_retry_after_within_budget(
+    monkeypatch: pytest.MonkeyPatch,
+    budget_seconds: float,
+    failures: int,
+    expected_sleeps: list[float],
+    expected_calls: int,
+) -> None:
+    sleeps: list[float] = []
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr("server.services.agent.agent_loop.asyncio.sleep", _sleep)
+
+    ###############################################################################
+    class _RateLimitedProvider(FakeProvider):
+        provider_name = "opencode-go"
+
+        # -------------------------------------------------------------------------
+        def __init__(self) -> None:
+            super().__init__([LLMResult(content="ready")])
+
+        # -------------------------------------------------------------------------
+        async def achat(self, request: Any, **kwargs: Any) -> LLMResult:
+            self.requests.append({"request": request, "kwargs": kwargs})
+            if len(self.requests) <= failures:
+                raise LLMProviderRequestError(
+                    provider="opencode-go",
+                    model="deepseek-v4-flash",
+                    stage="model_call",
+                    code="provider_rate_limited",
+                    http_status=429,
+                    retryable=True,
+                    retry_after_seconds=2.0,
+                )
+            return LLMResult(content="ready")
+
+    provider = _RateLimitedProvider()
+    request = AgentLoopRequest(
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+        state=_state(),
+        budget=AgentExecutionBudget(
+            total_seconds=budget_seconds, hard_max_seconds=budget_seconds
+        ),
+    )
+    loop = _loop(provider, transport_policy=LLMTransportPolicy(max_attempts=2))
+
+    call = loop._model_call(  # pyright: ignore[reportPrivateUsage]
+        request, provider, [], [], tool_choice="none"
+    )
+    if not expected_sleeps:
+        with pytest.raises(LLMProviderRequestError):
+            await call
+    else:
+        assert (await call).content == "ready"
+    assert sleeps == expected_sleeps
+    assert len(provider.requests) == expected_calls
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_model_retry_uses_same_provider_and_records_safe_transport_trace() -> None:
 
     ###############################################################################

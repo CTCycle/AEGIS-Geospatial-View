@@ -4,6 +4,7 @@ import re
 
 from typing import Any, Literal
 
+from server.common.time import parse_retry_after
 from server.services.llm.types import FailureCategory
 
 
@@ -51,6 +52,17 @@ def transport_diagnostics(
         if match:
             diagnostics.setdefault("winerror", int(match.group(1)))
     return diagnostics
+
+###############################################################################
+def retry_after_seconds_from_exception(exc: BaseException) -> float | None:
+    """Read a provider Retry-After header from an SDK/httpx exception response."""
+
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    getter = getattr(headers, "get", None)
+    if not callable(getter):
+        return None
+    raw = getter("retry-after") or getter("Retry-After")
+    return parse_retry_after(raw) if isinstance(raw, str) else None
 
 ###############################################################################
 def safe_failure_detail(exc: BaseException, fallback: str) -> str:
@@ -193,6 +205,7 @@ class LLMProviderRequestError(RuntimeError):
         timeout_origin: TimeoutOrigin | None = None,
         elapsed_ms: int | None = None,
         diagnostics: dict[str, Any] | None = None,
+        retry_after_seconds: float | None = None,
     ) -> None:
         self.provider = provider
         self.model = model
@@ -203,6 +216,7 @@ class LLMProviderRequestError(RuntimeError):
         self.category = category
         self.timeout_origin = timeout_origin
         self.elapsed_ms = elapsed_ms
+        self.retry_after_seconds = retry_after_seconds
         self.diagnostics = dict(diagnostics or {})
         self.context_usage = (
             dict(context_usage) if context_usage is not None else None
@@ -324,6 +338,9 @@ class LLMProviderRequestError(RuntimeError):
             diagnostics=transport_diagnostics(
                 exc,
                 http_status=status if isinstance(status, int) else None,
+            ),
+            retry_after_seconds=(
+                retry_after_seconds_from_exception(exc) if retryable else None
             ),
         )
 

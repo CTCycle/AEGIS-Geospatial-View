@@ -3939,9 +3939,23 @@
             "enum": [
               "in_progress",
               "completed",
-              "failed"
+              "failed",
+              "blocked",
+              "superseded"
             ],
             "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           },
           "dependencies": {
             "items": {

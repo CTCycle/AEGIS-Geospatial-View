@@ -452,7 +452,11 @@ class AgentTaskState(BaseModel):
         return self.model_dump(mode="json", exclude_none=True)
 
 ###############################################################################
-ConversationTaskStatus = Literal["in_progress", "completed", "failed"]
+# in_progress: started, awaiting the browser or a later step of the request.
+# failed: attempted, and the source or requested transform failed.
+# blocked: the run stopped before the obligation was met; ``reason`` says why.
+# superseded: a later request took the obligation over; kept for history only.
+ConversationTaskStatus = Literal["in_progress", "completed", "failed", "blocked", "superseded"]
 
 ###############################################################################
 class ConversationTask(BaseModel):
@@ -470,6 +474,8 @@ class ConversationTask(BaseModel):
     description: str = Field(min_length=1, max_length=300)
     kind: ObligationKind
     status: ConversationTaskStatus
+    # Short machine reason for a failed or blocked outcome (a stop reason).
+    reason: str | None = Field(default=None, max_length=80)
     dependencies: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     capability_id: str | None = Field(default=None, max_length=160)
@@ -931,6 +937,9 @@ class AgentRunState(BaseModel):
     current_iteration: int = Field(default=0, ge=0)
     max_iterations: int = Field(default=40, ge=1, le=1000)
     finalization_attempted: bool = False
+    # A text answer held back only because the completion contract was open;
+    # reused if evidence derivation alone then closes the contract.
+    deferred_answer: str | None = None
     iteration_trace: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]]()
     )

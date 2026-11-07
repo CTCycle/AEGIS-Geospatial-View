@@ -9,6 +9,8 @@ from typing import Any, cast
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import shapely
+
 from server.common.identifiers import normalize_target_key
 from server.common.typing import json_object
 from server.contracts.geospatial import (
@@ -38,6 +40,7 @@ from server.domain.agent.presentation_contract import (
 )
 from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.land_mask import country_at, country_shapes
 from server.services.geospatial.raster_tiles import (
     build_backend_raster_proxy_template,
 )
@@ -45,6 +48,10 @@ from server.services.geospatial.raster_tiles import (
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
+# A country is framed on its main landmasses: parts under this fraction of the
+# largest part's area (Azores, Madeira, Canaries, French Guiana) are left out
+# of the frame, while comparable landmasses (Alaska, Sicily, Sardinia) stay.
+COUNTRY_FRAME_MIN_PART_AREA_RATIO = 0.25
 # A single point fits to about city scale, not street level.
 MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES = 0.25
 # Margin around the places of a multi-place location-only view, per side.
@@ -999,6 +1006,8 @@ def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
     min_lon, min_lat, max_lon, max_lat = bbox
     if max(max_lon - min_lon, max_lat - min_lat) < MIN_LOCATION_VIEWPORT_SPAN_DEGREES:
         return None
+    if location.location_type == "country":
+        return _country_main_landmass_bbox(location, bbox) or bbox
     if location.location_type not in {"city", "municipality"}:
         return bbox
     if (
@@ -1007,6 +1016,37 @@ def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
     ):
         return None
     return bbox
+
+###############################################################################
+def _country_main_landmass_bbox(
+    location: ResolvedLocation, bbox: list[float]
+) -> list[float] | None:
+    """Bounds of a country's main landmasses, when distant parts widen the geocoder box.
+
+    Only the viewport uses it: the location's own bbox still scopes data
+    queries, so overseas territories stay in "earthquakes in Portugal".
+    """
+
+    code = country_at(location.longitude, location.latitude)
+    if code is None:
+        return None
+    parts = list(shapely.get_parts(country_shapes()[code]))  # pyright: ignore[reportUnknownMemberType]
+    largest = max(float(part.area) for part in parts)
+    kept = [
+        part for part in parts
+        if float(part.area) >= largest * COUNTRY_FRAME_MIN_PART_AREA_RATIO
+    ]
+    if len(kept) == len(parts):
+        return None
+    min_lon, min_lat, max_lon, max_lat = (
+        float(value) for value in shapely.union_all(kept).bounds  # pyright: ignore[reportUnknownMemberType]
+    )
+    narrower = (max_lon - min_lon < bbox[2] - bbox[0]) or (max_lat - min_lat < bbox[3] - bbox[1])
+    if not narrower or not (
+        min_lon <= location.longitude <= max_lon and min_lat <= location.latitude <= max_lat
+    ):
+        return None
+    return [min_lon, min_lat, max_lon, max_lat]
 
 ###############################################################################
 def _with_min_span(bbox: list[float], span: float) -> list[float]:

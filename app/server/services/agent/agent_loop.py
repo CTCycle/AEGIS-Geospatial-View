@@ -213,6 +213,8 @@ _REQUIREMENT_TOOLS: dict[str, frozenset[str]] = {
     "locations_marked": frozenset({"apply_map_plan"}),
     "render_verified": frozenset({"apply_map_plan"}),
 }
+# Tools that only derive from evidence the run already holds.
+_DERIVATION_TOOLS = frozenset({"inspect_evidence", "transform_evidence", "measure_geospatial"})
 
 ###############################################################################
 def _layer_count_text(count: tuple[int, int] | None) -> str:
@@ -759,6 +761,9 @@ class AgentLoop:
             state.provider_continuation = [
                 dict(item) for item in self._protocol_messages(messages)
             ]
+            if any(item.tool_name not in _DERIVATION_TOOLS for item in tool_results):
+                # New data or map work postdates the held-back answer.
+                state.deferred_answer = None
             self._transition(state, AgentPhase.UPDATE_STATE, request.budget)
             self._sync_task_state(state)
             self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
@@ -872,6 +877,8 @@ class AgentLoop:
         await self._checkpoint(request)
         if stop is not None:
             if await self._continue_after_no_progress(request, messages, stop):
+                if final_text and not recovery_results:
+                    state.deferred_answer = final_text
                 return None
             if final_text and stop[0] not in {"awaiting_render", "clarification_required"}:
                 checked = await self._verified_answer_text(
@@ -941,16 +948,20 @@ class AgentLoop:
             # still issued no tool call: a repeat only spends another full
             # context on the same answer.
             return False
-        state.no_progress_corrections += 1
-        correction = self._no_progress_correction(
-            state,
-            [
-                tool.name
-                for tool in self.tool_registry.expose(
-                    state, phase=AgentPhase.BUILD_TOOL_CONTEXT
-                )
-            ],
+        exposed = [
+            tool.name
+            for tool in self.tool_registry.expose(state, phase=AgentPhase.BUILD_TOOL_CONTEXT)
+        ]
+        derivable = bool(pending and state.evidence_refs) and all(
+            _REQUIREMENT_TOOLS.get(name, frozenset()) & _DERIVATION_TOOLS & set(exposed)
+            for name in pending
         )
+        if derivable and state.no_progress_corrections:
+            # The answer's evidence is already held: one targeted correction
+            # names the derivation; past that the run finalizes from facts.
+            return False
+        state.no_progress_corrections += 1
+        correction = self._no_progress_correction(state, exposed)
         state.relevant_tool_outcomes.append(correction)
         messages.append(
             {
@@ -1360,9 +1371,19 @@ class AgentLoop:
             if not instance.visible
         ]
         visible_text = ", ".join(item for item in visible if item) or "none"
+        framed = session.resolved_location.label
+        # Name the place only when this request asked for it, not a view
+        # carried over from an earlier turn.
+        requested = framed and any(
+            location_ref_matches(str(target), str(key), item.label)
+            for target in route.target_refs
+            for key, item in state.location_refs.items()
+            if item.label == framed
+        )
         summary = (
             "Map state update verified in the browser. "
-            f"Basemap: {basemap_label}. Visible overlays: {visible_text}."
+            + (f"The map is framed on {framed}. " if requested else "")
+            + f"Basemap: {basemap_label}. Visible overlays: {visible_text}."
         )
         if hidden:
             hidden_text = ", ".join(item for item in hidden if item)
@@ -1573,7 +1594,7 @@ class AgentLoop:
     ) -> str:
         """Synthesize a completed non-render request with tools disabled."""
 
-        candidate = await self._verified_answer_text(
+        candidate = await self._reused_deferred_answer(request) or await self._verified_answer_text(
             request,
             await self._terminal_synthesis(
                 request, provider, messages, reason="goal_satisfied"
@@ -1711,9 +1732,51 @@ class AgentLoop:
         back to its deterministic text, and the violations are traced.
         """
 
-        state = request.state
         if not candidate.strip():
             return candidate
+        violations = self._answer_violations(request.state, candidate)
+        if not violations:
+            return candidate
+        await self._emit_finalization_trace(
+            request,
+            reason=reason,
+            kind="finalization_completed",
+            outcome="answer_replaced",
+            violations=violations,
+            rejected_answer=candidate,
+        )
+        return ""
+
+    # -------------------------------------------------------------------------
+    async def _reused_deferred_answer(self, request: AgentLoopRequest) -> str:
+        """Return the held-back text answer once derivation closed the contract.
+
+        The model answered before deriving the figures; when only derivation
+        over evidence it already saw followed, and the answer cites the derived
+        values, a second full-context synthesis would only restate it.
+        """
+
+        state = request.state
+        answer = state.deferred_answer or ""
+        state.deferred_answer = None
+        cited = any(
+            item.kind == "analysis" and item.status == "met" and item.cite_groups
+            for item in self.completion_summary(state).obligations
+        )
+        if not answer.strip() or not cited or self._answer_violations(state, answer):
+            return ""
+        await self._emit_finalization_trace(
+            request,
+            reason="goal_satisfied",
+            kind="finalization_completed",
+            outcome="deferred_answer_reused",
+        )
+        return answer
+
+    # -------------------------------------------------------------------------
+    def _answer_violations(self, state: AgentRunState, candidate: str) -> list[str]:
+        """Claims in ``candidate`` that the run's verified facts contradict."""
+
         session = state.active_map_session
         route = state.route
         visible = (
@@ -1746,7 +1809,7 @@ class AgentLoop:
             # "the two cities"; only a requested map is known to be empty.
             features = sum(counts) if counts else (0 if not visible and map_requested else None)
         summary = self.completion_summary(state)
-        violations = check_final_answer(
+        return check_final_answer(
             candidate,
             target_names=targets,
             other_places=others,
@@ -1788,17 +1851,6 @@ class AgentLoop:
             ],
             prior_numbers=prior_evidence_numbers(state),
         )
-        if not violations:
-            return candidate
-        await self._emit_finalization_trace(
-            request,
-            reason=reason,
-            kind="finalization_completed",
-            outcome="answer_replaced",
-            violations=violations,
-            rejected_answer=candidate,
-        )
-        return ""
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -3233,6 +3285,13 @@ class AgentLoop:
             tool_choice=tool_choice,
             metadata=metadata,
         )
+        # Which loop phase spends the tokens: the route call, tool-loop
+        # decisions, or the tools-disabled answer synthesis.
+        call_phase = (
+            "routing" if budget_stage == "route_request"
+            else "finalization" if terminal
+            else "execution"
+        )
         attempts = 0
         while True:
             attempts += 1
@@ -3266,11 +3325,12 @@ class AgentLoop:
                     request,
                     self._context_usage_for_request(llm_request, result.context_usage),
                     attempts,
+                    call_phase,
                 )
                 return result
             except asyncio.TimeoutError as exc:
                 usage = self._context_usage_for_request(llm_request)
-                self._record_context_usage(request, usage, attempts)
+                self._record_context_usage(request, usage, attempts, call_phase)
                 error = LLMProviderRequestError(
                     provider=request.provider,
                     model=request.model,
@@ -3299,6 +3359,7 @@ class AgentLoop:
                     request,
                     self._context_usage_for_request(llm_request, exc.context_usage),
                     attempts,
+                    call_phase,
                 )
                 self._record_provider_failure(
                     request,
@@ -3307,16 +3368,14 @@ class AgentLoop:
                     protocol=protocol,
                     endpoint_host=endpoint_host,
                 )
-                if not exc.retryable or attempts >= self.transport_policy.max_attempts:
+                if not exc.retryable or attempts >= self._model_attempt_limit(exc):
+                    raise
+                delay = self._model_retry_delay(request, attempts, exc)
+                if delay is None:
                     raise
                 request.budget.record_retry()
                 request.budget.ensure_available("model_retry")
-                await asyncio.sleep(
-                    min(
-                        self.transport_policy.retry_delay(attempts),
-                        request.budget.remaining_seconds(),
-                    )
-                )
+                await asyncio.sleep(delay)
                 self._ensure_run_control(request)
                 request.budget.ensure_available("model_retry")
             except (AgentRunControlSignal, LLMStructuredOutputError):
@@ -3343,18 +3402,41 @@ class AgentLoop:
                     protocol=protocol,
                     endpoint_host=endpoint_host,
                 )
-                if not normalized.retryable or attempts >= self.transport_policy.max_attempts:
+                if not normalized.retryable or attempts >= self._model_attempt_limit(normalized):
+                    raise normalized from exc
+                delay = self._model_retry_delay(request, attempts, normalized)
+                if delay is None:
                     raise normalized from exc
                 request.budget.record_retry()
                 request.budget.ensure_available("model_retry")
-                await asyncio.sleep(
-                    min(
-                        self.transport_policy.retry_delay(attempts),
-                        request.budget.remaining_seconds(),
-                    )
-                )
+                await asyncio.sleep(delay)
                 self._ensure_run_control(request)
                 request.budget.ensure_available("model_retry")
+
+    # -------------------------------------------------------------------------
+    def _model_attempt_limit(self, error: LLMProviderRequestError) -> int:
+        return self.transport_policy.attempts_for(
+            rate_limited=error.code == "provider_rate_limited"
+        )
+
+    # -------------------------------------------------------------------------
+    def _model_retry_delay(
+        self,
+        request: AgentLoopRequest,
+        attempts: int,
+        error: LLMProviderRequestError,
+    ) -> float | None:
+        """Return the pre-retry wait, or None when a provider-mandated wait exceeds the run budget."""
+
+        delay = self.transport_policy.retry_delay(
+            attempts,
+            error.retry_after_seconds,
+            rate_limited=error.code == "provider_rate_limited",
+        )
+        remaining = request.budget.remaining_seconds()
+        if error.retry_after_seconds is None:
+            return min(delay, remaining)
+        return delay if delay <= remaining else None
 
     # -------------------------------------------------------------------------
     async def _checkpoint(self, request: AgentLoopRequest) -> None:
@@ -3383,15 +3465,17 @@ class AgentLoop:
         request: AgentLoopRequest,
         usage: dict[str, Any] | None,
         attempt: int,
+        call_phase: str,
     ) -> None:
         if not isinstance(usage, dict):
             return
+        usage = {**usage, "call_phase": call_phase}
         trace_usage = {
             "phase": "native_loop",
             "model": request.model,
             "attempt": attempt,
             "model_call": request.state.model_calls,
-            **dict(usage),
+            **usage,
         }
         request.budget.record_context_allocation(trace_usage)
         request.state.context_usage_trace.append(dict(trace_usage))

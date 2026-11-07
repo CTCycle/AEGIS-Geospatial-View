@@ -30,6 +30,22 @@ def test_provider_connection_errors_are_retryable() -> None:
     assert error.retryable is True
 
 ###############################################################################
+def test_rate_limit_error_captures_retry_after_header() -> None:
+    class _RateLimited(Exception):
+        response = SimpleNamespace(status_code=429, headers={"Retry-After": "2"})
+
+    error = LLMProviderRequestError.from_exception(
+        _RateLimited("slow down"),
+        provider="opencode-go",
+        model="mimo-v2.5",
+        stage="model_call",
+    )
+
+    assert error.code == "provider_rate_limited"
+    assert error.retryable is True
+    assert error.retry_after_seconds == 2.0
+
+###############################################################################
 def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
     context_usage = {
         "estimated_input_tokens": 321,

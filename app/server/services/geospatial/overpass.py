@@ -20,7 +20,7 @@ from server.services.geospatial.providers.base import (
     ProviderInvalidQueryError,
     ProviderRateLimitError,
 )
-from server.services.geospatial.providers.http import parse_retry_after
+from server.common.time import parse_retry_after
 
 ###############################################################################
 class OverpassServiceError(ProviderError):
