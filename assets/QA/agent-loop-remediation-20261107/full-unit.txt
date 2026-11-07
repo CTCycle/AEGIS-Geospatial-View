@@ -1,0 +1,5 @@
+FAILED tests/unit/agent_benchmark/test_trajectory_gate.py::test_trajectory_stays_within_baseline[nested_arguments_regression]
+FAILED tests/unit/test_credential_and_evidence_storage.py::test_evidence_write_does_not_block_event_loop
+FAILED tests/unit/test_credential_and_evidence_storage.py::test_cancelled_evidence_write_returns_no_reference
+FAILED tests/unit/test_launcher_cleanup.py::test_batch_entrypoint_reports_missing_powershell_without_cmd_parse_error
+4 failed, 1627 passed, 3 warnings in 91.56s (0:01:31)

@@ -1,0 +1,22 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+........................................................................ [ 32%]
+........................................................................ [ 43%]
+........................................................................ [ 54%]
+........................................................................ [ 65%]
+........................................................................ [ 76%]
+........................................................................ [ 86%]
+........................................................................ [ 97%]
+...............                                                          [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\google\genai\types.py:42
+  G:\Projects\Repositories\Active projects\AEGIS Geospatial View\app\server\.venv\Lib\site-packages\google\genai\types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+663 passed, 1 warning in 14.85s
+
+# Gates (2026-11-07)
+# ruff check (changed files): All checks passed!
+# pyright --project pyproject.toml (changed server files): 0 errors, 0 warnings
+# full unit suite: 1 failed (known test_launcher_cleanup.py::test_batch_entrypoint_reports_missing_powershell_without_cmd_parse_error), 1624 passed
