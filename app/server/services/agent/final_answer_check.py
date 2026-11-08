@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 
 _NUMBER_WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
@@ -61,6 +61,33 @@ _ANY_NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?!\w)")
 _NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 # "can be shown on the map" offers a map; it does not describe one.
 _OFFER = re.compile(r"\b(?:can|could|may|might|would)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
+
+
+_TIME_ZONE_DIFFERENCE = re.compile(
+    r"\b(?:different|separate)\s+time[\s-]?zones?\b|\btime[\s-]?zones?\s+differ",
+    re.IGNORECASE,
+)
+_SENTENCE_PARTS = re.compile(r"((?<=[.!?;])\s+|\n+)")
+
+
+# -----------------------------------------------------------------------------
+def drop_unsupported_time_zone_claims(text: str, utc_offsets: Collection[float]) -> str:
+    """Remove sentences claiming a time-zone difference the evidence does not show.
+
+    Such a claim is an aside no tool verified; dropping only that sentence keeps
+    the verified answer around it. An answer that is nothing but the claim stays.
+    """
+
+    if len(utc_offsets) > 1:
+        return text
+    parts = _SENTENCE_PARTS.split(text)
+    kept: list[str] = []
+    for sentence, separator in zip(parts[::2], [*parts[1::2], ""], strict=True):
+        claim = _TIME_ZONE_DIFFERENCE.search(sentence)
+        if claim and not _NEGATION.search(sentence[max(0, claim.start() - 24) : claim.start()]):
+            continue
+        kept.extend((sentence, separator))
+    return "".join(kept).strip() or text
 
 
 # -----------------------------------------------------------------------------

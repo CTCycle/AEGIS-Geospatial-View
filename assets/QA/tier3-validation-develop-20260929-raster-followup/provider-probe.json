@@ -1,8 +1,0 @@
-{
-  "http_status": 200,
-  "provider": "opencode-go",
-  "model": "deepseek-v4.1-flash",
-  "protocol": "openai-chat-completions",
-  "status": "passed",
-  "parse_status": "complete"
-}

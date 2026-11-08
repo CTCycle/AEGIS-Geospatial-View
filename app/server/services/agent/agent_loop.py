@@ -63,6 +63,7 @@ from server.domain.agent.tool_result import (
 )
 from server.domain.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition
 from server.prompts.agent import (
+    NATIVE_CONTEXT_PREFIX,
     build_native_agent_system_prompt,
     build_native_context_messages,
 )
@@ -79,7 +80,10 @@ from server.services.agent.capability_router import (
     is_location_only_map_request,
 )
 from server.services.agent.context_assembler import select_pair_safe_messages
-from server.services.agent.final_answer_check import check_final_answer
+from server.services.agent.final_answer_check import (
+    check_final_answer,
+    drop_unsupported_time_zone_claims,
+)
 from server.services.agent.tool_executor import (
     UNSUPPORTED_CODES,
     ToolExecutor,
@@ -93,6 +97,7 @@ from server.services.agent.completion import (
     describe_requirements,
     evidence_coordinates,
     evidence_numbers,
+    evidence_utc_offsets,
     imagery_only_note,
     key_names_variable,
     layer_edit_count,
@@ -116,6 +121,7 @@ from server.services.agent.vision_policy import (
     VisionPolicyEngine,
 )
 from server.services.llm.context_budget import (
+    estimate_input_sections,
     compute_context_usage,
     merge_provider_context_usage,
 )
@@ -1734,6 +1740,9 @@ class AgentLoop:
 
         if not candidate.strip():
             return candidate
+        candidate = drop_unsupported_time_zone_claims(
+            candidate, evidence_utc_offsets(request.state)
+        )
         violations = self._answer_violations(request.state, candidate)
         if not violations:
             return candidate
@@ -1763,6 +1772,7 @@ class AgentLoop:
             item.kind == "analysis" and item.status == "met" and item.cite_groups
             for item in self.completion_summary(state).obligations
         )
+        answer = drop_unsupported_time_zone_claims(answer, evidence_utc_offsets(state))
         if not answer.strip() or not cited or self._answer_violations(state, answer):
             return ""
         await self._emit_finalization_trace(
@@ -3457,7 +3467,12 @@ class AgentLoop:
         base_usage = compute_context_usage(
             llm_request, provider=llm_request.provider or "unknown"
         )
-        return merge_provider_context_usage(base_usage, provider_usage).to_dict()
+        return {
+            **merge_provider_context_usage(base_usage, provider_usage).to_dict(),
+            "input_sections": estimate_input_sections(
+                llm_request.messages, working_state_prefix=NATIVE_CONTEXT_PREFIX
+            ),
+        }
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -868,6 +868,15 @@ def viewport_covering_evidence(
     return _with_viewport(session, _viewport_for_bbox(union, session.viewport))
 
 ###############################################################################
+def location_frame_points(location: ResolvedLocation) -> list[tuple[float, float]]:
+    """Points a view must contain to frame this place: an area's extent, else its centre."""
+
+    bbox = None if location.location_type in {"city", "municipality"} else _usable_location_bbox(location)
+    if bbox is None:
+        return [(location.longitude, location.latitude)]
+    return [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
+
+###############################################################################
 def viewport_covering_points(
     session: MapSession, points: list[tuple[float, float]]
 ) -> MapSession:

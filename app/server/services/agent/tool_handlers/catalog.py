@@ -320,7 +320,13 @@ class CatalogToolHandler:
             summary=f"Described geospatial capability {capability_id}.",
             data={
                 "capability_id": capability_id,
-                "manifest": capability,
+                # Selection and audit metadata is spent by the time a capability
+                # is described, and this result stays in every later model call.
+                "manifest": {
+                    key: value
+                    for key, value in capability.items()
+                    if key not in {"agenticUse", "reliability"}
+                },
                 "argument_schema": argument_schema,
                 "execution_contract": self.capability_registry.execution_contract(
                     capability_id

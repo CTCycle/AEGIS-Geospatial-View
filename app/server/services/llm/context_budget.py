@@ -173,6 +173,25 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
     return max(total, 1)
 
 ###############################################################################
+def estimate_input_sections(
+    messages: list[dict[str, Any]], *, working_state_prefix: str
+) -> dict[str, int]:
+    """Estimated tokens per kind of input, to show which part of a request grew."""
+
+    sections = {"system": 0, "working_state": 0, "conversation": 0, "tool_exchanges": 0}
+    for message in messages:
+        role = message.get("role")
+        if role == "tool" or message.get("tool_calls") or message.get("type") in {
+            "function_call", "function_call_output", "reasoning",
+        }:
+            sections["tool_exchanges"] += estimate_json_tokens(message)
+        elif role == "system" and str(message.get("content") or "").startswith(working_state_prefix):
+            sections["working_state"] += estimate_message_tokens([message])
+        else:
+            sections["system" if role == "system" else "conversation"] += estimate_message_tokens([message])
+    return sections
+
+###############################################################################
 def estimate_json_tokens(value: object) -> int:
     if value is None:
         return 0

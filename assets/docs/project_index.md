@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-10-24
+Last updated: 2026-11-07
 
 ## Purpose
 
@@ -174,6 +174,8 @@ conversation-scoped `agent_evidence` store rather than model messages.
   reports in `assets/QA/` and link them instead of duplicating their narratives.
 - Include `Last updated: YYYY-MM-DD` whenever a document changes.
 - Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `assets/QA/` when they must be preserved.
+- Organize `assets/QA/` by topic, one subfolder per validation run: `agent-loop/`, `tiers/`, `tools/`, `e2e/`, `ui/`, `maintenance/`. Name runs `<scope>-<yyyymmdd>`.
+- Keep QA runs lightweight: preserve the `report.md`, scripts, and small baselines (JSON under 20 KB). Do not commit screenshots, raw logs, `turns.jsonl`, or raw provider/evidence JSON; summarize their findings in the report and delete them when the run is closed.
 
 ## Environment Rules
 

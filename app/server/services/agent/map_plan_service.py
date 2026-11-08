@@ -45,6 +45,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.map_session_builder import (
     MapPlanBuildError,
     MapSessionBuilder,
+    location_frame_points,
     session_view_bbox,
     viewport_covering_evidence,
     viewport_covering_points,
@@ -359,11 +360,17 @@ class MapPlanService:
                 )
             # Several requested places need one view that contains them all,
             # whatever the model's viewport actions framed.
+            resolved_targets = _resolved_target_locations(state)
             candidate = viewport_covering_points(
                 candidate,
                 [
-                    (matches[-1].longitude, matches[-1].latitude)
-                    for _, matches in _resolved_target_locations(state)
+                    point
+                    for _, matches in resolved_targets
+                    for point in (
+                        location_frame_points(matches[-1])
+                        if len(resolved_targets) > 1
+                        else [(matches[-1].longitude, matches[-1].latitude)]
+                    )
                 ],
             )
             outside = targets_outside_view(state, session_view_bbox(candidate))

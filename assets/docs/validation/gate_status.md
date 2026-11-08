@@ -54,7 +54,7 @@ The [audit report](../../QA/tool-catalog-audit-20261105/report.md) ran 66 scenar
 
 ## 2026-11-03 Wave 3 live validation (`develop@d4f4c1e2`)
 
-The [live evaluation summary](live_eval_20261103_wave3.md) (full evidence: untracked `assets/QA/w3-validation-20261103/report.md`) re-runs the Wave 2 non-PASS turns and adds the Wave 3 framing, forecast-window, H-03 and discovery checks on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
+The [live evaluation summary](live_eval_20261103_wave3.md) (full evidence: untracked `assets/QA/agent-loop/w3-validation-20261103/report.md`) re-runs the Wave 2 non-PASS turns and adds the Wave 3 framing, forecast-window, H-03 and discovery checks on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
 - Live UI **PARTIAL**: DeepSeek 11 PASS / 3 PARTIAL / 5 FAIL / 2 BLOCKED of 21 turns; Beam Free 9 / 6 / 9 / 1 of 25 (turn sets differ from Wave 2, see the summary).
 - False-success gate (target 0): **FAIL**, 2 (DeepSeek: a Brandenburg Gate request completed `goal_satisfied` on the Berlin map, stored-completion only; Beam: a recap claiming a magnitude filter that was never applied).
 - Graded runner (`--no-render`, 28 matrix plus 10 holdout scenarios): DeepSeek 27 pass / 11 fail (Wave 2: 25 / 13, no regression), Beam 23 / 15 (22 / 16, three pass-to-fail regressions from unexposed-tool calls); no false-success flag; a per-model baseline is proposed in the untracked QA folder, not applied.
@@ -64,7 +64,7 @@ The [live evaluation summary](live_eval_20261103_wave3.md) (full evidence: untra
 
 ## 2026-11-03 Wave 2 live validation (`develop@740792f4`)
 
-The [live evaluation summary](live_eval_20261103_wave2.md) (full evidence: untracked `assets/QA/w2-validation-20261103/report.md`) re-runs the Wave 1 non-PASS turns and the Wave 2 scenarios on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
+The [live evaluation summary](live_eval_20261103_wave2.md) (full evidence: untracked `assets/QA/agent-loop/w2-validation-20261103/report.md`) re-runs the Wave 1 non-PASS turns and the Wave 2 scenarios on OpenCode Go `deepseek-v4.1-flash` and `beam-free`, and runs the graded runner on both.
 - Live UI **PARTIAL**: DeepSeek 7 PASS / 6 PARTIAL / 3 FAIL / 2 BLOCKED of 18 turns; Beam Free 8 / 5 / 11 / 0 of 24 (turn sets differ from Wave 1, see the summary).
 - False-success gate (target 0): **PASS**, 0 on both models; six borderline framing or window claims are listed in the report and not counted.
 - Graded runner (`--no-render`, 28 matrix plus 10 holdout scenarios): DeepSeek 25 pass / 13 fail, Beam 22 / 16; no false-success flag; no baseline recorded, so the gate checks false successes only.
@@ -73,7 +73,7 @@ The [live evaluation summary](live_eval_20261103_wave2.md) (full evidence: untra
 
 ## 2026-11-03 Wave 1 live validation (`develop@6880a510`)
 
-The [live evaluation summary](live_eval_20261103_wave1.md) (full evidence: untracked `assets/QA/w1-validation-20261103/report.md`) re-runs the 2026-11-02 replay set plus four Wave 1 regressions on OpenCode Go `deepseek-v4.1-flash` and `beam-free`.
+The [live evaluation summary](live_eval_20261103_wave1.md) (full evidence: untracked `assets/QA/agent-loop/w1-validation-20261103/report.md`) re-runs the 2026-11-02 replay set plus four Wave 1 regressions on OpenCode Go `deepseek-v4.1-flash` and `beam-free`.
 - Live UI **PARTIAL**: DeepSeek 18 PASS / 4 PARTIAL / 4 FAIL / 2 BLOCKED of 28 turns; Beam Free 4 / 5 / 10 / 1 of 20 turns (baseline DeepSeek 20 / 3 / 3 / 1 of 27; Beam round 2 7 / 7 / 5 / 0 of 19; turn sets differ, see the summary).
 - False-success gate (target 0): **FAIL**, 2 on Beam Free (a filter follow-up reported as applied while the map still showed every event; one root cause). The H1 replay no longer claims unrendered markers on either model.
 - Worldwide earthquake evidence request: **FAIL** on both models. The server rejects `map.render_ack` and the run ends `render_timeout`; the UI stayed responsive.

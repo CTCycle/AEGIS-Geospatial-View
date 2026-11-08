@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-03
 
-Live validation of the Wave 2 remediation (`develop@740792f4`, on top of `e4e593a6`: H-04 independent place resolution, M-02 per-target route scopes, M-07 live eval runner; and the world-extent ack, forecast observation time and M-01 bounded route revision) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible. Part A is the graded runner (`--no-render`, matrix plus holdout); Part B re-runs the Wave 1 FAIL, PARTIAL and BLOCKED turns and the Wave 2 scenarios in the browser. Full evidence (traces, screenshots, analysis) is untracked under `assets/QA/w2-validation-20261103/`.
+Live validation of the Wave 2 remediation (`develop@740792f4`, on top of `e4e593a6`: H-04 independent place resolution, M-02 per-target route scopes, M-07 live eval runner; and the world-extent ack, forecast observation time and M-01 bounded route revision) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible. Part A is the graded runner (`--no-render`, matrix plus holdout); Part B re-runs the Wave 1 FAIL, PARTIAL and BLOCKED turns and the Wave 2 scenarios in the browser. Full evidence (traces, screenshots, analysis) is untracked under `assets/QA/agent-loop/w2-validation-20261103/`.
 
 ## Counts
 

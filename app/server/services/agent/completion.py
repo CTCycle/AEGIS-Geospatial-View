@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from server.common.identifiers import location_ref_matches, normalize_target_key
 from server.common.typing import json_array, json_object
@@ -36,6 +37,7 @@ from server.domain.agent.presentation_contract import (
 )
 from server.domain.agent.task_ledger import map_fingerprint
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
+from server.services.agent.route_references import place_targets
 
 ###############################################################################
 def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
@@ -643,14 +645,15 @@ def _obligation_targets(state: AgentRunState, kind: ObligationKind) -> list[str]
 
     goal = state.goal
     if goal is None:
-        return list(state.route.target_refs) if state.route is not None else []
-    return list(
+        return place_targets(state.route.target_refs, state) if state.route is not None else []
+    return place_targets(
         dict.fromkeys(
             target
             for obligation in goal.obligations
             if obligation.required and obligation.kind == kind
             for target in obligation.target_ids
-        )
+        ),
+        state,
     )
 
 
@@ -840,6 +843,38 @@ def evidence_numbers(state: AgentRunState) -> list[float]:
         if len(numbers) >= _MAX_EVIDENCE_NUMBERS:
             break
     return numbers[:_MAX_EVIDENCE_NUMBERS]
+
+###############################################################################
+def _time_zone_names(value: object) -> set[str]:
+    if isinstance(value, dict):
+        found: set[str] = set()
+        for key, item in json_object(value).items():
+            if key == "timezone" and isinstance(item, str):
+                found.add(item)
+            else:
+                found |= _time_zone_names(item)
+        return found
+    if isinstance(value, list):
+        return {name for item in json_array(value) for name in _time_zone_names(item)}
+    return set()
+
+
+###############################################################################
+def evidence_utc_offsets(state: AgentRunState) -> set[float]:
+    """Current UTC offsets, in seconds, of the time zones the run's evidence names."""
+
+    now = datetime.now(UTC)
+    offsets: set[float] = set()
+    for result in state.tool_results:
+        for name in _time_zone_names(result.data):
+            try:
+                offset = now.astimezone(ZoneInfo(name)).utcoffset()
+            except (ValueError, ZoneInfoNotFoundError):
+                continue
+            if offset is not None:
+                offsets.add(offset.total_seconds())
+    return offsets
+
 
 ###############################################################################
 def prior_evidence_numbers(state: AgentRunState) -> list[float]:
@@ -1283,12 +1318,17 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         elif obligation.kind == "identification":
             # Met only by resolution evidence that names every target place;
             # the answer must then name it too.
-            places = _identification_places(
-                state, obligation.target_ids or (goal.target_ids if goal is not None else [])
-            )
+            place_ids = obligation.target_ids or (goal.target_ids if goal is not None else [])
+            places = _identification_places(state, place_ids)
             named = [item for item in places if item is not None]
             status = "met" if named and len(named) == len(places) else "unmet"
-            if status == "met":
+            if not place_ids and any(
+                result.status == "success" and result.evidence_refs for result in state.tool_results
+            ):
+                # "Which one was strongest?" identifies a record, not a place:
+                # the evidence holding that record delivers it.
+                status = "met"
+            if named and status == "met":
                 values = [full for full, _ in named][:8]
                 # Spellings that name the (first) identified place.
                 must_name = list(dict.fromkeys([named[0][1], named[0][0]]))
@@ -1484,6 +1524,7 @@ __all__ = [
     "build_completion_summary",
     "data_verified_empty",
     "evidence_numbers",
+    "evidence_utc_offsets",
     "prior_evidence_numbers",
     "presentation_contract",
     "describe_requirements",

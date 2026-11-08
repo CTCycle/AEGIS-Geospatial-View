@@ -85,3 +85,21 @@ def test_transform_error_lists_the_available_fields() -> None:
 
     assert error is not None
     assert "temperature_2m" in error and "name" in error and "nested" not in error
+
+
+###############################################################################
+def test_a_projection_keeps_a_measurement_named_by_its_summary_path() -> None:
+    # S12-T4: summaries show observations.temperature_2m, records store it flat.
+    records = [
+        {"name": "Prague", "latitude": 50.1, "longitude": 14.4, "temperature_2m": 0.8},
+        {"name": "Vienna", "latitude": 48.2, "longitude": 16.4, "temperature_2m": 4.8},
+    ]
+    path = "observations.temperature_2m"
+
+    result, error = _apply_operations(records, [
+        {"op": "field_projection", "fields": ["name", path]},
+        {"op": "sort", "field": path, "descending": True},
+    ])
+
+    assert error is None
+    assert [(item["name"], item["temperature_2m"]) for item in result] == [("Vienna", 4.8), ("Prague", 0.8)]

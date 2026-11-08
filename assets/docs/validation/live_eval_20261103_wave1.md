@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-03
 
-Live UI validation of the Wave 1 remediation (`develop@6880a510`: H-01 per-target completion, H-02 raster render ack, H-05 final-answer reconciliation, M-04 off-loop evidence writes) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible. Full evidence (traces, screenshots, analysis) is untracked under `assets/QA/w1-validation-20261103/`.
+Live UI validation of the Wave 1 remediation (`develop@6880a510`: H-01 per-target completion, H-02 raster render ack, H-05 final-answer reconciliation, M-04 off-loop evidence writes) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible. Full evidence (traces, screenshots, analysis) is untracked under `assets/QA/agent-loop/w1-validation-20261103/`.
 
 ## Counts
 

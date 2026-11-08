@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-03
 
-Live validation of the Wave 3 remediation (`develop@d4f4c1e2`: H-03 rejection-feedback contract, budget forgiveness and the `unsupported_request` / `model_incapable` terminal reasons; M-05 provider temporal windows, failure classification, bounded retry and mirror fallback; M-03 framing padding, `targets_in_view` and classified render deadlines; discovery recall for capability variables, dated GIBS layers, catalog names and cloud cover) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible (`visibilityState` read as `visible` before the first turn, after each lane and before closing). Part A is the graded runner (`--no-render`, matrix plus holdout); Part B re-runs every Wave 2 FAIL, PARTIAL and BLOCKED browser turn plus the Wave 3 framing, forecast-window, H-03 and discovery checks. Full evidence (traces, screenshots, analysis, proposed baseline) is untracked under `assets/QA/w3-validation-20261103/`.
+Live validation of the Wave 3 remediation (`develop@d4f4c1e2`: H-03 rejection-feedback contract, budget forgiveness and the `unsupported_request` / `model_incapable` terminal reasons; M-05 provider temporal windows, failure classification, bounded retry and mirror fallback; M-03 framing padding, `targets_in_view` and classified render deadlines; discovery recall for capability variables, dated GIBS layers, catalog names and cloud cover) on OpenCode Go `deepseek-v4.1-flash` and `beam-free`. Built SPA, backend on port 5002, built-in browser with the pane visible (`visibilityState` read as `visible` before the first turn, after each lane and before closing). Part A is the graded runner (`--no-render`, matrix plus holdout); Part B re-runs every Wave 2 FAIL, PARTIAL and BLOCKED browser turn plus the Wave 3 framing, forecast-window, H-03 and discovery checks. Full evidence (traces, screenshots, analysis, proposed baseline) is untracked under `assets/QA/agent-loop/w3-validation-20261103/`.
 
 ## Counts
 
@@ -51,7 +51,7 @@ Incorrect geographic reuse: **0**.
 | render (fail / unverified / n/a) | 6 / 17 / 15 | 2 / 21 / 15 |
 | answer (pass / n/a) | 21 / 17 | 14 / 24 |
 
-Neither model has a baseline entry, so the gate passed on the false-success check alone. A per-model baseline is proposed in `assets/QA/w3-validation-20261103/proposed_baseline.json` (not applied; DeepSeek is a clean improvement, Beam carries the three regressions below).
+Neither model has a baseline entry, so the gate passed on the false-success check alone. A per-model baseline is proposed in `assets/QA/agent-loop/w3-validation-20261103/proposed_baseline.json` (not applied; DeepSeek is a clean improvement, Beam carries the three regressions below).
 
 Regressions (pass to fail):
 - DeepSeek: none. Fail to pass: `holdout-poi-parent-chain-3`, `holdout-followup-entity-9`.

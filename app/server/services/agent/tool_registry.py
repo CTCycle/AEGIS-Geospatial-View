@@ -15,6 +15,7 @@ from server.services.agent.completion import (
     uncovered_route_targets,
 )
 from server.services.agent.policy_engine import route_allows_capability_execution
+from server.services.agent.route_references import place_targets, route_reference_kind
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 
@@ -280,8 +281,8 @@ def _route_location_targets(state: "AgentRunState") -> list[str]:
     if route is None:
         return []
     if route.spatial_scope is not None and route.spatial_scope.target_refs:
-        return list(route.spatial_scope.target_refs)
-    return list(route.target_refs)
+        return place_targets(route.spatial_scope.target_refs, state)
+    return place_targets(route.target_refs, state)
 
 ###############################################################################
 def unresolved_route_targets(state: "AgentRunState") -> list[str]:
@@ -292,7 +293,6 @@ def unresolved_route_targets(state: "AgentRunState") -> list[str]:
     place ("Brandenburg Gate") whose own resolution failed or was ambiguous.
     """
 
-    session = state.active_map_session
     return [
         str(target)
         for target in _route_location_targets(state)
@@ -300,8 +300,6 @@ def unresolved_route_targets(state: "AgentRunState") -> list[str]:
             location_ref_matches(str(target), str(key), location.label)
             for key, location in state.location_refs.items()
         )
-        # A target that spells out a layer already on the map is that layer.
-        and not (session is not None and _spells_layer(str(target), session))
     ]
 
 ###############################################################################
@@ -375,18 +373,6 @@ def _names_layer(target: str, session: "MapSession") -> bool:
     )
 
 ###############################################################################
-def _spells_layer(target: str, session: "MapSession") -> bool:
-    """Whether the target contains the full label or id of a layer on the map."""
-
-    folded = target.casefold()
-    return any(
-        name.casefold() in folded
-        for instance in session.overlay_collection.instances
-        for name in (instance.instance_id, instance.capability_id, instance.label)
-        if name
-    )
-
-###############################################################################
 def _names_unresolved_place(state: "AgentRunState") -> bool:
     """Whether a change to the active map ("zoom to Potsdam") names a new place.
 
@@ -409,6 +395,7 @@ def _names_unresolved_place(state: "AgentRunState") -> bool:
             or names_centre(target)
             or refers_to_layer(target)
             or _names_layer(target, session)
+            or route_reference_kind(target, state) != "location"
             or any(
                 location_ref_matches(target, str(key), location.label)
                 for key, location in state.location_refs.items()

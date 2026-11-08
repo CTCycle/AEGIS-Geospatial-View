@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from server.domain.agent.capability_route import AgentPhase, AgentRunState
+from server.domain.agent.capability_route import AgentGoal, AgentPhase, AgentRunState, RequestObligation
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
-from server.services.agent.completion import evidence_coordinates
-from server.services.agent.final_answer_check import check_final_answer
+from server.services.agent.completion import (
+    build_completion_summary,
+    evidence_coordinates,
+    evidence_utc_offsets,
+)
+from server.services.agent.final_answer_check import (
+    check_final_answer,
+    drop_unsupported_time_zone_claims,
+)
 
 
 ###############################################################################
@@ -214,3 +221,50 @@ def test_coordinates_of_inspected_records_are_supported_but_invented_ones_are_no
 
     assert not violations("M6.1 at 34.9677° N, 142.1175° E.")
     assert violations("M6.1 at 35.5° N, 142.1175° E.")
+
+
+###############################################################################
+def test_an_unverified_time_zone_difference_is_dropped_and_the_answer_kept() -> None:
+    # S02: "Lugano is 0.4 °C warmer" carried a false aside about time zones.
+    answer = "Lugano is 0.4 °C warmer. The cities are in different time zones. See the map."
+
+    assert drop_unsupported_time_zone_claims(answer, {3600.0}) == "Lugano is 0.4 °C warmer. See the map."
+    assert drop_unsupported_time_zone_claims(answer, {3600.0, 32400.0}) == answer
+    same = "They are not in different time zones."
+    assert drop_unsupported_time_zone_claims(same, set()) == same
+
+
+###############################################################################
+def test_identifying_a_record_is_delivered_by_its_evidence() -> None:
+    # S08-T2 "Which one was strongest?": no place target, so a correct answer
+    # was replaced for not disclosing "the name of the requested place".
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="r", conversation_id="c", user_message="Which one?"
+    )
+    state.goal = AgentGoal(
+        goal="Which one?", task_mode="execute", presentation="text", operation="inspect_evidence",
+        location_mode="none",
+        obligations=[RequestObligation(id="identification", kind="identification", variable="strongest")],
+    )
+    outcome = lambda: build_completion_summary(state, {}).obligations[0].status  # noqa: E731
+
+    assert outcome() == "unmet"
+    state.tool_results.append(ToolResult(
+        call_id="1", tool_name="inspect_evidence", status="success", summary="Inspected.",
+        evidence_refs=["e1"], metadata=ToolExecutionMetadata(duration_ms=1),
+    ))
+    assert outcome() == "met"
+
+
+###############################################################################
+def test_named_zones_with_the_same_offset_count_as_one() -> None:
+    state = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="r", conversation_id="c", user_message="Compare."
+    )
+    for call, zone in (("1", "Europe/Zurich"), ("2", "Europe/Rome")):
+        state.tool_results.append(ToolResult(
+            call_id=call, tool_name="execute_geospatial_capability", status="success", summary="Done.",
+            data={"payload": {"timezone": zone}}, metadata=ToolExecutionMetadata(duration_ms=1),
+        ))
+
+    assert len(evidence_utc_offsets(state)) == 1

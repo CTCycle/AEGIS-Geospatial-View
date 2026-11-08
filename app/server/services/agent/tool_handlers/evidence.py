@@ -446,16 +446,8 @@ def _apply_operations(
         if op not in allowed:
             return result, "Only supported declarative evidence operations are allowed."
         field = str(operation.get("field") or "")
-        leaf = field.rsplit(".", 1)[-1]
-        if (
-            op in {"sort", "attribute_filter", "aggregate"}
-            and leaf != field
-            and not any(field in _properties(item) for item in result)
-            and any(leaf in _properties(item) for item in result)
-        ):
-            # Summaries show a measurement nested (observations.temperature_2m)
-            # where the evidence records keep it flat; the shown path is valid.
-            operation["field"] = field = leaf
+        if op in {"sort", "attribute_filter", "aggregate"}:
+            operation["field"] = field = _stored_field(field, result)
         if (
             op in {"sort", "attribute_filter", "aggregate"}
             and field
@@ -517,7 +509,8 @@ def _apply_operations(
             fields = operation.get("fields")
             if not is_json_array(fields) or not fields:
                 return result, "field_projection requires a non-empty fields list."
-            result = [_project(item, [str(key) for key in fields]) for item in result]
+            operation["fields"] = stored = [_stored_field(str(key), result) for key in fields]
+            result = [_project(item, stored) for item in result]
         elif op == "aggregate":
             metric = str(operation.get("metric") or "sum")
             field = str(operation.get("field") or "")
@@ -554,6 +547,19 @@ def _apply_operations(
                 if point is not None:
                     _properties(item)["country_iso2"] = country_at(point[0], point[1])
     return result, None
+
+###############################################################################
+def _stored_field(field: str, records: list[dict[str, Any]]) -> str:
+    """Map a path shown in summaries to the flat key the records store it under."""
+
+    leaf = field.rsplit(".", 1)[-1]
+    if (
+        leaf != field
+        and not any(field in _properties(item) for item in records)
+        and any(leaf in _properties(item) for item in records)
+    ):
+        return leaf
+    return field
 
 ###############################################################################
 def _project(item: dict[str, Any], fields: list[str]) -> dict[str, Any]:
