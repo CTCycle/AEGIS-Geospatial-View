@@ -107,7 +107,10 @@ from server.services.agent.completion import (
     requested_transform_unmet,
     unmarked_route_targets,
 )
-from server.services.agent.policy_engine import route_allows_capability_execution
+from server.services.agent.policy_engine import (
+    is_text_location_lookup,
+    route_allows_capability_execution,
+)
 from server.services.agent.tool_registry import (
     analysis_complete,
     route_target_location_available,
@@ -1472,10 +1475,11 @@ class AgentLoop:
             ),
             None,
         )
-        analysis = [
-            item for item in AgentLoop.completion_summary(state).obligations
-            if item.kind == "analysis"
-        ]
+        obligations = AgentLoop.completion_summary(state).obligations
+        if any(item.kind == "location" and item.values for item in obligations):
+            # A coordinate lookup's coordinates are its answer.
+            return AgentLoop.completion_summary(state).value_lines()
+        analysis = [item for item in obligations if item.kind == "analysis"]
         if analysis and (
             result is None or any(item.status != "met" or len(item.cite_groups) > 1 for item in analysis)
         ):
@@ -1848,7 +1852,7 @@ class AgentLoop:
             cite_groups=[
                 group
                 for item in summary.obligations
-                if item.kind == "analysis" and item.status == "met"
+                if item.kind in {"analysis", "location"} and item.status == "met"
                 for group in item.cite_groups
             ],
             coordinates=[
@@ -2049,11 +2053,7 @@ class AgentLoop:
                 for result in discovery_results
             )
         geocode_location_resolved = (
-            state.route is not None
-            and state.route.task_mode == "execute"
-            and state.route.primary_domain is CapabilityDomain.PLACE_SEARCH
-            and state.route.presentation == "text"
-            and state.route.operation in {"geocode", "resolve_location"}
+            is_text_location_lookup(state.route)
             and bool(state.location_refs)
             and any(
                 result.tool_name == "resolve_geospatial_location"
@@ -3781,6 +3781,13 @@ class AgentLoop:
                 in {CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE}
                 and not route.secondary_domains
             )
+            # A route that can neither execute a capability nor owes a
+            # discovery has no use for a shortlist; searching with its
+            # operation only reports a catalog miss the request never had.
+            or not (
+                route_allows_capability_execution(route)
+                or "capabilities_discovered" in state.completion_requirements
+            )
             or state.capability_ids
             or not (
                 (route.location_mode == "search_area" and route_target_location_available(state))
@@ -4720,11 +4727,7 @@ class AgentLoop:
         if route.analysis is not None:
             requirements.append("result_locations_derived")
         route_domains = {route.primary_domain, *route.secondary_domains}
-        text_location_resolution_only = (
-            route.primary_domain is CapabilityDomain.PLACE_SEARCH
-            and route.presentation == "text"
-            and route.operation in {"geocode", "resolve_location"}
-        )
+        text_location_resolution_only = is_text_location_lookup(route)
         text_evidence_inspection_only = (
             route.task_mode == "execute"
             and route.presentation == "text"

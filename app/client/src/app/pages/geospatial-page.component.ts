@@ -60,12 +60,14 @@ import {
   RunTraceEntry,
   ToolProgressItem,
   SelectedModelContext,
+  ConversationRunSummary,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 import { mapSessionOverlayEntries, reconcileOverlayOrder } from '../components/map-preview-rendering';
 
 const RECENT_SESSION_LIMIT = 12;
+const RUN_CANCELLED_MESSAGE = 'Run stopped. No result was produced.';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -176,6 +178,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   };
   private lastRunSequence = 0;
   private lastHandledRunId?: string;
+  private cancelledRunId?: string;
   private pendingRun?: { clientRequestId: string; message: string };
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
@@ -312,6 +315,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get inspectedRunId(): string | undefined {
     return this.activeRunId ?? this.lastHandledRunId;
+  }
+
+  get isInspectedRunCancelled(): boolean {
+    return this.cancelledRunId !== undefined && this.cancelledRunId === this.inspectedRunId;
   }
 
   get capabilityStatusItems(): CapabilityStatusItem[] {
@@ -478,6 +485,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.lastHandledRunId = undefined;
+    this.cancelledRunId = undefined;
     this.latestAcceptedRunId = undefined;
     this.latestAcceptedRunVersion = undefined;
     this.pendingRun = undefined;
@@ -744,12 +752,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.realtimeService.disconnect({ discardPending: true });
       this.contextRevision = snapshot.context_revision;
       this.conversationState = snapshot.conversation_state;
-      this.messages = snapshot.messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        created_at: message.created_at,
-        kind: 'normal' as const,
-      }));
+      this.messages = this.withCancelledRunNotices(
+        snapshot.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          created_at: message.created_at,
+          kind: 'normal' as const,
+        })),
+        snapshot.recent_runs ?? [],
+      );
       this.memorySnapshot = snapshot.memory_snapshot;
       this.contextUsage = undefined;
       this.lastRoute = undefined;
@@ -770,7 +781,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.cancelRequested = false;
       this.seenEventIds.clear();
       this.activeRunId = snapshot.active_run?.run_id;
-      this.lastHandledRunId = this.activeRunId;
+      // Recent runs are newest-first; a restored cancelled outcome stays visible.
+      const latestRun = snapshot.recent_runs?.[0];
+      this.cancelledRunId = !this.activeRunId && latestRun?.state === 'cancelled'
+        ? latestRun.run_id
+        : undefined;
+      this.lastHandledRunId = this.activeRunId ?? this.cancelledRunId;
       this.activeRunVersion = snapshot.active_run?.run_version;
       this.latestAcceptedRunId = this.activeRunId;
       this.latestAcceptedRunVersion = this.activeRunVersion;
@@ -1189,6 +1205,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
       }
       if (message.payload['command'] === 'run.cancel') {
+        if (message.payload['state'] === 'cancelled') {
+          this.recordRunCancelled(runId);
+        }
         this.status = 'Agent ready';
         this.progressLabel = undefined;
         this.isLoading = false;
@@ -1239,6 +1258,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.pendingRenderContext = undefined;
           this.renderAckQueued = false;
           this.pendingRenderAckMessageId = undefined;
+        }
+        if (state === 'cancelled') {
+          this.recordRunCancelled(this.readString(message.payload['run_id']) ?? this.activeRunId);
         }
         this.isLoading = false;
         this.activeRunId = undefined;
@@ -1541,6 +1563,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
           this.renderAckQueued = false;
           this.pendingRenderAckMessageId = undefined;
         }
+        this.recordRunCancelled(event.run_id);
         this.isLoading = false;
         this.status = 'Agent ready';
         this.progressLabel = undefined;
@@ -1569,6 +1592,42 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.syncState();
     this.changeDetectorRef.detectChanges();
     this.queueTranscriptScroll();
+  }
+
+  /** The ack, resume state, and event can each report one cancellation. */
+  private recordRunCancelled(runId: string | undefined): void {
+    if (runId === undefined || this.cancelledRunId === runId) {
+      return;
+    }
+    this.cancelledRunId = runId;
+    this.lastHandledRunId = runId;
+    this.assistantDraft = '';
+    this.appendAssistantEventMessage(RUN_CANCELLED_MESSAGE);
+  }
+
+  /** Chat history only stores completed turns, so cancelled runs are merged in. */
+  private withCancelledRunNotices(
+    messages: ChatMessage[],
+    runs: ConversationRunSummary[],
+  ): ChatMessage[] {
+    const merged = [...messages];
+    for (const run of runs) {
+      if (run.state !== 'cancelled') {
+        continue;
+      }
+      const stoppedAt = run.completed_at ?? run.cancel_requested_at ?? run.created_at;
+      const stoppedAtTime = stoppedAt ? Date.parse(stoppedAt) : Number.NaN;
+      const nextIndex = merged.findIndex((message) => (
+        message.created_at !== undefined && Date.parse(message.created_at) > stoppedAtTime
+      ));
+      merged.splice(nextIndex < 0 ? merged.length : nextIndex, 0, {
+        role: 'assistant',
+        content: RUN_CANCELLED_MESSAGE,
+        created_at: stoppedAt ?? undefined,
+        kind: 'normal',
+      });
+    }
+    return merged;
   }
 
   private applyRunCompletionPayload(payload: Record<string, unknown>): void {

@@ -78,3 +78,7 @@
   padding: 0.35rem 0.5rem;
   text-align: left;
 }
+
+.chat-message__content--markdown :where(th) {
+  white-space: nowrap;
+}

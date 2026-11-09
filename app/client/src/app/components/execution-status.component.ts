@@ -25,6 +25,7 @@ export class ExecutionStatusComponent {
   @Input() toolProgress: ToolProgressItem[] = [];
   @Input() traceEntries: RunTraceEntry[] = [];
   @Input() active = false;
+  @Input() cancelled = false;
   @Input() traceLoading = false;
   @Input() runError = '';
   @Input() traceError = '';
@@ -48,6 +49,9 @@ export class ExecutionStatusComponent {
   }
 
   get summaryLabel(): string {
+    if (this.cancelled && !this.active) {
+      return 'Cancelled';
+    }
     if (this.runError || this.failedToolCount > 0 || this.taskState?.status === 'failed') {
       return 'Needs attention';
     }
@@ -68,6 +72,9 @@ export class ExecutionStatusComponent {
   }
 
   get tone(): 'idle' | 'active' | 'error' {
+    if (this.cancelled && !this.active) {
+      return 'idle';
+    }
     if (this.runError || this.failedToolCount > 0 || this.taskState?.status === 'failed') {
       return 'error';
     }

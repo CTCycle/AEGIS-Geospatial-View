@@ -2309,3 +2309,53 @@ async def test_remove_layer_and_show_city_treats_the_layer_label_as_a_layer_not_
     summary = AgentLoop._verified_map_state_summary(committed) or ""
     assert "The map is framed on Tokyo, Japan." in summary and "Visible overlays: none." in summary
     assert layer_edit_count(committed) == 1
+
+
+###############################################################################
+_LISBON_COORDINATES_ROUTE = {"primary_domain": "place_search", "task_mode": "execute", "presentation": "text",
+                             "location_mode": "target", "operation": "resolve_location", "target_refs": ["Lisbon"]}
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("synthesis", "expected"),
+    [
+        ("Lisbon is at 38.72 N, 9.14 W.", "38.72 N, 9.14 W"),
+        ("Resolved Lisbon.", "latitude 38.72000, longitude -9.14000"),
+        ("", "latitude 38.72000, longitude -9.14000"),
+    ],
+)
+async def test_text_coordinate_lookup_delivers_the_resolved_coordinates(synthesis: str, expected: str) -> None:
+    state = AgentRunState(phase=AgentPhase.RECEIVE_REQUEST, request_id="coords", conversation_id="coords",
+                          user_message="What are the coordinates of Lisbon? Keep the map unchanged.", context_hydrated=True)
+    model = _ScriptedProvider([
+        _call("route", "route_request", _LISBON_COORDINATES_ROUTE),
+        _call("resolve", "resolve_geospatial_location", {"query": "Lisbon", "target_id": "Lisbon"}),
+        LLMResult(content=synthesis), LLMResult(content=synthesis),
+    ])
+
+    result = await make_loop(model, DiscoveryProvider(), CityResolver(), MemoryEvidence()).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+
+    assert result.stopped_reason == "goal_satisfied"
+    assert expected in result.final_text
+    assert state.prepared_map_session is None
+    assert [item.tool_name for item in result.tool_results] == ["resolve_geospatial_location"]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_text_coordinate_lookup_without_a_location_is_not_completed() -> None:
+    state = AgentRunState(phase=AgentPhase.RECEIVE_REQUEST, request_id="coords-unmet", conversation_id="coords-unmet",
+                          user_message="What are the coordinates of Lisbon?", context_hydrated=True)
+    model = _ScriptedProvider([
+        _call("route", "route_request", _LISBON_COORDINATES_ROUTE),
+        *(LLMResult(content="Resolved Lisbon.") for _ in range(4)),
+    ])
+
+    result = await make_loop(model, DiscoveryProvider(), CityResolver(), MemoryEvidence()).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
+
+    assert result.stopped_reason != "goal_satisfied"
+    assert "Not completed" in result.final_text

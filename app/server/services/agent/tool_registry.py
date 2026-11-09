@@ -14,7 +14,10 @@ from server.services.agent.completion import (
     uncovered_data_obligations,
     uncovered_route_targets,
 )
-from server.services.agent.policy_engine import route_allows_capability_execution
+from server.services.agent.policy_engine import (
+    is_text_location_lookup,
+    route_allows_capability_execution,
+)
 from server.services.agent.route_references import place_targets, route_reference_kind
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
@@ -474,6 +477,8 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
         registered.definition.name == "execute_geospatial_capability"
         and not route_allows_capability_execution(route)
     ):
+        return False
+    if registered.definition.name == "discover_geospatial_capabilities" and is_text_location_lookup(route):
         return False
     if route.primary_domain is CapabilityDomain.MAP_STATE:
         return registered.definition.name == "apply_map_plan"

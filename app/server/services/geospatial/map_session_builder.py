@@ -410,7 +410,8 @@ class MapSessionBuilder:
         """Pin resolved places as one labelled point layer on the current map.
 
         The map keeps its subject and the view the user is looking at; the
-        view only widens when a marker would fall outside it.
+        view only moves when a marker would fall outside it. A move that leaves
+        the subject out of frame makes the first marked place the new subject.
         """
 
         missing = [ref for ref in action.location_refs if ref not in marked_locations]
@@ -420,6 +421,32 @@ class MapSessionBuilder:
                 f"'{missing[0]}' is not a resolved location ref. Resolve it with "
                 "resolve_geospatial_location and pass the returned ref.",
             )
+        points = [
+            (location.longitude, location.latitude)
+            for location in (marked_locations[ref] for ref in action.location_refs)
+        ]
+        west, south, east, north = (
+            _valid_bbox(current_view_bounds) or session_view_bbox(session)
+        )
+        view = [west, south, east, north]
+        if not all(west <= lon <= east and south <= lat <= north for lon, lat in points):
+            # Frame the markers themselves: the old view does not show them all.
+            lons = [lon for lon, _ in points]
+            lats = [lat for _, lat in points]
+            pad = max(max(lons) - min(lons), max(lats) - min(lats)) * LOCATION_UNION_PADDING
+            view = _with_min_span(
+                [min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad],
+                MARKER_VIEWPORT_MIN_SPAN_DEGREES,
+            )
+            subject = session.resolved_location
+            if not (
+                view[0] <= subject.longitude <= view[2]
+                and view[1] <= subject.latitude <= view[3]
+            ):
+                session = session.model_copy(
+                    update={"resolved_location": marked_locations[action.location_refs[0]]},
+                    deep=True,
+                )
         features: list[dict[str, Any]] = []
         for ref in dict.fromkeys(action.location_refs):
             location = marked_locations[ref]
@@ -469,27 +496,7 @@ class MapSessionBuilder:
                 session.overlay_collection, additions.instances
             ),
         )
-        points = [
-            (location.longitude, location.latitude)
-            for location in (marked_locations[ref] for ref in action.location_refs)
-        ]
-        west, south, east, north = (
-            _valid_bbox(current_view_bounds) or session_view_bbox(session)
-        )
-        if all(west <= lon <= east and south <= lat <= north for lon, lat in points):
-            # Every marker is already in the view the user is looking at.
-            return _with_viewport(
-                session, _viewport_for_bbox([west, south, east, north], session.viewport)
-            )
-        # Otherwise frame the markers themselves: the old view shows none of them.
-        lons = [lon for lon, _ in points]
-        lats = [lat for _, lat in points]
-        pad = max(max(lons) - min(lons), max(lats) - min(lats)) * LOCATION_UNION_PADDING
-        framed = _with_min_span(
-            [min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad],
-            MARKER_VIEWPORT_MIN_SPAN_DEGREES,
-        )
-        return _with_viewport(session, _viewport_for_bbox(framed, session.viewport))
+        return _with_viewport(session, _viewport_for_bbox(view, session.viewport))
 
     # -------------------------------------------------------------------------
     def _update_instance(

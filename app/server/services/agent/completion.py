@@ -37,6 +37,7 @@ from server.domain.agent.presentation_contract import (
 )
 from server.domain.agent.task_ledger import map_fingerprint
 from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
+from server.services.agent.policy_engine import is_text_location_lookup
 from server.services.agent.route_references import place_targets
 
 ###############################################################################
@@ -1312,6 +1313,7 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         values: list[str] = []
         must_name: list[str] = []
         cite_groups: list[list[float]] = []
+        label = _obligation_label(obligation)
         status: ObligationStatus
         if obligation.kind == "presentation":
             status = "met" if map_state == "rendered" else "failed" if map_state == "failed" else "unmet"
@@ -1364,6 +1366,20 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
             if result is not None and (status == "met" or (obligation.kind == "data" and status == "failed")):
                 evidence_ref = result.evidence_refs[0] if result.evidence_refs else None
                 values = _leading_values(result, variable=obligation.variable)
+            if obligation.kind == "location" and status == "met" and is_text_location_lookup(state.route):
+                located = next((
+                    item for key, item in state.location_refs.items()
+                    if target is not None and location_ref_matches(target, str(key), item.label)
+                ), None)
+                if located is not None:
+                    # The coordinates are the requested result, so the answer
+                    # must cite them; either sign, for "9.14 W".
+                    label = (located.label or label)[:200]
+                    values = [f"latitude {located.latitude:.5f}, longitude {located.longitude:.5f}"]
+                    cite_groups = [
+                        [located.latitude, -located.latitude],
+                        [located.longitude, -located.longitude],
+                    ]
             if obligation.kind == "analysis" and status == "met":
                 # A comparison cites each target's own figure (or their
                 # difference); any other analysis cites its result.
@@ -1382,7 +1398,7 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                     cite_groups = [_value_numbers(item, obligation.variable) for item in sources]
         outcomes.append(ObligationOutcome(
             obligation_id=obligation.id, kind=obligation.kind, status=status,
-            label=_obligation_label(obligation),
+            label=label,
             evidence_ref=evidence_ref, values=values, answer_must_name=must_name,
             cite_groups=cite_groups,
         ))

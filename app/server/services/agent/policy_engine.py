@@ -356,4 +356,25 @@ def route_allows_capability_execution(route: Any) -> bool:
     )
 
 
-__all__ = ["PolicyEngine", "route_allows_capability_execution"]
+def is_text_location_lookup(route: Any) -> bool:
+    """Whether a route asks only for where a place is, answered as text.
+
+    The location resolver alone answers it: no provider capability can add
+    to the result, and the resolved coordinates are what must be delivered.
+    """
+
+    return (
+        route is not None
+        and route.task_mode == "execute"
+        and route.primary_domain is CapabilityDomain.PLACE_SEARCH
+        and route.presentation == "text"
+        and route.operation in {"geocode", "resolve_location"}
+        and not route_allows_capability_execution(route)
+    )
+
+
+__all__ = [
+    "PolicyEngine",
+    "is_text_location_lookup",
+    "route_allows_capability_execution",
+]

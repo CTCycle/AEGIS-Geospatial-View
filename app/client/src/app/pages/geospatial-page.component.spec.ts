@@ -700,6 +700,91 @@ describe('pages/geospatial-page.component', () => {
     expect(component.isLoading).toBeFalse();
   });
 
+  it('shows one cancellation outcome when the ack and terminal event both report it', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component['activeRunId'] = 'run-stop';
+    component['lastHandledRunId'] = 'run-stop';
+    component.assistantDraft = 'partial answer';
+    component.isLoading = true;
+
+    component['handleRealtimeMessage']({
+      type: 'run.ack',
+      conversation_id: 'conv-1',
+      payload: { command: 'run.cancel', accepted: true, run_id: 'run-stop', state: 'cancelled' },
+    } as never);
+    component['handleRunEvent']({
+      event_id: 'event-cancel',
+      conversation_id: 'conv-1',
+      run_id: 'run-stop',
+      run_version: 1,
+      sequence: 9,
+      type: 'cancelled',
+      visibility: 'user',
+      payload: { state: 'cancelled' },
+    } as never);
+
+    expect(component.isInspectedRunCancelled).toBeTrue();
+    expect(component.isLoading).toBeFalse();
+    expect(component.assistantDraft).toBe('');
+    expect(component.messages.map((message) => message.content)).toEqual([
+      'Run stopped. No result was produced.',
+    ]);
+  });
+
+  it('restores a cancelled outcome and its transcript notice from run history', async () => {
+    const seeded = defaultAppState().chatPage;
+    seeded.chatPanel.conversationId = 'conv-restore';
+    store.getChatPage.and.returnValue(seeded);
+    apiClient.fetchConversationSnapshot.and.resolveTo({
+      conversation_id: 'conv-restore',
+      title: 'Restored conversation',
+      context_revision: 1,
+      messages: [
+        { role: 'user', content: 'Recent earthquakes', created_at: '2026-08-31T10:00:00' },
+        { role: 'user', content: 'Show Rome', created_at: '2026-08-31T10:05:00' },
+      ],
+      conversation_state: {
+        schema_version: 2,
+        conversation_id: 'conv-restore',
+        revision: 1,
+        active_directives: [],
+        summary: null,
+        goal: null,
+        route: null,
+        constraints: {},
+        resolved_locations: {},
+        evidence_refs: [],
+        committed_map_session: null,
+        pending_clarification: null,
+      },
+      memory_snapshot: { location_slots: [] },
+      map_session: null,
+      active_run: null,
+      recent_runs: [{
+        run_id: 'run-stop',
+        state: 'cancelled',
+        created_at: '2026-08-31T10:00:00',
+        completed_at: '2026-08-31T10:00:30',
+      }],
+    });
+
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance;
+    expect(component.inspectedRunId).toBe('run-stop');
+    expect(component.isInspectedRunCancelled).toBeTrue();
+    expect(component.messages.map((message) => message.content)).toEqual([
+      'Recent earthquakes',
+      'Run stopped. No result was produced.',
+      'Show Rome',
+    ]);
+  });
+
   it('operation-driven failures preserve the response and flag the agent model', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Tool timed out.',

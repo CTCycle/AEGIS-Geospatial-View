@@ -220,8 +220,8 @@
           <div class="settings-row">
             <header class="settings-row__label">
               <h3>Local server</h3>
-              <span class="settings-status" [class.settings-status--ready]="ollamaStatus?.ok === true">
-                <span aria-hidden="true"></span>{{ ollamaStatus?.ok === true ? 'Connection healthy' : 'Not checked' }}
+              <span class="settings-status" [class.settings-status--ready]="ollamaHealthOk ?? ollamaStatus?.ok === true">
+                <span aria-hidden="true"></span>{{ (ollamaHealthOk ?? ollamaStatus?.ok === true) ? 'Connection healthy' : ollamaHealthOk === false ? 'Connection failed' : 'Not checked' }}
               </span>
             </header>
             <div class="settings-row__body">

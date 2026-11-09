@@ -576,18 +576,22 @@
     padding: 0.3rem 0.7rem;
     overflow: hidden;
     border: 1px solid #344953;
-    border-radius: 999px;
+    border-radius: 0.9rem;
     background: rgb(16 28 35 / 88%);
     color: #c5dbe6;
     font-size: 0.72rem;
     font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-align: center;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     pointer-events: none;
 }
 
 .activity-pill {
-    top: 3.3rem;
+    top: 3.7rem;
     left: 50%;
     max-width: min(60%, 26rem);
     transform: translateX(-50%);

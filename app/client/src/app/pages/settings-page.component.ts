@@ -305,6 +305,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ollamaStatusText = '';
   keyValidationErrors: ApiKeyValidationErrors = {};
   ollamaStatus: ModelLibrarySourceStatus | null = null;
+  ollamaHealthOk: boolean | null = null;
   deepseekStatus: ModelLibrarySourceStatus | null = null;
   opencodeStatus: ModelLibrarySourceStatus | null = null;
   opencodeGoStatus: ModelLibrarySourceStatus | null = null;
@@ -685,12 +686,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   async checkOllamaConnection(): Promise<void> {
     try {
       const health = await this.apiClient.checkOllamaHealth();
+      this.ollamaHealthOk = health.ok === true;
       const summary = this.formatOllamaHealthSummary(health);
       this.ollamaStatusText = summary;
       this.statusText = `Ollama: ${summary}`;
       this.syncState();
       this.changeDetectorRef.detectChanges();
     } catch (error: unknown) {
+      this.ollamaHealthOk = false;
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaStatusText = detail;
@@ -1712,10 +1715,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return 'Connection is healthy.';
     }
 
-    const detail = health.detail ?? 'an unknown status';
+    const detail = health.detail?.trim().replace(/\.+$/, '');
+    if (!detail) {
+      return 'Connection check returned an unknown status.';
+    }
     if (this.userFacingErrorService.isLowLevelConnectionError(detail)) {
       return `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`;
     }
-    return `Connection check returned ${detail}.`;
+    return `${detail}.`;
   }
 }

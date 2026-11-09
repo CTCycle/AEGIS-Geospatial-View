@@ -798,7 +798,8 @@ class MapPlanService:
         if active_session is not None and any(
             isinstance(action, MarkLocationsAction) for action in plan.actions
         ):
-            # Marking places keeps the shown map as the subject.
+            # Marking places keeps the shown map as the subject unless the
+            # reframe leaves it out of view (see MapSessionBuilder).
             return active_session.resolved_location
         explicit_refs = MapPlanService._explicit_location_refs(plan)
         if explicit_refs:

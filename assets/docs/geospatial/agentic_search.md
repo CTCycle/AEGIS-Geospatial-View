@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-11-06
+Last updated: 2026-11-08
 
 ## Summary
 
@@ -568,6 +568,20 @@ the view only when a marker falls outside it. A marking route requires the
 `locations_marked` obligation: a plan without `mark_locations` is rejected, and
 the run is not complete until the marker layer holds every requested place.
 If the model stops after resolving them, the server issues the marking itself.
+Marking keeps the map subject unless the reframe leaves it out of view; in that
+case the first marked place becomes `resolved_location`.
+
+Text-only coordinate lookups ("what are the coordinates of Lisbon") route as a
+text `PLACE_SEARCH` with operation `geocode` or `resolve_location` and no
+capability execution. Such a route never runs capability discovery, and the
+server's discovery refresh is skipped for routes that cannot execute
+capabilities. Data, analysis and presentation obligations the model declares on
+such a route are dropped in `_reconcile_declared_obligations`, so the answer
+carries no false "Not delivered" line. The location obligation carries the
+label and latitude/longitude as deliverable values: the final answer must cite
+them, otherwise a deterministic decimal answer is used. If the place stays
+unresolved the run stops `insufficient_evidence`. A lookup route with empty
+`target_refs` has no location obligation.
 
 Dated rasters report their own temporal coverage. NASA GIBS compares the
 requested day with the layer's catalog time extent: a covered day marks the

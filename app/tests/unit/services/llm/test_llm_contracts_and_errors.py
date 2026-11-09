@@ -18,6 +18,17 @@ from server.services.llm.response_serialization import dump_response_payload
 
 
 ###############################################################################
+def test_health_check_error_message_is_actionable_without_wildcard_model() -> None:
+    error = LLMProviderRequestError(
+        provider="ollama", model="*", stage="health", code="http_error", http_status=503
+    )
+
+    message = str(error)
+    assert "*" not in message
+    assert "could not be reached or refused the health check (HTTP 503)" in message
+
+
+###############################################################################
 def test_provider_connection_errors_are_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
         ConnectionError("socket unavailable"),

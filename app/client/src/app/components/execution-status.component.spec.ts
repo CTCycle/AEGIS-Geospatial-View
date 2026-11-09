@@ -20,6 +20,25 @@ describe('components/execution-status.component', () => {
     expect(fixture.nativeElement.querySelector('.execution-status__panel')).toBeNull();
   });
 
+  it('reports a cancelled run as Cancelled even after tool activity', () => {
+    const fixture = TestBed.createComponent(ExecutionStatusComponent);
+    const component = fixture.componentInstance;
+    component.runId = 'run-1';
+    component.cancelled = true;
+    component.toolProgress = [{
+      call_id: 'call-1',
+      tool_name: 'execute_geospatial_capability',
+      status: 'success',
+      duration_ms: 20,
+      error: null,
+    }];
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.execution-status__trigger') as HTMLButtonElement;
+    expect(trigger.textContent).toContain('Cancelled');
+    expect(component.tone).toBe('idle');
+  });
+
   it('summarizes running and failed tool activity without exposing arbitrary payloads', () => {
     const fixture = TestBed.createComponent(ExecutionStatusComponent);
     const component = fixture.componentInstance;

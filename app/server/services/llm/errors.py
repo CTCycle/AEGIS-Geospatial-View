@@ -221,6 +221,17 @@ class LLMProviderRequestError(RuntimeError):
         self.context_usage = (
             dict(context_usage) if context_usage is not None else None
         )
+        if stage == "health" and model == "*":
+            detail = (
+                f"{provider.capitalize()} could not be reached or refused the "
+                "health check"
+            )
+            if http_status is not None:
+                detail += f" (HTTP {http_status})"
+            super().__init__(
+                detail + ". Check that the server is running and the base URL is correct."
+            )
+            return
         detail = f"{provider} rejected {model} during {stage}"
         if http_status is not None:
             detail += f" (HTTP {http_status})"

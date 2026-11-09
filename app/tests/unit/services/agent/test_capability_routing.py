@@ -1903,3 +1903,29 @@ def test_marking_places_on_the_shown_map_is_a_location_only_marker_route() -> No
         active_state=state,
     )
     assert unnamed.status == "clarification"
+
+###############################################################################
+def test_coordinate_lookup_stays_free_of_provider_data_against_the_real_catalog() -> None:
+    router = CapabilityRouter(capability_registry=CapabilityRegistry(), runtime_registry=RuntimeRegistry())
+    route = _route(
+        primary_domain=CapabilityDomain.PLACE_SEARCH,
+        presentation="text",
+        operation="resolve_location",
+        target_refs=["Lisbon"],
+        obligations=[
+            {"kind": "location", "target_refs": ["Lisbon"]},
+            {"kind": "data", "target_refs": ["Lisbon"], "variable": "coordinates"},
+            {"kind": "presentation", "variable": "map unchanged"},
+        ],
+    )
+
+    lookup = router.validate_route(
+        route, user_message="What are the coordinates of Lisbon?", active_state=_state()
+    )
+    records = router.validate_route(
+        route, user_message="What are the coordinates of the airports in Lisbon?", active_state=_state()
+    )
+
+    assert lookup.route.secondary_domains == []
+    assert [item.kind for item in lookup.route.obligations] == ["location"]
+    assert CapabilityDomain.DATA_RETRIEVAL in records.route.secondary_domains

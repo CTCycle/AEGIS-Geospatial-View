@@ -253,6 +253,6 @@ def check_final_answer(
         if not all(_cites_any(cited, group) for group in groups) and not (
             len(groups) > 1 and _cites_any(cited, differences)
         ):
-            violations.append("cites no value for the requested analysis although the evidence has them")
+            violations.append("cites no value for the requested result although the evidence has them")
 
     return violations

@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-11-01
+Last updated: 2026-11-08
 
 ## Overview
 
@@ -36,6 +36,12 @@ chat or browser reload starts from the catalog default basemap.
 
 Conversation history, active runs, and map sessions are loaded from their
 current API contracts; they are not copied into this view-preference cache.
+
+A cancelled run's toolbar state ("Cancelled") and transcript notice ("Run
+stopped. No result was produced.") are derived on hydrate from
+`snapshot.recent_runs` (the latest 8 runs). They are never stored as chat
+messages, so they cannot enter model context; cancelled notices older than the
+latest 8 runs are not restored.
 
 Prepared map state is a candidate, not committed visualization memory. The
 client validates it locally and acknowledges the exact run/version/session/

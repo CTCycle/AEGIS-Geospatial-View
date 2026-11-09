@@ -29,6 +29,7 @@ from server.services.agent.basemap_intent import (
     refers_to_basemap,
     refers_to_layer,
 )
+from server.services.agent.policy_engine import is_text_location_lookup
 from server.services.agent.tool_registry import is_active_map_update
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -118,6 +119,8 @@ _PLACE_SEARCH_DATA_TERMS = frozenset(
         "stations",
     }
 )
+
+_COORDINATES_WORD = re.compile(r"\bcoordinates\b", re.IGNORECASE)
 
 # Fast routing accepts one display verb and one target, nothing else: a
 # wrong deterministic route costs more than the routing call it saves.
@@ -376,7 +379,13 @@ class CapabilityRouter:
         )
         if coordinate_reason is not None:
             reasons.append(coordinate_reason)
-        requests_entities = self.requests_catalog_entities(user_message)
+        # The catalog's coordinate tool makes "coordinates" a data noun, but a
+        # normalized lookup asks for the place's position, not provider records.
+        requests_entities = self.requests_catalog_entities(
+            _COORDINATES_WORD.sub(" ", user_message)
+            if coordinate_reason is not None
+            else user_message
+        )
         proposed, map_data_reason = _normalize_data_bearing_map_route(
             proposed, user_message=user_message, requests_entities=requests_entities
         )
@@ -828,6 +837,9 @@ def _reconcile_declared_obligations(
         dropped_kinds.add("analysis")
     if is_mark_locations_operation(validated.operation):
         dropped_kinds.update({"data", "analysis"})
+    if is_text_location_lookup(validated):
+        # The resolved position is the whole deliverable of this route.
+        dropped_kinds.update({"data", "analysis", "presentation"})
     kept: list[RouteObligation] = []
     for item in validated.obligations:
         if item.kind in dropped_kinds:

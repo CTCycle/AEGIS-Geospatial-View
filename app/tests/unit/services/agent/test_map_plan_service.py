@@ -1432,6 +1432,28 @@ async def test_marking_outside_the_view_frames_the_markers_under_the_requested_n
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_marking_a_distant_place_moves_the_map_subject_with_the_view() -> None:
+    rome = ResolvedLocation(label="Rome, Italy", latitude=41.893, longitude=12.483)
+    state = _marking_state({"Rome": rome})
+
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Rome"])],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    candidate = state.prepared_map_session
+    assert candidate is not None
+    assert candidate.resolved_location == rome
+    west, south, east, north = candidate.viewport.bbox or []
+    assert west < rome.longitude < east and south < rome.latitude < north
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_marking_route_rejects_plans_that_do_not_mark_resolved_places() -> None:
     state = _marking_state({
         "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
