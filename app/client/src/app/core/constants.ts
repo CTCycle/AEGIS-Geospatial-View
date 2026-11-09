@@ -46,6 +46,8 @@ export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string)
   `/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`;
 export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers/account-setup';
 export const API_GEOSPATIAL_RENDER_CAPTURES_PATH = '/geospatial/render-captures';
+export const API_GEOSPATIAL_SAMPLE_PATH = (capabilityId: string): string =>
+  `/geospatial/sample/${encodeURIComponent(capabilityId)}`;
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_ATTACHMENTS_PATH = '/chat/attachments';
 export const API_CHAT_MODELS_PATH = '/chat/models';

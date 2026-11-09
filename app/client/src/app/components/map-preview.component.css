@@ -361,6 +361,8 @@
     right: 0.75rem;
     top: 0.75rem;
     max-width: min(20rem, calc(100% - 1.5rem));
+    max-height: 60%;
+    overflow-y: auto;
     display: grid;
     gap: 0.35rem;
     padding: 0.55rem 0.65rem;

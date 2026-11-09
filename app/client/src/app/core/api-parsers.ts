@@ -55,6 +55,7 @@ import {
   OverlayCollectionState,
   OverlayInstance,
   OverlayLegend,
+  OverlaySampleResponse,
 } from './types';
 import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
 import { ApiContractError } from './api-errors';
@@ -2419,6 +2420,30 @@ function parseOverlayLegend(value: unknown): OverlayLegend | undefined {
       : [],
   };
 }
+
+export const parseOverlaySampleResponse = (value: unknown): OverlaySampleResponse => {
+  const endpoint = 'geospatial sample';
+  if (!isRecord(value)) return apiContract(endpoint, 'response is not an object', value);
+  const kind = value['kind'];
+  if (kind !== 'continuous' && kind !== 'categorical') return apiContract(endpoint, 'kind is invalid', value);
+  const units = typeof value['units'] === 'string' ? value['units'] : null;
+  const rawSample = value['sample'];
+  let sample: OverlaySampleResponse['sample'] = null;
+  if (rawSample !== null && rawSample !== undefined) {
+    if (!isRecord(rawSample) || typeof rawSample['label'] !== 'string'
+        || (rawSample['value'] !== null && !isFiniteNumber(rawSample['value']))) {
+      return apiContract(endpoint, 'sample is invalid', value);
+    }
+    sample = {
+      value: isFiniteNumber(rawSample['value']) ? rawSample['value'] : null,
+      label: rawSample['label'],
+      units: typeof rawSample['units'] === 'string' ? rawSample['units'] : units,
+      kind: rawSample['kind'] === 'categorical' ? 'categorical' : kind,
+      matched_color: typeof rawSample['matched_color'] === 'string' ? rawSample['matched_color'] : null,
+    };
+  }
+  return {capability_id: requireApiString(value, 'capability_id', endpoint), units, kind, sample};
+};
 
 function parseValueEncoding(value: unknown): MapOverlayEntry['value_encoding'] {
   if (!isRecord(value)) return undefined;

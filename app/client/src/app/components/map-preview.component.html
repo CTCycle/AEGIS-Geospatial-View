@@ -116,6 +116,9 @@
                   <button type="button" class="metadata-panel__action" (click)="openInspection(inspection)">Inspect</button>
                 }
               </p>
+              @if (entry.legend; as legend) {
+                <app-overlay-legend [legend]="legend" [layerLabel]="entry.label" [readout]="hoverReadoutFor(entry.id)" />
+              }
             }
           </div>
         }

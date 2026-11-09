@@ -1,0 +1,72 @@
+:host {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 11rem;
+    padding-left: 1.15rem;
+}
+
+p {
+    margin: 0;
+}
+
+.overlay-legend__caption {
+    color: #9cc2d1;
+    font-size: 0.64rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.overlay-legend__bar {
+    height: 0.45rem;
+    border-radius: 0.15rem;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 25%);
+}
+
+.overlay-legend__ticks {
+    position: relative;
+    height: 0.8rem;
+    color: #c6dde6;
+    font-size: 0.6rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.overlay-legend__ticks span {
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+}
+
+.overlay-legend__categories {
+    display: grid;
+    gap: 0.12rem;
+    max-height: calc(8 * 0.95rem);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    font-size: 0.64rem;
+    line-height: 0.83rem;
+}
+
+.overlay-legend__categories li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.overlay-legend__swatch {
+    flex: 0 0 auto;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 0.12rem;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 25%);
+}
+
+.overlay-legend__readout {
+    color: #edf8fb;
+    font-size: 0.66rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}

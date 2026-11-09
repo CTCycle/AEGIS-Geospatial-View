@@ -12,6 +12,7 @@ import {
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
   API_GEOSPATIAL_RENDER_CAPTURES_PATH,
+  API_GEOSPATIAL_SAMPLE_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
@@ -32,6 +33,7 @@ import {
   parseGeospatialLayersResponse,
   parseGeospatialProviderPayload,
   parseGeospatialProviderAccountSetups,
+  parseOverlaySampleResponse,
   parseModelLibraryResponse,
   parseModelSettingsResponse,
   parseRuntimeSettingsResponse,
@@ -65,6 +67,7 @@ import {
   RunTraceResponse,
   AgentRunSnapshot,
   OllamaHealthResponse,
+  OverlaySampleResponse,
 } from './types';
 import { ApiRequestError } from './api-errors';
 
@@ -181,6 +184,19 @@ export const fetchGeospatialLayerFeatures = async (
     { method: 'GET' },
   );
   return parseGeospatialProviderPayload(data, 'geospatial layer features');
+};
+
+export const fetchOverlaySample = async (
+  capabilityId: string,
+  params: { lon: number; lat: number; z: number; time?: string },
+  signal?: AbortSignal,
+): Promise<OverlaySampleResponse> => {
+  const suffix = buildQuerySuffix(params);
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_GEOSPATIAL_SAMPLE_PATH(capabilityId)}${suffix}`,
+    { method: 'GET', signal },
+  );
+  return parseOverlaySampleResponse(data);
 };
 
 export const fetchGeospatialCameras = async (

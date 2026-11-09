@@ -319,6 +319,21 @@ export interface OverlayLegend {
   nodata_colors: string[];
 }
 
+export interface OverlaySample {
+  value: number | null;
+  label: string;
+  units: string | null;
+  kind: OverlayLegend['kind'];
+  matched_color: string | null;
+}
+
+export interface OverlaySampleResponse {
+  capability_id: string;
+  units: string | null;
+  kind: OverlayLegend['kind'];
+  sample: OverlaySample | null;
+}
+
 export interface MapOverlayEntry {
   legend?: OverlayLegend;
   value_encoding?: { mode: 'graduated' | 'heatmap'; field: string; min: number; max: number };

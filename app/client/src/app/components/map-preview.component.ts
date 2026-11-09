@@ -11,9 +11,13 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  signal,
 } from '@angular/core';
-import maplibregl, { Map } from 'maplibre-gl';
+import maplibregl, { Map, MapMouseEvent } from 'maplibre-gl';
+
+import { fetchOverlaySample } from '../core/api';
+import { ApiRequestError } from '../core/api-errors';
 
 import {
   DEFAULT_MAP_FIT_MAX_ZOOM,
@@ -29,10 +33,19 @@ import {
   OverlayRenderStatus,
   OverlayOpacityChange,
   OverlayStateChange,
+  OverlayLegend,
+  OverlaySampleResponse,
   OverlayVisibilityChange,
   SearchResponsePayload,
 } from '../core/types';
 import { OverlayControlsComponent } from './overlay-controls.component';
+import { OverlayLegendComponent } from './overlay-legend.component';
+import {
+  HOVER_READOUT_DELAY_MS,
+  HoverReadoutScheduler,
+  formatHoverReadout,
+  sampleCacheKey,
+} from './overlay-legend';
 import {
   FrameInsets,
   FrameRect,
@@ -79,6 +92,13 @@ const OVERLAY_SOURCE_PREFIX = 'overlay-source-';
 // `idle` needs every tile settled and can stay silent on slow tiles, so a
 // candidate that is applied and verifiable is acknowledged after this grace.
 const RENDER_WATCHDOG_MS = 30_000;
+const SAMPLE_CACHE_LIMIT = 256;
+
+interface HoverTarget {
+  point: MapMouseEvent['point'];
+  lng: number;
+  lat: number;
+}
 const IDLE_FALLBACK_GRACE_MS = 3_000;
 const IDLE_FALLBACK_POLL_MS = 1_000;
 
@@ -117,7 +137,7 @@ export interface MapCapturePayload {
 @Component({
   selector: 'app-map-preview',
   standalone: true,
-  imports: [OverlayControlsComponent],
+  imports: [OverlayControlsComponent, OverlayLegendComponent],
   templateUrl: './map-preview.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './map-preview.component.css',
@@ -199,6 +219,36 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     basemapId: string | null;
     centerKey: string | null;
     sessionKey: string | null;
+  };
+  /** One-line value readout for the legend card of the overlay under the resting pointer. */
+  readonly hoverReadout = signal<{ overlayId: string; text: string } | null>(null);
+  private hoverMap: Map | null = null;
+  private hoverAbort?: AbortController;
+  private readonly sampleCache = new globalThis.Map<string, OverlaySampleResponse['sample']>();
+  private readonly unsampleableCapabilities = new Set<string>();
+  private readonly hoverScheduler = new HoverReadoutScheduler<HoverTarget>(
+    HOVER_READOUT_DELAY_MS,
+    () => this.hoverMap?.isMoving() ?? true,
+    (target) => this.readHoverValue(target),
+    () => this.abortHoverSample(),
+  );
+  private readonly onHoverMove = (event: MapMouseEvent): void => {
+    const original = event.originalEvent as (MouseEvent & { sourceCapabilities?: { firesTouchEvents?: boolean } }) | undefined;
+    if (!this.toolsOpen || original?.sourceCapabilities?.firesTouchEvents) {
+      this.hoverScheduler.stop();
+      return;
+    }
+    const lngLat = event.lngLat.wrap();
+    const buttons = original?.buttons ?? 0;
+    this.hoverScheduler.move({ point: event.point, lng: lngLat.lng, lat: lngLat.lat }, buttons);
+    if (buttons !== 0) {
+      // A drag moves the map under the pointer; the last reading no longer applies.
+      this.hoverReadout.set(null);
+    }
+  };
+  private readonly onHoverOut = (): void => {
+    this.hoverScheduler.stop();
+    this.hoverReadout.set(null);
   };
   private inspectionListeners: Array<{
     map: Map;
@@ -326,12 +376,18 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     });
   }
 
-  get legendEntries(): Array<{ id: string; label: string; mode: string }> {
+  get legendEntries(): Array<{ id: string; label: string; mode: string; legend?: OverlayLegend }> {
     return this.overlays.map((overlay) => ({
       id: overlay.id,
       label: overlay.label,
       mode: String(overlay.rendering_mode || overlay.type || 'overlay'),
+      legend: overlay.legend,
     }));
+  }
+
+  hoverReadoutFor(overlayId: string): string | null {
+    const readout = this.hoverReadout();
+    return readout?.overlayId === overlayId ? readout.text : null;
   }
 
   get failedOverlayStatuses(): OverlayRenderStatus[] {
@@ -1604,6 +1660,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
   }
 
   private destroyMap(): void {
+    this.unbindHoverListeners();
     this.mapPreparing = false;
     this.clearRenderWatchdog();
     this.candidateGeneration += 1;
@@ -1692,6 +1749,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
         this.inspectionListeners.push({ map, layerId, handler });
       });
     });
+    this.bindHoverListeners(map);
   }
 
   private unbindInspectionListeners(): void {
@@ -1702,6 +1760,9 @@ private fitMaxZoom(defaultMaxZoom: number): number {
   }
 
   private unbindInspectionListenersForMap(target: Map): void {
+    if (this.hoverMap === target) {
+      this.unbindHoverListeners();
+    }
     const remaining: typeof this.inspectionListeners = [];
     this.inspectionListeners.forEach((entry) => {
       if (entry.map === target) {
@@ -1711,6 +1772,135 @@ private fitMaxZoom(defaultMaxZoom: number): number {
       }
     });
     this.inspectionListeners = remaining;
+  }
+
+  /** A single map-level hover listener pair follows the map that owns the inspection listeners. */
+  private bindHoverListeners(map: Map): void {
+    if (this.hoverMap === map) {
+      return;
+    }
+    this.unbindHoverListeners();
+    if (typeof map.on !== 'function') {
+      return;
+    }
+    map.on('mousemove', this.onHoverMove);
+    map.on('mouseout', this.onHoverOut);
+    this.hoverMap = map;
+  }
+
+  private unbindHoverListeners(): void {
+    this.hoverScheduler.stop();
+    this.hoverReadout.set(null);
+    if (!this.hoverMap) {
+      return;
+    }
+    if (typeof this.hoverMap.off === 'function') {
+      this.hoverMap.off('mousemove', this.onHoverMove);
+      this.hoverMap.off('mouseout', this.onHoverOut);
+    }
+    this.hoverMap = null;
+  }
+
+  private abortHoverSample(): void {
+    this.hoverAbort?.abort();
+    this.hoverAbort = undefined;
+  }
+
+  /** Read the value of the topmost visible overlay with a legend under the resting pointer. */
+  private readHoverValue(target: HoverTarget): void {
+    const map = this.hoverMap;
+    if (!map || this.destroyed) {
+      return;
+    }
+    for (const overlay of this.overlays) {
+      const legend = overlay.legend;
+      if (!legend || !(this.overlayVisibility[overlay.id] ?? overlay.visible ?? true)) {
+        continue;
+      }
+      const layerIds = getOverlayLayerIds(overlay).filter((layerId) => map.getLayer(layerId));
+      if (!layerIds.length) {
+        continue;
+      }
+      const encoding = overlay.value_encoding;
+      if (encoding) {
+        const queryLayers = layerIds.filter((layerId) => !layerId.endsWith('-heatmap'));
+        const feature = queryLayers.length
+          ? map.queryRenderedFeatures(target.point, { layers: queryLayers })[0]
+          : undefined;
+        const raw: unknown = feature?.properties?.[encoding.field];
+        const value = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : Number.NaN;
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        this.hoverReadout.set({
+          overlayId: overlay.id,
+          text: formatHoverReadout({ kind: 'continuous', value, label: '', units: legend.units }, target.lng, target.lat),
+        });
+        return;
+      }
+      const capabilityId = overlay.capability_id;
+      const proxied = buildRasterOverlayTiles(overlay)?.some((url) => url.includes('/geospatial/tiles/'));
+      if (!capabilityId || !proxied || this.unsampleableCapabilities.has(capabilityId)) {
+        continue;
+      }
+      this.sampleRasterOverlay(map, overlay, capabilityId, legend, target);
+      return;
+    }
+    this.hoverReadout.set(null);
+  }
+
+  private sampleRasterOverlay(
+    map: Map,
+    overlay: OverlayEntry,
+    capabilityId: string,
+    legend: OverlayLegend,
+    target: HoverTarget,
+  ): void {
+    const z = Math.max(0, Math.min(30, Math.round(map.getZoom())));
+    const time = overlay.render?.time || overlay.render?.default_time || overlay.time || overlay.default_time || undefined;
+    const key = sampleCacheKey(capabilityId, z, target.lng, target.lat, time);
+    const show = (sample: OverlaySampleResponse['sample']): void => {
+      this.hoverReadout.set({
+        overlayId: overlay.id,
+        text: formatHoverReadout(sample && { ...sample, units: sample.units ?? legend.units }, target.lng, target.lat),
+      });
+    };
+    if (this.sampleCache.has(key)) {
+      show(this.sampleCache.get(key) ?? null);
+      return;
+    }
+    const controller = new AbortController();
+    this.hoverAbort = controller;
+    const round = (value: number): number => Math.round(value * 1e5) / 1e5;
+    fetchOverlaySample(capabilityId, { lon: round(target.lng), lat: round(target.lat), z, time }, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted || this.destroyed) {
+          return;
+        }
+        if (this.sampleCache.size >= SAMPLE_CACHE_LIMIT) {
+          const oldest = this.sampleCache.keys().next().value;
+          if (oldest !== undefined) {
+            this.sampleCache.delete(oldest);
+          }
+        }
+        this.sampleCache.set(key, response.sample);
+        show(response.sample);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || this.destroyed) {
+          return;
+        }
+        // 404/422 mean this layer cannot be sampled at all; stop asking.
+        if (error instanceof ApiRequestError && (error.status === 404 || error.status === 422)) {
+          this.unsampleableCapabilities.add(capabilityId);
+        }
+        this.hoverReadout.set(null);
+      })
+      .finally(() => {
+        if (this.hoverAbort === controller) {
+          this.hoverAbort = undefined;
+        }
+      });
   }
 
   private registerLayerClickListener(map: Map, layerId: string, handler: (event: unknown) => void): void {
