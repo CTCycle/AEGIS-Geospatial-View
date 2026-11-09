@@ -13,6 +13,7 @@ import {
   DEFAULT_WMS_VERSION,
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
+  VALUE_ENCODING_RAMP,
 } from '../core/constants';
 import { mapOverlayEntryFromInstance } from '../core/api-parsers';
 import { MapOverlayEntry, MapSession, OverlayRenderStatus } from '../core/types';
@@ -556,7 +557,7 @@ const addGeoJsonOverlayLayer = (
       }});
     } else {
       map.addLayer({id: layerId, source: sourceId, type: 'circle', paint: {
-        'circle-color': encoding.min === encoding.max ? '#ef4444' : ['interpolate', ['linear'], value, encoding.min, '#38bdf8', encoding.max, '#ef4444'],
+        'circle-color': encoding.min === encoding.max ? VALUE_ENCODING_RAMP.high : ['interpolate', ['linear'], value, encoding.min, VALUE_ENCODING_RAMP.low, encoding.max, VALUE_ENCODING_RAMP.high],
         'circle-radius': encoding.min === encoding.max ? 9 : ['interpolate', ['linear'], value, encoding.min, 4, encoding.max, 16],
         'circle-opacity': opacity, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff',
       }});

@@ -67,7 +67,33 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "last_validated": "2026-04-27"
+    "last_validated": "2026-04-27",
+    "legend": {
+      "kind": "categorical",
+      "title": "IGBP land cover class",
+      "units": null,
+      "entries": [
+        {"color": "#218a21", "label": "Evergreen Needleleaf Forests"},
+        {"color": "#31cc31", "label": "Evergreen Broadleaf Forests"},
+        {"color": "#98cc31", "label": "Deciduous Needleleaf Forests"},
+        {"color": "#96fa96", "label": "Deciduous Broadleaf Forests"},
+        {"color": "#8dba8d", "label": "Mixed Forests"},
+        {"color": "#ba8d8d", "label": "Closed Shrublands"},
+        {"color": "#f5deb3", "label": "Open Shrublands"},
+        {"color": "#daeb9d", "label": "Woody Savannas"},
+        {"color": "#ffd500", "label": "Savannas"},
+        {"color": "#f0b967", "label": "Grasslands"},
+        {"color": "#4783b5", "label": "Permanent Wetlands"},
+        {"color": "#faef73", "label": "Croplands"},
+        {"color": "#ff0000", "label": "Urban and Built-up Lands"},
+        {"color": "#999356", "label": "Cropland/Natural Vegetation Mosaics"},
+        {"color": "#ffffff", "label": "Permanent Snow and Ice"},
+        {"color": "#bfbfbd", "label": "Barren"},
+        {"color": "#86cae3", "label": "Water Bodies"},
+        {"color": "#646464", "label": "Unclassified"}
+      ],
+      "nodata_colors": ["#000000"]
+    }
   },
   "version": 1,
   "last_modified": "2026-04-06T17:08:00.882573+02:00",

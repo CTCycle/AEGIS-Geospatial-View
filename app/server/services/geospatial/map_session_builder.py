@@ -298,7 +298,9 @@ class MapSessionBuilder:
                 numbers = [float(value) for value in values if isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)]
                 if not numbers:
                     raise MapPlanBuildError("invalid_value_field", f"Field '{field}' has no numeric values; choose a numeric evidence field.")
-                descriptor["value_encoding"] = {"mode": action.value_encoding.mode, "field": field, "min": min(numbers), "max": max(numbers)}
+                low, high = min(numbers), max(numbers)
+                descriptor["value_encoding"] = {"mode": action.value_encoding.mode, "field": field, "min": low, "max": high}
+                descriptor["legend"] = _value_encoding_legend(field, low, high, evidence.provenance)
                 descriptor["rendering_mode"] = "circles"
                 descriptor.pop("render", None)
             self._validate_render_descriptor(descriptor)
@@ -1159,6 +1161,31 @@ def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
         max(extent[2] for extent in extents),
         max(extent[3] for extent in extents),
     ]
+
+###############################################################################
+# Colour ramp the client draws for value-encoded circles; keep in sync with
+# VALUE_ENCODING_RAMP in app/client/src/app/core/constants.ts.
+VALUE_ENCODING_LOW_COLOR = "#38bdf8"
+VALUE_ENCODING_HIGH_COLOR = "#ef4444"
+
+###############################################################################
+def _value_encoding_legend(
+    field: str, low: float, high: float, provenance: dict[str, Any]
+) -> dict[str, Any]:
+    declared = provenance.get("units")
+    units = json_object(declared).get(field) if isinstance(declared, dict) else declared
+    unit_text = units if isinstance(units, str) and units.strip() else None
+    suffix = f" {unit_text}" if unit_text else ""
+    return {
+        "kind": "continuous",
+        "title": field,
+        "units": unit_text,
+        "entries": [
+            {"color": VALUE_ENCODING_LOW_COLOR, "value": low, "label": f"{low:g}{suffix}"},
+            {"color": VALUE_ENCODING_HIGH_COLOR, "value": high, "label": f"{high:g}{suffix}"},
+        ],
+        "nodata_colors": [],
+    }
 
 ###############################################################################
 def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:

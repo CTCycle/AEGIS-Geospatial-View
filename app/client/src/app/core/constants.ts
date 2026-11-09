@@ -69,6 +69,8 @@ export const REALTIME_SUBPROTOCOL = 'aegis.realtime.v1';
 export const MAX_CHAT_MESSAGE_LENGTH = 12_000;
 
 export const DEFAULT_OVERLAY_OPACITY = 0.65;
+// Colour ramp for value-encoded evidence layers; the backend legend mirrors it.
+export const VALUE_ENCODING_RAMP = {low: '#38bdf8', high: '#ef4444'} as const;
 export const DEFAULT_WMS_LAYER_ID = '0';
 export const DEFAULT_WMS_VERSION = '1.1.1';
 export const DEFAULT_WMS_EXCEPTIONS = 'application/vnd.ogc.se_inimage';

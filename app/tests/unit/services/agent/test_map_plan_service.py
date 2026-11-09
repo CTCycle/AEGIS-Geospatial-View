@@ -45,6 +45,14 @@ from server.services.geospatial.map_session_builder import (
 )
 
 
+SRTM_LEGEND = {
+    "kind": "continuous",
+    "title": "Elevation",
+    "units": "m",
+    "entries": [{"color": "#0044ca", "value": -100.0, "label": "-100"}],
+    "nodata_colors": ["#000000"],
+}
+
 LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
 
 ###############################################################################
@@ -59,7 +67,7 @@ class FakeCapabilityRegistry:
 
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
-        values = {
+        values: dict[str, dict[str, object]] = {
             "basemap:osm": {
                 "id": "basemap:osm",
                 "name": "OpenStreetMap",
@@ -95,7 +103,10 @@ class FakeCapabilityRegistry:
                 "provider": "gibs",
                 "capabilityKind": "raster-overlay",
                 "renderingMode": "raster-tile",
-                "metadata": {"label": "NASA GIBS SRTM Color Index"},
+                "metadata": {
+                    "label": "NASA GIBS SRTM Color Index",
+                    "legend": SRTM_LEGEND,
+                },
             },
             "broken:vector-tile": {
                 "id": "broken:vector-tile",
@@ -296,6 +307,100 @@ class _TwoCityEvidenceRepository(FakeEvidenceRepository):
         ).encode()
 
 ###############################################################################
+class _ForecastEvidenceRepository(FakeEvidenceRepository):
+    """Numeric point features, optionally with provenance units."""
+
+    def __init__(self, units: object) -> None:
+        self._units = units
+
+    # -------------------------------------------------------------------------
+    def get_summary(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> AgentEvidenceSummary | None:
+        return AgentEvidenceSummary(
+            evidence_id=evidence_id,
+            kind="vector",
+            media_type="application/geo+json",
+            status="available",
+            summary={"feature_count": 2, "bbox": [8.5, 47.3, 8.6, 47.4]},
+            provenance={} if self._units is None else {"units": self._units},
+            map_eligibility="renderable",
+        )
+
+    # -------------------------------------------------------------------------
+    def get_payload(
+        self,
+        evidence_id: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
+        summary = self.get_summary(evidence_id, conversation_id=conversation_id)
+        assert summary is not None
+        features = [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [lon, 47.37]},
+                "properties": {"precipitation_sum_mm": value},
+            }
+            for lon, value in ((8.52, 2.5), (8.58, 12.0))
+        ]
+        return summary, json.dumps(
+            {"type": "FeatureCollection", "features": features}
+        ).encode()
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("units", "expected_units", "expected_label"),
+    [
+        ({"precipitation_sum_mm": "mm"}, "mm", "12 mm"),
+        ("mm", "mm", "12 mm"),
+        (None, None, "12"),
+    ],
+)
+async def test_value_encoded_evidence_layer_carries_a_continuous_legend(
+    units: object, expected_units: str | None, expected_label: str
+) -> None:
+    state = _state()
+    state.evidence_refs = ["evidence:forecast"]
+    service = MapPlanService(
+        capability_registry=FakeCapabilityRegistry(),  # type: ignore[arg-type]
+        evidence_repository=_ForecastEvidenceRepository(units),
+    )
+
+    result = await service.apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:forecast",
+                    capability_id="places:hospitals",
+                    value_encoding={"mode": "graduated", "field": "precipitation_sum_mm"},  # type: ignore[arg-type]
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    legend = state.prepared_map_session.overlay_collection.instances[-1].descriptor["legend"]
+    assert legend["kind"] == "continuous"
+    assert legend["title"] == "precipitation_sum_mm"
+    assert legend["units"] == expected_units
+    assert [(e["color"], e["value"]) for e in legend["entries"]] == [
+        ("#38bdf8", 2.5),
+        ("#ef4444", 12.0),
+    ]
+    assert legend["entries"][1]["label"] == expected_label
+    assert legend["nodata_colors"] == []
+
+###############################################################################
 def _state(
     *,
     active_map_session: MapSession | None = None,
@@ -480,6 +585,7 @@ async def test_nested_provider_raster_payload_is_admitted_for_map_plan() -> None
     assert overlay.descriptor["render"]["max_zoom"] == 9
     assert overlay.descriptor["render"]["default_time"] == "2026-06-18"
     assert overlay.descriptor["default_time"] == "2026-06-18"
+    assert overlay.descriptor["legend"] == SRTM_LEGEND
 
 ###############################################################################
 @pytest.mark.asyncio

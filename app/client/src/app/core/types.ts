@@ -305,7 +305,22 @@ export interface GeospatialProviderPayload {
   partial?: boolean;
 }
 
+export interface OverlayLegendEntry {
+  color: string;
+  value?: number;
+  label: string;
+}
+
+export interface OverlayLegend {
+  kind: 'continuous' | 'categorical';
+  title: string;
+  units: string | null;
+  entries: OverlayLegendEntry[];
+  nodata_colors: string[];
+}
+
 export interface MapOverlayEntry {
+  legend?: OverlayLegend;
   value_encoding?: { mode: 'graduated' | 'heatmap'; field: string; min: number; max: number };
   id: string;
   instance_id?: string;

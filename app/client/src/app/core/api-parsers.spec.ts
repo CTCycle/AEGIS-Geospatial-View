@@ -41,6 +41,38 @@ describe('value encoding parsing', () => {
   });
 });
 
+describe('overlay legend parsing', () => {
+  const base = {id: 'dem', type: 'raster'};
+  const legend = {
+    kind: 'continuous',
+    title: 'Elevation',
+    units: 'm',
+    entries: [{color: '#0044ca', value: -100, label: '-100'}, {color: '#ff0000', value: 3000, label: '3000'}],
+    nodata_colors: ['#000000'],
+  };
+
+  it('keeps a valid legend and ignores malformed ones', () => {
+    expect(normalizeMapOverlayEntry({...base, legend})?.legend).toEqual(legend as never);
+    for (const bad of [
+      {...legend, kind: 'gradient'},
+      {...legend, entries: []},
+      {...legend, entries: [{color: 'red', value: 1, label: 'x'}]},
+      {...legend, entries: [{color: '#0044ca', label: 'no value'}]},
+      'legend',
+    ]) {
+      expect(normalizeMapOverlayEntry({...base, legend: bad})?.legend).toBeUndefined();
+    }
+  });
+
+  it('allows categorical entries without values', () => {
+    const categorical = {...legend, kind: 'categorical', units: undefined, entries: [{color: '#006400', label: 'Tree cover'}]};
+    expect(normalizeMapOverlayEntry({...base, legend: categorical})?.legend).toEqual({
+      ...categorical,
+      units: null,
+    } as never);
+  });
+});
+
 describe('chat operation parsing', () => {
   it('accepts the internal and render-recovery failure categories', () => {
     for (const category of ['internal_error', 'render_recovery_exhausted']) {

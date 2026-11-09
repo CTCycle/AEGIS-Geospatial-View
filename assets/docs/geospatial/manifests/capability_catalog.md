@@ -91,6 +91,27 @@ Representative implemented layers include:
 - `gtfs_static`
 - `gtfs_realtime`
 
+### Raster Legends
+
+Colour-mapped raster overlays may declare `metadata.legend`, which the map
+session copies onto the overlay descriptor as `legend`:
+
+```json
+{"kind": "continuous|categorical", "title": "...", "units": "...|null",
+ "entries": [{"color": "#rrggbb", "value": 0.0, "label": "..."}],
+ "nodata_colors": ["#rrggbb"]}
+```
+
+`entries` hold the exact colours rendered in tiles (`value` is required for
+`continuous`, optional for `categorical`) so pixel colours can be reverse-mapped
+to values; transparent and no-data colours go in `nodata_colors`. GIBS legends
+come from the layer's official colormap XML
+(`https://gibs.earthdata.nasa.gov/colormaps/v1.3/<colormap>.xml`, linked from
+the layer's WMTS capabilities). Layers without a documented discrete palette
+(true colour, day/night band, radar and traffic gradients, MODIS fire) declare
+no legend. Value-encoded evidence layers get a continuous legend generated from
+the observed field range.
+
 ## Direct Tools
 
 | ID | Purpose | Source |

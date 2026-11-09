@@ -69,7 +69,26 @@
     "auth_mode": "none",
     "rate_limit_notes": "Use bounded WMS GetMap requests through the AEGIS raster proxy.",
     "retrieval_mode": "direct",
-    "last_validated": "2026-09-30"
+    "last_validated": "2026-09-30",
+    "legend": {
+      "kind": "categorical",
+      "title": "ESA WorldCover 2021 land cover class",
+      "units": null,
+      "entries": [
+        {"color": "#006400", "label": "Tree cover"},
+        {"color": "#ffbb22", "label": "Shrubland"},
+        {"color": "#ffff4c", "label": "Grassland"},
+        {"color": "#f096ff", "label": "Cropland"},
+        {"color": "#fa0000", "label": "Built-up"},
+        {"color": "#b4b4b4", "label": "Bare / sparse vegetation"},
+        {"color": "#f0f0f0", "label": "Snow and ice"},
+        {"color": "#0064c8", "label": "Permanent water bodies"},
+        {"color": "#0096a0", "label": "Herbaceous wetland"},
+        {"color": "#00cf75", "label": "Mangroves"},
+        {"color": "#fae6a0", "label": "Moss and lichen"}
+      ],
+      "nodata_colors": []
+    }
   },
   "version": 1,
   "last_modified": "2026-09-30T00:00:00+00:00",

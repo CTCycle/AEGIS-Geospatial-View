@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import re
 import pytest
 import shutil
 from pathlib import Path
@@ -484,6 +485,29 @@ def test_priority_provider_manifests_include_temporal_metadata() -> None:
         assert metadata["dataset_time_reference"]
         assert metadata["source_freshness"]
         assert metadata["query_mode"]
+
+###############################################################################
+def test_raster_overlay_legends_follow_the_shared_schema() -> None:
+    overlays = GeospatialManifestLoader().load_all()["overlays"]
+    legends = {
+        item["id"]: item["metadata"]["legend"]
+        for item in overlays
+        if "legend" in item["metadata"]
+    }
+    assert {"SRTM_Color_Index", "MODIS_Terra_NDVI_8Day", "esa_worldcover"} <= set(legends)
+    hex_color = re.compile(r"^#[0-9a-f]{6}$")
+    for layer_id, legend in legends.items():
+        assert set(legend) == {"kind", "title", "units", "entries", "nodata_colors"}, layer_id
+        assert legend["kind"] in {"continuous", "categorical"}, layer_id
+        assert legend["entries"], layer_id
+        colors = [entry["color"] for entry in legend["entries"]]
+        assert all(hex_color.match(color) for color in colors + legend["nodata_colors"]), layer_id
+        # Pixels are reverse-mapped by colour, so each colour must be unambiguous
+        # and never both a value and a transparent/no-data colour.
+        assert len(colors) == len(set(colors)), layer_id
+        assert not set(colors) & set(legend["nodata_colors"]), layer_id
+        if legend["kind"] == "continuous":
+            assert all(isinstance(entry["value"], (int, float)) for entry in legend["entries"]), layer_id
 
 ###############################################################################
 def test_manifest_loader_accepts_path_root_argument() -> None:

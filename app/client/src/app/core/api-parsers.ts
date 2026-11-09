@@ -54,6 +54,7 @@ import {
   MapInspection,
   OverlayCollectionState,
   OverlayInstance,
+  OverlayLegend,
 } from './types';
 import { isFiniteNumber, isJsonObject, isRecord, isStringArray } from './type-guards';
 import { ApiContractError } from './api-errors';
@@ -775,6 +776,7 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
   return {
     id: String(value.id),
     value_encoding: parseValueEncoding(value['value_encoding']),
+    legend: parseOverlayLegend(value['legend']),
     instance_id: typeof value.instance_id === 'string' ? value.instance_id : undefined,
     capability_id: typeof value.capability_id === 'string' ? value.capability_id : undefined,
     label: String(value.label ?? value.id),
@@ -2383,6 +2385,39 @@ function parseAnalysisIntent(value: unknown, endpoint: string): AgentGoal['analy
     return apiContract(endpoint, 'analysis is invalid', value);
   }
   return {kind: kind as 'rank' | 'hotspot' | 'threshold', metric: requireApiString(item, 'metric', endpoint), order: requireApiString(item, 'order', endpoint), top_k: top};
+}
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function parseOverlayLegend(value: unknown): OverlayLegend | undefined {
+  if (!isRecord(value) || Array.isArray(value)) return undefined;
+  const kind = value['kind'];
+  const title = value['title'];
+  const rawEntries = value['entries'];
+  if ((kind !== 'continuous' && kind !== 'categorical') || typeof title !== 'string' || !title.trim()
+      || !Array.isArray(rawEntries)) return undefined;
+  const entries: OverlayLegend['entries'] = [];
+  for (const entry of rawEntries) {
+    if (!isRecord(entry) || typeof entry['color'] !== 'string' || !HEX_COLOR.test(entry['color'])
+        || typeof entry['label'] !== 'string') return undefined;
+    const entryValue = entry['value'];
+    if (entryValue !== undefined && !isFiniteNumber(entryValue)) return undefined;
+    if (kind === 'continuous' && entryValue === undefined) return undefined;
+    entries.push(entryValue === undefined
+      ? {color: entry['color'], label: entry['label']}
+      : {color: entry['color'], value: entryValue, label: entry['label']});
+  }
+  if (!entries.length) return undefined;
+  const nodata = value['nodata_colors'];
+  return {
+    kind,
+    title,
+    units: typeof value['units'] === 'string' ? value['units'] : null,
+    entries,
+    nodata_colors: Array.isArray(nodata)
+      ? nodata.filter((color): color is string => typeof color === 'string' && HEX_COLOR.test(color))
+      : [],
+  };
 }
 
 function parseValueEncoding(value: unknown): MapOverlayEntry['value_encoding'] {
