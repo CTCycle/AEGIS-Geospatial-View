@@ -207,7 +207,10 @@ class ToolRegistry:
             if prerequisite == "data_route":
                 if state.route is None:
                     return False
-                if state.route.operation == "discover_available_map_data":
+                if (
+                    state.route.operation == "discover_available_map_data"
+                    and state.route.presentation == "text"
+                ):
                     return False
                 route_domains = {
                     state.route.primary_domain,

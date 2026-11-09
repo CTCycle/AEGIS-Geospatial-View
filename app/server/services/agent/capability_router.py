@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from server.common.identifiers import normalize_target_key
+from server.common.identifiers import normalize_target_key, parse_coordinate_pair
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import (
@@ -361,6 +361,9 @@ class CapabilityRouter:
         proposed, semantic_reason = _normalize_route_semantics(proposed)
         if semantic_reason is not None:
             reasons.append(semantic_reason)
+        proposed, unsupported_reason = _answer_unsupported_map_state_route(proposed)
+        if unsupported_reason is not None:
+            reasons.append(unsupported_reason)
         proposed, reference_reason = self._normalize_catalog_reference_targets(proposed)
         if reference_reason is not None:
             reasons.append(reference_reason)
@@ -833,7 +836,10 @@ def _reconcile_declared_obligations(
     dropped_kinds: set[str] = set()
     if proposed.presentation != "text" and validated.presentation == "text":
         dropped_kinds.add("presentation")
-    if proposed.analysis is not None and validated.analysis is None:
+    if validated.analysis is None and (
+        proposed.analysis is not None or validated.target_area_km2 is not None
+    ):
+        # A requested view size is framing, carried by target_area_km2.
         dropped_kinds.add("analysis")
     if is_mark_locations_operation(validated.operation):
         dropped_kinds.update({"data", "analysis"})
@@ -843,6 +849,18 @@ def _reconcile_declared_obligations(
     kept: list[RouteObligation] = []
     for item in validated.obligations:
         if item.kind in dropped_kinds:
+            continue
+        if item.kind == "identification" and item.target_refs and not any(
+            parse_coordinate_pair(ref) is not None for ref in item.target_refs
+        ):
+            # Only bare coordinates need naming; a named target already is one.
+            continue
+        if (
+            validated.target_area_km2 is not None
+            and item.kind == "data"
+            and re.search(r"\bkm|\barea\b", item.variable or "", re.IGNORECASE)
+        ):
+            # The requested view size is framing, not data to retrieve.
             continue
         places = [
             ref for ref in item.target_refs if normalize_target_key(ref) not in removed_places
@@ -1028,6 +1046,37 @@ def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
             }
         )
     )
+
+###############################################################################
+# Map-state requests no ``apply_map_plan`` action can perform: map furniture the
+# plan cannot draw, and questions about what is already shown.
+_TEXT_ANSWERED_MAP_STATE_WORDS = frozenset(
+    {
+        "legend", "label", "labels", "annotate", "annotation",
+        "explain", "describe", "interpret", "summarize", "summarise",
+    }
+)
+
+
+def _answer_unsupported_map_state_route(
+    route: CapabilityRoute,
+) -> tuple[CapabilityRoute, str | None]:
+    """Answer in text a map-state operation that no map action can perform."""
+
+    def words(text: str | None) -> set[str]:
+        return set(re.findall(r"[a-z]+", (text or "").casefold()))
+
+    unsupported_operation = (
+        route.primary_domain is CapabilityDomain.MAP_STATE
+        and _TEXT_ANSWERED_MAP_STATE_WORDS & words(route.operation)
+    )
+    # No provider returns a legend, so a search for one can only find nothing.
+    legend_search = bool(route.capability_queries) and all(
+        "legend" in words(query) for query in route.capability_queries
+    )
+    if route.task_mode != "execute" or not (unsupported_operation or legend_search):
+        return route, None
+    return build_conversation_fallback_route(), "map_state_operation_answered_in_text"
 
 ###############################################################################
 def _normalize_route_semantics(

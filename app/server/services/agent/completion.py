@@ -353,6 +353,7 @@ class CompletionEvaluator:
             # A map is prepared only after the loop's own checks; measurement
             # is not re-evaluated by the browser.
             "measurement_computed": True,
+            "capabilities_discovered": True,
             "required_data_retrieved": not data_failure
             and bool(
                 map_session.overlay_collection.instances

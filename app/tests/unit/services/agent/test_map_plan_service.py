@@ -1532,3 +1532,22 @@ async def test_marker_value_labels_must_come_from_the_retrieved_data() -> None:
     )
     properties = markers.descriptor["data"]["features"][0]["properties"]
     assert properties["name"] == "Kunsthaus: 18.3 °C" and properties["annotation"] == "18.3 °C"
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_fit_location_honours_requested_area() -> None:
+    builder = MapSessionBuilder(capability_registry=FakeCapabilityRegistry())  # type: ignore[arg-type]
+
+    candidate = await builder.build(
+        location=ResolvedLocation(label="Milan", latitude=45.46, longitude=9.19),
+        active_session=_active_session(),
+        evidence=[],
+        actions=[
+            SetViewportAction(action="set_viewport", strategy="fit_location", target_area_km2=100)
+        ],
+    )
+    west, south, east, north = candidate.viewport.bbox or []
+
+    assert (north - south) * 111.32 == pytest.approx(10, rel=0.05)
+    assert (east - west) * 111.32 * 0.7 == pytest.approx(10, rel=0.05)

@@ -67,6 +67,34 @@ async def test_raster_result_satisfies_spatial_scope_for_bounded_request(
 
 ###############################################################################
 @pytest.mark.asyncio
+async def test_single_frame_raster_for_a_monthly_aggregation_is_disclosed_but_not_rejected() -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="overpass",
+        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/tiles"},
+        result_type="raster",
+        coverage={"time": "2026-07-01", "temporal_scope_satisfied": True},
+    )
+
+    result = await _service(FakeProviderRegistry(response)).execute_capability(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            bbox=[8, 45, 10, 46],
+            start_time_iso="2026-07-01",
+            end_time_iso="2026-07-31",
+            arguments={"temporal_granularity": "month", "aggregation": "total"},
+        ),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.metadata.coverage["temporal_scope_satisfied"] is True
+    assert any(
+        "Only one frame, dated 2026-07-01" in warning and "no aggregation" in warning
+        for warning in result.data["warnings"]
+    )
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope() -> None:
     response = ProviderResponse(
         capability_id="places:hospitals",
@@ -1929,3 +1957,65 @@ def test_coordinate_lookup_stays_free_of_provider_data_against_the_real_catalog(
     assert lookup.route.secondary_domains == []
     assert [item.kind for item in lookup.route.obligations] == ["location"]
     assert CapabilityDomain.DATA_RETRIEVAL in records.route.secondary_domains
+
+
+###############################################################################
+def test_map_state_operation_no_action_can_perform_is_answered_in_text() -> None:
+    state = _state()
+    state.active_map_session = cast(Any, SimpleNamespace(resolved_location=None))
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_STATE,
+            presentation="both",
+            operation="add_legend",
+            target_refs=["Precipitation Rate (IMERG, 30min)"],
+            obligations=[
+                {"kind": "identification", "target_refs": ["Precipitation Rate (IMERG, 30min)"]}
+            ],
+        ),
+        user_message="Can you explain what I'm seeing right now in the canvas?",
+        active_state=state,
+    )
+
+    assert decision.route.task_mode == "answer"
+    assert decision.route.presentation == "text"
+    assert decision.route.obligations == []
+
+
+###############################################################################
+def test_declared_identification_is_kept_only_for_coordinates() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.PLACE_SEARCH,
+            presentation="text",
+            location_mode="target",
+            operation="resolve_location",
+            target_refs=["Rome", "41.9,12.5"],
+            obligations=[
+                {"kind": "identification", "target_refs": ["Rome"]},
+                {"kind": "identification", "target_refs": ["41.9,12.5"]},
+            ],
+        ),
+        user_message="Where is Rome and what is at 41.9,12.5?",
+        active_state=_state(),
+    )
+
+    assert [item.target_refs for item in decision.route.obligations if item.kind == "identification"] == [
+        ["41.9,12.5"]
+    ]
+
+
+###############################################################################
+def test_search_for_a_layer_legend_is_answered_in_text() -> None:
+    decision = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            presentation="both",
+            operation="show",
+            capability_queries=["precipitation rate legend and color scale"],
+        ),
+        user_message="I'd like to have some labels.",
+        active_state=_state(),
+    )
+
+    assert decision.route.task_mode == "answer"

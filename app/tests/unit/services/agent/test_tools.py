@@ -708,6 +708,9 @@ def test_capability_discovery_route_does_not_expose_data_execution() -> None:
     assert "describe_geospatial_capability" in exposed
     assert "execute_geospatial_capability" not in exposed
 
+    state.route = state.route.model_copy(update={"presentation": "both"})
+    assert "execute_geospatial_capability" in {tool.name for tool in registry.expose(state)}
+
 ###############################################################################
 def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> None:
     registry = _registry()
@@ -1574,3 +1577,29 @@ def test_inspecting_evidence_can_rank_records_without_a_derived_dataset() -> Non
     payload = {"features": [{"properties": {"place": name, "mag": mag}} for name, mag in (("a", 4.1), ("b", 6.1), ("c", 5.2))]}
     top = _inspect_payload(payload, view="page", fields=["place"], cursor=None, limit=2, sort_by="mag")
     assert [item["place"] for item in top["records"]] == ["b", "c"]
+
+
+###############################################################################
+def test_resolved_reference_matches_a_goal_target_spelled_differently() -> None:
+    state = _state()
+    state.goal = AgentGoal(
+        goal="Show fires",
+        task_mode="execute",
+        presentation="map",
+        operation="show",
+        location_mode="target",
+        target_ids=["San Mauro Torinese, Turin, Piedmont, Italy"],
+    )
+    state.location_refs["san mauro torinese, piedmont, italy"] = ResolvedLocation(
+        label="San Mauro Torinese, Turin, Piedmont, 10099, Italy", latitude=45.1, longitude=7.76
+    )
+
+    errors = _capability_semantic_validator(
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            location_ref="san mauro torinese, piedmont, italy",
+        ),
+        state,
+    )
+
+    assert not any("location_ref" in item for item in errors)

@@ -581,6 +581,7 @@ class RenderCompletionService:
                     "recovery": (
                         "terminal"
                         if prior_attempt + 1 >= max_render_attempts
+                        or self._only_empty_rasters(payload)
                         else "revise_map"
                     ),
                     "action_fingerprint": action_fingerprint,
@@ -661,6 +662,19 @@ class RenderCompletionService:
             duplicate=False,
             observation=observation,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _only_empty_rasters(payload: RealtimeRenderAckPayload) -> bool:
+        """Whether every probed raster loaded blank: no map edit can add pixels."""
+
+        counts = [
+            item.get("raster_nontransparent_pixel_count")
+            for item in payload.overlay_results or []
+            if item.get("loaded") is True
+            and item.get("raster_nontransparent_pixel_count") is not None
+        ]
+        return bool(counts) and not any(counts)
 
     # -------------------------------------------------------------------------
     @staticmethod

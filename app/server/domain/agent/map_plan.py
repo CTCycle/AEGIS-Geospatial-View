@@ -94,6 +94,10 @@ class SetViewportAction(MapActionBase):
     evidence_refs: list[str] = Field(
         default_factory=lambda: list[str](), max_length=16
     )
+    target_area_km2: float | None = Field(
+        default=None,
+        gt=0,
+    )
     # zoom_in/zoom_out/pan move the view the user sees; the server computes
     # the geometry, the model only chooses how far and which way.
     steps: int = Field(

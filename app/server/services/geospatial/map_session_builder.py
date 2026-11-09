@@ -46,6 +46,20 @@ from server.services.geospatial.raster_tiles import (
 )
 
 ###############################################################################
+def _bbox_of_area(location: ResolvedLocation, area_km2: float) -> list[float]:
+    """Return a square bbox of about ``area_km2`` centred on ``location``."""
+
+    half_side_km = area_km2**0.5 / 2
+    half_lat = min(half_side_km / 111.32, 85.0)
+    half_lon = min(half_side_km / (111.32 * max(cos(radians(location.latitude)), 0.01)), 179.0)
+    return [
+        location.longitude - half_lon,
+        max(location.latitude - half_lat, -85.0),
+        location.longitude + half_lon,
+        min(location.latitude + half_lat, 85.0),
+    ]
+
+###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
 MIN_LOCATION_VIEWPORT_SPAN_DEGREES = 0.001
 # A country is framed on its main landmasses: parts under this fraction of the
@@ -389,6 +403,14 @@ class MapSessionBuilder:
         # Raster evidence carries no bbox; the target place is the validated
         # frame for it, so fit that instead of rejecting the action.
         if action.strategy in {"fit_location", "fit_evidence"}:
+            if action.strategy == "fit_location" and action.target_area_km2 is not None:
+                return _with_viewport(
+                    session,
+                    _viewport_for_bbox(
+                        _bbox_of_area(session.resolved_location, action.target_area_km2),
+                        session.viewport,
+                    ),
+                )
             return _with_viewport(
                 session,
                 _viewport_for_location(session.resolved_location),

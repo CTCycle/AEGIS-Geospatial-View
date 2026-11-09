@@ -1226,3 +1226,49 @@ def test_valid_empty_raster_does_not_require_visible_pixels(render_context) -> N
 
     assert result.state == "completed"
     assert result.presentation_status == "ready"
+
+
+###############################################################################
+def _blank_raster_ack(candidate, run_id: str) -> RealtimeRenderAckPayload:
+    return RealtimeRenderAckPayload(
+        run_id=run_id, run_version=1, map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision, status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={"required_sources_loaded": True, "required_layers_present": True, "viewport_valid": True},
+        overlay_results=[{
+            "overlay_id": "raster", "source_present": True, "layer_present": True, "loaded": True,
+            "visibility_matches": True, "result_visible": False,
+            "raster_tile_intersects_viewport": True, "raster_nontransparent_pixel_count": 0,
+        }],
+    )
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("descriptor", "status", "recovery"),
+    [
+        ({"result_type": "raster", "empty_tiles_expected": True}, "ready", "continue"),
+        ({"result_type": "raster"}, "failed", "terminal"),
+    ],
+)
+def test_blank_raster_passes_when_expected_and_is_not_retried_otherwise(
+    render_context, descriptor, status, recovery
+) -> None:
+    repository, publisher, conversation_id, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher, resume_mode=True, max_render_attempts=5
+    )
+    candidate = _session(OverlayInstance(
+        instance_id="raster", capability_id="raster", label="Raster", provider="test",
+        overlay_type="tile", rendering_mode="wms", descriptor=descriptor,
+    ))
+    service.prepare(run_id=run_id, run_version=1, response_payload={
+        "map_session": candidate.model_dump(mode="json"),
+        "execution_trace": {"checkpoint": {"render_attempts": 0, "budget_snapshot": {},
+            "execution_policy": {"max_render_attempts": 5, "render_ack_seconds": 7}}},
+    })
+
+    result = run_async_in_thread(service.acknowledge(conversation_id, _blank_raster_ack(candidate, run_id)))
+
+    assert result.observation.status == status
+    assert result.observation.recovery == recovery

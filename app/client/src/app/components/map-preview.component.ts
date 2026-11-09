@@ -251,8 +251,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (pending) {
       this.pendingCandidate = undefined;
       this.candidateGeneration += 1;
-      this.unbindInspectionListenersForMap(pending.map);
-      pending.map.remove();
+      this.removeCandidateMap(pending.map);
       this.removeCandidateContainer(pending.container, pending.originalContainer);
     }
     const retained = this.retainedPrevious;
@@ -746,8 +745,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
           // Report the candidate's real per-check state before tearing it down.
           this.emitRenderState('failed', 'render_timeout', candidateIdentity, { map: candidate, checks });
         }
-        this.unbindInspectionListenersForMap(candidate);
-        candidate.remove();
+        this.abandonCandidate(candidate);
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
           this.changeDetector.detectChanges();
@@ -780,8 +778,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         this.mapPreparing = false;
         stopFallback();
         clearCandidate();
-        this.unbindInspectionListenersForMap(candidate);
-        candidate.remove();
+        this.abandonCandidate(candidate);
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
           this.emitRenderState('failed', this.safeRenderError(error, sourceId), candidateIdentity);
@@ -965,6 +962,24 @@ candidate.on('load', () => {
     return candidate;
   }
 
+  /** Remove a candidate exactly once; it may already be the committed `mapRef`. */
+  private removeCandidateMap(map: Map): void {
+    this.unbindInspectionListenersForMap(map);
+    map.remove();
+    if (this.mapRef === map) {
+      this.mapRef = null;
+    }
+  }
+
+  /** Drop a failed candidate and, if it was committed, restore the previous map. */
+  private abandonCandidate(candidate: Map): void {
+    const committed = this.mapRef === candidate;
+    this.removeCandidateMap(candidate);
+    if (committed && !this.destroyed) {
+      this.rejectRenderedCandidate();
+    }
+  }
+
   private removeCandidateContainer(candidate: HTMLDivElement, original: HTMLDivElement): void {
     if (candidate !== original) {
       candidate.remove();
@@ -1111,10 +1126,25 @@ candidate.on('load', () => {
         getSource?: (id: string) => unknown;
         getLayoutProperty?: (id: string, property: string) => unknown;
       } | null;
+      // A map being replaced has no style; MapLibre throws instead of answering.
+      const layerOf = (id: string): unknown => {
+        try {
+          return mapApi?.getLayer?.call(map, id);
+        } catch {
+          return undefined;
+        }
+      };
+      const sourcePresent = (id: string): boolean => {
+        try {
+          return Boolean(mapApi?.getSource?.call(map, id));
+        } catch {
+          return false;
+        }
+      };
       const layerRecords = metadataOnly
         ? []
         : layerIds
-          .map((id) => (mapApi?.getLayer ? mapApi.getLayer.call(map, id) : undefined))
+          .map(layerOf)
           .filter((layer): layer is Record<string, unknown> => (
             Boolean(layer) && typeof layer === 'object'
           ));
@@ -1131,16 +1161,13 @@ candidate.on('load', () => {
           && (minZoom === undefined || maxZoom === undefined || Number(minZoom) <= Number(maxZoom));
       });
       const visible = metadataOnly || layerIds.some((id) => {
-        if (!mapApi?.getLayer) {
-          return false;
-        }
-        const layer = mapApi.getLayer.call(map, id) as Record<string, unknown> | undefined;
+        const layer = layerOf(id) as Record<string, unknown> | undefined;
         if (!layer) {
           return false;
         }
         let visibility: unknown;
         try {
-          visibility = mapApi.getLayoutProperty?.call(map, id, 'visibility');
+          visibility = mapApi?.getLayoutProperty?.call(map, id, 'visibility');
         } catch {
           visibility = undefined;
         }
@@ -1168,7 +1195,7 @@ candidate.on('load', () => {
           // MapLibre makes queryRenderedFeatures throw and incorrectly turns
           // a visibly rendered cluster/point layer into a render-ack failure.
           const queryLayerIds = layerIds.filter((id) => (
-            Boolean(mapApi?.getLayer?.call(map, id))
+            Boolean(layerOf(id))
           ));
           if (!queryLayerIds.length) {
             renderedFeatureCount = 0;
@@ -1187,9 +1214,7 @@ candidate.on('load', () => {
       return {
         overlay_id: overlay.id,
         capability_id: overlay.capability_id || overlay.id,
-        source_present: metadataOnly || Boolean(
-          mapApi?.getSource?.call(map, `overlay-source-${overlay.id}`),
-        ),
+        source_present: metadataOnly || sourcePresent(`overlay-source-${overlay.id}`),
         layer_present: present && styleValid && zoomRangeValid,
         loaded,
         metadata_only: metadataOnly,
@@ -1585,8 +1610,7 @@ private fitMaxZoom(defaultMaxZoom: number): number {
     const pendingCandidate = this.pendingCandidate;
     this.pendingCandidate = undefined;
     if (pendingCandidate) {
-      this.unbindInspectionListenersForMap(pendingCandidate.map);
-      pendingCandidate.map.remove();
+      this.removeCandidateMap(pendingCandidate.map);
       this.removeCandidateContainer(pendingCandidate.container, pendingCandidate.originalContainer);
     }
     if (this.retainedPrevious) {

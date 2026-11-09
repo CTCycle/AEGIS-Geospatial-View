@@ -37,14 +37,14 @@
       "total_estimated_input_tokens": 25214
     },
     "inspect_loop_regression": {
-      "termination_reason": "no_progress",
+      "termination_reason": "insufficient_evidence",
       "model_calls": 11,
       "total_estimated_input_tokens": 66958
     },
     "nested_arguments_regression": {
       "termination_reason": "goal_satisfied",
       "model_calls": 4,
-      "total_estimated_input_tokens": 13669
+      "total_estimated_input_tokens": 14391
     },
     "follow_up_prior_evidence_regression": {
       "termination_reason": "goal_satisfied",

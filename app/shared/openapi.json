@@ -2441,6 +2441,18 @@
               }
             ]
           },
+          "target_area_km2": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Area Km2"
+          },
           "target_requirements": {
             "items": {
               "$ref": "#/components/schemas/TargetRequirement"

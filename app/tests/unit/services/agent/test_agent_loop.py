@@ -4,7 +4,8 @@ from collections import deque
 from dataclasses import replace
 import json
 import logging
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -3372,3 +3373,31 @@ async def test_s12_the_nested_path_a_summary_shows_addresses_the_flat_records() 
     shown_path, _ = request.state.tool_results
     assert shown_path.status == "success"
     assert [record["temperature_2m"] for record in shown_path.data["preview"]] == [10.0, 6.7]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_map_route_target_is_resolved_only_after_text_survives_a_correction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = _loop(FakeProvider([]))
+    state = _state()
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING, task_mode="execute", presentation="map",
+        location_mode="target", target_refs=["San Mauro Torinese"],
+    )
+    calls: list[Any] = []
+
+    async def execute(_request: Any, batch: Any, *_args: Any, **_kwargs: Any) -> list[ToolResult]:
+        calls.extend(batch)
+        return []
+
+    monkeypatch.setattr(loop, "_execute_calls", execute)
+    tools = [SimpleNamespace(name="resolve_geospatial_location")]
+
+    await loop._recover_route_target(cast(Any, None), state, cast(Any, tools))  # pyright: ignore[reportPrivateUsage]
+    assert calls == []
+
+    state.no_progress_corrections = 1
+    await loop._recover_route_target(cast(Any, None), state, cast(Any, tools))  # pyright: ignore[reportPrivateUsage]
+    assert [call.arguments for call in calls] == [{"query": "San Mauro Torinese"}]

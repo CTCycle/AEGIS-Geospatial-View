@@ -69,6 +69,10 @@ class CapabilityRoute(BaseModel):
     target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
     spatial_scope: "AgentSpatialScope | None" = None
+    target_area_km2: float | None = Field(
+        default=None,
+        gt=0,
+    )
     # Compound requests ("Rome today vs Milan tomorrow") give a target its own
     # scope; an unset field falls back to the route-level scope above.
     target_requirements: list["TargetRequirement"] = Field(

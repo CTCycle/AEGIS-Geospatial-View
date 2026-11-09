@@ -723,10 +723,7 @@ def _names_goal_target(
         return True
     return any(
         location_ref_matches(requested, str(key), location.label)
-        and bool(
-            {normalize_target_key(str(key)), normalize_target_key(location.label)}
-            & goal_targets
-        )
+        and any(location_ref_matches(goal, str(key), location.label) for goal in goal_targets)
         for key, location in state.location_refs.items()
     )
 
@@ -978,6 +975,7 @@ def _capability_semantic_validator(
         for item in (state.goal.target_ids if state.goal is not None else [])
         if normalize_target_key(str(item))
     }
+    known_refs = (f" Use one of: {', '.join(list(state.location_refs)[:12])}." if state.location_refs else "")
     requested_target = normalize_target_key(str(request.location_ref or ""))
     if (
         requested_target
@@ -986,18 +984,17 @@ def _capability_semantic_validator(
     ):
         errors.append(
             "location_ref must match an exact target in the validated goal; "
-            "another geography will not be substituted."
+            f"another geography will not be substituted.{known_refs}"
         )
     elif request.location_ref:
         if _location_for_request(request, state) is None:
             errors.append(
                 "location_ref must match one exact resolved location reference; "
-                "another location will not be substituted."
+                f"another location will not be substituted.{known_refs}"
             )
     elif len(state.location_refs) > 1:
         errors.append(
-            "location_ref is required when more than one resolved location is "
-            "available."
+            f"location_ref is required when more than one resolved location is available.{known_refs}"
         )
     if capability_registry is not None:
         contract_errors, schema = _manifest_contract_errors(

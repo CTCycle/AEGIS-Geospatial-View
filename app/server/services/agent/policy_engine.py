@@ -349,6 +349,9 @@ def route_allows_capability_execution(route: Any) -> bool:
     the model only to be rejected when called.
     """
 
+    if route.operation == "discover_available_map_data" and route.presentation in {"map", "both"}:
+        # Layers found by discovery can only reach the map through execution.
+        return True
     route_domains = {route.primary_domain, *route.secondary_domains}
     return route.primary_domain is not CapabilityDomain.MAP_STATE and bool(
         route_domains

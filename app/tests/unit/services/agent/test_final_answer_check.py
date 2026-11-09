@@ -10,6 +10,7 @@ from server.services.agent.completion import (
 from server.services.agent.final_answer_check import (
     check_final_answer,
     drop_unsupported_time_zone_claims,
+    only_omissions,
 )
 
 
@@ -268,3 +269,23 @@ def test_named_zones_with_the_same_offset_count_as_one() -> None:
         ))
 
     assert len(evidence_utc_offsets(state)) == 1
+
+
+###############################################################################
+def test_cannot_counts_as_disclosure_and_missing_disclosure_is_an_omission() -> None:
+    undelivered = ["the requested map"]
+
+    assert not check_final_answer(
+        "I can't add a legend to that layer.", target_names=[], undelivered=undelivered
+    )
+    assert only_omissions(
+        check_final_answer("Here is the basemap.", target_names=[], undelivered=undelivered)
+    )
+
+
+###############################################################################
+def test_pending_render_wording_is_flagged_only_after_a_verified_render() -> None:
+    text = "The map is currently awaiting render confirmation."
+
+    assert check_final_answer(text, target_names=[], render_settled=True)
+    assert not check_final_answer(text, target_names=[])

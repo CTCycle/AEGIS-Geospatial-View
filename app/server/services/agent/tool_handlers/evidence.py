@@ -65,7 +65,10 @@ class EvidenceToolHandler:
             return _failure(
                 tool_name="inspect_evidence",
                 code="unknown_evidence",
-                message="The evidence reference is not part of the current state.",
+                message=(
+                    "The evidence reference is not part of the current state. Valid references: "
+                    + (", ".join(state.evidence_refs[-8:]) or "none; answer from the working state.")
+                ),
                 recovery="choose_alternate_tool",
                 started=started,
             )

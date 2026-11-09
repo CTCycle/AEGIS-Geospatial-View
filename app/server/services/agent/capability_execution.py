@@ -8,7 +8,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from collections.abc import Sequence
 from typing import Any, Literal, Protocol
 from uuid import uuid4
@@ -331,6 +331,12 @@ class CapabilityExecutionService:
             # completion assessment instead.
             # A provider that declared its own window coverage keeps its verdict.
             coverage.setdefault("temporal_scope_satisfied", True)
+        if response.result_type == "raster" and response.result_status != "valid_empty":
+            frame_warning = _single_frame_scope_warning(request, coverage)
+            if frame_warning:
+                # One frame cannot answer a multi-day window or an aggregation;
+                # it still renders, with the limitation disclosed.
+                summary["warnings"] = [*summary.get("warnings", []), frame_warning]
         if response.result_status == "valid_empty":
             # A completed empty query is a legitimate data outcome; it must not
             # be conflated with a failed/partial fetch. Mark the query as
@@ -923,6 +929,32 @@ def _unmet_requested_attributes(
         name for name in requested
         if not any(key.startswith(name.replace("_", "")) for key in keys)
     ]
+
+###############################################################################
+def _single_frame_scope_warning(
+    request: ExecuteCapabilityInput, coverage: dict[str, Any]
+) -> str | None:
+    """Warn when one raster frame stands in for a window or an aggregation."""
+
+    def day(value: object) -> date | None:
+        try:
+            return date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return None
+
+    start = day(request.start_time_iso)
+    end = day(request.end_time_iso)
+    aggregation = str(request.arguments.get("aggregation") or "").strip()
+    multi_day = start is not None and end is not None and end > start
+    if not multi_day and not aggregation:
+        return None
+    frame = day(coverage.get("time")) or start
+    shown = frame.isoformat() if frame else "a single date"
+    return (
+        f"Only one frame, dated {shown}, is shown; "
+        "no aggregation was applied over the requested period."
+    )
+
 
 ###############################################################################
 def _response_summary(

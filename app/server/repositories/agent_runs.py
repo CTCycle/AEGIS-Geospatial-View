@@ -1041,6 +1041,7 @@ class AgentRunRepository:
                                     missing_overlays.append(overlay_id)
                                 elif (
                                     not valid_empty
+                                    and _json_object(instance.get("descriptor")).get("empty_tiles_expected") is not True
                                     and instance.get("visible") is not False
                                     and result.get("result_visible") is not True
                                 ):

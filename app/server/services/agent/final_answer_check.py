@@ -33,7 +33,7 @@ _COMPLETENESS = re.compile(
     re.IGNORECASE,
 )
 _DISCLOSURE = re.compile(
-    r"\b(unavailable|could not|couldn't|unable|missing|only|partial(?:ly)?|"
+    r"\b(unavailable|could not|couldn't|cannot|can not|can't|can’t|not able|unable|missing|only|partial(?:ly)?|"
     r"no data|not (?:available|completed|retrieved)|failed|ambiguous|unresolved)\b",
     re.IGNORECASE,
 )
@@ -68,6 +68,17 @@ _TIME_ZONE_DIFFERENCE = re.compile(
     re.IGNORECASE,
 )
 _SENTENCE_PARTS = re.compile(r"((?<=[.!?;])\s+|\n+)")
+_OMISSION_PREFIX = "does not disclose: "
+_RENDER_PENDING = re.compile(
+    r"\bawaiting (?:the )?render\w*|\bonce it renders\b|\bis (?:now )?rendering\b", re.IGNORECASE
+)
+
+
+# -----------------------------------------------------------------------------
+def only_omissions(violations: Sequence[str]) -> bool:
+    """Whether every violation is a missing disclosure, which appending repairs."""
+
+    return bool(violations) and all(item.startswith(_OMISSION_PREFIX) for item in violations)
 
 
 # -----------------------------------------------------------------------------
@@ -141,6 +152,7 @@ def check_final_answer(
     cite_groups: Sequence[Sequence[float]] = (),
     coordinates: Sequence[float] = (),
     prior_numbers: Sequence[float] = (),
+    render_settled: bool = False,
 ) -> list[str]:
     """Return the claims in ``text`` that the verified run facts contradict.
 
@@ -168,6 +180,9 @@ def check_final_answer(
 
     violations: list[str] = []
     targets = {name.strip().lower() for name in target_names if name.strip()}
+
+    if render_settled and (pending := _RENDER_PENDING.search(text)):
+        violations.append(f"says the render is pending ({pending.group(0)!r}) after it was verified")
 
     if targets:
         for place in other_places:
@@ -212,7 +227,7 @@ def check_final_answer(
                 break
 
     if undelivered and not _DISCLOSURE.search(text):
-        violations.append("does not disclose: " + "; ".join(undelivered))
+        violations.append(_OMISSION_PREFIX + "; ".join(undelivered))
 
     if map_rendered is False:
         for match in _MAP_CLAIM.finditer(text):

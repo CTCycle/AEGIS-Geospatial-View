@@ -349,6 +349,7 @@ class MapPlanService:
                 state=state,
                 actions=effective_actions,
             )
+            candidate = self._mark_empty_tiles_expected(candidate)
             if state.route is not None and len(state.route.target_refs) > 1 and evidence:
                 candidate = viewport_covering_evidence(candidate, evidence)
             if self._valid_empty_data_only(state):
@@ -609,6 +610,23 @@ class MapPlanService:
             update={"instances": instances}, deep=True
         )
         return candidate.model_copy(update={"overlay_collection": collection}, deep=True)
+
+    # -------------------------------------------------------------------------
+    def _mark_empty_tiles_expected(self, candidate: MapSession) -> MapSession:
+        """Tell render validation which rasters are legitimately blank in places."""
+
+        instances = [
+            item.model_copy(
+                update={"descriptor": {**item.descriptor, "empty_tiles_expected": True}}
+            )
+            if json_object(
+                (self.capability_registry.get_capability(item.capability_id) or {}).get("metadata")
+            ).get("empty_tiles_expected") is True
+            else item
+            for item in candidate.overlay_collection.instances
+        ]
+        collection = candidate.overlay_collection.model_copy(update={"instances": instances})
+        return candidate.model_copy(update={"overlay_collection": collection})
 
     # -------------------------------------------------------------------------
     def _with_default_basemap(

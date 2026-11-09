@@ -33,6 +33,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
+    "empty_tiles_expected": true,
     "constraints": "AEGIS capability MODIS_Combined_Thermal_Anomalies_Fire maps to provider-native GIBS layer MODIS_Combined_Thermal_Anomalies_All; verify provider availability and attribution requirements.",
     "content_hash": "686f050f517c0c48beaa7dd99946d50abd56bd59662077fd14db85c371613398",
     "human_summary": "Hotspot layer for probable active fires and high-temperature anomalies.",

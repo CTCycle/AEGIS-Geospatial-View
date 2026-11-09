@@ -316,6 +316,23 @@ describe('components/map-preview.component', () => {
     expect(states.at(-1)).toBe('preparing');
   });
 
+  it('removes a committed candidate once when rejected during its raster probe', () => {
+    const candidateMap = { ...fakeMap, remove: jasmine.createSpy('candidateRemove') };
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    const container = document.createElement('div');
+    const internals = component as unknown as Record<string, unknown>;
+    internals['retainedPrevious'] = { map: fakeMap, container, basemapId: null, centerKey: null, sessionKey: null };
+    internals['pendingCandidate'] = { map: candidateMap, container, originalContainer: container, generation: 1 };
+    internals['mapRef'] = candidateMap;
+
+    component.rejectRenderedCandidate();
+
+    expect(candidateMap.remove).toHaveBeenCalledTimes(1);
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    expect(internals['mapRef']).toBe(fakeMap);
+  });
+
   it('preserves external satellite imagery tile URLs', () => {
     component.payload = {
       map_session: makeMapSession({

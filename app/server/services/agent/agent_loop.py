@@ -83,6 +83,7 @@ from server.services.agent.context_assembler import select_pair_safe_messages
 from server.services.agent.final_answer_check import (
     check_final_answer,
     drop_unsupported_time_zone_claims,
+    only_omissions,
 )
 from server.services.agent.tool_executor import (
     UNSUPPORTED_CODES,
@@ -829,11 +830,17 @@ class AgentLoop:
                 final_text = await self._finalize_iteration_exhaustion(
                     request, provider, messages, stop_reason="no_progress"
                 )
-                await self._emit_completion_decision(
-                    request, reason="no_progress", status="terminal"
+                # A stuck run that gathered results reports them as a limitation.
+                reason = (
+                    "insufficient_evidence"
+                    if any(item.status == "success" for item in state.tool_results)
+                    else "no_progress"
                 )
-                state.termination_reason = "no_progress"
-                return self._outcome(state, final_text, "no_progress", request)
+                await self._emit_completion_decision(
+                    request, reason=reason, status="terminal"
+                )
+                state.termination_reason = reason
+                return self._outcome(state, final_text, reason, request)
             await self._emit_iteration_completed(request, "continue")
             if iteration + 1 >= state.max_iterations:
                 final_text = await self._finalize_iteration_exhaustion(
@@ -856,9 +863,15 @@ class AgentLoop:
                 category="model_capability",
             )
         final_text = result.content.strip()
-        recovery_results = await self._recover_location_only_map(
-            request, route, state
-        ) or await self._recover_evidence_map(request, route, state)
+        target_results = await self._recover_route_target(request, state, tools)
+        if target_results:
+            # The text ignored a required lookup; it must not read as progress.
+            final_text = ""
+        recovery_results = (
+            target_results
+            or await self._recover_location_only_map(request, route, state)
+            or await self._recover_evidence_map(request, route, state)
+        )
         self._transition(state, AgentPhase.EVALUATE_STOP, request.budget)
         stop = (
             self._evaluate_stop(
@@ -1317,9 +1330,34 @@ class AgentLoop:
             or candidate
             or self._verified_map_fallback(state)
         )
-        note = self._basemap_mismatch_note(state)
-        final = self._with_disclosure(state, final)
-        return f"{final}\n\n{note}" if note else final
+        notes = [
+            item
+            for item in (self._basemap_mismatch_note(state), self._empty_raster_note(state))
+            if item
+        ]
+        return "\n\n".join([self._with_disclosure(state, final), *notes])
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _empty_raster_note(state: AgentRunState) -> str | None:
+        """Say so when a verified raster overlay drew nothing in the view."""
+
+        session = state.prepared_map_session or state.active_map_session
+        if session is None or not state.render_observations:
+            return None
+        empty = {
+            item.get("capability_id")
+            for item in state.render_observations[-1].overlay_results
+            if item.get("raster_nontransparent_pixel_count") == 0
+        }
+        labels = [
+            item.label
+            for item in session.overlay_collection.instances
+            if item.capability_id in empty
+        ]
+        if not labels:
+            return None
+        return f"Note: {', '.join(labels)} loaded, but it has no detections in the current view."
 
     # -------------------------------------------------------------------------
     def _basemap_mismatch_note(self, state: AgentRunState) -> str | None:
@@ -1616,6 +1654,11 @@ class AgentLoop:
             candidate
             or self._evidence_findings(request.state)
             or self._evidence_summary(request.state)
+            or (
+                self._verified_map_fallback(request.state)
+                if request.state.active_map_session is not None and request.state.render_verified
+                else ""
+            )
             or "No answer could be produced from the available results.",
         )
 
@@ -1750,6 +1793,22 @@ class AgentLoop:
         violations = self._answer_violations(request.state, candidate)
         if not violations:
             return candidate
+        if only_omissions(violations) and not any(
+            item.kind in {"data", "analysis", "presentation"}
+            for item in self.completion_summary(request.state).undelivered()
+        ):
+            # Nothing in the answer is false; it only leaves out what was not
+            # delivered, so keep it and state the gap deterministically. With
+            # data or the map undelivered, the text would describe what never
+            # happened: invented values or an unchanged map.
+            await self._emit_finalization_trace(
+                request,
+                reason=reason,
+                kind="finalization_completed",
+                outcome="disclosure_appended",
+                violations=violations,
+            )
+            return self._with_disclosure(request.state, candidate)
         await self._emit_finalization_trace(
             request,
             reason=reason,
@@ -1864,6 +1923,7 @@ class AgentLoop:
                 *evidence_coordinates(state),
             ],
             prior_numbers=prior_evidence_numbers(state),
+            render_settled=state.render_verified,
         )
 
     # -------------------------------------------------------------------------
@@ -2031,6 +2091,7 @@ class AgentLoop:
         catalog_discovery_only = (
             state.goal is not None
             and state.goal.operation == "discover_available_map_data"
+            and state.goal.presentation == "text"
         )
         if catalog_discovery_only:
             latest_discovery = discovery_results[-1] if discovery_results else None
@@ -3626,7 +3687,13 @@ class AgentLoop:
                         }
                     )
                 return cached.model_copy(
-                    update={"call_id": call.id or cached.call_id}, deep=True
+                    update={
+                        "call_id": call.id or cached.call_id,
+                        "summary": (
+                            f"Already returned; take a different action. {cached.summary}"
+                        ),
+                    },
+                    deep=True,
                 )
             failed_count = state.failed_fingerprints.get(fingerprint, 0)
             if (
@@ -4316,6 +4383,7 @@ class AgentLoop:
                     "action": "set_viewport",
                     "strategy": "fit_location",
                     "location_ref": str(location_ref),
+                    **({"target_area_km2": route.target_area_km2} if route.target_area_km2 else {}),
                 }
             ]
         )
@@ -4333,6 +4401,43 @@ class AgentLoop:
             [recovery_call],
             state,
             exposed_tool_names={"apply_map_plan"},
+        )
+
+    # -------------------------------------------------------------------------
+    async def _recover_route_target(
+        self,
+        request: AgentLoopRequest,
+        state: AgentRunState,
+        tools: list[LLMToolDefinition],
+    ) -> list[ToolResult]:
+        """Resolve a map route's one named place when text survived a correction.
+
+        The lookup and its argument are already fixed by the validated route.
+        It runs at most once, through the normal typed tool boundary.
+        """
+
+        name = "resolve_geospatial_location"
+        unresolved = unresolved_route_targets(state)
+        if (
+            not state.no_progress_corrections
+            or state.route is None
+            or state.route.presentation == "text"
+            or len(unresolved) != 1
+            or name not in {tool.name for tool in tools}
+            or any(result.tool_name == name for result in state.tool_results)
+        ):
+            return []
+        return await self._execute_calls(
+            request,
+            [
+                LLMToolCall(
+                    id=f"server-target-resolution-{state.request_id}",
+                    name=name,
+                    arguments={"query": unresolved[0]},
+                )
+            ],
+            state,
+            exposed_tool_names={name},
         )
 
     # -------------------------------------------------------------------------
