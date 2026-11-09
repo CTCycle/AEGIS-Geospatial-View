@@ -207,6 +207,36 @@ class GeospatialProviderPayloadResponse(BaseModel):
     error_code: str | None = None
 
 ###############################################################################
+class GeospatialRasterSampleValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: float | None = None
+    label: str
+    units: str | None = None
+    kind: Literal["continuous", "categorical"]
+    matched_color: str
+
+###############################################################################
+class GeospatialRasterSampleResponse(BaseModel):
+    """Legend value of a colour-mapped raster overlay at one coordinate.
+
+    ``sample`` is null where the tile is transparent, shows a no-data colour,
+    or shows no legend colour within tolerance.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str
+    lon: float
+    lat: float
+    z: int
+    time: str | None = None
+    legend_title: str | None = None
+    units: str | None = None
+    kind: Literal["continuous", "categorical"]
+    sample: GeospatialRasterSampleValue | None = None
+
+###############################################################################
 class GeospatialLayerRenderDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

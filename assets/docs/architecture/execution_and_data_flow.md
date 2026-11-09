@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-11-05
+Last updated: 2026-11-09
 
 ## Layering
 
@@ -169,7 +169,9 @@ render observations.
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `discover_geospatial_provider_layers` (model-visible only on `provider_discovery` routes)
-- `inspect_evidence`
+- `inspect_evidence` (view `values_at` reads legend values of raster imagery
+  evidence at up to 20 `{lon, lat}` points through the sample service; active
+  overlay instances in map memory carry a capped `legend_summary`)
 - `transform_evidence`
 - `measure_geospatial`
 - `apply_map_plan`

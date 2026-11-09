@@ -208,7 +208,11 @@ def register_agent_tools(
         capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
-    evidence = EvidenceToolHandler(repository=evidence_repository, place_labeler=place_labeler)
+    evidence = EvidenceToolHandler(
+        repository=evidence_repository,
+        place_labeler=place_labeler,
+        raster_sampler=getattr(geospatial_api_service, "sample_capability", None),
+    )
     location = LocationToolHandler(resolver=location_resolver)
     provider_layers = ProviderLayerToolHandler(
         geospatial_api_service=geospatial_api_service,
@@ -341,9 +345,13 @@ def register_agent_tools(
                 "Inspect bounded metadata, statistics (min, max and the "
                 "record at each extreme) or record pages from stored "
                 "evidence. Set sort_by on a page to read the top records by "
-                "one field without creating derived evidence."
+                "one field without creating derived evidence. values_at "
+                "reads raster imagery values at points."
             ),
             input_model=InspectEvidenceInput,
+            parameters_json_schema=_inline_schema_refs(
+                InspectEvidenceInput.model_json_schema()
+            ),
             handler=evidence.inspect,
             domains=_DATA,
             phases=_MODEL_PHASE,

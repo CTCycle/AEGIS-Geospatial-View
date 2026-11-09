@@ -18,6 +18,7 @@ from server.common.typing import (
     with_nested_scalars,
 )
 from server.domain.agent.capability_route import AgentRunState
+from server.domain.agent.evidence import AgentEvidenceSummary
 from server.domain.agent.tool_result import (
     ToolExecutionError,
     ToolExecutionMetadata,
@@ -32,6 +33,12 @@ from server.services.agent.tool_definitions import (
     InspectEvidenceInput,
     TransformEvidenceInput,
 )
+from server.services.geospatial.api_service import (
+    GeospatialApiServiceError,
+    GeospatialCapabilityNotFoundError,
+    GeospatialSampleUnavailableError,
+    GeospatialUnsupportedTileError,
+)
 from server.services.geospatial.land_mask import country_at
 from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
@@ -40,6 +47,19 @@ from server.services.geospatial.spatial_constraints import geodesic_distance_m
 MAX_PLACE_LABELS = 10
 
 PlaceLabeler = Callable[[float, float], Awaitable[str | None]]
+# Reads a raster capability's legend value at one point:
+# (capability_id, lon, lat, z, time, *, legend) -> sample payload.
+RasterSampler = Callable[..., Awaitable[dict[str, Any]]]
+
+# Zoom at which values_at reads raster imagery; the sampler clamps it to the
+# layer's maximum zoom. Fine enough for local values, one tile per area.
+VALUES_AT_ZOOM = 8
+# Capability errors that leave every point unreadable, not just one.
+_UNSAMPLEABLE_ERRORS = (
+    GeospatialCapabilityNotFoundError,
+    GeospatialSampleUnavailableError,
+    GeospatialUnsupportedTileError,
+)
 
 ###############################################################################
 class EvidenceToolHandler:
@@ -50,9 +70,11 @@ class EvidenceToolHandler:
         *,
         repository: AgentEvidenceRepository,
         place_labeler: PlaceLabeler | None = None,
+        raster_sampler: RasterSampler | None = None,
     ) -> None:
         self.repository = repository
         self.place_labeler = place_labeler
+        self.raster_sampler = raster_sampler
 
     # -------------------------------------------------------------------------
     async def inspect(
@@ -94,6 +116,8 @@ class EvidenceToolHandler:
                 started=started,
             )
         payload = _decode_json(raw)
+        if request.view == "values_at":
+            return await self._values_at(request, summary, payload, started)
         data = _inspect_payload(
             payload,
             view=request.view,
@@ -124,6 +148,103 @@ class EvidenceToolHandler:
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=[request.evidence_ref],
                 coverage=coverage,
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    async def _values_at(
+        self,
+        request: InspectEvidenceInput,
+        summary: AgentEvidenceSummary,
+        payload: Any,
+        started: float,
+    ) -> ToolResult:
+        """Read the legend value of raster imagery evidence at each point."""
+
+        capability_id = str(summary.provenance.get("capability_id") or "").strip()
+        if summary.kind != "raster_descriptor" or not capability_id:
+            return _failure(
+                tool_name="inspect_evidence", code="unsupported_view",
+                message="values_at reads raster imagery evidence; use page or statistics for records.",
+                recovery="correct_arguments", started=started,
+            )
+        if self.raster_sampler is None:
+            return _failure(
+                tool_name="inspect_evidence", code="sampling_unavailable",
+                message="Raster values cannot be read in this runtime.",
+                recovery="choose_alternate_tool", started=started,
+            )
+        descriptor = json_object(payload)
+        render = json_object(descriptor.get("render"))
+        legend = next(
+            (value for value in (descriptor.get("legend"), render.get("legend")) if is_json_object(value)),
+            None,
+        )
+        layer_time = next(
+            (
+                value.strip()
+                for value in (render.get("time"), render.get("default_time"),
+                              descriptor.get("time"), descriptor.get("default_time"))
+                if isinstance(value, str) and value.strip()
+            ),
+            None,
+        )
+        points: list[dict[str, Any]] = []
+        sampled: dict[str, Any] = {}
+        for point in request.points:
+            entry: dict[str, Any] = {"lon": round(point.lon, 5), "lat": round(point.lat, 5)}
+            try:
+                sampled = await self.raster_sampler(
+                    capability_id, point.lon, point.lat, VALUES_AT_ZOOM, layer_time, legend=legend
+                )
+            except _UNSAMPLEABLE_ERRORS as exc:
+                return _failure(
+                    tool_name="inspect_evidence", code="no_legend",
+                    message=f"{exc} Its values cannot be read; describe the imagery instead.",
+                    recovery="choose_alternate_tool", started=started,
+                )
+            except GeospatialApiServiceError as exc:
+                points.append({**entry, "value": None, "error": str(exc)[:160]})
+                continue
+            sample = sampled.get("sample")
+            if is_json_object(sample):
+                entry.update(value=sample.get("value"), label=sample.get("label"))
+            else:
+                entry.update(value=None, label=None, no_data=True)
+            points.append(entry)
+        failed = sum("error" in item for item in points)
+        if failed == len(points):
+            return _failure(
+                tool_name="inspect_evidence", code="sampling_failed",
+                message="No point could be read from the imagery: " + str(points[0]["error"]),
+                recovery="choose_alternate_tool", started=started,
+            )
+        units = sampled.get("units") if isinstance(sampled.get("units"), str) else None
+        return ToolResult(
+            call_id="handler-call",
+            tool_name="inspect_evidence",
+            status="partial" if failed else "success",
+            summary=f"Read raster values at {len(points) - failed} of {len(points)} points.",
+            data={
+                "evidence_ref": request.evidence_ref,
+                "view": request.view,
+                "result": {
+                    "capability_id": capability_id,
+                    "time": sampled.get("time"),
+                    "z": sampled.get("z"),
+                    "legend_title": sampled.get("legend_title"),
+                    "units": units,
+                    "kind": sampled.get("kind"),
+                    "points": points,
+                },
+                "source_summary": summary.summary,
+            },
+            evidence_refs=[request.evidence_ref],
+            metadata=ToolExecutionMetadata(
+                capability_id=capability_id,
+                duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+                evidence_refs=[request.evidence_ref],
+                units={"value": units} if units else {},
             ),
         )
 

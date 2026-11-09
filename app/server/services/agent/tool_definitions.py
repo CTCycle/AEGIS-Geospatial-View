@@ -146,9 +146,14 @@ class ExecuteCapabilityToolInput(StrictToolInput):
         return data
 
 ###############################################################################
+class EvidencePoint(StrictToolInput):
+    lon: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+
+###############################################################################
 class InspectEvidenceInput(StrictToolInput):
     evidence_ref: str = Field(min_length=1, max_length=200)
-    view: str = Field(pattern="^(metadata|schema|sample|statistics|page)$")
+    view: str = Field(pattern="^(metadata|schema|sample|statistics|page|values_at)$")
 
     # -------------------------------------------------------------------------
     @model_validator(mode="before")
@@ -169,6 +174,17 @@ class InspectEvidenceInput(StrictToolInput):
     # top-k question needs no derived dataset.
     sort_by: str | None = Field(default=None, min_length=1, max_length=200)
     ascending: bool = False
+    # values_at reads the legend value of raster imagery at each point.
+    points: list[EvidencePoint] = Field(
+        default_factory=lambda: list[EvidencePoint](), max_length=20
+    )
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _points_for_values_at(self) -> "InspectEvidenceInput":
+        if self.view == "values_at" and not self.points:
+            raise ValueError("values_at needs at least one point as {lon, lat}.")
+        return self
 
 ###############################################################################
 class AttributeFilterOperation(StrictToolInput):

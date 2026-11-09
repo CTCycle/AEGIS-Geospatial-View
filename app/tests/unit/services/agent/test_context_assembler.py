@@ -149,7 +149,23 @@ def test_active_overlay_identity_survives_context_bounding() -> None:
                             "visible": True,
                             "opacity": 1.0,
                             "payload": {"features": ["large renderer payload"]},
-                        }
+                        },
+                        {
+                            "instance_id": "evidence:gibs:rain",
+                            "capability_id": "fixture_rain",
+                            "descriptor": {
+                                "label": "Rain rate",
+                                "legend": {
+                                    "kind": "continuous",
+                                    "title": "Rain rate",
+                                    "units": "mm/h",
+                                    "entries": [
+                                        {"color": f"#0000{value:02x}", "value": value, "label": str(value)}
+                                        for value in range(1, 40)
+                                    ],
+                                },
+                            },
+                        },
                     ],
                 }
             }
@@ -166,7 +182,22 @@ def test_active_overlay_identity_survives_context_bounding() -> None:
                 "label": "USGS Earthquakes",
                 "visible": True,
                 "opacity": 1.0,
-            }
+            },
+            {
+                "instance_id": "evidence:gibs:rain",
+                "capability_id": "fixture_rain",
+                "label": "Rain rate",
+                "visible": True,
+                "opacity": 1.0,
+                # The full legend stays out of context; only its range remains.
+                "legend_summary": {
+                    "title": "Rain rate",
+                    "units": "mm/h",
+                    "kind": "continuous",
+                    "min": 1.0,
+                    "max": 39.0,
+                },
+            },
         ],
     }
 

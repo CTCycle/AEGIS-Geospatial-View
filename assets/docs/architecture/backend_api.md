@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-10-21
+Last updated: 2026-11-09
 
 ## Mounting
 
@@ -28,6 +28,13 @@ Defined in `app/server/api/geospatial.py`:
   `403` rule for disabled capabilities.
 - `GET /api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png`
   Proxies manifest-backed raster tiles.
+- `GET /api/geospatial/sample/{capability_id}?lon&lat&z&time`
+  Returns `GeospatialRasterSampleResponse`: the `metadata.legend` entry whose
+  colour is nearest to the proxied tile pixel at the coordinate (zoom clamped
+  to the layer's `max_zoom`). `sample` is null for transparent, no-data, or
+  out-of-tolerance pixels. A layer without a legend returns `422`; one not
+  served through the tile proxy returns `404`. Sampled tiles are kept in a
+  small bounded in-process LRU.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`
   Proxies TomTom tiles.
 - `GET /api/geospatial/cameras`

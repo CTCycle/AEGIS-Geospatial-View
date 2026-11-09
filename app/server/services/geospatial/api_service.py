@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
+from collections import OrderedDict
 from collections.abc import Iterator
 from datetime import datetime
 import asyncio
 import logging
 import math
+from time import monotonic
 from typing import Any, TypeGuard
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
@@ -46,8 +48,17 @@ from server.services.geospatial.rainviewer import (
     RainViewerService,
 )
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
+from server.services.geospatial.raster_sampling import (
+    DEFAULT_TILE_SIZE,
+    RasterSamplingError,
+    compile_legend,
+    lonlat_to_tile_pixel,
+    sample_tile,
+)
 from server.services.geospatial.raster_tiles import (
+    MAX_TILE_ZOOM,
     RasterTileTemplateError,
+    build_backend_raster_proxy_template,
     build_wms_get_map_url,
     build_wmts_get_tile_url,
     materialize_tile_template,
@@ -73,6 +84,10 @@ _FEMA_RELAY_PATH = "/sharing/proxy"
 # relayed fetches get a bounded retry on transient failures only.
 _RELAY_MAX_ATTEMPTS = 4
 _RELAY_RETRY_BACKOFF_SECONDS = 0.5
+# Sampled tiles kept in process so hover and point queries on one map area
+# do not refetch the same tile. Bounded by count and age (latest-time layers).
+_SAMPLE_TILE_CACHE_SIZE = 128
+_SAMPLE_TILE_CACHE_TTL_SECONDS = 300.0
 _RELAY_TRANSIENT_CATEGORIES = frozenset(
     {
         "upstream_http_5xx",
@@ -114,6 +129,10 @@ class GeospatialTileNoDataError(GeospatialApiServiceError):
 ###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
+
+###############################################################################
+class GeospatialSampleUnavailableError(GeospatialApiServiceError):
+    """Raised when a raster capability has no legend to read values from."""
 
 ###############################################################################
 class GeospatialProviderResponseError(GeospatialApiServiceError):
@@ -294,6 +313,9 @@ class GeospatialApiService:
             credential_resolver or runtime_registry.credential_resolver
         )
         self.rainviewer_service = rainviewer_service or RainViewerService()
+        self._sample_tiles: OrderedDict[tuple[str, int, int, int, str | None], tuple[float, bytes]] = (
+            OrderedDict()
+        )
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -501,6 +523,107 @@ class GeospatialApiService:
             raise GeospatialTileRequestError(
                 f"{self._humanize_provider(provider)} tile request failed."
             ) from exc
+
+    # -------------------------------------------------------------------------
+    async def sample_capability(
+        self,
+        capability_id: str,
+        lon: float,
+        lat: float,
+        z: int,
+        time: str | None = None,
+        *,
+        legend: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Read the legend value of a proxied raster overlay at one coordinate.
+
+        ``legend`` overrides the manifest legend when a descriptor carries one.
+        """
+
+        manifest = self._tile_manifest_by_id(capability_id)
+        metadata = json_object(manifest.get("metadata"))
+        provider = str(manifest.get("provider") or "").strip().lower()
+        rendering_mode = str(
+            manifest.get("renderingMode") or manifest.get("type") or ""
+        )
+        if (
+            build_backend_raster_proxy_template(
+                capability_id,
+                provider=provider,
+                render={"rendering_mode": rendering_mode},
+            )
+            is None
+        ):
+            raise GeospatialUnsupportedTileError(
+                f"Capability '{capability_id}' is not served through the raster tile proxy."
+            )
+        raw_legend = legend if legend is not None else metadata.get("legend")
+        compiled = compile_legend(raw_legend) if is_json_object(raw_legend) else None
+        if compiled is None:
+            raise GeospatialSampleUnavailableError(
+                f"Capability '{capability_id}' has no colour legend to read values from."
+            )
+        zoom = max(0, min(int(z), self._sample_max_zoom(metadata)))
+        tile_size = metadata.get("tile_size")
+        try:
+            pixel = lonlat_to_tile_pixel(
+                lon,
+                lat,
+                zoom,
+                tile_size=(
+                    int(tile_size)
+                    if isinstance(tile_size, int) and tile_size > 0
+                    else DEFAULT_TILE_SIZE
+                ),
+            )
+        except RasterSamplingError as exc:
+            raise GeospatialInvalidRequestError(str(exc)) from exc
+        requested_time = self._normalize_tile_time(time)
+        png = await self._sample_tile_bytes(
+            capability_id, pixel.z, pixel.x, pixel.y, requested_time
+        )
+        try:
+            sample = sample_tile(png, pixel, compiled)
+        except RasterSamplingError as exc:
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} returned an unreadable tile."
+            ) from exc
+        return {
+            "capability_id": capability_id,
+            "lon": lon,
+            "lat": lat,
+            "z": zoom,
+            "time": requested_time,
+            "legend_title": compiled.title,
+            "units": compiled.units,
+            "kind": compiled.kind,
+            "sample": sample,
+        }
+
+    # -------------------------------------------------------------------------
+    async def _sample_tile_bytes(
+        self, capability_id: str, z: int, x: int, y: int, time: str | None
+    ) -> bytes:
+        key = (capability_id, z, x, y, time)
+        now = monotonic()
+        cached = self._sample_tiles.get(key)
+        if cached is not None and now - cached[0] < _SAMPLE_TILE_CACHE_TTL_SECONDS:
+            self._sample_tiles.move_to_end(key)
+            return cached[1]
+        body = await self.fetch_capability_tile(capability_id, z, x, y, time=time)
+        self._sample_tiles[key] = (now, body)
+        self._sample_tiles.move_to_end(key)
+        while len(self._sample_tiles) > _SAMPLE_TILE_CACHE_SIZE:
+            self._sample_tiles.popitem(last=False)
+        return body
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sample_max_zoom(metadata: dict[str, Any]) -> int:
+        max_zoom = metadata.get("max_zoom")
+        if isinstance(max_zoom, int | float) and not isinstance(max_zoom, bool):
+            return max(0, min(int(max_zoom), MAX_TILE_ZOOM))
+        return MAX_TILE_ZOOM
 
     # -------------------------------------------------------------------------
     async def list_cameras(

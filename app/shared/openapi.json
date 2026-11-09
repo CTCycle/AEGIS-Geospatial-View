@@ -974,6 +974,97 @@
         }
       }
     },
+    "/api/geospatial/sample/{capability_id}": {
+      "get": {
+        "tags": [
+          "geospatial"
+        ],
+        "summary": "Sample Capability Value",
+        "operationId": "sample_capability_value_api_geospatial_sample__capability_id__get",
+        "parameters": [
+          {
+            "name": "capability_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Capability Id"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "title": "Lon"
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "z",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 30,
+              "minimum": 0,
+              "title": "Z"
+            }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeospatialRasterSampleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png": {
       "get": {
         "tags": [
@@ -4681,6 +4772,138 @@
           "label"
         ],
         "title": "GeospatialProviderSignupField"
+      },
+      "GeospatialRasterSampleResponse": {
+        "properties": {
+          "capability_id": {
+            "type": "string",
+            "title": "Capability Id"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "z": {
+            "type": "integer",
+            "title": "Z"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "legend_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legend Title"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "continuous",
+              "categorical"
+            ],
+            "title": "Kind"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeospatialRasterSampleValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capability_id",
+          "lon",
+          "lat",
+          "z",
+          "kind"
+        ],
+        "title": "GeospatialRasterSampleResponse",
+        "description": "Legend value of a colour-mapped raster overlay at one coordinate.\n\n``sample`` is null where the tile is transparent, shows a no-data colour,\nor shows no legend colour within tolerance."
+      },
+      "GeospatialRasterSampleValue": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "continuous",
+              "categorical"
+            ],
+            "title": "Kind"
+          },
+          "matched_color": {
+            "type": "string",
+            "title": "Matched Color"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "kind",
+          "matched_color"
+        ],
+        "title": "GeospatialRasterSampleValue"
       },
       "HTTPValidationError": {
         "properties": {

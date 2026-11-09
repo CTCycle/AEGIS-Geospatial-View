@@ -11,6 +11,7 @@ from server.contracts.geospatial import (
     GeospatialLayersResponse,
     GeospatialProviderAccountSetupListResponse,
     GeospatialProviderPayloadResponse,
+    GeospatialRasterSampleResponse,
 )
 from server.contracts.render_capture import (
     RenderCaptureCreateRequest,
@@ -23,6 +24,7 @@ from server.services.geospatial.api_service import (
     GeospatialCapabilityNotFoundError,
     GeospatialInvalidRequestError,
     GeospatialProviderResponseError,
+    GeospatialSampleUnavailableError,
     GeospatialTileCredentialError,
     GeospatialTileNoDataError,
     GeospatialTileRequestError,
@@ -36,6 +38,7 @@ GEOSPATIAL_ERROR_STATUS = {
     GeospatialCapabilityNotFoundError: status.HTTP_404_NOT_FOUND,
     GeospatialCapabilityDisabledError: status.HTTP_403_FORBIDDEN,
     GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
+    GeospatialSampleUnavailableError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
     GeospatialTileNoDataError: status.HTTP_404_NOT_FOUND,
     GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,
@@ -195,6 +198,26 @@ async def proxy_capability_tile(
         media_type="image/png",
         headers={"Cache-Control": "private, max-age=60"},
     )
+
+###############################################################################
+@router.get(
+    "/sample/{capability_id}",
+    response_model=GeospatialRasterSampleResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def sample_capability_value(
+    capability_id: str,
+    lon: float = Query(ge=-180.0, le=180.0),
+    lat: float = Query(ge=-90.0, le=90.0),
+    z: int = Query(ge=0, le=30),
+    time: str | None = Query(default=None),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> GeospatialRasterSampleResponse:
+    try:
+        payload = await service.sample_capability(capability_id, lon, lat, z, time)
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+    return GeospatialRasterSampleResponse.model_validate(payload)
 
 ###############################################################################
 @router.get(

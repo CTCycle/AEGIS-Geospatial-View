@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from server.common.typing import is_json_array, is_json_object, json_array
 
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
+from server.services.geospatial.raster_sampling import summarize_legend
 from server.services.llm.context_budget import (
     estimate_json_tokens,
     profile_to_request_metadata,
@@ -362,15 +363,17 @@ def _bounded_map_memory(value: object) -> dict[str, Any]:
                 or capability_id
                 or instance_id
             ).strip()
-            compact_instances.append(
-                {
-                    "instance_id": instance_id,
-                    "capability_id": capability_id,
-                    "label": label,
-                    "visible": bool(raw_instance.get("visible", True)),
-                    "opacity": raw_instance.get("opacity", 1.0),
-                }
-            )
+            compact_instance: dict[str, Any] = {
+                "instance_id": instance_id,
+                "capability_id": capability_id,
+                "label": label,
+                "visible": bool(raw_instance.get("visible", True)),
+                "opacity": raw_instance.get("opacity", 1.0),
+            }
+            legend_summary = summarize_legend(descriptor.get("legend"))
+            if legend_summary is not None:
+                compact_instance["legend_summary"] = legend_summary
+            compact_instances.append(compact_instance)
     active_bounded["overlay_collection"] = {
         "revision": overlay_collection.get("revision", 0),
         "instances": compact_instances,
