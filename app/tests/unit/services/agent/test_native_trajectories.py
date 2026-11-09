@@ -1859,7 +1859,8 @@ class _PlaceResolver:
 
 ###############################################################################
 async def _raster_map_run(
-    message: str, route: dict[str, Any], place: str, capability: str, *, first_try: str | None = None
+    message: str, route: dict[str, Any], place: str, capability: str, *, first_try: str | None = None,
+    evidence: MemoryEvidence | None = None,
 ) -> tuple[AgentRunState, list[str]]:
     """Run route -> resolve -> (describe first_try) -> describe -> execute -> map with a keyless raster source."""
 
@@ -1881,7 +1882,7 @@ async def _raster_map_run(
         phase=AgentPhase.RECEIVE_REQUEST, request_id="raster", conversation_id="raster", user_message=message,
         context_hydrated=True,
     )
-    await make_loop(model, providers, _PlaceResolver(), MemoryEvidence()).run(AgentLoopRequest(
+    await make_loop(model, providers, _PlaceResolver(), evidence or MemoryEvidence()).run(AgentLoopRequest(
         provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
     return state, [request.capability_id for _, request in providers.requests]
 
@@ -2309,6 +2310,64 @@ async def test_remove_layer_and_show_city_treats_the_layer_label_as_a_layer_not_
     summary = AgentLoop._verified_map_state_summary(committed) or ""
     assert "The map is framed on Tokyo, Japan." in summary and "Visible overlays: none." in summary
     assert layer_edit_count(committed) == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("target", "stored_coverage", "retrieved", "scoped"),
+    [
+        ("Tokyo", {}, True, True),
+        # The map is built from Tokyo evidence but the turn asks about Portugal.
+        ("Portugal", {}, False, False),
+        # The stored evidence was retrieved but judged unusable when fetched.
+        ("Tokyo", {"data_valid": False}, False, False),
+        ("Tokyo", {"spatial_scope_satisfied": False}, True, False),
+    ],
+)
+async def test_follow_up_map_accepts_only_covering_evidence_from_an_earlier_turn(
+    target: str, stored_coverage: dict[str, Any], retrieved: bool, scoped: bool
+) -> None:
+    def radar_route(place: str) -> dict[str, Any]:
+        return {
+            "primary_domain": "data_retrieval", "secondary_domains": ["map_rendering"], "task_mode": "execute",
+            "presentation": "map", "location_mode": "target", "target_refs": [place], "operation": "show",
+            "capability_queries": ["weather radar"], "explicit_capability_ids": [], "temporal_scope": {"mode": "current"},
+            "spatial_scope": {"kind": "administrative_geometry", "relationship": "in", "target_refs": [place]},
+        }
+
+    evidence = MemoryEvidence()
+    first, _ = await _raster_map_run(
+        "Show the weather radar over Tokyo.", radar_route("Tokyo"), "Tokyo", "rainviewer_precipitation_radar",
+        first_try="noaa_radar", evidence=evidence,
+    )
+    assert first.prepared_map_session is not None
+    evidence.records["evidence-1"][0].summary.setdefault("coverage", {}).update(stored_coverage)
+    places = dict(first.location_refs)
+    places["portugal"] = ResolvedLocation(
+        label="Portugal", country="Portugal", latitude=39.5, longitude=-7.8,
+        location_type="country", bbox=[-9.5, 36.9, -6.2, 42.2],
+    )
+
+    providers = _FakeProviderRegistry()
+    second = AgentRunState(
+        phase=AgentPhase.RECEIVE_REQUEST, request_id="t2", conversation_id="raster", context_hydrated=True,
+        user_message="ok, render it please", location_refs=places, evidence_refs=list(first.evidence_refs),
+    )
+    await make_loop(_ScriptedProvider([
+        _call("route", "route_request", radar_route(target)),
+        _call("map", "apply_map_plan", {"expected_collection_revision": 0, "actions": [
+            {"action": "set_basemap", "capability_id": "osm_default"},
+            {"action": "add_evidence_layer", "capability_id": "rainviewer_precipitation_radar", "evidence_ref": "evidence-1"},
+        ]}),
+    ]), providers, _PlaceResolver(), evidence).run(AgentLoopRequest(
+        provider="scripted", model="scripted", state=second, budget=AgentExecutionBudget(total_seconds=10)))
+
+    assert providers.requests == []
+    assert second.prepared_map_session is not None
+    checks = CompletionEvaluator.data_checks(second)
+    assert checks["required_data_retrieved"] is retrieved
+    assert checks["spatial_scope_applied"] is scoped
 
 
 ###############################################################################

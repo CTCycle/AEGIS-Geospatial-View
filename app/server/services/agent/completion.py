@@ -36,7 +36,7 @@ from server.domain.agent.presentation_contract import (
     PresentationContract,
 )
 from server.domain.agent.task_ledger import map_fingerprint
-from server.domain.agent.tool_result import EvidenceAssessment, ToolResult
+from server.domain.agent.tool_result import EvidenceAssessment, ToolExecutionMetadata, ToolResult
 from server.services.agent.policy_engine import is_text_location_lookup
 from server.services.agent.route_references import place_targets
 
@@ -118,6 +118,9 @@ def imagery_only_note(state: AgentRunState) -> str:
         f"so the requested {subject or 'values'} could not be computed or compared."
     )
 
+_DATA_TOOLS = frozenset({"execute_geospatial_capability", "inspect_evidence", "transform_evidence"})
+_FAILED_RESULT_STATUSES = frozenset({"unavailable", "error", "failed", "invalid"})
+
 ###############################################################################
 def _result_location_ref(result: ToolResult) -> str:
     """Name the target a result belongs to: its query, else its first source."""
@@ -155,6 +158,62 @@ def _is_eligible_evidence(result: ToolResult, assessment: EvidenceAssessment, an
         assessment.tool_execution_success and assessment.data_valid is True
         and assessment.data_relevant is True and (analysis or result.status != "partial")
     )
+
+
+###############################################################################
+def _reused_layer_results(state: AgentRunState) -> list[ToolResult]:
+    """Restate the latest map plan's earlier-turn evidence as data results.
+
+    A follow-up may layer evidence an earlier turn of the conversation
+    retrieved. It then passes the same assessment as evidence fetched now, so
+    a layer for another place, or without a known place, covers nothing.
+    Numeric and analysis routes still need evidence read in this run.
+    """
+
+    route = state.route
+    if route is None or route.analysis is not None or needs_numeric_values(state):
+        return []
+    plan = next(
+        (
+            result
+            for result in reversed(state.tool_results)
+            if result.tool_name == "apply_map_plan" and result.status == "success"
+        ),
+        None,
+    )
+    if plan is None:
+        return []
+    fetched_now = {
+        ref
+        for result in state.tool_results
+        if result.tool_name in _DATA_TOOLS
+        for ref in result.evidence_refs
+    }
+    located_goal = state.goal is not None and bool(state.goal.target_ids)
+    results: list[ToolResult] = []
+    for layer in plan.metadata.layer_evidence:
+        status = str(layer.get("result_status") or "").casefold()
+        sources = [str(item) for item in json_array(layer.get("location_refs"))]
+        ref = str(layer.get("evidence_ref") or "")
+        if ref in fetched_now or status in _FAILED_RESULT_STATUSES or (located_goal and not sources):
+            continue
+        results.append(ToolResult(
+            call_id=plan.call_id,
+            tool_name="execute_geospatial_capability",
+            status="partial" if status == "partial" else "success",
+            summary="Evidence retrieved earlier in this conversation.",
+            evidence_refs=[ref],
+            metadata=ToolExecutionMetadata(
+                capability_id=str(layer.get("capability_id") or "") or None,
+                duration_ms=0,
+                evidence_refs=[ref],
+                result_type=str(layer.get("result_type") or "") or None,
+                observation_time=str(layer.get("observation_time") or "") or None,
+                coverage={**json_object(layer.get("coverage")), "source_location_refs": sources},
+                covered_queries=[str(item) for item in json_array(layer.get("covered_queries"))],
+            ),
+        ))
+    return results
 
 
 ###############################################################################
@@ -244,9 +303,10 @@ class CompletionEvaluator:
     # -------------------------------------------------------------------------
     @staticmethod
     def data_checks(state: AgentRunState) -> dict[str, bool]:
-        results = [result for result in state.tool_results if result.tool_name in {
-            "execute_geospatial_capability", "inspect_evidence", "transform_evidence"
-        }]
+        results = [
+            *(result for result in state.tool_results if result.tool_name in _DATA_TOOLS),
+            *_reused_layer_results(state),
+        ]
         analysis = state.route is not None and state.route.analysis is not None
         if needs_numeric_values(state) and not analysis_unsupported(state):
             # Derived evidence inherits its parents' source; raster parents
@@ -628,7 +688,7 @@ def uncovered_data_obligations(state: AgentRunState) -> list[str]:
     analysis = state.route is not None and state.route.analysis is not None
     imagery_counts = not analysis_unsupported(state)
     covered: set[str] = set()
-    for result in state.tool_results:
+    for result in [*state.tool_results, *_reused_layer_results(state)]:
         if result.tool_name != "execute_geospatial_capability" or not result.metadata.covered_queries:
             continue
         if analysis and imagery_counts and result.metadata.result_type == "raster":

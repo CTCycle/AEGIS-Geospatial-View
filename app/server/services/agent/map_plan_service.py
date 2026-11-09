@@ -443,6 +443,7 @@ class MapPlanService:
             for action in effective_actions
             if isinstance(action, AddEvidenceLayerAction)
         ]
+        layer_evidence = self._layer_evidence(evidence, set(evidence_refs), state)
         if _already_shown(state, candidate):
             # The committed map is exactly this candidate and still in the
             # user's view: rendering it again would change nothing, so the
@@ -458,6 +459,7 @@ class MapPlanService:
                 metadata=ToolExecutionMetadata(
                     duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                     evidence_refs=list(dict.fromkeys(evidence_refs)),
+                    layer_evidence=layer_evidence,
                 ),
             )
         state.prepared_map_session = candidate
@@ -481,8 +483,46 @@ class MapPlanService:
             metadata=ToolExecutionMetadata(
                 duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
                 evidence_refs=list(dict.fromkeys(evidence_refs)),
+                layer_evidence=layer_evidence,
             ),
         )
+
+    # -------------------------------------------------------------------------
+    def _layer_evidence(
+        self,
+        evidence: list[AgentEvidenceEnvelope],
+        layer_refs: set[str],
+        state: AgentRunState,
+    ) -> list[dict[str, Any]]:
+        """Describe each layer's stored evidence for the completion checks.
+
+        A layer may reuse evidence an earlier turn retrieved; these facts come
+        from the evidence store, so the model cannot vouch for a place.
+        """
+
+        queries = state.route.capability_queries if state.route is not None else []
+        layers: list[dict[str, Any]] = []
+        for item in evidence:
+            capability_id = str(item.summary.get("capability_id") or "")
+            if item.evidence_ref not in layer_refs or not capability_id:
+                continue
+            query = item.summary.get("query")
+            place = query if isinstance(query, dict) else {}
+            layers.append({
+                "evidence_ref": item.evidence_ref,
+                "capability_id": capability_id,
+                "result_type": item.summary.get("result_type"),
+                "result_status": item.summary.get("result_status"),
+                "location_refs": [
+                    str(value)
+                    for value in (place.get("location_ref"), place.get("resolved_location"))
+                    if value
+                ],
+                "coverage": item.summary.get("coverage"),
+                "observation_time": item.provenance.get("observation_time"),
+                "covered_queries": self.capability_registry.covered_queries(capability_id, queries),
+            })
+        return layers
 
     # -------------------------------------------------------------------------
     def _superseded_layer_removals(
