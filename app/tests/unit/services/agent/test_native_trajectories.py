@@ -862,7 +862,7 @@ async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder()
 def test_discovery_prompt_requires_disclosure_and_forbids_overclaiming():
     from server.prompts.agent import build_native_agent_system_prompt
     prompt = build_native_agent_system_prompt()
-    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "sample count", "model estimates", "partial or excluded", "verified maximum", "evidence does not contain", "near <place_label>", "completeness_note"]:
+    for term in ["grid_aggregate", "fit_evidence", "value_encoding", "observed vs modelled", "partial or excluded", "verified maximum", "evidence does not contain", "near <place_label>", "completeness_note"]:
         assert term in prompt
 
 # --- test_native_harness_trajectories.py ---

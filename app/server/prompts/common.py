@@ -12,8 +12,8 @@ GROUNDING_REQUIREMENTS = (
 )
 
 UNCERTAINTY_RULES = (
-    "Preserve unresolved ambiguity and source conflict. Mark uncertainty when "
-    "it materially blocks execution or changes the requested outcome."
+    "Preserve unresolved ambiguity and source conflict; flag uncertainty only "
+    "when it blocks execution or changes the outcome."
 )
 
 INTERNAL_INFORMATION_RESTRICTIONS = (

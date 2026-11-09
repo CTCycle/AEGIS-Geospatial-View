@@ -86,9 +86,8 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "earthquake), resolve the result's 'latitude, longitude' with "
     "resolve_geospatial_location, discover the second source with a specific query, "
     "and execute it with that point's target_id as location_ref. "
-    "The final answer must state source, sample count or spacing, units, time window, "
-    "whether values are model estimates or observations, and partial or excluded "
-    "coverage. Grid samples cover only land of the named region (coverage.region) and "
+    "State the source, units, time window, and observed vs modelled in one line; "
+    "mention partial or excluded coverage only when it applies. Grid samples cover only land of the named region (coverage.region) and "
     "add refined points around the strongest coarse cells; they still sample, so "
     "never call a sampled maximum the verified maximum of the region. "
     "Never name a place the evidence does not contain. A record with place_label "
@@ -103,8 +102,10 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "script, landmarks, architecture, vegetation, terrain) behind any inferred place, "
     "resolve it only when the cues are specific, and otherwise ask the user to confirm "
     "candidate places. Never present an image-inferred location as certain.\n\n"
-    "After useful tool work is complete, provide one concise user-facing "
-    "answer and stop."
+    "Answer style: lead with the direct answer, in at most about 4 short sentences "
+    "or bullets unless the user asks for detail. Do not restate the request, narrate "
+    "tools or process, or add generic closing offers or suggestions. Give caveats in "
+    "one line. Then stop."
 )
 
 ###############################################################################
