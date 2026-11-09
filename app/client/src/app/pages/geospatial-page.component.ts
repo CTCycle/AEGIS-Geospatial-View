@@ -142,6 +142,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   progressPercent = 0;
   isResizing = false;
   isAlertsOpen = false;
+  isMapToolsOpen = false;
+  isLayersOpen = false;
 
   private readonly minWidth = 240;
   private readonly canvasMinWidth = 240;
@@ -534,6 +536,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   toggleAlerts(): void {
     this.isAlertsOpen = !this.isAlertsOpen;
+  }
+
+  toggleMapTools(): void {
+    this.isMapToolsOpen = !this.isMapToolsOpen;
+  }
+
+  toggleLayers(): void {
+    this.isLayersOpen = !this.isLayersOpen;
   }
 
   @HostListener('document:keydown.escape')

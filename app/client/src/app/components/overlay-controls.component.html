@@ -4,17 +4,8 @@
       <h2>Layers</h2>
       <p>{{ visibleOverlayCount }} of {{ overlays.length }} visible</p>
     </div>
-    <button
-      type="button"
-      class="overlay-controls__toggle"
-      aria-controls="map-layers-panel"
-      [attr.aria-expanded]="isExpanded"
-      (click)="toggleExpanded()"
-    >
-      {{ isExpanded ? 'Collapse' : 'Expand' }}
-    </button>
   </header>
-  <div id="map-layers-panel" class="overlay-controls__list" [hidden]="!isExpanded">
+  <div id="map-layers-panel" class="overlay-controls__list">
       @for (overlay of overlays; track trackOverlay($index, overlay)) {
         <div class="overlay-control-row">
           <label [attr.data-render-status]="getRenderStatus(overlay.id)">

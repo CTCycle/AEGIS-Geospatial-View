@@ -38,32 +38,11 @@
     font-size: 0.68rem;
 }
 
-.overlay-controls__toggle {
-    flex: 0 0 auto;
-    border: 1px solid #3d5965;
-    border-radius: 0.25rem;
-    padding: 0.22rem 0.42rem;
-    background: #162833;
-    color: #dcecf1;
-    font-size: 0.68rem;
-    font-weight: 700;
-}
-
-.overlay-controls__toggle:hover,
-.overlay-controls__toggle:focus-visible {
-    border-color: #73c7ed;
-    background: #1b3340;
-}
-
 .overlay-controls__list {
     display: grid;
     gap: 0.25rem;
     max-height: min(22rem, calc(100vh - 12rem));
     overflow-y: auto;
-}
-
-.overlay-controls__list[hidden] {
-    display: none;
 }
 
 .overlay-control-row {

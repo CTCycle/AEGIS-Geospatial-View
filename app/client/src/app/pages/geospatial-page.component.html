@@ -217,37 +217,6 @@
             </button>
           </div>
         }
-        <div class="canvas-actions" data-map-obstruction>
-          <button
-            type="button"
-            class="panel-icon-button panel-icon-button--map"
-            [class.panel-icon-button--active]="isAlertsOpen"
-            aria-label="Alerts"
-            title="Alerts"
-            [attr.aria-expanded]="isAlertsOpen"
-            (click)="toggleAlerts()"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path
-                d="M12 3.5a4.8 4.8 0 0 0-4.8 4.8v1.7c0 .8-.2 1.6-.6 2.3L5.1 15h13.8l-1.5-2.7a4.8 4.8 0 0 1-.6-2.3V8.3A4.8 4.8 0 0 0 12 3.5zm0 17a2.4 2.4 0 0 1-2.2-1.5h4.4A2.4 2.4 0 0 1 12 20.5z"
-                fill="currentColor"
-              />
-            </svg>
-            <span class="sr-only">Alerts</span>
-          </button>
-          <button
-            type="button"
-            class="panel-icon-button panel-icon-button--map"
-            aria-label="Hide map"
-            title="Hide map"
-            (click)="toggleCanvas()"
-          >
-            <span class="sr-only">Hide map</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M4 5.5h16v13H4zM15 5.5v13M8 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </button>
-        </div>
         @if (isAlertsOpen) {
           <section class="workspace-alerts" role="status" aria-live="polite">
             <header class="workspace-alerts__header">
@@ -288,6 +257,8 @@
           [initialOverlayOrder]="mapState.overlayOrder"
           [availableBasemaps]="availableBasemaps"
           [renderIdentity]="mapRenderIdentity"
+          [toolsOpen]="isMapToolsOpen"
+          [layersOpen]="isLayersOpen"
           (overlayStateChange)="onOverlayStateChange($event)"
           (basemapChange)="onBasemapChange($event)"
           (renderStateChange)="onMapRenderStateChange($event)"
@@ -300,21 +271,7 @@
       [class.history-sidebar--collapsed]="isHistoryCollapsed"
       aria-label="Session history"
     >
-      @if (isHistoryCollapsed) {
-        <button
-          type="button"
-          class="panel-icon-button history-sidebar__open"
-          aria-label="Show history"
-          title="Show history"
-          [attr.aria-expanded]="false"
-          (click)="toggleHistory()"
-        >
-          <span class="sr-only">Show history</span>
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-            <path d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 5v3.5H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-      } @else {
+      @if (!isHistoryCollapsed) {
         <app-conversation-history
           [conversations]="conversationHistory"
           [selectedConversationId]="conversationId"
@@ -325,6 +282,82 @@
         ></app-conversation-history>
       }
     </aside>
+
+    <nav class="workspace-toolbar" aria-label="Workspace tools">
+      <button
+        type="button"
+        class="panel-icon-button"
+        [class.panel-icon-button--active]="!isHistoryCollapsed"
+        [attr.aria-label]="isHistoryCollapsed ? 'Show history' : 'Hide history'"
+        [attr.title]="isHistoryCollapsed ? 'Show history' : 'Hide history'"
+        [attr.aria-expanded]="!isHistoryCollapsed"
+        (click)="toggleHistory()"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 5v3.5H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <span class="workspace-toolbar__divider" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="panel-icon-button"
+        [class.panel-icon-button--active]="isAlertsOpen"
+        aria-label="Alerts"
+        title="Alerts"
+        [attr.aria-expanded]="isAlertsOpen"
+        [disabled]="isCanvasCollapsed"
+        (click)="toggleAlerts()"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path
+            d="M12 3.5a4.8 4.8 0 0 0-4.8 4.8v1.7c0 .8-.2 1.6-.6 2.3L5.1 15h13.8l-1.5-2.7a4.8 4.8 0 0 1-.6-2.3V8.3A4.8 4.8 0 0 0 12 3.5zm0 17a2.4 2.4 0 0 1-2.2-1.5h4.4A2.4 2.4 0 0 1 12 20.5z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="panel-icon-button"
+        [class.panel-icon-button--active]="isMapToolsOpen"
+        aria-controls="map-tools"
+        aria-label="Map tools"
+        title="Basemap and legend"
+        [attr.aria-expanded]="isMapToolsOpen"
+        [disabled]="isCanvasCollapsed"
+        (click)="toggleMapTools()"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M9 4 3.5 6.5v13L9 17l6 2.5 5.5-2.5v-13L15 6.5zM9 4v13M15 6.5v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="panel-icon-button"
+        [class.panel-icon-button--active]="isLayersOpen"
+        aria-controls="map-layers-panel"
+        aria-label="Layers"
+        title="Layers"
+        [attr.aria-expanded]="isLayersOpen"
+        [disabled]="isCanvasCollapsed"
+        (click)="toggleLayers()"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 8l9 5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" />
+        </svg>
+      </button>
+      <span class="workspace-toolbar__divider" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="panel-icon-button"
+        [attr.aria-label]="isCanvasCollapsed ? 'Show map' : 'Hide map'"
+        [attr.title]="isCanvasCollapsed ? 'Show map' : 'Hide map'"
+        (click)="toggleCanvas()"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M4 5.5h16v13H4zM15 5.5v13M8 10l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </nav>
 
     <footer class="workspace-status-bar" role="group" aria-label="Workspace status">
       <div class="workspace-status-bar__capabilities">

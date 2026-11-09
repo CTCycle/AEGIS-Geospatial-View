@@ -132,8 +132,7 @@ def _base_state(saved_at: int | None = None) -> dict[str, Any]:
 
 ###############################################################################
 def _open_layer_list(page: Page) -> None:
-    page.get_by_role("button", name="Map tools", exact=True).click()
-    page.get_by_role("button", name="Expand", exact=True).click()
+    page.get_by_role("button", name="Layers", exact=True).click()
 
 ###############################################################################
 def test_refresh_same_tab_restores_chat_and_map_state(

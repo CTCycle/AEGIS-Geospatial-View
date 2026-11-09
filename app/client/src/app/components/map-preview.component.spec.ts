@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { By } from '@angular/platform-browser';
 import maplibregl from 'maplibre-gl';
 
 import {
@@ -9,7 +8,6 @@ import {
   DEFAULT_SATELLITE_MAP_FIT_MAX_ZOOM,
 } from '../core/constants';
 import { MapPreviewComponent } from './map-preview.component';
-import { OverlayControlsComponent } from './overlay-controls.component';
 
 describe('components/map-preview.component', () => {
   let fixture: ComponentFixture<MapPreviewComponent>;
@@ -134,19 +132,16 @@ describe('components/map-preview.component', () => {
     expect(component.overlayOpacity['weather']).toBe(0.33);
   });
 
-  it('hides map tools until the toggle is used', () => {
+  it('hides map tools and layers until the toolbar opens them', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();
 
-    const toggle = fixture.nativeElement.querySelector('.map-tools-toggle') as HTMLButtonElement;
     const tools = fixture.nativeElement.querySelector('#map-tools') as HTMLElement;
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(tools.hidden).toBeTrue();
 
-    toggle.click();
+    component.toolsOpen = true;
     fixture.detectChanges();
 
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(tools.hidden).toBeFalse();
   });
 
@@ -844,8 +839,7 @@ describe('components/map-preview.component', () => {
     expect(noResultsPanel?.textContent).toContain('Flood Zones');
     expect(noResultsPanel?.textContent).toContain('no results');
 
-    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
-    overlayControls.isExpanded = true;
+    component.layersOpen = true;
     fixture.detectChanges();
     const layerNote = fixture.nativeElement.querySelector('.overlay-render-note') as HTMLElement | null;
     expect(layerNote?.getAttribute('role')).toBe('status');
@@ -929,8 +923,7 @@ describe('components/map-preview.component', () => {
 
     fixture.detectChanges();
 
-    const overlayControls = fixture.debugElement.query(By.directive(OverlayControlsComponent)).componentInstance as OverlayControlsComponent;
-    overlayControls.isExpanded = true;
+    component.layersOpen = true;
     fixture.detectChanges();
 
     const opacityInput = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;

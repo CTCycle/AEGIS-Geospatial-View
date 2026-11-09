@@ -190,9 +190,8 @@ def test_tab_overlay_preferences_are_restored_after_refresh(
     page.get_by_label("Chat message").fill("show map with overlays")
     page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
-    page.get_by_role("button", name="Map tools", exact=True).click()
+    page.get_by_role("button", name="Layers", exact=True).click()
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
-    page.get_by_role("button", name="Expand", exact=True).click()
 
     first_checkbox = page.locator(".overlay-control-row input[type='checkbox']").first
     first_checkbox.uncheck()
@@ -202,9 +201,8 @@ def test_tab_overlay_preferences_are_restored_after_refresh(
     )
     assert int(first_range.input_value()) == 25
     page.reload()
-    page.get_by_role("button", name="Map tools", exact=True).click()
+    page.get_by_role("button", name="Layers", exact=True).click()
     expect(page.locator(".overlay-controls")).to_be_visible()
-    page.get_by_role("button", name="Expand", exact=True).click()
     # Tab-local overlay preferences override the snapshot values only while
     # the page is restoring after a refresh.
     expect(

@@ -49,7 +49,6 @@ describe('OverlayControlsComponent', () => {
         message: 'Metadata only.',
       },
     ];
-    component.isExpanded = true;
 
     fixture.detectChanges();
 
@@ -68,7 +67,6 @@ describe('OverlayControlsComponent', () => {
         message: 'No results in the requested area or time window.',
       },
     ];
-    component.isExpanded = true;
 
     fixture.detectChanges();
 
@@ -79,20 +77,9 @@ describe('OverlayControlsComponent', () => {
     expect(note?.textContent).toContain('No results in the requested area or time window.');
   });
 
-  it('starts collapsed and exposes an accessible disclosure control', () => {
+  it('renders the layer list with accessible opacity controls', () => {
     fixture.detectChanges();
 
-    const toggle = fixture.nativeElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
-    const panel = fixture.nativeElement.querySelector('#map-layers-panel') as HTMLDivElement | null;
-    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle?.getAttribute('aria-controls')).toBe('map-layers-panel');
-    expect(panel?.hidden).toBeTrue();
-
-    toggle?.click();
-    fixture.detectChanges();
-
-    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
-    expect(panel?.hidden).toBeFalse();
     expect((fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement).getAttribute('aria-label')).toBe('Opacity for Overlay 1');
   });
 
@@ -102,7 +89,6 @@ describe('OverlayControlsComponent', () => {
       { id: 'ov2', label: 'Overlay 2', provider: 'x', type: 'geojson' },
       { id: 'ov3', label: 'Overlay 3', provider: 'x', type: 'tile' },
     ];
-    component.isExpanded = true;
     const spy = jasmine.createSpy('order');
     component.overlayOrderChange.subscribe(spy);
 

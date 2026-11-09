@@ -1404,7 +1404,7 @@ describe('pages/geospatial-page.component', () => {
     const label = (selector: string) => root.querySelector(selector)?.getAttribute('aria-label');
 
     expect(label('.panel-header [aria-label="Hide chat panel"]')).toBe('Hide chat panel');
-    expect(label('.canvas-actions [aria-label="Hide map"]')).toBe('Hide map');
+    expect(label('.workspace-toolbar [aria-label="Hide map"]')).toBe('Hide map');
 
     component.toggleToolbar();
     fixture.detectChanges();
@@ -1415,6 +1415,26 @@ describe('pages/geospatial-page.component', () => {
     expect(component.isToolbarCollapsed).toBeFalse();
     expect(component.isCanvasCollapsed).toBeTrue();
     expect(label('.panel-header [aria-label="Show map"]')).toBe('Show map');
+    expect(label('.workspace-toolbar [aria-label="Show map"]')).toBe('Show map');
+    expect((root.querySelector('.workspace-toolbar [aria-label="Layers"]') as HTMLButtonElement).disabled).toBeTrue();
+  });
+
+  it('opens map tools and layers from the workspace toolbar', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const click = (name: string) => {
+      (root.querySelector(`.workspace-toolbar [aria-label="${name}"]`) as HTMLButtonElement).click();
+      fixture.detectChanges();
+    };
+
+    click('Map tools');
+    click('Layers');
+    expect(fixture.componentInstance.isMapToolsOpen).toBeTrue();
+    expect(fixture.componentInstance.isLayersOpen).toBeTrue();
+
+    click('Map tools');
+    expect(fixture.componentInstance.isMapToolsOpen).toBeFalse();
   });
 
   it('collapses and reopens the history sidebar and lists recent sessions', async () => {

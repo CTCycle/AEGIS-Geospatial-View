@@ -9,7 +9,7 @@
 .geospatial-workspace {
     position: relative;
     display: grid;
-    grid-template-columns: var(--toolbar-width, 30vw) 0.6rem minmax(0, 1fr) var(--history-width, 15rem);
+    grid-template-columns: var(--toolbar-width, 30vw) 0.6rem minmax(0, 1fr) var(--history-width, 15rem) 2.5rem;
     width: 100%;
     height: 100%;
     grid-template-rows: minmax(0, 1fr) 2.1rem;
@@ -17,15 +17,15 @@
 }
 
 .geospatial-workspace--toolbar-collapsed {
-    grid-template-columns: 0 0.6rem minmax(0, 1fr) var(--history-width, 15rem);
+    grid-template-columns: 0 0.6rem minmax(0, 1fr) var(--history-width, 15rem) 2.5rem;
 }
 
 .geospatial-workspace--canvas-collapsed {
-    grid-template-columns: minmax(0, 1fr) 0.6rem 0 var(--history-width, 15rem);
+    grid-template-columns: minmax(0, 1fr) 0.6rem 0 var(--history-width, 15rem) 2.5rem;
 }
 
 .geospatial-workspace--history-collapsed {
-    --history-width: 2.5rem;
+    --history-width: 0;
 }
 
 .geospatial-workspace--canvas-collapsed .canvas-panel {
@@ -218,7 +218,8 @@
 .toolbar-panel,
 .toolbar-resize-handle,
 .canvas-panel,
-.history-sidebar {
+.history-sidebar,
+.workspace-toolbar {
     grid-row: 1;
 }
 
@@ -550,11 +551,6 @@
     outline-offset: 2px;
 }
 
-.panel-icon-button--map {
-    border-color: #344953;
-    background: rgb(16 28 35 / 88%);
-}
-
 .panel-icon-button--active {
     border-color: #2f9bd7;
     background: #172f3a;
@@ -562,8 +558,7 @@
 }
 
 .canvas-chip,
-.activity-pill,
-.canvas-actions {
+.activity-pill {
     position: absolute;
     z-index: 6;
 }
@@ -632,13 +627,6 @@
     background: #2a4a5b;
 }
 
-.canvas-actions {
-    top: 0.75rem;
-    right: 0.75rem;
-    display: flex;
-    gap: 0.35rem;
-}
-
 .panel-restore {
     position: absolute;
     top: 50%;
@@ -672,11 +660,29 @@
 }
 
 .history-sidebar--collapsed {
-    display: flex;
-    justify-content: center;
-    padding-top: 0.4rem;
+    border-left: none;
 }
 
-.history-sidebar__open {
-    align-self: flex-start;
+.workspace-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 0;
+    padding-top: 0.4rem;
+    border-left: 1px solid #253640;
+    background: #101c23;
+}
+
+.workspace-toolbar__divider {
+    width: 1.4rem;
+    height: 1px;
+    margin: 0.1rem 0;
+    background: #253640;
+}
+
+.panel-icon-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
 }

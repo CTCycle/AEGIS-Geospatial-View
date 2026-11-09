@@ -25,12 +25,7 @@ export class OverlayControlsComponent {
   @Output() overlayOpacityChange = new EventEmitter<OverlayOpacityChange>();
   @Output() overlayOrderChange = new EventEmitter<string[]>();
 
-  isExpanded = false;
   reorderAnnouncement = '';
-
-  toggleExpanded(): void {
-    this.isExpanded = !this.isExpanded;
-  }
 
   get visibleOverlayCount(): number {
     return this.overlays.filter((overlay) => this.overlayVisibility[overlay.id] ?? true).length;
