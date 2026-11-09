@@ -1,8 +1,6 @@
 import { Routes } from '@angular/router';
 
 import { GeospatialPageComponent } from './pages/geospatial-page.component';
-import { CapabilitiesPageComponent } from './pages/capabilities-page.component';
-import { SettingsPageComponent } from './pages/settings-page.component';
 
 export const routes: Routes = [
   {
@@ -15,7 +13,7 @@ export const routes: Routes = [
   },
   {
     path: 'geodata',
-    component: CapabilitiesPageComponent,
+    loadComponent: () => import('./pages/capabilities-page.component').then((m) => m.CapabilitiesPageComponent),
     data: {
       title: 'AEGIS | Geospatial catalog',
       description: 'Browse the manifest-backed geospatial providers, layers, map types, and direct tools available in AEGIS.',
@@ -23,7 +21,7 @@ export const routes: Routes = [
   },
   {
     path: 'settings',
-    component: SettingsPageComponent,
+    loadComponent: () => import('./pages/settings-page.component').then((m) => m.SettingsPageComponent),
     data: {
       title: 'AEGIS | Settings',
       description: 'Choose the AEGIS agent model and manage model and geospatial provider access.',

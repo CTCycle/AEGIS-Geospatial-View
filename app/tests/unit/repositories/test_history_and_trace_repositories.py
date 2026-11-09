@@ -110,6 +110,63 @@ def test_context_history_is_a_newest_text_window_in_chronological_order() -> Non
     assert set(window[0]) == {"id", "turn_index", "request_id", "role", "content"}
 
 ###############################################################################
+def test_message_headers_exclude_heavy_payload_columns_and_keep_order() -> None:
+    backend = _backend()
+    conversations = ConversationRepository(backend)
+    history = ChatHistoryRepository(backend)
+    conversation = conversations.create_conversation("Headers")
+    history.append_message(conversation_id=conversation.id, role="user", content="Show Rome")
+    history.append_message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content="Done",
+        structured_payload={"big": "x" * 1000},
+        tool_payload={"calls": []},
+        map_session={"overlays": []},
+    )
+
+    headers = history.list_message_headers(conversation_id=conversation.id)
+
+    assert [(item["role"], item["content"]) for item in headers] == [
+        ("user", "Show Rome"),
+        ("assistant", "Done"),
+    ]
+    assert all(set(item) == {"role", "content", "created_at"} for item in headers)
+
+###############################################################################
+def test_latest_user_event_walks_back_through_matching_user_events_only() -> None:
+    backend = _backend()
+    conversations = ConversationRepository(backend)
+    events = AgentRunEventRepository(backend)
+    runs = AgentRunRepository(backend, event_repository=events)
+    conversation = conversations.create_conversation("Latest")
+    run = runs.create_run(conversation.id, "request", "request")
+
+    def append(event_type: RunEventType, visibility: RunEventVisibility) -> int:
+        return events.append_event(
+            RunEventCreate(
+                conversation_id=conversation.id,
+                run_id=run.run_id,
+                run_version=1,
+                type=event_type,
+                visibility=visibility,
+                payload={"kind": event_type.value},
+            )
+        ).sequence
+
+    first = append(RunEventType.COMPLETED, RunEventVisibility.USER)
+    append(RunEventType.PROGRESS, RunEventVisibility.USER)
+    last = append(RunEventType.COMPLETED, RunEventVisibility.USER)
+    append(RunEventType.COMPLETED, RunEventVisibility.INTERNAL)
+    wanted = frozenset({RunEventType.COMPLETED})
+
+    newest = events.get_latest_user_event(run.run_id, types=wanted)
+    assert newest is not None and newest.sequence == last
+    older = events.get_latest_user_event(run.run_id, types=wanted, before_sequence=last)
+    assert older is not None and older.sequence == first
+    assert events.get_latest_user_event(run.run_id, types=wanted, before_sequence=first) is None
+
+###############################################################################
 def test_run_control_is_one_fresh_query_that_never_scans_events() -> None:
     backend = _backend()
     conversations = ConversationRepository(backend)

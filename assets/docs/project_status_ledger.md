@@ -1,6 +1,6 @@
 # Project Status Ledger
 
-Last updated: 2026-11-08
+Last updated: 2026-11-09
 
 **E2E remediation validation (2026-11-08, live on deepseek-v4.1-flash):** text-only coordinate lookups, a clarified Springfield then Rome marking, run cancellation (toolbar "Cancelled", transcript notice restored after reload), an image attachment and long-chip/wide-table layouts all pass; a false "Not delivered" line on Lisbon coordinates was fixed in `_reconcile_declared_obligations`. The Ollama check-connection message now shows the backend sentence once, and the "Local server" row shows "Connection failed" after a failed check. Unit results: frontend 323 of 323, tsc and build clean, backend 1646 passed with 4 environment failures in untouched files. Open: native file picker and the missing transcript thumbnail unverified, the Rome run not traced to the `mark_locations` path, Ollama success/refresh/pull unverified, markers all leaving the view label only the first place, cancelled notices only for the latest 8 runs, a lookup route with empty `target_refs` has no location obligation, narrow-viewport gate clipping at 768/375. See [report](../QA/e2e/e2e-remediation-20261108/report.md).
 
@@ -455,6 +455,15 @@ limitation.
 - **Remediation status:** Fixed for `both` routes: the router prefers a clearly better text-capable source (`text_only_capability_preferred`) and the loop drops an emptied `both` route to `text` (`text_only_capability_available`, `_downgrade_unrenderable_route`). Live: 6 of 10 Seville solar runs return PVGIS data (was 0 of 3), soil uses SoilGrids, `both` map prompts still prepare maps. Remaining misses are 429s, one tool error and one query-wording miss.
 - **Required revalidation:** Replay the PVGIS and soil prompts in `scenarios_f03_fix_*.json`; keep the `both_route` tests.
 - **Related documentation:** [audit report](../QA/tool-catalog-audit-20261105/report.md), ISSUE-006.
+
+### ISSUE-010 — Memory footprint: payload-heavy reads and map GL memory (partly fixed 2026-11-09)
+
+- **Affected component:** `backend.persistence`, `backend.agent.run-events`, `ui.map-preview`.
+- **Severity:** MEDIUM.
+- **Description and impact:** Queries decoded large JSON columns the caller did not need (conversation snapshot, evidence summaries, terminal-response lookup), and the Overpass cache was unbounded. Fixed 2026-11-09: snapshot and evidence summaries now allocate 0.13 and 0.4 MiB where a synthetic production-shaped database measured 83.1 and 10.3 MiB; the terminal lookup halved (28.0 to 14.0 MiB); the Overpass cache is capped at 64 entries; `/geodata` and `/settings` are lazy-loaded (initial JS 1.68 to 1.49 MB). Still open: map `preserveDrawingBuffer` and retained previous maps, decoded size of multi-MB run events, unpruned checkpoint events (687 MB), the 16 MiB evidence decode ceiling.
+- **Remediation status:** Fixes unit-tested (1651 backend pass with two failures that also fail on the baseline; 324 frontend pass). No live-provider or full-server idle/peak measurement was taken.
+- **Required revalidation:** Re-run `assets/QA/maintenance/memory-20261109/memory_benchmark.py` after changes to snapshot, evidence or event reads; sample the uvicorn process under real agent turns before changing the map or checkpoint behavior.
+- **Related documentation:** [memory audit report](../QA/maintenance/memory-20261109/report.md).
 
 ## Resolved / historical findings
 

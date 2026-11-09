@@ -1,0 +1,34 @@
+{
+  "commit": "bee400a6cf7c30389111ec70a6716569d7fe45f2",
+  "scenarios": {
+    "snapshot_messages": {
+      "repetitions": 5,
+      "peak_alloc_mib": 0.13,
+      "rss_start_mib": 90.8,
+      "rss_peak_mib": 90.8,
+      "rss_delta_mib": 0.0
+    },
+    "evidence_summaries": {
+      "repetitions": 5,
+      "peak_alloc_mib": 0.4,
+      "rss_start_mib": 91.4,
+      "rss_peak_mib": 91.5,
+      "rss_delta_mib": 0.1
+    },
+    "event_stream": {
+      "repetitions": 5,
+      "peak_alloc_mib": 28.01,
+      "rss_start_mib": 92.3,
+      "rss_peak_mib": 121.1,
+      "rss_delta_mib": 6.6
+    },
+    "terminal_lookup": {
+      "repetitions": 5,
+      "peak_alloc_mib": 13.99,
+      "rss_start_mib": 91.7,
+      "rss_peak_mib": 105.0,
+      "rss_delta_mib": 4.7
+    }
+  },
+  "db_size_mib": 31.2
+}

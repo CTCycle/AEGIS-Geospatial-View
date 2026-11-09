@@ -166,6 +166,18 @@ class RunEventPublisher:
         )
 
     # -------------------------------------------------------------------------
+    def latest_event(
+        self,
+        run_id: str,
+        *,
+        types: frozenset[RunEventType],
+        before_sequence: int | None = None,
+    ) -> RunEvent | None:
+        return self.event_repository.get_latest_user_event(
+            run_id, types=types, before_sequence=before_sequence
+        )
+
+    # -------------------------------------------------------------------------
     async def events(
         self,
         run_id: str,

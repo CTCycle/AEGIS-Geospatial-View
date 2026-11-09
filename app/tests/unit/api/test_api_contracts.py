@@ -298,12 +298,11 @@ def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
         ),
     )
     lifecycle.event_publisher = SimpleNamespace(
-        replay=lambda _run_id: [
-            SimpleNamespace(
-                type=SimpleNamespace(value="completed"),
-                payload=event_payload,
-            )
-        ]
+        latest_event=lambda _run_id, *, types, before_sequence=None: (
+            SimpleNamespace(sequence=1, payload=event_payload)
+            if before_sequence is None
+            else None
+        )
     )
 
     response = _post_with_lifecycle(lifecycle)
@@ -548,7 +547,7 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
     assert persisted.conversation_state == committed_state
     assert [
         item["content"]
-        for item in history.list_messages(conversation_id=conversation.id)
+        for item in history.list_message_headers(conversation_id=conversation.id)
     ] == ["First response"]
 
 ###############################################################################
@@ -590,7 +589,7 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
     assert second.id == first.id
     assert [
         item["content"]
-        for item in history.list_messages(conversation_id=conversation.id)
+        for item in history.list_message_headers(conversation_id=conversation.id)
     ] == ["The map is ready."]
 
 # --- test_realtime_api.py ---

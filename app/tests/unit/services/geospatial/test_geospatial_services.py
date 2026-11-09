@@ -3,6 +3,7 @@ from tests.conftest import run_async_in_thread
 from server.services.geospatial.openmeteo import OpenMeteoService, zoned_observation_time
 from server.services.geospatial.overpass import OverpassService
 import math
+import time
 from typing import Any
 
 import pytest
@@ -685,6 +686,23 @@ def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent
     # A persistent failure of the only batch still raises (nothing to disclose).
     with pytest.raises(module.OpenMeteoRequestError):
         grid(2)
+
+###############################################################################
+def test_overpass_cache_is_bounded_and_drops_expired_entries(monkeypatch) -> None:
+    from server.services.geospatial import overpass as overpass_module
+
+    monkeypatch.setattr(overpass_module, "OVERPASS_CACHE_MAX_ENTRIES", 3)
+    service = OverpassService(base_url="https://overpass.example/api/interpreter")
+
+    for index in range(5):
+        service._cache_set(f"key-{index}", {"elements": [index]})  # noqa: SLF001
+
+    assert list(service._cache) == ["key-2", "key-3", "key-4"]  # noqa: SLF001
+
+    service.cache_ttl_s = 0.0
+    time.sleep(0.01)
+    service._cache_set("fresh", {"elements": []})  # noqa: SLF001
+    assert list(service._cache) == ["fresh"]  # noqa: SLF001
 
 ###############################################################################
 def test_overpass_keeps_results_of_non_amenity_categories() -> None:

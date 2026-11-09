@@ -276,18 +276,31 @@ class ChatHistoryRepository:
         return self._to_message_dict(row) if row is not None else None
 
     # -------------------------------------------------------------------------
-    def list_messages(self, *, conversation_id: str) -> list[dict[str, Any]]:
+    def list_message_headers(self, *, conversation_id: str) -> list[dict[str, Any]]:
+        """Return role, text and timestamp for every message, oldest first.
+
+        The structured, tool and map payload columns routinely hold hundreds of
+        kilobytes per row, so they are never loaded for transcript listings.
+        """
+
         with self._session_factory() as session:
-            rows = (
-                session.execute(
-                    select(ChatMessageRecord)
-                    .where(ChatMessageRecord.conversation_id == conversation_id)
-                    .order_by(ChatMessageRecord.turn_index.asc())
+            rows = session.execute(
+                select(
+                    ChatMessageRecord.role,
+                    ChatMessageRecord.content,
+                    ChatMessageRecord.created_at,
                 )
-                .scalars()
-                .all()
-            )
-        return [self._to_message_dict(row) for row in rows]
+                .where(ChatMessageRecord.conversation_id == conversation_id)
+                .order_by(ChatMessageRecord.turn_index.asc())
+            ).all()
+        return [
+            {
+                "role": row.role,
+                "content": row.content,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in rows
+        ]
 
     # -------------------------------------------------------------------------
     def search_conversation_history(

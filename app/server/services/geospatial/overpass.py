@@ -22,6 +22,9 @@ from server.services.geospatial.providers.base import (
 )
 from server.common.time import parse_retry_after
 
+# Overpass payloads can be megabytes each, so the response cache stays small.
+OVERPASS_CACHE_MAX_ENTRIES = 64
+
 ###############################################################################
 class OverpassServiceError(ProviderError):
     """Base exception for Overpass failures."""
@@ -549,7 +552,17 @@ class OverpassService:
     # -------------------------------------------------------------------------
     def _cache_set(self, cache_key: str, payload: dict[str, Any]) -> None:
         with self._lock:
-            self._cache[cache_key] = (time.time(), payload)
+            now = time.time()
+            for key in [
+                key for key, (ts, _payload) in self._cache.items()
+                if now - ts > self.cache_ttl_s
+            ]:
+                del self._cache[key]
+            # Re-inserting keeps dict order equal to insertion age.
+            self._cache.pop(cache_key, None)
+            self._cache[cache_key] = (now, payload)
+            while len(self._cache) > OVERPASS_CACHE_MAX_ENTRIES:
+                del self._cache[next(iter(self._cache))]
 
     # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self) -> None:

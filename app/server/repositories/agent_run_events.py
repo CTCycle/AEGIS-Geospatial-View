@@ -102,6 +102,35 @@ class AgentRunEventRepository:
         return [self._to_domain(row) for row in rows]
 
     # -------------------------------------------------------------------------
+    def get_latest_user_event(
+        self,
+        run_id: str,
+        *,
+        types: frozenset[RunEventType],
+        before_sequence: int | None = None,
+    ) -> RunEvent | None:
+        """Return the newest user-visible event of ``types`` below a sequence.
+
+        Terminal events carry multi-megabyte map payloads, so lookups of the
+        final response decode one row instead of the whole run log.
+        """
+
+        with self._session_factory() as session:
+            statement = select(AgentRunEventRecord).where(
+                AgentRunEventRecord.run_id == run_id,
+                AgentRunEventRecord.visibility == RunEventVisibility.USER.value,
+                AgentRunEventRecord.type.in_([item.value for item in types]),
+            )
+            if before_sequence is not None:
+                statement = statement.where(
+                    AgentRunEventRecord.sequence < before_sequence
+                )
+            record = session.scalar(
+                statement.order_by(AgentRunEventRecord.sequence.desc()).limit(1)
+            )
+        return self._to_domain(record) if record is not None else None
+
+    # -------------------------------------------------------------------------
     def get_last_sequence(self, run_id: str) -> int:
         with self._session_factory() as session:
             return int(

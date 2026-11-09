@@ -31,8 +31,8 @@ class ChatHistoryService:
         return self.repo.list_context_messages(conversation_id, limit)
 
     # -------------------------------------------------------------------------
-    def list_messages(self, *, conversation_id: str) -> list[dict[str, Any]]:
-        return self.repo.list_messages(conversation_id=conversation_id)
+    def list_message_headers(self, *, conversation_id: str) -> list[dict[str, Any]]:
+        return self.repo.list_message_headers(conversation_id=conversation_id)
 
     # -------------------------------------------------------------------------
     def find_message_by_request_id(

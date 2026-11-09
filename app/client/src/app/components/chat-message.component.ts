@@ -17,14 +17,22 @@ import { ChatMessage } from '../core/types';
 export class ChatMessageComponent {
   @Input({ required: true }) message!: ChatMessage;
 
+  private renderedContent?: string;
+  private renderedHtml = '';
+
+  /** Parsed once per content change, not on every change-detection pass. */
   get assistantHtml(): string {
     if (this.message.role !== 'assistant') {
       return '';
     }
-    return marked.parse(this.message.content, {
-      async: false,
-      breaks: true,
-      gfm: true,
-    }) as string;
+    if (this.message.content !== this.renderedContent) {
+      this.renderedContent = this.message.content;
+      this.renderedHtml = marked.parse(this.message.content, {
+        async: false,
+        breaks: true,
+        gfm: true,
+      }) as string;
+    }
+    return this.renderedHtml;
   }
 }

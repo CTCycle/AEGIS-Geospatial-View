@@ -58,7 +58,7 @@ class ConversationSnapshotService:
                     content=row["content"],
                     created_at=row["created_at"],
                 )
-                for row in self.history_service.list_messages(
+                for row in self.history_service.list_message_headers(
                     conversation_id=conversation_id
                 )
             ]

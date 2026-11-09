@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { marked } from 'marked';
 
 import { ChatMessageComponent } from './chat-message.component';
 
@@ -42,6 +43,20 @@ describe('ChatMessageComponent', () => {
     expect(element.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
     expect(element.querySelector('code')?.textContent).toBe('precipitation');
     expect(element.querySelector('img')?.hasAttribute('onerror')).toBeFalse();
+  });
+
+  it('parses Markdown once per content change, not per change-detection pass', () => {
+    const parse = spyOn(marked, 'parse').and.callThrough();
+    component.message = { role: 'assistant', content: '**first**' };
+
+    fixture.detectChanges();
+    fixture.detectChanges();
+    expect(parse).toHaveBeenCalledTimes(1);
+
+    component.message = { role: 'assistant', content: '**second**' };
+    fixture.detectChanges();
+    expect(parse).toHaveBeenCalledTimes(2);
+    expect((fixture.nativeElement as HTMLElement).querySelector('strong')?.textContent).toBe('second');
   });
 
   it('keeps user Markdown syntax as escaped plain text', () => {

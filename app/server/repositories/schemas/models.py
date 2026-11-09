@@ -304,7 +304,8 @@ class AgentEvidenceRecord(Base):
     status: Mapped[str] = mapped_column(String(24), nullable=False)
     summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     provenance_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    payload_blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    # Deferred: summary listings must not pull up to 16 MiB blobs per row.
+    payload_blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
     uncompressed_byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     parent_evidence_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)

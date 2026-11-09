@@ -30,6 +30,10 @@ from server.services.agent_runs.exceptions import (
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 from server.services.geospatial.render_capture import RenderCaptureStore
 
+_RESPONSE_EVENT_TYPES = frozenset(
+    {RunEventType.COMPLETED, RunEventType.CLARIFICATION_NEEDED}
+)
+
 ###############################################################################
 class RunLifecycleService:
 
@@ -206,9 +210,18 @@ class RunLifecycleService:
         snapshot = self.run_repository.get_run(run_id)
         if snapshot is None or snapshot.conversation_id != conversation_id:
             return None
-        for event in reversed(self.event_publisher.replay(run_id)):
-            if event.type.value not in {"completed", "clarification_needed"}:
-                continue
+        before_sequence: int | None = None
+        while True:
+            # Newest-first, one event at a time: terminal payloads are
+            # multi-megabyte, so the whole run log is never decoded.
+            event = self.event_publisher.latest_event(
+                run_id,
+                types=_RESPONSE_EVENT_TYPES,
+                before_sequence=before_sequence,
+            )
+            if event is None:
+                return None
+            before_sequence = event.sequence
             payload = dict(event.payload)
             if "assistant_message" not in payload and "content" in payload:
                 payload["assistant_message"] = payload.get("content")
@@ -221,7 +234,6 @@ class RunLifecycleService:
                 return ChatTurnResponse.model_validate(payload)
             except (TypeError, ValueError):
                 continue
-        return None
 
     # -------------------------------------------------------------------------
     def resume_active_runs(self) -> int:
