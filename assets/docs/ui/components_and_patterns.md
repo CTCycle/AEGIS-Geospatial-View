@@ -10,7 +10,7 @@ Last updated: 2026-11-10
 - `settings-api-key-field.component.*` (masked key input with a **Save key** primary button beside it; credentials persist only on that button or Enter, disabled while the draft is empty, invalid, or saving)
 - `selected-model-summary.component.*`
 - `chat-message.component.*`
-- `clarification-popover.component.*` (quick-answer chips above the composer for an active clarification; arrow keys move between chips, Escape returns focus to the composer, free-text input stays available)
+- `clarification-popover.component.*` (quick-answer rows (compact vertical list) above the composer for an active clarification; arrow keys move between rows, Escape returns focus to the composer, free-text input stays available)
 - `execution-status.component.*`
 - `capability-status-list.component.*`
 - `source-health-badge.component.*`
