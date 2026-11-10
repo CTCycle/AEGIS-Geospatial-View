@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/figures/aegis-mark.svg" alt="AEGIS mark" width="72"></p>
+![AEGIS mark](assets/figures/aegis-mark.svg)
 
 <h1 align="center">AEGIS Geospatial View</h1>
 
@@ -26,7 +26,7 @@
   <a href="assets/docs/project_index.md">Documentation</a>
 </p>
 
-<p align="center"><img src="assets/figures/workspace.png" alt="AEGIS Search workspace: chat on the left, current weather for Turin on the map" width="100%"></p>
+![AEGIS Search workspace: chat on the left, current weather for Turin on the map](assets/figures/workspace.png)
 
 AEGIS is a local, single-user geospatial workspace. You describe a place or a dataset in chat; an LLM agent picks tools from a catalog of public data sources, fetches the data, and returns an answer together with a map you can inspect. The screenshot above is a real session: a current-weather request for Turin, answered with the model-based reading and its source and time window.
 
@@ -43,15 +43,15 @@ Try:
 - `Show the Colosseum in Rome`
 - `Show ESA WorldCover land cover over Rome, Italy`
 
-<p align="center"><img src="assets/figures/landmark.png" alt="The Colosseum in Rome on an OpenStreetMap basemap with points of interest" width="100%"></p>
+![The Colosseum in Rome on an OpenStreetMap basemap with points of interest](assets/figures/landmark.png)
 
 Regional comparisons are ranked samples or grid bins, reported with source, time window and coverage. Weather grid values are model estimates, not station measurements, and the answer says so. When a request is ambiguous the agent asks and offers clickable answers; here "Springfield" was resolved to Illinois with one click:
 
-<p align="center"><img src="assets/figures/clarification.png" alt="Springfield, Illinois shown on the map after the user picked it from the clarification options" width="100%"></p>
+![Springfield, Illinois shown on the map after the user picked it from the clarification options](assets/figures/clarification.png)
 
 Overlays such as land cover, temperature and imagery layers can be added to the same map, with source attribution:
 
-<p align="center"><img src="assets/figures/overlay.png" alt="ESA WorldCover land-cover classes over Rome" width="100%"></p>
+![ESA WorldCover land-cover classes over Rome](assets/figures/overlay.png)
 
 With a vision-capable model you can also attach a photo and ask for location clues; treat the suggested place as a hypothesis.
 
@@ -71,7 +71,7 @@ Known limits at 1.0.0:
 
 The catalog lists providers, basemaps, overlays, camera networks, transit feeds, and direct tools. Each entry includes source, coverage or scope, update information, access notes, and dependencies.
 
-<p align="center"><img src="assets/figures/geodata-catalog.png" alt="AEGIS Geodata catalog showing providers, data sources, and access requirements" width="100%"></p>
+![AEGIS Geodata catalog showing providers, data sources, and access requirements](assets/figures/geodata-catalog.png)
 
 Coverage, availability, credentials, quotas, attribution, and reuse terms vary by source. Check the catalog and provider terms before relying on a dataset.
 
