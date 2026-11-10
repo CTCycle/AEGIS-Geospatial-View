@@ -808,8 +808,11 @@ describe('pages/geospatial-page.component', () => {
     component.conversationId = 'conv-1';
     component['activeRunId'] = 'run-stop';
     component['lastHandledRunId'] = 'run-stop';
-    component.assistantDraft = 'partial answer';
     component.isLoading = true;
+    component.progressLabel = 'Fetching data';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.chat-activity-status')).not.toBeNull();
+    component.assistantDraft = 'partial answer';
 
     component['handleRealtimeMessage']({
       type: 'run.ack',
@@ -830,6 +833,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.isInspectedRunCancelled).toBeTrue();
     expect(component.isLoading).toBeFalse();
     expect(component.assistantDraft).toBe('');
+    expect(fixture.nativeElement.querySelector('.chat-activity-status')).toBeNull();
     expect(component.messages.map((message) => message.content)).toEqual([
       'Run stopped. No result was produced.',
     ]);
@@ -1479,7 +1483,7 @@ describe('pages/geospatial-page.component', () => {
     expect(fixture.nativeElement.querySelector('.workspace-alerts')).toBeNull();
   });
 
-  it('shows agent activity as a map overlay with a stop control instead of a canvas header', () => {
+  it('shows temporary agent activity in chat and keeps Stop in the composer', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -1487,14 +1491,193 @@ describe('pages/geospatial-page.component', () => {
 
     expect(root.querySelector('.canvas-header')).toBeNull();
     expect(root.querySelector('.activity-pill')).toBeNull();
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
 
     component.isLoading = true;
     component.progressLabel = 'Fetching weather';
     fixture.detectChanges();
 
-    const pill = root.querySelector('.canvas-panel__body .activity-pill') as HTMLElement;
-    expect(pill.textContent).toContain('Fetching weather');
-    expect(pill.querySelector('button')?.getAttribute('aria-label')).toBe('Stop generating');
+    const chatStatus = root.querySelector('.chat-transcript .chat-activity-status') as HTMLElement;
+    expect(chatStatus).not.toBeNull();
+    expect(chatStatus.textContent).toContain('Fetching weather');
+    expect(chatStatus.getAttribute('role')).toBe('status');
+    expect(chatStatus.querySelector('.chat-progress-spinner')?.getAttribute('aria-hidden')).toBe('true');
+    expect(chatStatus.querySelector('button')).toBeNull();
+    expect(root.querySelector('.canvas-panel__body .activity-pill')).toBeNull();
+    expect(root.querySelector('.chat-composer .primary-button')?.getAttribute('aria-label')).toBe('Stop generating');
+    expect(component.messages.some((message) => message.content === 'Fetching weather')).toBeFalse();
+
+    component.progressLabel = 'Correcting the map after a render failure';
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.chat-activity-status').length).toBe(1);
+    expect(root.querySelector('.chat-activity-status')?.textContent).toContain('Correcting the map');
+  });
+
+  it('replaces temporary activity with streamed assistant text and does not show it again during rendering', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.activeRunVersion = 1;
+    component.isLoading = true;
+    component.progressLabel = 'Fetching weather';
+    fixture.detectChanges();
+
+    component['handleRunEvent']({
+      event_id: 'assistant-delta-1',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'assistant_text_delta',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { delta: 'Rainfall is expected this afternoon.' },
+    });
+    fixture.detectChanges();
+
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
+    expect(root.querySelector('.chat-transcript')?.textContent).toContain('Rainfall is expected');
+    expect(component.messages.some((message) => message.content === 'Fetching weather')).toBeFalse();
+
+    component['handleRunEvent']({
+      event_id: 'assistant-completed-1',
+      sequence: 2,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'assistant_text_completed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { content: 'Rainfall is expected this afternoon.' },
+    });
+    component.progressLabel = 'Map rendering verified; continuing';
+    fixture.detectChanges();
+
+    expect(component.isLoading).toBeTrue();
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
+    expect(root.querySelector('.chat-transcript')?.textContent).toContain('Rainfall is expected');
+  });
+
+  it('replaces activity when assistant text completes without streamed deltas', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.activeRunVersion = 1;
+    component.isLoading = true;
+    component.progressLabel = 'Understanding the request';
+    fixture.detectChanges();
+
+    component['handleRunEvent']({
+      event_id: 'assistant-completed-without-delta',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'assistant_text_completed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { content: 'Here is the answer.' },
+    });
+    fixture.detectChanges();
+
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
+    expect(root.querySelector('.chat-transcript')?.textContent).toContain('Here is the answer.');
+  });
+
+  it('shows reconnecting and stopping labels in the chat activity row', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    component.isLoading = true;
+    component.progressLabel = 'Fetching weather';
+    component.streamState = 'reconnecting';
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')?.textContent).toContain('Reconnecting…');
+
+    component.streamState = 'open';
+    await component.cancelActiveRun();
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')?.textContent).toContain('Stopping…');
+  });
+
+  it('shows activity again after a steering update until new text streams', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    const event = (id: string, sequence: number, runVersion: number, type: string, payload: Record<string, unknown>) => ({
+      event_id: id,
+      sequence,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: runVersion,
+      type,
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload,
+    });
+    component.conversationId = 'conv-1';
+    component.activeRunId = 'run-1';
+    component.activeRunVersion = 1;
+    component.isLoading = true;
+
+    component['handleRunEvent'](event('d1', 1, 1, 'assistant_text_delta', { delta: 'First answer' }) as never);
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
+
+    component['handleRunEvent'](event('u1', 2, 2, 'request_updated', { label: 'Request updated' }) as never);
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')?.textContent).toContain('Request updated');
+
+    component['handleRunEvent'](event('d2', 3, 2, 'assistant_text_delta', { delta: 'Updated answer' }) as never);
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
+  });
+
+  it('clears the chat activity row on terminal states and chat reset', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const root = fixture.nativeElement as HTMLElement;
+    const terminal = (type: string, sequence: number) => ({
+      event_id: `terminal-${sequence}`,
+      sequence,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type,
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {},
+    });
+
+    for (const [index, type] of ['completed', 'error', 'cancelled'].entries()) {
+      component.conversationId = 'conv-1';
+      component.activeRunId = 'run-1';
+      component.activeRunVersion = 1;
+      component['lastRunSequence'] = 0;
+      component.isLoading = true;
+      component.progressLabel = 'Fetching weather';
+      fixture.detectChanges();
+      expect(root.querySelector('.chat-activity-status')).not.toBeNull();
+
+      component['handleRunEvent'](terminal(type, index + 1) as never);
+      fixture.detectChanges();
+      expect(root.querySelector('.chat-activity-status')).withContext(type).toBeNull();
+    }
+
+    component.isLoading = true;
+    fixture.detectChanges();
+    component.startNewChat();
+    fixture.detectChanges();
+    expect(root.querySelector('.chat-activity-status')).toBeNull();
   });
 
   it('lets either panel be hidden and restored, keeping at least one visible', () => {

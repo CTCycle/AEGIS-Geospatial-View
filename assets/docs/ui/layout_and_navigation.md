@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 
 ## Desktop Viewport Contract
 
@@ -19,8 +19,8 @@ The main workspace uses a content grid with a thin footer row:
   activity, hide chat); Tool activity opens its execution details inside the
   chat pane because they belong to the current session
 - resize handle
-- map pane, with no header row; small overlays hold the location chip and the
-  agent activity pill
+- map pane, with no header row; the location chip overlays the canvas while
+  activity status appears temporarily in the chat transcript
 - session-history sidebar (15rem; fully collapsed by default on narrow screens)
 - workspace toolbar, an always-visible 2.5rem icon rail on the far right with
   History, Alerts, Map tools, Layers, and Hide/Show map
@@ -53,9 +53,10 @@ and Layers are disabled while the map is hidden. Zoom controls, failures,
 attribution, and compliance notices stay visible on the map, and layer rows
 keep names on one line to conserve canvas space.
 
-The location chip truncates on one line at the top center of the map; the
-activity pill sits beneath it and never blocks map gestures outside its Stop
-button.
+The location chip truncates on one line at the top center of the map. During a
+run, the latest activity label appears with a spinner at the bottom of the chat
+transcript and yields to streamed assistant response text. Stop remains in the
+chat composer.
 
 ## Other Page Layouts
 

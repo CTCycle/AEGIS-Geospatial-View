@@ -184,6 +184,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private lastRunSequence = 0;
   private lastHandledRunId?: string;
   private cancelledRunId?: string;
+  private assistantResponseStartedVersion?: number;
   private pendingRun?: { clientRequestId: string; message: string };
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
@@ -271,6 +272,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return 'Reconnecting…';
     }
     return this.progressLabel || this.status;
+  }
+
+  get showActivityStatus(): boolean {
+    const responseStarted = this.assistantResponseStartedVersion !== undefined
+      && this.assistantResponseStartedVersion === this.activeRunVersion;
+    return this.isLoading && !responseStarted && !this.assistantDraft.trim();
   }
 
   get renderedMessages(): ChatMessage[] {
@@ -556,6 +563,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.status = 'Agent ready';
     this.isLoading = false;
     this.assistantDraft = '';
+    this.assistantResponseStartedVersion = undefined;
     this.setComposerDraft('');
     this.transcriptScrollTop = 0;
     this.mapState = { overlayVisibility: {}, overlayOpacity: {}, overlayOrder: [] };
@@ -811,6 +819,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.completionContract = undefined;
       this.lastOperation = undefined;
       this.assistantDraft = '';
+      this.assistantResponseStartedVersion = undefined;
       this.progressStage = undefined;
       this.progressLabel = undefined;
       this.progressPercent = 0;
@@ -957,6 +966,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.pendingRenderAckMessageId = undefined;
     this.payload = undefined;
     this.assistantDraft = '';
+    this.assistantResponseStartedVersion = undefined;
     this.status = 'Agent ready';
     this.isLoading = false;
     this.progressPercent = 0;
@@ -1081,6 +1091,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.runFailureSummary = '';
     this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
+    this.assistantResponseStartedVersion = undefined;
     this.syncState();
 
     try {
@@ -1169,6 +1180,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.syncState();
     try {
       this.realtimeService.sendRunSteer(this.activeRunId, message, clientMutationId);
+      this.assistantDraft = '';
+      this.assistantResponseStartedVersion = undefined;
     } catch (error: unknown) {
       this.pendingSupersession = undefined;
       const fallback = this.userFacingErrorService.toUserFacingError(
@@ -1436,14 +1449,26 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
         break;
       }
-      case 'assistant_text_delta':
-        this.assistantDraft += String(event.payload['delta'] ?? '');
+      case 'assistant_text_delta': {
+        const delta = String(event.payload['delta'] ?? '');
+        if (delta.trim()) {
+          this.assistantResponseStartedVersion = event.run_version;
+        }
+        this.assistantDraft += delta;
         break;
-      case 'assistant_text_completed':
+      }
+      case 'assistant_text_completed': {
+        const content = String(event.payload['content'] ?? '');
+        if (content.trim()) {
+          this.assistantResponseStartedVersion = event.run_version;
+        }
         this.assistantDraft = '';
-        this.appendAssistantEventMessage(String(event.payload['content'] ?? ''));
+        this.appendAssistantEventMessage(content);
         break;
+      }
       case 'request_updated':
+        this.assistantDraft = '';
+        this.assistantResponseStartedVersion = undefined;
         this.progressStage = 'request_updated';
         this.progressLabel = String(event.payload['label'] ?? 'Request updated');
         this.status = 'Request updated';

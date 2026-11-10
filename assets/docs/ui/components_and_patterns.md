@@ -37,9 +37,10 @@ All interactive components must provide:
 - Use persistent status text for settings operations.
 - Use inline alerts for map and session concerns.
 - Keep progress indicators visible during in-flight chat requests.
-- Keep chat conversational: tool widgets, run traces, retry metadata, and raw
-  execution diagnostics belong in the workspace execution-status surface, not
-  in the transcript.
+- Keep chat conversational: a single transient row may show the latest
+  user-facing run progress label until assistant response text begins. Tool
+  widgets, run traces, retry metadata, and raw execution diagnostics belong in
+  the workspace execution-status surface, not in the transcript.
 - Present failures through concise user-readable summaries while retaining
   bounded operational detail in Tool activity.
 - Workspace capability indicators expose their description on hover and keyboard focus. Only indicators with a clear destination are interactive; those links open the relevant settings, access, or geodata page rather than mutating map state implicitly.
@@ -49,7 +50,10 @@ All interactive components must provide:
 - Describe a cloud agent as configured until a live request succeeds. Mark it verified after a successful run and needs attention after a terminal run error; never infer live provider readiness from stored credential health or model-catalog access alone.
 - Settings dialogs move focus inside on open, trap keyboard focus, close with Escape, and restore focus to their opener.
 - The workspace Alerts popover closes with Escape. The right-hand session-history sidebar lists the 12 most recent sessions (title, last-activity time, Active badge); only its list scrolls, and its header chevron (or the History button in the workspace toolbar rail) collapses it.
-- Agent activity appears as a floating pill at the top of the map (spinner, concise label, Stop button) only while a run is active; details, errors, and traces stay in the chat-header Tool activity panel and the Alerts popover.
+- Agent activity appears as one temporary spinner-and-label row at the bottom
+  of the chat transcript until response text begins; the composer is the only
+  Stop control. Details, errors, and traces stay in the chat-header Tool
+  activity panel and the Alerts popover.
 - Scrollbars use the dark app palette globally (`styles.css`).
 - Keep chat input within the realtime contract's 12,000-character message limit before sending.
 - Treat normalized backend render descriptors as the only source for raster and

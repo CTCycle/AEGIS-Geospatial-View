@@ -81,6 +81,12 @@
             @for (message of renderedMessages; track $index) {
               <article appChatMessage [message]="message"></article>
             }
+            @if (showActivityStatus) {
+              <div class="chat-message chat-activity-status" role="status" aria-live="polite" aria-atomic="true">
+                <span class="chat-progress-spinner" aria-hidden="true"></span>
+                <span class="chat-activity-status__label">{{ activityLabel }}</span>
+              </div>
+            }
           </div>
 
           @if (activeClarification; as clarification) {
@@ -211,21 +217,6 @@
     <section class="canvas-panel" aria-label="Map canvas">
       <div class="canvas-panel__body" data-map-frame>
         <div class="canvas-chip" data-map-obstruction [attr.title]="canvasTitle">{{ canvasTitle }}</div>
-        @if (isLoading) {
-          <div class="activity-pill" data-map-obstruction role="status" aria-live="polite">
-            <span class="chat-progress-spinner" aria-hidden="true"></span>
-            <span class="activity-pill__label">{{ activityLabel }}</span>
-            <button
-              type="button"
-              class="activity-pill__stop"
-              aria-label="Stop generating"
-              title="Stop generating"
-              (click)="onComposerAction()"
-            >
-              <span class="composer-stop-icon" aria-hidden="true"></span>
-            </button>
-          </div>
-        }
         @if (isAlertsOpen) {
           <section class="workspace-alerts" role="status" aria-live="polite">
             <header class="workspace-alerts__header">

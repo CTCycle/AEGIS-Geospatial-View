@@ -60,11 +60,14 @@ The agent is presented as continuously ready for the chat session. Per-run
 progress begins with request understanding and is separate from the persistent
 availability state.
 
-Run events are applied by type: progress labels update the activity indicator,
+Run events are applied by type: progress labels update one transient status row
+at the bottom of the chat transcript until assistant response text begins,
 assistant completion updates the transcript, clarification-needed preserves any
 partial map update, and completed payloads apply normalized operation, task,
-memory, visualization, and context-revision state together. Invalid optional
-terminal fields are ignored rather than replacing the last valid value.
+memory, visualization, and context-revision state together. The status row is
+derived from active run state and is not persisted as a conversation message.
+Invalid optional terminal fields are ignored rather than replacing the last
+valid value.
 Replayed event IDs are ignored after reconnect.
 
 Assistant message strings are rendered as GitHub-style Markdown through the
@@ -116,9 +119,11 @@ repository; runtime blocks use `/api/settings/runtime` and are persisted by
 SQLite. Child sections do not create a second settings store.
 
 The Search workspace keeps context usage in a separate compact progress row
-below the composer. The chat transcript contains only user and assistant
-conversation messages; tool progress, run failures, retries, trace events, and
-other operational diagnostics are presented outside the transcript.
+below the composer. The chat transcript contains user and assistant
+conversation messages plus one transient user-facing run status while no
+assistant response text is visible. Tool progress details, run failures,
+retries, trace events, and other operational diagnostics are presented outside
+the transcript.
 
 A compact full-width workspace footer spans the chat and map panes and exposes
 Agent model, Satellite, and Optional Keys. The Tool activity control lives in
@@ -128,8 +133,8 @@ including sanitized task, tool, timing, error-summary, and trace information.
 Raw provider payloads and model reasoning are not rendered there. Optional Keys
 opens `/settings?tab=geospatial-access` and Agent model opens `/settings`.
 
-The map has no header row: a location chip, Alerts, Hide map, and a transient
-agent-activity pill with a Stop button overlay the canvas.
+The map has no header row: a location chip, Alerts, and Hide map overlay the
+canvas. The composer owns the run's Stop control.
 
 ## Routing Rule
 

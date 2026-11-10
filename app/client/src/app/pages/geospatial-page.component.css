@@ -545,7 +545,6 @@
 }
 
 .panel-icon-button:focus-visible,
-.activity-pill__stop:focus-visible,
 .panel-restore:focus-visible {
     outline: 2px solid #2f9bd7;
     outline-offset: 2px;
@@ -557,13 +556,9 @@
     color: #e8f7ff;
 }
 
-.canvas-chip,
-.activity-pill {
+.canvas-chip {
     position: absolute;
     z-index: 6;
-}
-
-.canvas-chip {
     top: 0.75rem;
     left: 50%;
     max-width: min(40%, 28rem);
@@ -585,46 +580,20 @@
     pointer-events: none;
 }
 
-.activity-pill {
-    top: 3.7rem;
-    left: 50%;
-    max-width: min(60%, 26rem);
-    transform: translateX(-50%);
+.chat-activity-status {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.3rem 0.25rem 0.7rem;
-    border: 1px solid #344953;
-    border-radius: 999px;
-    background: rgb(16 28 35 / 92%);
+    gap: 0.55rem;
     color: #9fc9df;
-    font-size: 0.72rem;
-    font-weight: 700;
 }
 
-.activity-pill__label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.activity-pill__stop {
-    width: 1.6rem;
-    height: 1.6rem;
-    display: grid;
-    place-items: center;
+.chat-activity-status .chat-progress-spinner {
     flex: 0 0 auto;
-    padding: 0;
-    border: none;
-    border-radius: 999px;
-    background: #1b3340;
-    color: #e5f5ff;
-    cursor: pointer;
 }
 
-.activity-pill__stop:hover:not(:disabled) {
-    background: #2a4a5b;
+.chat-activity-status__label {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .panel-restore {
