@@ -233,6 +233,22 @@
       "auth_required": false
     },
     {
+      "capability_id": "gdacs_disaster_events",
+      "enabled_by_default": false,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": "gdacs_disaster_events",
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": ["disaster", "alert", "hazard", "flood", "cyclone", "volcano", "drought", "wildfire"],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
       "capability_id": "noaa_weather_alerts",
       "enabled_by_default": true,
       "credential_provider": null,

@@ -10,6 +10,7 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers import emsc as emsc_module
 from server.services.geospatial.providers.emsc import EMSC_FDSN_URL, EMSCProvider
+from server.services.geospatial.providers.gdacs import GDACS_EVENTS_URL, GDACSProvider
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
@@ -974,3 +975,32 @@ def test_soilgrids_is_available_to_runtime_and_provider_registries() -> None:
     assert runtime_registry.credentials_present("soilgrids_soil_properties") is True
     assert "soilgrids" in provider_registry.list_provider_ids()
     assert isinstance(provider_registry.get("soilgrids"), SoilGridsProvider)
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_gdacs_events_are_reported_points_filtered_by_type_level_and_bbox():
+    urls: list[str] = []
+
+    async def fetcher(url, headers=None):
+        urls.append(url)
+        def event(eid, lon, lat, country):
+            return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                    "properties": {"eventtype": "FL", "eventid": eid, "episodeid": 1, "name": f"Flood in {country}",
+                                   "alertlevel": "Orange", "alertscore": 2, "country": country,
+                                   "fromdate": "2026-11-05T00:00:00", "todate": "2026-11-09T00:00:00",
+                                   "severitydata": {"severity": 0, "severitytext": "Magnitude 0", "severityunit": ""},
+                                   "url": {"report": f"https://www.gdacs.org/report.aspx?eventid={eid}"}}}
+        return {"type": "FeatureCollection", "features": [event(1, 105.8, 21.0, "Vietnam"), event(2, -60.0, -10.0, "Brazil")]}
+
+    response = await GDACSProvider(fetcher=fetcher).fetch(ProviderRequest(
+        capability_id="gdacs_disaster_events", bbox=(90.0, -11.0, 141.0, 29.0),
+        params={"live": True, "categories": ["flood", "orange"]}))
+    assert urls[0].startswith(GDACS_EVENTS_URL) and "eventlist=FL" in urls[0] and "alertlevel=Orange" in urls[0]
+    [event] = response.payload["features"]
+    assert event["country"] == "Vietnam" and event["alert_level"] == "Orange"
+    assert event["footprint_basis"] == "reported_point" and event["time"] == 1793836800000
+    assert response.coverage["footprint_basis"] == "reported_point"
+
+    with pytest.raises(ProviderInvalidQueryError):
+        await GDACSProvider(fetcher=fetcher).fetch(ProviderRequest(
+            capability_id="gdacs_disaster_events", params={"categories": ["tsunami"]}))

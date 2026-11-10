@@ -1,6 +1,6 @@
 # Provider Framework
 
-Last updated: 2026-09-08
+Last updated: 2026-11-11
 
 ## Provider Adapter Location
 
@@ -16,6 +16,7 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `gtfs_realtime.py`
 - `gtfs_static.py`
 - `fema.py`
+- `gdacs.py` (disaster events as reported points, `footprint_basis: reported_point`)
 - `local_open_data.py`
 - `mobility_database.py`
 - `nasa_gibs.py`

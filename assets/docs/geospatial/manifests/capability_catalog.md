@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-10-24
+Last updated: 2026-11-11
 
 ## Purpose
 
@@ -33,6 +33,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `gbif` | biodiversity occurrence records | public |
 | `noaa` | CONUS weather radar and observations | public |
 | `emsc` | Euro-Mediterranean earthquake catalog (SeismicPortal FDSN) | public |
+| `gdacs` | Global disaster alerts (earthquake, cyclone, flood, volcano, drought, wildfire) as reported event points | public |
 
 ## Basemaps
 
@@ -86,6 +87,7 @@ Representative implemented layers include:
 - `openchargemap_ev_charging`
 - `opentripmap_tourism_pois`
 - `emsc_earthquakes`
+- `gdacs_disaster_events` (disabled by default until live-validated)
 - `usgs_earthquakes`
 - `usgs_water_gauges`
 - `gtfs_static`

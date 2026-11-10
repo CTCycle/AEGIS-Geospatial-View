@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-11-10
+Last updated: 2026-11-11
 
 ## Purpose
 
@@ -8,7 +8,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 ## Current Implementation Snapshot
 
-The runtime catalog currently contains 93 capability/reference JSON documents: 6 basemaps, 49
+The runtime catalog currently contains 94 capability/reference JSON documents: 6 basemaps, 50
 overlays, 18 provider descriptors, 5 direct tools, 7 camera networks, 3
 transit capabilities, and 5 reference catalogs, plus simplified Natural Earth
 country shapes (`reference/country_shapes.geojson`) for region and land masks.

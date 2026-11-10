@@ -192,6 +192,12 @@ PROVIDER_SMOKE_CHECKS = (
         required_payload_keys=("features",),
     ),
     LiveCheck(
+        provider_id="gdacs",
+        request=ProviderRequest(capability_id="gdacs_disaster_events", params={"live": True}),
+        response_contract="feature_collection",
+        required_payload_keys=("features",),
+    ),
+    LiveCheck(
         provider_id="noaa",
         request=ProviderRequest(
             capability_id="noaa_weather_alerts",
