@@ -427,6 +427,18 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
         )
     _validate_auth_policy(path, manifest, report)
     _validate_renderability(path, manifest, report)
+    contract = manifest.execution_contract
+    if contract.render_support == "raster" and contract.numeric_query == "numeric":
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message=(
+                "Rendered raster imagery cannot declare numeric_query 'numeric'; "
+                "use legend_sampled or render_only."
+            ),
+        )
 
 ###############################################################################
 def profile_claims_unrenderable_map_support(

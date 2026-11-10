@@ -915,6 +915,27 @@ def test_execution_contract_is_read_from_the_manifest() -> None:
     assert contract["output_geometry_type"] == "Point"
 
 ###############################################################################
+def test_numeric_eligibility_defaults_and_ranks_imagery_below_values() -> None:
+    registry = CapabilityRegistry()
+    assert registry.execution_contract("MODIS_Combined_Thermal_Anomalies_Fire")["numeric_query"] == "render_only"
+    assert registry.execution_contract("MODIS_Terra_NDVI_8Day")["numeric_query"] == "legend_sampled"
+    assert registry.execution_contract("usgs_earthquakes")["numeric_query"] == "numeric"
+    declared = normalized_execution_contract(
+        {"executionContract": {"render_support": "raster", "result_kind": "raster", "numeric_query": "numeric"}}
+    )
+    assert declared["numeric_query"] == "numeric"
+
+    def score(requires_numeric: bool) -> float:
+        candidates = registry.shortlist(
+            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=["fire", "hotspots"],
+            explicit_ids=[], runtime_registry=RuntimeRegistry(), requires_numeric=requires_numeric,
+        )
+        return next(item["routing_score"] for item in candidates
+                    if item["id"] == "MODIS_Combined_Thermal_Anomalies_Fire")
+
+    assert score(True) < score(False)
+
+###############################################################################
 def test_execution_contract_is_not_inferred_for_an_incomplete_manifest() -> None:
     contract = normalized_execution_contract(
         {

@@ -70,6 +70,14 @@ class CapabilityExecutionContract(BaseModel):
     required_inputs: list[str] = Field(default_factory=lambda: list[str]())
     output_geometry_type: str | None = None
     render_support: Literal["vector", "raster", "metadata_only", "none"] = "none"
+    # Result shape and quantitative eligibility; derived from render_support
+    # and the legend when omitted (see normalized_execution_contract).
+    result_kind: Literal["vector", "raster", "time_series", "metadata"] | None = None
+    numeric_query: Literal["numeric", "legend_sampled", "render_only"] | None = None
+    crs: str | None = None
+    spatial_resolution: str | None = None
+    temporal_coverage: str | None = None
+    units: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
     coverage: str | None = None
     # [west, south, east, north] where this source ranks above global equivalents.
     preferred_bbox: tuple[float, float, float, float] | None = None

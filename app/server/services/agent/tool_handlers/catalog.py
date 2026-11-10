@@ -15,7 +15,7 @@ from server.domain.agent.tool_result import (
     ToolResult,
 )
 from server.services.agent.tool_registry import follow_up_investigation_open
-from server.services.agent.completion import follow_up_location_keys
+from server.services.agent.completion import follow_up_location_keys, needs_numeric_values
 from server.services.agent.tool_definitions import (
     CapabilityDiscoveryInput,
     DescribeCapabilityInput,
@@ -137,6 +137,7 @@ class CatalogToolHandler:
                 "requires_render": (
                     route_filters is not None and route_filters.presentation in {"map", "both"}
                 ),
+                "requires_numeric": not catalog_discovery and needs_numeric_values(state),
                 "location": location,
             }
             candidates = self.capability_registry.shortlist(**constraints)
@@ -374,7 +375,7 @@ def _descriptor(
     render_support = str(
         execution_contract.get("render_support") or "none"
     ).casefold()
-    return {
+    descriptor = {
         "id": capability_id,
         "name": str(capability.get("name") or capability_id),
         "summary": str(
@@ -389,6 +390,12 @@ def _descriptor(
         "render_support": render_support,
         "reason": _match_reason(capability, execution_contract, queries or []),
     }
+    # Only imagery-backed sources say how far their values can be queried;
+    # records are numeric by default.
+    numeric_query = str(execution_contract.get("numeric_query") or "numeric")
+    if numeric_query != "numeric":
+        descriptor["numeric_query"] = numeric_query
+    return descriptor
 
 ###############################################################################
 def _match_reason(

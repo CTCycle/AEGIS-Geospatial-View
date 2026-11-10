@@ -31,6 +31,12 @@ class RuntimeEligibility(Protocol):
 # Score swing for a manifest whose executionContract.preferred_bbox contains
 # (or misses) the resolved location; smaller than one identity match.
 PREFERRED_AREA_BONUS = 40.0
+# Penalty for imagery-only sources when the request needs computed values:
+# larger than a subject match, so any numeric source ranks first, while the
+# imagery stays listed for map presentation.
+RENDER_ONLY_NUMERIC_PENALTY = 200.0
+RESULT_KINDS = frozenset({"vector", "raster", "time_series", "metadata"})
+NUMERIC_QUERY_KINDS = frozenset({"numeric", "legend_sampled", "render_only"})
 
 
 ###############################################################################
@@ -309,7 +315,33 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, int | float)
     ]
     contract["preferred_bbox"] = preferred if len(preferred) == 4 else None
+    contract["result_kind"], contract["numeric_query"] = _result_semantics(
+        raw, contract["render_support"], metadata
+    )
     return contract
+
+###############################################################################
+def _result_semantics(
+    raw: dict[str, Any], render_support: str, metadata: dict[str, Any]
+) -> tuple[str, str]:
+    """Declared result kind and numeric eligibility, else their safe defaults.
+
+    Raster imagery is never numerically queryable by default: it is
+    ``legend_sampled`` only when a legend maps its colours to values, and
+    ``render_only`` otherwise.
+    """
+
+    declared_kind = str(raw.get("result_kind") or "").strip().casefold()
+    declared_numeric = str(raw.get("numeric_query") or "").strip().casefold()
+    default_kind = {"vector": "vector", "raster": "raster"}.get(render_support, "metadata")
+    if render_support == "raster":
+        default_numeric = "legend_sampled" if is_json_object(metadata.get("legend")) else "render_only"
+    else:
+        default_numeric = "numeric"
+    return (
+        declared_kind if declared_kind in RESULT_KINDS else default_kind,
+        declared_numeric if declared_numeric in NUMERIC_QUERY_KINDS else default_numeric,
+    )
 
 ###############################################################################
 def capability_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
@@ -723,6 +755,7 @@ class CapabilityRegistry:
         temporal_granularity: str | None = None,
         has_explicit_time_range: bool = False,
         requires_render: bool = False,
+        requires_numeric: bool = False,
         location: ResolvedLocation | None = None,
     ) -> list[dict[str, Any]]:
         """Return eligible routing candidates without selecting final tools.
@@ -859,6 +892,8 @@ class CapabilityRegistry:
             if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
                 score += 50.0
             score += _preferred_area_bonus(contract, location)
+            if requires_numeric and contract["numeric_query"] == "render_only":
+                score -= RENDER_ONLY_NUMERIC_PENALTY
             candidate = dict(item)
             candidate["routing_score"] = score
             candidate["routing_query_matches"] = sorted(matched_queries)

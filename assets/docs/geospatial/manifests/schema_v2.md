@@ -1,6 +1,6 @@
 # Schema V2
 
-Last updated: 2026-09-28
+Last updated: 2026-11-11
 
 ## Required Fields
 
@@ -47,6 +47,24 @@ Optional but supported fields include:
 - `choropleth`
 - `camera-points`
 - `metadata-only`
+
+## Result Semantics
+
+`executionContract` may declare how its results can be analysed:
+
+- `result_kind`: `vector`, `raster`, `time_series` or `metadata`.
+- `numeric_query`: `numeric` (records with values), `legend_sampled` (raster
+  imagery whose legend maps colours to values; read with `inspect_evidence`
+  `values_at`) or `render_only` (imagery with no queryable values).
+- `crs`, `spatial_resolution`, `temporal_coverage` and `units` (field to unit).
+
+When omitted, the registry derives `result_kind` from `render_support` and
+`numeric_query` as `legend_sampled` for a raster with `metadata.legend`,
+`render_only` for any other raster, and `numeric` otherwise. When a request
+needs computed values, discovery ranks `render_only` sources below the rest and
+reports a non-default `numeric_query` on each descriptor. The strict audit
+rejects a raster that declares `numeric_query: numeric`. New manifests should
+declare these fields explicitly.
 
 ## Strict Rules
 
