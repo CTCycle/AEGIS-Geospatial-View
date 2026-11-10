@@ -65,3 +65,6 @@ Thumbs.db
 # Commit dependency lockfiles for reproducible CI installs.
 !app/server/uv.lock
 !app/client/package-lock.json
+
+# Local assistant configuration
+.claude/
