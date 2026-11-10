@@ -43,6 +43,7 @@ from server.domain.agent.capability_route import (
     unrouted_obligations,
 )
 from server.domain.agent.context import AgentContextView
+from server.domain.agent.decision import normalize_clarification_options
 from server.domain.agent.presentation_contract import CompletionSummary
 from server.domain.agent.task_ledger import compatible_tasks, freshness_seconds
 from server.domain.agent.map_plan import (
@@ -2474,6 +2475,9 @@ class AgentLoop:
                         request.state.capability_ids = list(decision.capability_ids)
                         return None, "", decision.route
                     if decision.status == "clarification":
+                        request.state.clarification_options = list(
+                            decision.clarification_options
+                        )
                         return (
                             decision.clarification_question
                             or "Which supported capability should I use?",
@@ -4121,9 +4125,9 @@ class AgentLoop:
         # A coverage rejection asks the user only when nothing else in the
         # batch succeeded; otherwise an in-coverage alternative is in hand.
         alternative_succeeded = any(result.status != "failed" for result in results)
-        question = next(
+        asking = next(
             (
-                result.error.message
+                result
                 for result in results
                 if result.error is not None
                 and result.error.recovery == "request_user_input"
@@ -4133,8 +4137,12 @@ class AgentLoop:
             ),
             None,
         )
-        if question is not None:
-            return "clarification_required", question
+        if asking is not None and asking.error is not None:
+            options = asking.data.get("options") if isinstance(asking.data, dict) else None
+            state.clarification_options = normalize_clarification_options(
+                options if isinstance(options, list) else None
+            )
+            return "clarification_required", asking.error.message
         if AgentLoop._render_recovery_requires_map_action(state, results):
             return (
                 "no_progress",
@@ -4308,6 +4316,7 @@ class AgentLoop:
         available_tools: list[str] | None = None,
     ) -> tuple[str, str] | None:
         if route.task_mode == "clarify":
+            state.clarification_options = list(route.clarification_options)
             return "clarification_required", text
         if state.prepared_map_session is not None:
             return "awaiting_render", text
@@ -5277,6 +5286,8 @@ class AgentLoop:
         if reason in _TERMINAL_CAUSES:
             state.termination_reason = reason
         reason = stopped_reason
+        if reason != "clarification_required":
+            state.clarification_options = []
         self._sync_task_state(state)
         self._set_terminal_task_state(state, reason)
         state.budget_snapshot = request.budget.snapshot()

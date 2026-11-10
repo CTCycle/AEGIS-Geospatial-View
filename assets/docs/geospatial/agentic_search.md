@@ -1,6 +1,6 @@
 # Native Geospatial Agent Harness
 
-Last updated: 2026-11-08
+Last updated: 2026-11-10
 
 ## Summary
 
@@ -484,7 +484,9 @@ Recovery is semantic rather than a blind repeat:
 - `correct_arguments` returns an actionable observation;
 - `choose_alternate_tool` exposes alternatives;
 - `replan` re-evaluates route and candidates;
-- `request_user_input` enters clarification;
+- `request_user_input` enters clarification; a clarify route, a `request_user_input`
+  tool failure, or a location ambiguity may carry 2-5 distinct answer options
+  (`clarification_options`), stored on `PendingClarification.options` for the UI;
 - `terminal` ends the run.
 
 Equivalent successful calls are replay-protected only for tools registered

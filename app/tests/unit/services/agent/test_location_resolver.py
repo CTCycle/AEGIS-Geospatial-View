@@ -697,6 +697,7 @@ def test_location_resolver_clarifies_same_level_targets() -> None:
         assert result.missing_fields == ["location"]
         assert "Springfield" in result.question
         assert "Shelbyville" in result.question
+        assert result.options == ["Springfield", "Shelbyville"]
 
     run_async_in_thread(_run())
 

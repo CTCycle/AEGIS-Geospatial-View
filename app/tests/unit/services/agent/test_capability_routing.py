@@ -1368,6 +1368,53 @@ def test_router_clarifies_broad_infrastructure_category_before_shortlisting() ->
         assert "ambiguous_infrastructure_category" in decision.reason_codes
         assert decision.clarification_question is not None
         assert "EV charging" in decision.clarification_question
+        assert decision.clarification_options == [
+            "EV charging stations",
+            "Buildings",
+            "Airports",
+            "Roads",
+            "Transit",
+        ]
+
+###############################################################################
+def test_clarify_route_carries_normalized_options_and_execute_route_drops_them() -> None:
+    clarify = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.CONVERSATION,
+            task_mode="clarify",
+            presentation="text",
+            location_mode="none",
+            capability_queries=[],
+            clarification_question="Which layer?",
+            clarification_options=[" Traffic ", "traffic", "Weather", "x" * 101],
+        ),
+        user_message="Show it.",
+        active_state=_state(),
+    )
+    assert clarify.status == "clarification"
+    assert clarify.clarification_options == ["Traffic", "Weather"]
+
+    open_ended = _router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.CONVERSATION,
+            task_mode="clarify",
+            presentation="text",
+            location_mode="none",
+            capability_queries=[],
+            clarification_question="What do you want to see?",
+            clarification_options=["Only one"],
+        ),
+        user_message="Show it.",
+        active_state=_state(),
+    )
+    assert open_ended.clarification_options == []
+
+    execute = _router().validate_route(
+        _route(clarification_options=["Traffic", "Weather"]),
+        user_message="Show traffic in Zurich.",
+        active_state=_state(),
+    )
+    assert execute.route.clarification_options == []
 
 ###############################################################################
 def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() -> None:

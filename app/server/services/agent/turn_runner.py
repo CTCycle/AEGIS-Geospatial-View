@@ -262,6 +262,7 @@ class AgentResponseBuilder:
             task_outcomes=ledger_outcomes(
                 state, AgentLoop.completion_summary(state), now=datetime.now(UTC)
             ),
+            clarification_options=list(state.clarification_options),
         )
 
 

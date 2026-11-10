@@ -520,6 +520,7 @@ async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
                 question="Which Springfield do you mean?",
                 reason="Multiple candidates matched.",
                 missing_fields=["location"],
+                options=["Springfield, Illinois", "Springfield, Missouri"],
             )
 
     result = await LocationToolHandler(resolver=AmbiguousResolver()).resolve(
@@ -539,6 +540,7 @@ async def test_ambiguous_location_is_a_typed_semantic_outcome() -> None:
         "question": "Which Springfield do you mean?",
         "reason": "Multiple candidates matched.",
         "missing_fields": ["location"],
+        "options": ["Springfield, Illinois", "Springfield, Missouri"],
     }
     assert result.error is not None
     assert result.error.recovery == "request_user_input"

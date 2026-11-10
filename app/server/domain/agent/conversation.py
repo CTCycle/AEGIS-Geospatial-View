@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_route import AgentGoal, CapabilityRoute, ConversationTask
-from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.decision import ResolvedLocation, normalize_clarification_options
 from server.domain.agent.task_ledger import LEDGER_LIMIT, complete_presentation, ledger_view
 
 
@@ -35,13 +35,13 @@ _CLARIFICATION_NON_ANSWER = re.compile(
 )
 
 _INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
-    "ev_charging": ("ev", "charging", "charger", "chargers", "electric vehicle"),
-    "residential_buildings": ("building", "buildings", "residential"),
-    "airports": ("airport", "airports"),
-    "roads": ("road", "roads", "highway", "highways"),
-    "transit_amenities": ("transit", "transport", "bus", "rail", "station"),
-    "other": ("other", "another", "different", "something else"),
+    "EV charging stations": ("ev", "charging", "charger", "chargers", "electric vehicle"),
+    "Buildings": ("building", "buildings", "residential"),
+    "Airports": ("airport", "airports"),
+    "Roads": ("road", "roads", "highway", "highways"),
+    "Transit": ("transit", "transport", "bus", "rail", "station"),
 }
+INFRASTRUCTURE_CLARIFICATION_OPTIONS: tuple[str, ...] = tuple(_INFRASTRUCTURE_OPTION_ALIASES)
 
 ###############################################################################
 class PendingClarification(BaseModel):
@@ -82,18 +82,18 @@ class PendingClarification(BaseModel):
             if len(token) >= 3
         ]
         inferred_kind = kind
-        inferred_options = list(options or [])
+        inferred_options = normalize_clarification_options(options)
         if inferred_kind == "generic" and "infrastructure" in terms:
             inferred_kind = "infrastructure_subtype"
         if inferred_kind == "infrastructure_subtype" and not inferred_options:
-            inferred_options = list(_INFRASTRUCTURE_OPTION_ALIASES)
+            inferred_options = list(INFRASTRUCTURE_CLARIFICATION_OPTIONS)
         return cls(
             question=question,
             source_turn_index=source_turn_index,
             source_request_id=source_request_id,
             scope_terms=list(dict.fromkeys(terms))[:24],
             kind=inferred_kind,
-            options=list(dict.fromkeys(inferred_options))[:12],
+            options=inferred_options,
         )
 
     # -------------------------------------------------------------------------
@@ -110,6 +110,9 @@ class PendingClarification(BaseModel):
         normalized = " ".join(message.strip().split())
         if self.status == "answered" or not normalized:
             return False
+        if self._exact_option(normalized) is not None:
+            # A chosen option label answers regardless of the wording heuristics.
+            return True
         if _CLARIFICATION_ACTION_MARKERS.search(normalized):
             return False
         if _CLARIFICATION_NON_ANSWER.fullmatch(normalized):
@@ -123,11 +126,19 @@ class PendingClarification(BaseModel):
         return True
 
     # -------------------------------------------------------------------------
+    def _exact_option(self, message: str) -> str | None:
+        key = " ".join(message.split()).casefold()
+        return next((option for option in self.options if option.casefold() == key), None)
+
+    # -------------------------------------------------------------------------
     def match_option(self, message: str) -> str | None:
         """Return the canonical option selected by a short clarification reply."""
 
         if not self.options:
             return None
+        exact = self._exact_option(message)
+        if exact is not None:
+            return exact
         normalized = " ".join(message.casefold().split())
         tokens = set(re.findall(r"[a-z0-9]+", normalized))
         for option in self.options:

@@ -83,6 +83,15 @@
             }
           </div>
 
+          @if (activeClarification; as clarification) {
+            <app-clarification-popover
+              [options]="clarification.options"
+              (optionSelected)="answerClarification($event)"
+              (dismissed)="focusComposer()"
+              (shown)="queueTranscriptScroll()"
+            ></app-clarification-popover>
+          }
+
           <div class="chat-composer">
             @if (composerImage) {
               <div class="chat-composer__attachment">

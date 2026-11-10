@@ -189,6 +189,107 @@ describe('pages/geospatial-page.component', () => {
     });
   });
 
+  describe('clarification answers', () => {
+    const pending = (question: string, options: string[], status = 'active') => ({
+      question,
+      source_turn_index: 1,
+      scope: 'current_request' as const,
+      scope_terms: [],
+      options,
+      status: status as 'active' | 'deferred' | 'answered',
+    });
+
+    const clarifying = (question = 'Which Springfield?', options = ['Springfield, Illinois', 'Springfield, Missouri']) => {
+      const fixture = TestBed.createComponent(GeospatialPageComponent);
+      fixture.detectChanges();
+      const component = fixture.componentInstance;
+      component.conversationId = 'conv-1';
+      component.messages = [
+        { role: 'user', content: 'Show Springfield', kind: 'normal' },
+        { role: 'assistant', content: question, kind: 'normal' },
+      ];
+      component.conversationState = { pending_clarification: pending(question, options) } as never;
+      fixture.detectChanges();
+      return { fixture, component };
+    };
+
+    const chipLabels = (fixture: { nativeElement: HTMLElement }): string[] =>
+      Array.from(fixture.nativeElement.querySelectorAll('app-clarification-popover button'))
+        .map((button) => button.textContent?.trim() ?? '');
+
+    it('submits a clicked option as the answer, once, and hides the popover', async () => {
+      const { fixture, component } = clarifying();
+      expect(chipLabels(fixture)).toEqual(['Springfield, Illinois', 'Springfield, Missouri']);
+
+      const chip = fixture.nativeElement.querySelector('app-clarification-popover button') as HTMLButtonElement;
+      chip.click();
+      chip.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(sendChatTurnMock).toHaveBeenCalledTimes(1);
+      expect(sendChatTurnMock.calls.mostRecent().args[0].message).toBe('Springfield, Illinois');
+      expect(component.messages.filter((message) => message.content === 'Springfield, Illinois').length).toBe(1);
+      expect(chipLabels(fixture)).toEqual([]);
+    });
+
+    it('hides the popover when the user types a free-text answer instead', async () => {
+      const { fixture, component } = clarifying();
+
+      component.composerDraft = 'The one near Chicago';
+      await component.sendMessage();
+      fixture.detectChanges();
+
+      expect(sendChatTurnMock.calls.mostRecent().args[0].message).toBe('The one near Chicago');
+      expect(chipLabels(fixture)).toEqual([]);
+    });
+
+    it('shows a following clarification and ignores resolved or unusable ones', () => {
+      const { fixture, component } = clarifying();
+      const next = 'Which state?';
+      component.messages = [...component.messages, { role: 'user', content: 'Springfield, Illinois' }, { role: 'assistant', content: next }];
+      component.conversationState = { pending_clarification: pending(next, ['Illinois', 'Missouri', 'Ohio']) } as never;
+      fixture.detectChanges();
+      expect(chipLabels(fixture)).toEqual(['Illinois', 'Missouri', 'Ohio']);
+
+      for (const state of [
+        pending(next, ['Illinois', 'Missouri'], 'answered'),
+        pending(next, ['Illinois', 'Missouri'], 'deferred'),
+        pending(next, ['Illinois']),
+        pending(next, ['A', 'B', 'C', 'D', 'E', 'F']),
+        pending('A different question?', ['Illinois', 'Missouri']),
+      ]) {
+        component.conversationState = { pending_clarification: state } as never;
+        fixture.detectChanges();
+        expect(chipLabels(fixture)).toEqual([]);
+      }
+    });
+
+    it('stays hidden while a run is active, after a newer message, and after starting a new chat', () => {
+      const { fixture, component } = clarifying();
+
+      component.isLoading = true;
+      fixture.detectChanges();
+      expect(chipLabels(fixture)).toEqual([]);
+
+      component.isLoading = false;
+      component.messages = [...component.messages, { role: 'assistant', content: 'Run stopped. No result was produced.', kind: 'system_progress' }];
+      fixture.detectChanges();
+      expect(chipLabels(fixture).length).toBe(2);
+
+      component.messages = [...component.messages, { role: 'user', content: 'never mind', kind: 'normal' }];
+      fixture.detectChanges();
+      expect(chipLabels(fixture)).toEqual([]);
+
+      component.messages = component.messages.slice(0, 2);
+      fixture.detectChanges();
+      expect(chipLabels(fixture).length).toBe(2);
+      component.startNewChat();
+      fixture.detectChanges();
+      expect(chipLabels(fixture)).toEqual([]);
+    });
+  });
+
   it('sendMessage happy path updates status and appends assistant', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Search executed successfully.',

@@ -2498,6 +2498,14 @@
             ],
             "title": "Clarification Question"
           },
+          "clarification_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Clarification Options",
+            "description": "2-5 short, mutually distinct answer choices when task_mode is clarify and a bounded set of answers exists; empty otherwise."
+          },
           "operation": {
             "anyOf": [
               {

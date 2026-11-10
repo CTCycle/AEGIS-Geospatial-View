@@ -6,13 +6,13 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from server.common.identifiers import location_ref_matches, normalize_target_key, parse_coordinate_pair
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.decision import ResolvedLocation
+from server.domain.agent.decision import ResolvedLocation, normalize_clarification_options
 from server.domain.agent.tool_result import ModelObservation, ToolResult
 from server.domain.agent.vision_policy import VisionState
 
@@ -62,6 +62,13 @@ class CapabilityRoute(BaseModel):
         default_factory=lambda: list[str](), max_length=8
     )
     clarification_question: str | None = Field(default=None, max_length=500)
+    clarification_options: list[str] = Field(
+        default_factory=lambda: list[str](),
+        description=(
+            "2-5 short, mutually distinct answer choices when task_mode is "
+            "clarify and a bounded set of answers exists; empty otherwise."
+        ),
+    )
     # These are user-semantic constraints, not provider arguments.  Keeping
     # them on the validated route gives the native harness a deterministic
     # request contract without a separate interpretation stage.
@@ -90,6 +97,11 @@ class CapabilityRoute(BaseModel):
     )
 
     # -------------------------------------------------------------------------
+    @field_validator("clarification_options")
+    @classmethod
+    def _normalize_clarification_options(cls, value: list[str]) -> list[str]:
+        return normalize_clarification_options(value)
+
     @model_validator(mode="after")
     def _requirements_name_route_targets(self) -> "CapabilityRoute":
         known = {normalize_target_key(ref) for ref in self.target_refs}
@@ -799,6 +811,7 @@ class CapabilityRouteDecision(BaseModel):
         default_factory=lambda: list[str](), max_length=16
     )
     clarification_question: str | None = Field(default=None, max_length=500)
+    clarification_options: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class AgentPhase(StrEnum):
@@ -944,6 +957,8 @@ class AgentRunState(BaseModel):
     # A text answer held back only because the completion contract was open;
     # reused if evidence derivation alone then closes the contract.
     deferred_answer: str | None = None
+    # Answer choices offered with a clarification stop; empty when open-ended.
+    clarification_options: list[str] = Field(default_factory=lambda: list[str]())
     iteration_trace: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]]()
     )

@@ -1234,7 +1234,21 @@ def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> N
         )
 
     assert _stop([rejected]) == ("clarification_required", coverage)
+    assert state.clarification_options == []
     assert _stop([rejected, described]) is None
+
+    ambiguous = rejected.model_copy(
+        update={"data": {"options": ["Springfield, Illinois", "Springfield, Missouri"]}}
+    )
+    assert _stop([ambiguous]) == ("clarification_required", coverage)
+    assert state.clarification_options == ["Springfield, Illinois", "Springfield, Missouri"]
+    clarify_route = route.model_copy(
+        update={"task_mode": "clarify", "clarification_options": ["A", "B"]}
+    )
+    assert AgentLoop._evaluate_text_stop(  # pyright: ignore[reportPrivateUsage]
+        state, clarify_route, "Which?"
+    ) == ("clarification_required", "Which?")
+    assert state.clarification_options == ["A", "B"]
 
 ###############################################################################
 def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None:

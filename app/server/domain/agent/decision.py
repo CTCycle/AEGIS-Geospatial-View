@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.common.time import utc_now
 
@@ -10,6 +11,28 @@ from server.common.time import utc_now
 # Hierarchy source of the names a reverse geocode gave a coordinate location.
 REVERSE_GEOCODER_SOURCE = "reverse_geocoder"
 
+# A clarification offers 2-5 short answer choices, or none when open-ended.
+CLARIFICATION_MIN_OPTIONS = 2
+CLARIFICATION_MAX_OPTIONS = 5
+CLARIFICATION_OPTION_MAX_CHARS = 100
+
+###############################################################################
+def normalize_clarification_options(values: Iterable[object] | None) -> list[str]:
+    """Return distinct, trimmed answer choices, or none when fewer than two."""
+
+    options: list[str] = []
+    seen: set[str] = set()
+    for value in values or ():
+        label = " ".join(str(value).split())
+        key = label.casefold()
+        if not label or len(label) > CLARIFICATION_OPTION_MAX_CHARS or key in seen:
+            continue
+        seen.add(key)
+        options.append(label)
+    if len(options) < CLARIFICATION_MIN_OPTIONS:
+        return []
+    return options[:CLARIFICATION_MAX_OPTIONS]
+
 ###############################################################################
 class ClarificationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -17,6 +40,12 @@ class ClarificationRequest(BaseModel):
     question: str
     reason: str
     missing_fields: list[str] = Field(default_factory=lambda: list[str]())
+    options: list[str] = Field(default_factory=lambda: list[str]())
+
+    @field_validator("options")
+    @classmethod
+    def _normalize_options(cls, value: list[str]) -> list[str]:
+        return normalize_clarification_options(value)
 
 ###############################################################################
 class LocationResolutionProvenance(BaseModel):

@@ -12,6 +12,7 @@ from typing import Sequence
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import (
+    CLARIFICATION_MAX_OPTIONS,
     ClarificationRequest,
     LocationHierarchy,
     LocationHierarchyEntry,
@@ -384,6 +385,7 @@ class LocationResolver:
                 ),
                 reason="The name resolves to different places with and without the previous location.",
                 missing_fields=["location"],
+                options=[bare.label, with_parent.label],
             )
         return bare
 
@@ -952,6 +954,7 @@ class LocationResolver:
                     question=f"Which location do you mean: {', '.join(options)}?",
                     reason="The geocoder returned multiple same-level candidates with similar confidence.",
                     missing_fields=["location"],
+                    options=options if len(options) <= CLARIFICATION_MAX_OPTIONS else [],
                 )
         if not self._candidate_matches_target(
             geocoded,
@@ -2042,4 +2045,7 @@ class LocationResolver:
             question=f"Which location do you mean: {', '.join(options)}?",
             reason=reason,
             missing_fields=["location"],
+            # A partial candidate list would hide valid answers; offer the
+            # choices only when every one of them fits the widget.
+            options=options if len(options) <= CLARIFICATION_MAX_OPTIONS else [],
         )

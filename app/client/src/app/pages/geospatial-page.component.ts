@@ -8,6 +8,7 @@ import {
   CapabilityStatusTone,
 } from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
+import { ClarificationPopoverComponent } from '../components/clarification-popover.component';
 import { ConversationHistoryComponent } from '../components/conversation-history.component';
 import {
   MapPreviewComponent,
@@ -43,6 +44,7 @@ import {
   OverlayStateChange,
   SearchResponsePayload,
   ChatMessage,
+  PendingClarification,
   ChatRole,
   ChatTurnResponse,
   ContextUsage,
@@ -76,6 +78,7 @@ const RUN_CANCELLED_MESSAGE = 'Run stopped. No result was produced.';
     CommonModule,
     CapabilityStatusListComponent,
     ChatMessageComponent,
+    ClarificationPopoverComponent,
     ConversationHistoryComponent,
     MapPreviewComponent,
     ExecutionStatusComponent,
@@ -275,6 +278,36 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return this.messages;
     }
     return [...this.messages, { role: 'assistant' as ChatRole, content: this.assistantDraft }];
+  }
+
+  /**
+   * The pending clarification to offer as quick answers. It is derived, never
+   * stored: any new user message, completion, or reset hides it automatically.
+   */
+  get activeClarification(): (PendingClarification & { options: string[] }) | null {
+    const pending = this.conversationState?.pending_clarification;
+    const options = pending?.options ?? [];
+    if (!pending || pending.status !== 'active' || this.isLoading || options.length < 2 || options.length > 5) {
+      return null;
+    }
+    const last = [...this.messages].reverse().find((entry) => (entry.kind ?? 'normal') === 'normal');
+    if (last?.role !== 'assistant' || last.content.trim() !== pending.question.trim()) {
+      return null;
+    }
+    return { ...pending, options };
+  }
+
+  answerClarification(option: string): void {
+    if (this.activeClarification?.options.includes(option) !== true) {
+      return;
+    }
+    // The option is sent exactly as typed text would be; startAgentRun appends
+    // the user message synchronously, which hides the popover at once.
+    void this.startAgentRun(option, this.conversationNonce);
+  }
+
+  focusComposer(): void {
+    this.composerInputRef?.nativeElement.focus();
   }
 
   get activeAlertItems(): string[] {
@@ -2505,7 +2538,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.transcriptScrollTop = container.scrollTop;
   }
 
-  private queueTranscriptScroll(): void {
+  queueTranscriptScroll(): void {
     queueMicrotask(() => {
       if (!this.isDestroyed) {
         this.scrollTranscriptToBottom();

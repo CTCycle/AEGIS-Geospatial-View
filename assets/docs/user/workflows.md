@@ -1,6 +1,6 @@
 # Workflows
 
-Last updated: 2026-10-20
+Last updated: 2026-11-10
 
 ## Core Journeys
 
@@ -26,7 +26,9 @@ Last updated: 2026-10-20
 ### Clarification And Overlay Control
 
 1. If the request contains similarly likely locations, answer the clarification
-   with the intended candidate.
+   with the intended candidate. When the agent can offer a bounded set of answers,
+   they appear as 2-5 buttons above the chat input; click one to send it as your
+   reply, or type your own answer. Either dismisses the buttons.
 2. Ask to add a layer or focus to extend the current map session.
 3. Ask to remove, hide, clear, or stop showing a named overlay to remove the
    matching active layer while preserving the rest of the session.

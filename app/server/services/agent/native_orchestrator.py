@@ -319,6 +319,7 @@ class NativeAgentOrchestrator:
                 source_turn_index=recent_count + 1,
                 source_request_id=request_id,
                 source_text=payload.message,
+                options=native_response.clarification_options,
             )
         elif stored_clarification is not None:
             next_clarification = conversation_state.clarification_after_turn(

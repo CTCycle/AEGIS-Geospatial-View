@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-09-21
+Last updated: 2026-11-10
 
 ## Route-Level Pages
 
@@ -49,6 +49,12 @@ duplicating assistant or progress output.
 Clarification runs terminate with `clarification_needed`. The event may include a
 partial validated map update, allowing a basemap or layer correction before the
 user answers. Matching assistant/error messages are deduplicated.
+
+When the stored `pending_clarification` is `active` with 2-5 `options`, no run
+is active, and its question is the last normal transcript message, the page shows
+`clarification-popover.component` above the composer. Visibility is derived from
+that state, so a new user message, a completion, or a chat reset hides it. A
+clicked option starts a normal run with the option text as the user message.
 
 The agent is presented as continuously ready for the chat session. Per-run
 progress begins with request understanding and is separate from the persistent

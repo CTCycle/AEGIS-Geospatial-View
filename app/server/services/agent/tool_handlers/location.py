@@ -235,6 +235,7 @@ class LocationToolHandler:
                     "question": result.question,
                     "reason": result.reason,
                     "missing_fields": list(result.missing_fields),
+                    "options": list(result.options),
                 },
                 started=started,
             )

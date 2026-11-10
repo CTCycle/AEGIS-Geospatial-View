@@ -18,6 +18,7 @@ from server.domain.agent.capability_route import (
     names_data_subject,
     places_named_in,
 )
+from server.domain.agent.conversation import INFRASTRUCTURE_CLARIFICATION_OPTIONS
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.map_plan import is_mark_locations_operation
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -509,6 +510,7 @@ class CapabilityRouter:
                     "Which infrastructure category do you need: EV charging stations, "
                     "buildings, airports, roads/transit, or another specific category?"
                 ),
+                clarification_options=list(INFRASTRUCTURE_CLARIFICATION_OPTIONS),
             )
 
         # A new map cannot be prepared without a validated location.  Keep this
@@ -646,10 +648,14 @@ class CapabilityRouter:
                 rejected_capability_ids=rejected,
                 reason_codes=[*dict.fromkeys([*reasons, "model_requested_clarification"])],
                 clarification_question=proposed.clarification_question,
+                clarification_options=list(proposed.clarification_options),
             )
 
         if proposed.clarification_question is not None:
             reasons.append("clarification_question_not_allowed")
+        if proposed.clarification_options:
+            # Answer choices belong to a clarification only; drop them quietly.
+            proposed = proposed.model_copy(update={"clarification_options": []})
 
         catalog_discovery = proposed.operation == "discover_available_map_data"
         evidence_inspection_only = (

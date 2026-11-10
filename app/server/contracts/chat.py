@@ -180,6 +180,8 @@ class AgentTurnResponse(BaseModel):
     task_outcomes: list[ConversationTask] = Field(
         default_factory=lambda: list[ConversationTask](), max_length=32
     )
+    # Answer choices for a clarification operation; stored on the pending record.
+    clarification_options: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):

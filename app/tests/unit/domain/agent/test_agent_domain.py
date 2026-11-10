@@ -184,8 +184,32 @@ def test_infrastructure_option_matching_uses_word_boundaries() -> None:
         source_text="Show infrastructure in Rome",
     )
 
-    assert clarification.match_option("EV charging stations") == "ev_charging"
+    assert clarification.options == [
+        "EV charging stations",
+        "Buildings",
+        "Airports",
+        "Roads",
+        "Transit",
+    ]
+    assert clarification.match_option("charging points") == "EV charging stations"
     assert clarification.match_option("level crossings") is None
+
+###############################################################################
+def test_chosen_option_label_answers_despite_wording_heuristics() -> None:
+    clarification = PendingClarification.from_turn(
+        "Which one do you mean?",
+        source_turn_index=1,
+        options=["Show Springfield, Illinois", "Springfield, Missouri (MO)?"],
+    )
+    state = ConversationState.empty("conversation-5").model_copy(
+        update={"pending_clarification": clarification}
+    )
+
+    for label in clarification.options:
+        answered = state.clarification_after_turn(label.upper())
+        assert answered is not None
+        assert answered.status == "answered"
+        assert answered.selected_option == label
 
 # --- test_map_plan.py ---
 
