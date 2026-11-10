@@ -26,9 +26,9 @@
   <a href="assets/docs/project_index.md">Documentation</a>
 </p>
 
-<p align="center"><img src="assets/figures/workspace.png" alt="AEGIS Search workspace: chat on the left, MODIS land surface temperature and ESA WorldCover overlays on Italy" width="100%"></p>
+<p align="center"><img src="assets/figures/workspace.png" alt="AEGIS Search workspace: chat on the left, current weather for Turin on the map" width="100%"></p>
 
-AEGIS is a local, single-user geospatial workspace. You describe a place or a dataset in chat; an LLM agent picks tools from a catalog of public data sources, fetches the data, and returns an answer together with a map you can inspect. The screenshot above is a real session: two overlays requested in one sentence, with the agent's note that the first render hit a provider HTTP 502 and succeeded on retry.
+AEGIS is a local, single-user geospatial workspace. You describe a place or a dataset in chat; an LLM agent picks tools from a catalog of public data sources, fetches the data, and returns an answer together with a map you can inspect. The screenshot above is a real session: a current-weather request for Turin, answered with the model-based reading and its source and time window.
 
 **Status: 1.0.0, source release.** There is no installer or hosted service. AEGIS runs on Windows and needs an LLM (hosted or local) and internet access to the public data providers. The sections below say what has been validated and what has not.
 
@@ -40,21 +40,24 @@ Try:
 
 - `Show current satellite context for Rome, Italy.`
 - `Where in Europe did it rain most today?`
-- `Show MODIS Terra land surface temperature (day) and ESA WorldCover over Italy`
+- `Show the Colosseum in Rome`
+- `Show ESA WorldCover land cover over Rome, Italy`
 
-<p align="center"><img src="assets/figures/regional-ranking.png" alt="Ranked answer to a rainfall question with source, window and coverage caveats" width="100%"></p>
+<p align="center"><img src="assets/figures/landmark.png" alt="The Colosseum in Rome on an OpenStreetMap basemap with points of interest" width="100%"></p>
 
-Regional comparisons are ranked samples or grid bins, reported with source, time window and coverage. Weather grid values are model estimates, not station measurements, and the answer says so. When a request is ambiguous the agent asks, and offers clickable answers:
+Regional comparisons are ranked samples or grid bins, reported with source, time window and coverage. Weather grid values are model estimates, not station measurements, and the answer says so. When a request is ambiguous the agent asks and offers clickable answers; here "Springfield" was resolved to Illinois with one click:
 
-<p align="center"><img src="assets/figures/clarification.png" alt="Agent asking which infrastructure category is wanted, with clickable options" width="100%"></p>
+<p align="center"><img src="assets/figures/clarification.png" alt="Springfield, Illinois shown on the map after the user picked it from the clarification options" width="100%"></p>
+
+Overlays such as land cover, temperature and imagery layers can be added to the same map, with source attribution:
+
+<p align="center"><img src="assets/figures/overlay.png" alt="ESA WorldCover land-cover classes over Rome" width="100%"></p>
 
 With a vision-capable model you can also attach a photo and ask for location clues; treat the suggested place as a hypothesis.
 
 ## What to expect
 
-AEGIS is explicit about failure instead of inventing a result. When a source needs a credential you have not configured, it says so and draws no map:
-
-<p align="center"><img src="assets/figures/provider-limit.png" alt="Agent explaining that EV charging stations cannot be mapped because Open Charge Map needs an API key" width="100%"></p>
+AEGIS is explicit about failure instead of inventing a result. When a source needs a credential you have not configured (for example EV charging stations via Open Charge Map), it says so and draws no map.
 
 Known limits at 1.0.0:
 
