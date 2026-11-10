@@ -252,6 +252,42 @@ class CountryTagOperation(StrictToolInput):
 
     op: Literal["country_tag"]
 
+###############################################################################
+class AreaOperation(StrictToolInput):
+    op: Literal["area"]
+
+###############################################################################
+class BufferOperation(StrictToolInput):
+    op: Literal["buffer"]
+    distance_km: float = Field(gt=0, le=500)
+
+###############################################################################
+class SpatialJoinOperation(StrictToolInput):
+    """join_ref records within/intersecting/within distance_km of each target_ref record."""
+
+    op: Literal["spatial_join"]
+    target_ref: str = Field(min_length=1, max_length=200)
+    join_ref: str = Field(min_length=1, max_length=200)
+    predicate: Literal["within", "intersects", "within_distance"] = "within"
+    mode: Literal["count", "attach", "filter"] = "count"
+    distance_km: float | None = Field(default=None, gt=0, le=500)
+
+    # -------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _distance_for_within_distance(self) -> "SpatialJoinOperation":
+        if (self.predicate == "within_distance") != (self.distance_km is not None):
+            raise ValueError("distance_km is required with, and only with, predicate within_distance.")
+        return self
+
+###############################################################################
+class OverlayOperation(StrictToolInput):
+    """Polygon overlay; right_ref must hold polygons, never points."""
+
+    op: Literal["overlay"]
+    left_ref: str = Field(min_length=1, max_length=200)
+    right_ref: str = Field(min_length=1, max_length=200)
+    kind: Literal["intersection", "union", "difference", "clip"] = "intersection"
+
 
 EvidenceOperation = Annotated[
     AttributeFilterOperation
@@ -263,7 +299,11 @@ EvidenceOperation = Annotated[
     | AggregateOperation
     | GridAggregateOperation
     | DistanceFromOperation
-    | CountryTagOperation,
+    | CountryTagOperation
+    | AreaOperation
+    | BufferOperation
+    | SpatialJoinOperation
+    | OverlayOperation,
     Field(discriminator="op"),
 ]
 

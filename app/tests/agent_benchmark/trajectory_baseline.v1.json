@@ -24,7 +24,7 @@
     "europe_rainfall_rank": {
       "termination_reason": "awaiting_render",
       "model_calls": 4,
-      "total_estimated_input_tokens": 18480
+      "total_estimated_input_tokens": 19700
     },
     "follow_up_weather": {
       "termination_reason": "goal_satisfied",
@@ -39,7 +39,7 @@
     "inspect_loop_regression": {
       "termination_reason": "insufficient_evidence",
       "model_calls": 11,
-      "total_estimated_input_tokens": 68988
+      "total_estimated_input_tokens": 73432
     },
     "nested_arguments_regression": {
       "termination_reason": "goal_satisfied",
@@ -49,7 +49,7 @@
     "follow_up_prior_evidence_regression": {
       "termination_reason": "goal_satisfied",
       "model_calls": 3,
-      "total_estimated_input_tokens": 11082
+      "total_estimated_input_tokens": 11767
     }
   }
 }

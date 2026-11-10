@@ -39,6 +39,9 @@ from server.services.geospatial.api_service import (
     GeospatialSampleUnavailableError,
     GeospatialUnsupportedTileError,
 )
+from shapely.geometry import mapping
+
+from server.services.geospatial import geometry_ops
 from server.services.geospatial.land_mask import country_at
 from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
@@ -318,6 +321,15 @@ class EvidenceToolHandler:
             records.extend(parent_records)
         records, outside_scope = _within_requested_country(records, state)
         operations = [operation.model_dump(mode="python") for operation in request.operations]
+        ref_error = _pairwise_ref_error(operations, refs)
+        if ref_error is not None:
+            return _failure(
+                tool_name="transform_evidence",
+                code="invalid_transform",
+                message=ref_error,
+                recovery="correct_arguments",
+                started=started,
+            )
         for operation in operations:
             if operation.get("op") != "distance_from":
                 continue
@@ -351,13 +363,22 @@ class EvidenceToolHandler:
         status = "success" if transformed else "valid_empty"
         truncated_from = _count_cut_by_limit(records, operations)
         labelled = await self._label_places(transformed)
-        points = [point for item in transformed if (point := _record_point(item)) is not None]
-        bbox = [min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)] if points else None
+        shapes = [geometry for item in transformed if (geometry := geometry_ops.record_geometry(item)) is not None]
+        bounds = [geometry.bounds for geometry in shapes]
+        bbox = [min(b[0] for b in bounds), min(b[1] for b in bounds), max(b[2] for b in bounds), max(b[3] for b in bounds)] if bounds else None
         value_fields = sorted({key for item in transformed for key, value in _properties(item).items() if _numeric(value) is not None})
-        unlocated = sum(_record_point(item) is None for item in records)
+        unlocated = sum(geometry_ops.record_geometry(item) is None for item in records)
         capability_id, coverage = _inherited_assessment(parents)
-        provenance = {"operation_count": len(request.operations), "parents": parents,
+        provenance: dict[str, Any] = {"operation_count": len(request.operations), "parents": parents,
                       "coverage": coverage, "capability_id": capability_id}
+        geometry_kinds = [str(item["op"]) for item in operations if item.get("op") in _GEOMETRY_OPS]
+        if geometry_kinds:
+            # Derived areas, joins and overlays name the operations and the
+            # result's footprint so a point location is never read as an area.
+            provenance["geometry_ops"] = geometry_kinds
+            provenance["footprint_basis"] = (
+                "polygon" if any(geometry_ops.is_polygonal(item) for item in shapes) else "point"
+            )
         if len(parents) == 1:
             provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "units", "observation_time", "value_kind") if key in parents[0]})
         evidence = await create_evidence_async(
@@ -372,11 +393,11 @@ class EvidenceToolHandler:
                 "record_count": len(transformed),
                 "parent_count": len(refs),
                 "bbox": bbox,
-                "located_record_count": len(points),
+                "located_record_count": len(shapes),
                 "place_labelled_count": labelled,
                 "excluded_outside_scope_count": outside_scope,
                 "value_fields": value_fields,
-                "map_eligibility": "renderable" if points else "not_renderable",
+                "map_eligibility": "renderable" if shapes else "not_renderable",
             },
             provenance=provenance,
             parent_evidence_ids=refs,
@@ -390,7 +411,8 @@ class EvidenceToolHandler:
             summary=f"Created derived evidence with {len(transformed)} records.",
             data={"record_count": len(transformed), "parent_refs": refs,
                   "truncated_from": truncated_from,
-                  "preview": transformed[:5], "located_record_count": len(points),
+                  "preview": [_preview(item) for item in transformed[:5]],
+                  "located_record_count": len(shapes),
                   "unlocated_record_count": unlocated, "place_labelled_count": labelled,
                   "excluded_outside_scope_count": outside_scope,
                   "parent_coverage": [parent.get("coverage") for parent in parents]},
@@ -549,6 +571,61 @@ def _count_cut_by_limit(
 
 
 ###############################################################################
+_GEOMETRY_OPS = frozenset({"area", "buffer", "spatial_join", "overlay"})
+_PAIRWISE_REF_FIELDS = {"spatial_join": ("target_ref", "join_ref"), "overlay": ("left_ref", "right_ref")}
+
+
+###############################################################################
+def _pairwise_ref_error(operations: list[dict[str, Any]], refs: list[str]) -> str | None:
+    """Joins and overlays relate two distinct refs that are both being transformed."""
+
+    for operation in operations:
+        fields = _PAIRWISE_REF_FIELDS.get(str(operation.get("op") or ""))
+        if fields is None:
+            continue
+        first, second = (str(operation.get(field) or "") for field in fields)
+        if first == second or first not in refs or second not in refs:
+            return (
+                f"{operation['op']} needs {fields[0]} and {fields[1]} to be two different "
+                f"refs listed in evidence_refs ({', '.join(refs)})."
+            )
+    return None
+
+
+###############################################################################
+def _geometry_operation(
+    records: list[dict[str, Any]], operation: dict[str, Any]
+) -> list[dict[str, Any]]:
+    op = str(operation.get("op"))
+    if op == "area":
+        return [geometry_ops.with_area(item, _properties) for item in records]
+    if op == "buffer":
+        distance = float(operation["distance_km"])
+        shapes = [geometry_ops.record_geometry(item) for item in records]
+        geometry_ops.check_bounds(shapes)
+        buffered: list[dict[str, Any]] = []
+        for item, geometry in zip(records, shapes, strict=True):
+            if geometry is None:
+                continue
+            item["geometry"] = mapping(geometry_ops.buffer_km(geometry, distance))
+            item.setdefault("type", "Feature")
+            _properties(item)["buffer_km"] = distance
+            buffered.append(geometry_ops.with_area(item, _properties))
+        return buffered
+    first_field, second_field = _PAIRWISE_REF_FIELDS[op]
+    first = [item for item in records if _properties(item).get("source_ref") == operation[first_field]]
+    second = [item for item in records if _properties(item).get("source_ref") == operation[second_field]]
+    if op == "spatial_join":
+        return geometry_ops.spatial_join(
+            first, second, predicate=str(operation.get("predicate") or "within"),
+            mode=str(operation.get("mode") or "count"),
+            distance_km=operation.get("distance_km"), properties=_properties,
+        )
+    return geometry_ops.overlay(first, second, kind=str(operation.get("kind") or "intersection"),
+                                properties=_properties)
+
+
+###############################################################################
 def _apply_operations(
     records: list[dict[str, Any]], operations: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], str | None]:
@@ -563,6 +640,7 @@ def _apply_operations(
         "grid_aggregate",
         "distance_from",
         "country_tag",
+        *_GEOMETRY_OPS,
     }
     result = list(records)
     for operation in operations:
@@ -653,6 +731,11 @@ def _apply_operations(
             ]
         elif op == "grid_aggregate":
             result = _grid_aggregate(result, operation)
+        elif op in _GEOMETRY_OPS:
+            try:
+                result = _geometry_operation(result, operation)
+            except geometry_ops.GeometryOperationError as exc:
+                return result, str(exc)
         elif op == "spatial_filter":
             result, error = _spatial_filter(result, operation)
             if error is not None:
@@ -817,6 +900,16 @@ def _record_point(item: dict[str, Any], *, field: str = "geometry") -> tuple[flo
     if lon is None or lat is None or not (-180 <= lon <= 180 and -90 <= lat <= 90):
         return None
     return lon, lat
+
+
+###############################################################################
+def _preview(item: dict[str, Any]) -> dict[str, Any]:
+    """A preview record without polygon or line coordinates."""
+
+    geometry = item.get("geometry")
+    if is_json_object(geometry) and geometry.get("type") != "Point":
+        return {key: value for key, value in item.items() if key != "geometry"}
+    return item
 
 
 ###############################################################################

@@ -1,6 +1,6 @@
 # Agent Catalog Contract
 
-Last updated: 2026-11-05
+Last updated: 2026-11-11
 
 ## Stable native boundary
 
@@ -111,6 +111,21 @@ lat/lon spatial filtering, sum/count/mean/max/min aggregation, and grid bins
 with count, sum, mean, max, representative, centre and cell bounds. Derived
 payloads use `features`; summaries carry bbox, located count and value fields.
 Provenance chains retain provider, coverage, units, observation time and value
-kind. `add_evidence_layer.value_encoding` accepts graduated or heatmap plus a
+kind.
+
+Geometry operations (`services/geospatial/geometry_ops.py`, shapely + pyproj,
+WGS84) extend the same tool: `area` adds geodesic `area_km2`/`perimeter_km` to
+polygons; `buffer` replaces geometry with a true-distance buffer
+(`distance_km` ≤ 500, local azimuthal-equidistant projection); `spatial_join`
+relates `join_ref` records to each `target_ref` record (`within`, `intersects`,
+`within_distance` with `distance_km`) in `count` (`joined_count`), `attach`
+(`join_<field>` from the first match) or `filter` mode; `overlay`
+(`intersection`, `difference`, `clip`, `union`) needs polygons on `right_ref`
+and refuses point footprints, so a reported event point is never treated as an
+affected area. Pairwise refs must be two different entries of `evidence_refs`.
+Geometry work is capped at 5,000 records and 250,000 vertices. Derived evidence
+records `geometry_ops` and `footprint_basis` (`polygon` or `point`) in
+provenance; its bbox and map eligibility come from any located geometry, and
+the tool preview omits polygon coordinates. `add_evidence_layer.value_encoding` accepts graduated or heatmap plus a
 numeric field. The server computes the range and rejects invalid fields with
 correctable `invalid_value_field`.

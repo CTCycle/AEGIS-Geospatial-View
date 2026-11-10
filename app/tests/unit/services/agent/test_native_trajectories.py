@@ -710,6 +710,37 @@ async def test_transform_on_raster_imagery_fails_fast_and_ends_a_request_for_val
 
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_spatial_join_persists_traceable_polygon_evidence() -> None:
+    repo = MemoryEvidence()
+    ring = [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]
+    regions = repo.create(kind="vector", media_type="application/json", status="available",
+                          payload={"features": [{"type": "Feature", "properties": {"name": "zone"},
+                                                 "geometry": {"type": "Polygon", "coordinates": [ring]}}]},
+                          summary={}, provenance={"provider_id": "geoboundaries"})
+    quakes = repo.create(kind="vector", media_type="application/json", status="available",
+                         payload={"features": [{"latitude": 0.5, "longitude": 0.5, "magnitude": 3}]},
+                         summary={}, provenance={"provider_id": "usgs"})
+    value = state("World")
+    value.route.analysis = None
+    value.evidence_refs = [regions.evidence_id, quakes.evidence_id]
+    join = {"op": "spatial_join", "target_ref": regions.evidence_id, "join_ref": quakes.evidence_id}
+    result = await EvidenceToolHandler(repository=repo).transform(
+        TransformEvidenceInput(evidence_refs=value.evidence_refs, operations=[join, {"op": "area"}]), value)
+    assert result.status == "success" and result.data["preview"][0]["properties"]["joined_count"] == 1
+    assert "geometry" not in result.data["preview"][0]
+    derived = repo.records[result.evidence_refs[0]][0]
+    assert derived.provenance["geometry_ops"] == ["spatial_join", "area"]
+    assert derived.provenance["footprint_basis"] == "polygon"
+    assert derived.summary["map_eligibility"] == "renderable" and derived.summary["bbox"] == [0, 0, 1, 1]
+
+    same = {**join, "join_ref": regions.evidence_id}
+    rejected = await EvidenceToolHandler(repository=repo).transform(
+        TransformEvidenceInput(evidence_refs=value.evidence_refs, operations=[same]), value)
+    assert rejected.error is not None and rejected.error.code == "invalid_transform"
+
+
+###############################################################################
 def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -> None:
     from server.repositories.agent_runs import redact_trace_payload
     intent = {"kind": "rank", "metric": "rain", "order": "descending", "top_k": 5}
