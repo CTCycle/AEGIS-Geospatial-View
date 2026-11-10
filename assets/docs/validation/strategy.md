@@ -2,24 +2,23 @@
 
 Last updated: 2026-10-21
 
-The [2026-10-19 F-19 / T4-09 slice](../../QA/validation-20261019-f19-t4-09/report.md) passes `T4-09` (exact OpenCode Go lane) and closes F-19; `T4-10` to `T4-13`, `T5-11` and `T5-13` stay `UNRUN`.
+The 2026-10-19 F-19 / T4-09 slice passes `T4-09` (exact OpenCode Go lane) and closes F-19; `T4-10` to `T4-13`, `T5-11` and `T5-13` stay `UNRUN`.
 
-The [2026-10-19 Tier 5 accessibility and performance slice](../../QA/validation-20261019-tier5-perf-a11y/report.md) authors the missing contracts and passes `T5-10` (axe-core over nine views at desktop width plus keyboard focus; nine accessibility defects fixed) and `T5-09` (API p95 under 30 ms, 368 kB initial transfer, Rome and Naples renders). `T5-11` and `T5-13` stay `UNRUN`; Tier 4B is unchanged.
+The 2026-10-19 Tier 5 accessibility and performance slice authors the missing contracts and passes `T5-10` (axe-core over nine views at desktop width plus keyboard focus; nine accessibility defects fixed) and `T5-09` (API p95 under 30 ms, 368 kB initial transfer, Rome and Naples renders). `T5-11` and `T5-13` stay `UNRUN`; Tier 4B is unchanged.
 
-The [2026-10-19 Tier 5 recovery slice](../../QA/validation-20261019-tier5-recovery/report.md) passes `T5-04` outages, `T5-05` restart recovery and `T5-06` repetition (reconstructed mapping, LOW confidence), and confirms F-13 live. Its `T5-07` checks covered stream and job adapters that have since been retired; current chat and run contracts are documented in [backend_api.md](../architecture/backend_api.md). `T5-09`, `T5-10`, `T5-11` and `T5-13` remain `UNRUN`.
+The 2026-10-19 Tier 5 recovery slice passes `T5-04` outages, `T5-05` restart recovery and `T5-06` repetition (reconstructed mapping, LOW confidence), and confirms F-13 live. Its `T5-07` checks covered stream and job adapters that have since been retired; current chat and run contracts are documented in [backend_api.md](../architecture/backend_api.md). `T5-09`, `T5-10`, `T5-11` and `T5-13` remain `UNRUN`.
 
-The [2026-10-19 leftover and Tier 5 slice](../../QA/validation-20261019-leftovers-tier5/report.md) opens Tier 5 under a reconstructed ID-to-theme mapping (LOW confidence; `T5-13` unresolved): `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` pass, and `T5-12` passes on hosted CI run 39212579230. It also fixes Census timeouts, the imagery temporal-scope failure, F-13 point-scope routing, F-25, failed-materialization rollback and an over-long-message 404 defect.
+The 2026-10-19 leftover and Tier 5 slice opens Tier 5 under a reconstructed ID-to-theme mapping (LOW confidence; `T5-13` unresolved): `T5-01`, `T5-02`, `T5-03`, `T5-07`, `T5-08` pass, and `T5-12` passes on hosted CI run 39212579230. It also fixes Census timeouts, the imagery temporal-scope failure, F-13 point-scope routing, F-25, failed-materialization rollback and an over-long-message 404 defect.
 
-The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and advances `T4-04` to `PASS` for configured live GTFS static/realtime validation. Location-only spatial completion and the realtime-validator contract were repaired; 1,088 backend unit tests, changed-file Ruff, and full strict Pyright pass. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT was not yet run. Later reports supersede the EEA and vision statuses; Census, elevation, imagery, and narration limitations remain.
+The 2026-10-17 follow-up passes `T3-16` basemap rendering/preferences and advances `T4-04` to `PASS` for configured live GTFS static/realtime validation. Location-only spatial completion and the realtime-validator contract were repaired; 1,088 backend unit tests, changed-file Ruff, and full strict Pyright pass. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT was not yet run. Later reports supersede the EEA and vision statuses; Census, elevation, imagery, and narration limitations remain.
 
-The [T3-17 continuation](../../QA/tier3-validation-20261017-t3-17/report.md) is superseded by the [2026-10-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md), which passes mixed GIBS/Open-Meteo/GBIF composition, opacity, ordering, selective removal, and retention.
+The T3-17 continuation is superseded by the 2026-10-17 ordering follow-up, which passes mixed GIBS/Open-Meteo/GBIF composition, opacity, ordering, selective removal, and retention.
 
 This document is the durable digest of the AEGIS comprehensive validation
 roadmap, first established on `loop-dev` and continued on `develop`. It defines
 the campaign order, evidence boundary, status vocabulary, and hand-off points
-that future validation agents should use. The dated
-scenario results live under [`../../QA/`](../../QA/); this document does not
-replace those reports.
+that future validation agents should use. Scenario-level results from the dated runs are consolidated here and in
+`gate_status.md`; the raw run folders were removed at the 1.0.0 release.
 
 ## Purpose and authority
 
@@ -31,7 +30,7 @@ Source authority is divided deliberately:
 
 - `assets/docs/project_status_ledger.md` is the current operational conclusion.
 - `assets/docs/validation/gate_status.md` is the compact gate matrix.
-- The dated `assets/QA/<campaign>/` package is the scenario-level evidence.
+- A run's scenario-level evidence is summarized in the ledger entry and gate row it supports; raw run output (reports, screenshots, logs) is local scratch under `assets/QA/` and is not versioned.
 - Architecture and contract documents describe intended behavior; they do not
   promote an implementation or a provider response to validated behavior.
 
@@ -76,12 +75,12 @@ trusting downstream feature evidence.
 
 | Campaign tier | Slice IDs | Focus | Current hand-off |
 | --- | --- | --- | --- |
-| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The [2026-09-22 Tier 0 reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md) passed all five on its tested boundary. The [2026-09-25 T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` is `PASS`; its unavailable historical timing comparator is explicitly non-gating. |
-| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md), [2026-09-23 T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md), [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md), [2026-09-22 T1-02 continuation](../../QA/tier1-validation-develop-20260922/T1-02/report.md), and [2026-09-21 baseline](../../QA/tier1-application-foundations-20260921/report.md). Tier 1 remains 12/12 `PASS`. |
-| Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The [2026-09-24 continuation](../../QA/tier2-validation-develop-20260924-head77c5d67/report.md) passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The [2026-09-25 continuation](../../QA/tier2-validation-develop-20260925-next-slices/report.md) passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the [T0/T2 follow-up](../../QA/tier0-tier2-validation-develop-20260925-t0-t2-followup/report.md) passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
-| Tier 3 | `T3-01` to `T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Current count: 18 `PASS`. `T3-07` is `PASS` again: ESA renders and FEMA renders after a bounded retry of transient official-relay 500s ([retry follow-up](../../QA/validation-20261018-fema-retry/report.md)). `T3-15` is `PASS`: EEA END-2022 renders in Milan through the same-origin proxy with attribution, spatial-scope evidence, accepted `map.render_ack`, a passing EU coverage guardrail, EEA-plus-GBIF add/remove and a complete zero-direct-request lifecycle capture. `T3-18` is `PASS` per the 2026-10-18 campaign. See [current raster/EEA evidence](../../QA/validation-20261018-eea-end2022/report.md), [T3-07 history](../../QA/tier3-validation-develop-20261001-t3-07-final/report.md), [2026-10-18 campaign](../../QA/tool-e2e-validation-20261018/report.md), and [T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md). Keep provider retrieval, routing, renderer loading, browser requests, and acknowledgement as distinct evidence boundaries. |
-| Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05/T4-07 PARTIAL; T4-06 BLOCKED. [2026-10-17 continuation](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes configured live GTFS and corrects the heavy-format implementation boundary. |
-| Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | `T4-09` PASS on 2026-10-19 ([report](../../QA/validation-20261019-f19-t4-09/report.md)); `T4-10`-`T4-13` UNRUN. Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
+| Tier 0 | `T0-01`–`T0-05` | Static quality, current migration, legacy settings migration, Windows startup, and API composition. | The 2026-09-22 Tier 0 reconciliation passed all five on its tested boundary. The 2026-09-25 T0/T2 follow-up revalidated the exact-head Windows launcher boundary: fresh/warm readiness, outage startup, ownership/PID-reuse safety, injected cleanup, canonical-state protection, and final port cleanup pass. `T0-04` is `PASS`; its unavailable historical timing comparator is explicitly non-gating. |
+| Tier 1 | `T1-01`–`T1-12` | Application foundations: routing, tab-local state, conversations, realtime, run lifecycle, HTTP chat, jobs, runtime Settings, credential lifecycle, model selection, and context presentation. | [Tier 1 checklist](tier1_application_foundations.md), T1-10 continuation, 2026-09-23 T1-06 continuation, T1-03 continuation, 2026-09-22 T1-02 continuation, and 2026-09-21 baseline. Tier 1 remains 12/12 `PASS`. |
+| Tier 2 | `T2-01` through `T2-07` | Plain and ambiguous location flows, multi-turn replacement, landmarks, capability discovery, direct tools, history, and evidence inspection. | The 2026-09-24 continuation passes `T2-01`/`T2-02` on the exact OpenCode Go lane; `T2-03` remains `PASS`. The 2026-09-25 continuation passes the tested `T2-05`/`T2-06`/`T2-07` scenarios, and the T0/T2 follow-up passes `T2-04` with five pages, 50 unique candidates, and `next_cursor=null` under an approved isolated six-call budget restored to four afterward. `ISSUE-001` is resolved. |
+| Tier 3 | `T3-01` to `T3-18` | Basemaps, vector/raster families, valid-empty behavior, public providers, overlay mutation, composition, and map inspection controls. | Current count: 18 `PASS`. `T3-07` is `PASS` again: ESA renders and FEMA renders after a bounded retry of transient official-relay 500s (retry follow-up). `T3-15` is `PASS`: EEA END-2022 renders in Milan through the same-origin proxy with attribution, spatial-scope evidence, accepted `map.render_ack`, a passing EU coverage guardrail, EEA-plus-GBIF add/remove and a complete zero-direct-request lifecycle capture. `T3-18` is `PASS` per the 2026-10-18 campaign. See current raster/EEA evidence, T3-07 history, 2026-10-18 campaign, and T3-17 ordering follow-up. Keep provider retrieval, routing, renderer loading, browser requests, and acknowledgement as distinct evidence boundaries. |
+| Tier 4A | `T4-01`–`T4-08` | Ingestion, heavy formats, mobility, configured sources, credentials and descriptors. | T4-01/T4-02/T4-04/T4-08 PASS; T4-03/T4-05/T4-07 PARTIAL; T4-06 BLOCKED. 2026-10-17 continuation passes configured live GTFS and corrects the heavy-format implementation boundary. |
+| Tier 4B | `T4-09`–`T4-13` | Exact OpenCode Go, OpenAI, Google, DeepSeek/OpenCode Zen, and Ollama parity. | `T4-09` PASS on 2026-10-19 (report); `T4-10`-`T4-13` UNRUN. Never substitute a provider or model; record unavailable lanes as blocked or unrun. |
 | Tier 5 | `T5-01`–`T5-13` | Acknowledgement identity, failed-render recovery, races, outages, restart recovery, repetition, malformed input, cancellation, performance, accessibility, provider reconciliation, and hosted CI. | Opened 2026-10-19 with a reconstructed mapping (see the [Tier 5 ledger](gate_status.md#current-tier-5-slice-ledger)): `T5-01` to `T5-10` and `T5-12` `PASS`; `T5-11` and `T5-13` are `UNRUN` (Tier 4B lanes and the unresolved 13th theme). `T5-09`/`T5-10` use contracts authored on 2026-10-19. |
 
 The current roll-up is 58 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 6 `UNRUN`. This reconciliation counts `T3-07` and `T3-15` as `PASS` after the 2026-10-18 FEMA relay retry and EEA lifecycle follow-ups, the `T3-17`/`T3-18` passes, and the eleven reconstructed Tier 5 passes of 2026-10-19 (the intermediate 44/5/1/18 figure recorded earlier is superseded). Tier 4A is 4 PASS, 3 PARTIAL (`T4-03`, `T4-05`, `T4-07`), and 1 BLOCKED (`T4-06`); Tier 4B has one PASS (`T4-09`) and four UNRUN, and Tier 5 has two UNRUN gates.
@@ -98,7 +97,7 @@ The 68 campaign slices are counted exactly once as follows:
 | `UNRUN` | `T4-10` to `T4-13`, `T5-11`, `T5-13` | 6 |
 
 `T4-01`/`T4-02`/`T4-08` are `PASS` for the deterministic isolated fixture and
-descriptor boundaries recorded in the [2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md).
+descriptor boundaries recorded in the 2026-10-01 T4A slice.
 `T4-04` is now PASS for configured live feeds; `T4-03`/`T4-05` remain PARTIAL
 (heavy normalizers are not implemented beyond raw preservation, optional packages
 are absent, and approved configured datasets are missing),
@@ -107,7 +106,7 @@ are absent, and approved configured datasets are missing),
 scenarios pass. These classifications do not claim browser transit rendering, cross-agency
 schedule matching, complete agent routing, or credentialed-provider behavior.
 
-`T3-15` is now `PARTIAL` after the 2026-10-18 END-2022 EEA re-point and exact-lane browser validation; direct browser request-count evidence is still missing. `T3-10` to `T3-14` are `PASS` per the [T3-10](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-10/report.md), [T3-11](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-11/report.md), [T3-12](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-12/report.md), [T3-13](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-13/report.md), and [T3-14](../../QA/tier3-validation-develop-20261001-t3-10-t3-14/T3-14/report.md) slices. Their individual acceptance criteria were never preserved in the repository or its history (verified against campaign creation commit `9c2da7a4` and QA consolidation `f3b819f2`); reconstructed criteria remain in the Tier 3 checklist.
+`T3-15` is now `PARTIAL` after the 2026-10-18 END-2022 EEA re-point and exact-lane browser validation; direct browser request-count evidence is still missing. `T3-10` to `T3-14` are `PASS` per the T3-10, T3-11, T3-12, T3-13, and T3-14 slices. Their individual acceptance criteria were never preserved in the repository or its history (verified against campaign creation commit `9c2da7a4` and QA consolidation `f3b819f2`); reconstructed criteria remain in the Tier 3 checklist.
 
 The 2026-09-30 T3-07/T3-09 implementation follow-up centralizes public
 raster browser transport at the manifest-backed AEGIS tile proxy, including
@@ -131,14 +130,14 @@ and generic-infrastructure clarification pass, and the weather-forecast row
 passes at an adequate runtime budget (the default simple budget is a configuration
 value); census demographics / numeric elevation / imagery extent
 remain `PARTIAL`; in that 2026-10-01 check EEA was proxied but the then-configured 2019 WMS was retired. The 2026-10-18 END-2022 follow-up supersedes that EEA status. See the
-[route-matrix report](../../QA/tier3-validation-develop-20261001-route-matrix/report.md).
+route-matrix report.
 The subsequent current-head contract follow-up at
 `develop@889066b3` closes a repository defect where `tile`, `xyz`, `wms`, and
 `wmts` raster candidates bypassed the visibility-proof requirement; the
 2026-10-01 raster remediation additionally validates the acknowledged raster
 semantics for FEMA and ESA. A bounded CSV/GeoJSON
 ingestion fixture run was recorded as supporting evidence only until the
-[2026-10-01 T4A slice](../../QA/tier4a-dataset-ingestion-20261001/report.md)
+2026-10-01 T4A slice
 established the grouped Tier 4A ID-to-scenario mapping and opened `T4-01`–`T4-08`;
 the durable production rollback/cleanup boundary remains an open validated
 limitation (see the slice report).
@@ -190,23 +189,21 @@ explicitly reclassified.
 
 The first opened campaign slice is the T0-01 static-quality baseline at exact
 `loop-dev` HEAD `5bb8d416da80e33a7e85b02538f605ee22aee0a5`. Its detailed
-evidence is in
-[`../../QA/t0-01-static-quality-20260922/report.md`](../../QA/t0-01-static-quality-20260922/report.md).
+evidence is summarized in the Tier 0 gate rows of `gate_status.md`.
 The Tier 1 application-foundations baseline remains recorded at
-`loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its machine-readable
-ledger and detailed evidence are in
-[`../../QA/tier1-application-foundations-20260921/`](../../QA/tier1-application-foundations-20260921/).
+`loop-dev` SHA `c615c5799e1d5fb01e0af0eccaab5c6490d554c0`; its results are summarized in
+`tier1_application_foundations.md`.
 The historical pointer below records the campaign's original opening counts (30 `PASS`, 0 `PARTIAL`, 0 `BLOCKED`, 38 `UNRUN`); they do not override the current ledger. The current roll-up is 57 `PASS`, 3 `PARTIAL`, 1 `BLOCKED`, and 7 `UNRUN`, across dated evidence boundaries that do not certify one common commit. Tier 0 is `PASS` for its functional Windows startup scope;
 Tier 1 remains 12/12 `PASS`; the current Tier 2 ledger has seven `PASS` slices.
 Preserve historical source boundaries in the linked T1 reports.
 
 ## Current Tier 0 execution record
-The 2026-09-23 [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md)
+The 2026-09-23 T1-09 continuation
 passes Settings URL authority, all seven rendered sections, invalid-tab fallback,
 draft retention, controlled save, and return/reopen. Its implementation commit
 `c090abd1ca9d6d78e82e798da9167b9d19b3fc23` passed four jobs in [hosted CI run
 35873578752](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35873578752).
-The 2026-09-23 [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md)
+The 2026-09-23 T1-10 continuation
 passes credential lifecycle and Settings checks; Tier 1 remains 12/12 `PASS`, and
 its implementation head passed four jobs in [hosted CI run
 35891289442](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/runs/35891289442).
@@ -231,10 +228,10 @@ the final validation and was verified restored to the documented provider
 lane. The validated source was committed and pushed as
 `afa608c8d5c53a34d0ce8da36e5fe5f47f689145`. The detailed reports are:
 
-- [T0-03 legacy Settings migration](../../QA/tier0-validation-develop-20260922/T0-03/report.md)
-- [T0-04 Windows startup](../../QA/tier0-validation-develop-20260922/T0-04/report.md)
-- [T0-05 API composition](../../QA/tier0-validation-develop-20260922/T0-05/report.md)
-- [final exact-head regression and reconciliation](../../QA/tier0-validation-develop-20260922/final/report.md)
+- T0-03 legacy Settings migration
+- T0-04 Windows startup
+- T0-05 API composition
+- final exact-head regression and reconciliation
 
 The exact execution order was `T0-03 -> T0-04 -> T0-05 -> final T0-01/T0-02
 regression sweep -> ledger reconciliation`. Local PASS does not promote the

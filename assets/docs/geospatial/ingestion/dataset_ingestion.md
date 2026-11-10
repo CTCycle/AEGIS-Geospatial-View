@@ -68,4 +68,4 @@ The current executor normalizes only CSV and GeoJSON. Other formats preserve
 the raw source and emit partial-health warnings regardless of installed
 packages. Successful heavy-format ingestion requires implementation of the
 optional adapters as well as the extra; installation alone does not close
-T4-03. See the [2026-10-17 follow-up](../../../QA/tier3-validation-validation-20261017-t3-16/report.md).
+T4-03. See the 2026-10-17 follow-up.

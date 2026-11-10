@@ -2,9 +2,9 @@
 
 Last updated: 2026-10-22
 
-The [2026-10-17 follow-up](../../QA/tier3-validation-validation-20261017-t3-16/report.md) passes `T3-16` basemap rendering/preferences and `T4-04` configured live GTFS. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT had not yet run. Later EEA and vision follow-ups supersede those statuses; Census, elevation, imagery, and narration limitations remain.
+The 2026-10-17 follow-up passes `T3-16` basemap rendering/preferences and `T4-04` configured live GTFS. At that time Census timed out, elevation was disabled, imagery temporal completion failed, EEA returned upstream 404, and VISION-INSPECT had not yet run. Later EEA and vision follow-ups supersede those statuses; Census, elevation, imagery, and narration limitations remain.
 
-The [2026-10-17 T3-17 ordering follow-up](../../QA/tier3-validation-20261017-t3-17-reorder/report.md) closes `T3-17` as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready render acknowledgements, keyboard ordering, independent opacity, selective removal, and retention across map updates. `T3-18` subsequently passed on 2026-10-18.
+The 2026-10-17 T3-17 ordering follow-up closes `T3-17` as `PASS`: exact-lane three-layer Open-Meteo/GIBS/GBIF composition, ready render acknowledgements, keyboard ordering, independent opacity, selective removal, and retention across map updates. `T3-18` subsequently passed on 2026-10-18.
 
 Tier 3 is the rendering and geospatial feature-family gate. It must establish
 browser-authoritative evidence that basemaps, vector/raster families,
@@ -122,7 +122,7 @@ All Tier 3 slices share the standing campaign rules:
   `app/client/src/app/components/map-preview.component.ts`.
 - **Historical documentation/QA evidence:** `project_status_ledger.md`
   `maps.vector-overlays` ("earthquakes … remain additional selected paths");
-  `assets/QA/aegis-maps-geospatial-validation-20260918.md`; `T3-02` report.
+  the `T3-02` report (since consolidated).
 - **Reconstruction confidence:** MEDIUM.
 
 ### T3-11 — NOAA coastal stations and radar (remaining NOAA family)
@@ -265,12 +265,12 @@ All Tier 3 slices share the standing campaign rules:
   frame itself was not separately captured. Attribution and the END-2022/service-2025 note were visible.
   The Chicago request was rejected by the EU coverage guardrail while retaining
   the last-known-good map. EEA-plus-GBIF add/remove passed.
-- **Request-capture closure:** The [raster follow-up](../../QA/validation-20261018-raster-followup/report.md) observes fresh contexts from before navigation with HTTP cache disabled and service workers blocked. The complete four-turn lifecycle records 41 EEA proxy requests, zero direct EEA requests and zero dropped events; counters remain independent of bounded event storage. Milan, Chicago rejection with unchanged committed map, GBIF addition and EEA removal all pass. Acknowledgement acceptance is evidenced by persisted ready observations and completed runs; websocket frames were not separately captured.
+- **Request-capture closure:** The raster follow-up observes fresh contexts from before navigation with HTTP cache disabled and service workers blocked. The complete four-turn lifecycle records 41 EEA proxy requests, zero direct EEA requests and zero dropped events; counters remain independent of bounded event storage. Milan, Chicago rejection with unchanged committed map, GBIF addition and EEA removal all pass. Acknowledgement acceptance is evidenced by persisted ready observations and completed runs; websocket frames were not separately captured.
 - **Source limitation:** The EEA catalogue record restricts this dataset to
   research/non-profit use and excludes nationally restricted contours; this
   technical validation grants no commercial-use clearance.
-- **Evidence:** [2026-10-18 EEA report](../../QA/validation-20261018-eea-end2022/report.md)
-  and [browser evidence](../../QA/validation-20261018-eea-end2022/browser-evidence.md).
+- **Evidence:** 2026-10-18 EEA report
+  and browser evidence.
 - **Depends on:** `T3-07` (proxy/render pattern), `T3-08`.
 - **Depended on by:** `T3-17` (raster composition partner).
 - **Source files:** `app/server/services/geospatial/providers/eea.py`,
@@ -410,4 +410,4 @@ All Tier 3 slices share the standing campaign rules:
 
 ## Next actionable slice
 
-`T3-07`, `T3-15` and `T3-17`/`T3-18` are `PASS` (see the [2026-10-19 slice](../../QA/validation-20261019-leftovers-tier5/report.md) for the latest route/Census/imagery evidence). F-19 closed on 2026-10-19 ([report](../../QA/validation-20261019-f19-t4-09/report.md)). F-26 (dates parsed as coordinates) fixed and unit-verified. Continue with Overpass reliability, the remaining Tier 5 gates (fixtures and authored performance/accessibility contracts first), and Tier 4B once approved credentials or a local Ollama exist; preserve the exact provider/model lane and browser acknowledgement boundary.
+`T3-07`, `T3-15` and `T3-17`/`T3-18` are `PASS` (see the 2026-10-19 slice for the latest route/Census/imagery evidence). F-19 closed on 2026-10-19 (report). F-26 (dates parsed as coordinates) fixed and unit-verified. Continue with Overpass reliability, the remaining Tier 5 gates (fixtures and authored performance/accessibility contracts first), and Tier 4B once approved credentials or a local Ollama exist; preserve the exact provider/model lane and browser acknowledgement boundary.

@@ -507,7 +507,7 @@ class MapPlanService:
             if item.evidence_ref not in layer_refs or not capability_id:
                 continue
             query = item.summary.get("query")
-            place = query if isinstance(query, dict) else {}
+            place: dict[str, Any] = cast("dict[str, Any]", query) if isinstance(query, dict) else {}
             layers.append({
                 "evidence_ref": item.evidence_ref,
                 "capability_id": capability_id,

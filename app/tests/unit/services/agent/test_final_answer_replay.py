@@ -1,8 +1,7 @@
 """Replay recorded live runs through the real final-answer gate and fallbacks.
 
-The corpus (``fixtures/agent/final_answer_replay.json``) is exported by
-``assets/QA/agent-loop/agent-loop-reliability-20261105/extract_final_answer_corpus.py``:
-each case is a run's restored checkpoint, an answer and its human verdict.
+The corpus (``fixtures/agent/final_answer_replay.json``) is a snapshot of recorded
+live runs from the 2026-11-05 reliability suite: each case is a run's restored checkpoint, an answer and its human verdict.
 """
 
 from __future__ import annotations

@@ -19,8 +19,8 @@ The same script runs on the baseline and the optimized commit; it adapts to the
 renamed repository method.
 
 Usage (repository root):
-    app/server/.venv/Scripts/python.exe assets/QA/maintenance/memory-20261109/memory_benchmark.py \
-        --output assets/QA/maintenance/memory-20261109/<label>.json
+    app/server/.venv/Scripts/python.exe scripts/benchmarks/memory_benchmark.py \
+        --output assets/QA/<folder>/<label>.json
 """
 
 from __future__ import annotations

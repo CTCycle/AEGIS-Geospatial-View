@@ -26,23 +26,43 @@
   <a href="assets/docs/project_index.md">Documentation</a>
 </p>
 
-<p align="center"><img src="assets/figures/workspace.png" alt="AEGIS Search workspace with chat beside the map canvas" width="100%"></p>
+<p align="center"><img src="assets/figures/workspace.png" alt="AEGIS Search workspace: chat on the left, MODIS land surface temperature and ESA WorldCover overlays on Italy" width="100%"></p>
 
-AEGIS is a local geospatial workspace. Ask about a place or an area in chat, then inspect the returned map session and its overlays alongside the conversation.
+AEGIS is a local, single-user geospatial workspace. You describe a place or a dataset in chat; an LLM agent picks tools from a catalog of public data sources, fetches the data, and returns an answer together with a map you can inspect. The screenshot above is a real session: two overlays requested in one sentence, with the agent's note that the first render hit a provider HTTP 502 and succeeded on retry.
 
-The map canvas starts empty and fills when a request returns a map session.
+**Status: 1.0.0, source release.** There is no installer or hosted service. AEGIS runs on Windows and needs an LLM (hosted or local) and internet access to the public data providers. The sections below say what has been validated and what has not.
 
 ## Search
 
-Ask for a location, coordinates, or a regional comparison. Follow-up messages can refine the request, zoom the map, or add, hide, and remove overlays in the current conversation.
+Ask for a location, coordinates, a regional comparison or a data layer. Follow-ups can refine the request, zoom the map, or add, hide, and remove overlays in the current conversation.
 
 Try:
 
 - `Show current satellite context for Rome, Italy.`
 - `Where in Europe did it rain most today?`
-- `Give me the coordinates of Rome, Italy.`
+- `Show MODIS Terra land surface temperature (day) and ESA WorldCover over Italy`
 
-Regional comparisons use ranked samples or grid bins and report source and coverage context. Weather grid values are model estimates, not station measurements. With a vision-capable model, you can also attach a photo and ask for location clues; treat the suggested place as a hypothesis.
+<p align="center"><img src="assets/figures/regional-ranking.png" alt="Ranked answer to a rainfall question with source, window and coverage caveats" width="100%"></p>
+
+Regional comparisons are ranked samples or grid bins, reported with source, time window and coverage. Weather grid values are model estimates, not station measurements, and the answer says so. When a request is ambiguous the agent asks, and offers clickable answers:
+
+<p align="center"><img src="assets/figures/clarification.png" alt="Agent asking which infrastructure category is wanted, with clickable options" width="100%"></p>
+
+With a vision-capable model you can also attach a photo and ask for location clues; treat the suggested place as a hypothesis.
+
+## What to expect
+
+AEGIS is explicit about failure instead of inventing a result. When a source needs a credential you have not configured, it says so and draws no map:
+
+<p align="center"><img src="assets/figures/provider-limit.png" alt="Agent explaining that EV charging stations cannot be mapped because Open Charge Map needs an API key" width="100%"></p>
+
+Known limits at 1.0.0:
+
+- **Models.** The agent loop is validated live on OpenCode Go (`deepseek-v4.1-flash`) and, less thoroughly, on `beam-free`. OpenAI and Ollama paths are implemented but have not been validated end to end. The model must support native tool calling and structured output; weaker models fail more often.
+- **Reliability.** Results depend on public providers that rate-limit, time out, or return errors (Overpass, FEMA relay and some raster tiles are the least reliable). Agent runs are not deterministic: the same prompt can succeed on one attempt and need a retry or a rephrase on another.
+- **Coverage.** Some catalog entries need credentials (Open Charge Map, OpenAQ, TomTom, NASA FIRMS and others). Antimeridian handling is provider-dependent, and multi-layer comparisons are only made when units and time windows are verifiably comparable.
+- **Platform.** Windows only; no Docker, Linux or macOS launcher. Narrow viewports below about 1024 px are not a supported layout.
+- **Tests.** Not a clean suite: at release, two environment-dependent backend tests (launcher/cache-root checks) and one frontend browser-smoke test (layer reorder) fail; Ruff, strict Pyright and the production build pass. The full validation record is in [project status ledger](assets/docs/project_status_ledger.md).
 
 ## Geodata
 
@@ -60,7 +80,7 @@ AEGIS currently runs on Windows. Use PowerShell 7 or later and a desktop browser
 .\start_on_windows.bat
 ```
 
-On first use, the launcher prepares portable Python, `uv`, and Node.js runtimes, synchronizes dependencies, and builds the frontend when needed. It opens the app after the backend is ready. Keep the launcher open while using AEGIS; press **Ctrl+C** to stop it. Run pwsh .\setup_and_maintenance.ps1 to open the setup and maintenance menu.
+On first use, the launcher prepares portable Python, `uv`, and Node.js runtimes, synchronizes dependencies, and builds the frontend when needed. It opens the app after the backend is ready. Keep the launcher open while using AEGIS; press **Ctrl+C** to stop it. Run `pwsh .\setup_and_maintenance.ps1` to open the setup and maintenance menu.
 
 Before sending a chat request, select an agent model in **Settings → Models**. The model must support native tool calling and structured output. Install an Ollama model for local use, or configure credentials under **Settings → Model Providers** for a hosted model.
 
@@ -86,4 +106,4 @@ For manual startup and test commands, see [Runtime startup](assets/docs/runtime/
 
 AEGIS Geospatial View is licensed under the [MIT License](LICENSE).
 
-<p align="center"><sub>Last updated: 2026-10-28</sub></p>
+<p align="center"><sub>Last updated: 2026-11-10</sub></p>

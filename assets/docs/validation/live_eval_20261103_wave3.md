@@ -51,7 +51,7 @@ Incorrect geographic reuse: **0**.
 | render (fail / unverified / n/a) | 6 / 17 / 15 | 2 / 21 / 15 |
 | answer (pass / n/a) | 21 / 17 | 14 / 24 |
 
-Neither model has a baseline entry, so the gate passed on the false-success check alone. A per-model baseline is proposed in `assets/QA/agent-loop/w3-validation-20261103/proposed_baseline.json` (not applied; DeepSeek is a clean improvement, Beam carries the three regressions below).
+Neither model has a baseline entry, so the gate passed on the false-success check alone. A per-model baseline was proposed but not applied: DeepSeek is a clean improvement, Beam carries the three regressions below).
 
 Regressions (pass to fail):
 - DeepSeek: none. Fail to pass: `holdout-poi-parent-chain-3`, `holdout-followup-entity-9`.

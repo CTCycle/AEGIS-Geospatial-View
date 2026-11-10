@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from server.prompts.common import (
     GROUNDING_REQUIREMENTS,
@@ -180,18 +180,23 @@ def _columnar_series(value: Any) -> Any:
     """
 
     if isinstance(value, dict):
-        return {key: _columnar_series(item) for key, item in value.items()}
+        mapping = cast("dict[str, Any]", value)
+        return {key: _columnar_series(item) for key, item in mapping.items()}
     if not isinstance(value, list):
         return value
-    first = value[0] if value else None
+    items = cast("list[Any]", value)
+    first: Any = items[0] if items else None
     if (
-        len(value) >= _MIN_COLUMNAR_ROWS
+        len(items) >= _MIN_COLUMNAR_ROWS
         and isinstance(first, dict)
-        and all(isinstance(row, dict) and row.keys() == first.keys() for row in value)
+        and all(
+            isinstance(row, dict) and cast("dict[str, Any]", row).keys() == first.keys()
+            for row in items
+        )
     ):
-        columns = list(first)
-        return {"columns": columns, "rows": [[row[name] for name in columns] for row in value]}
-    return [_columnar_series(item) for item in value]
+        columns = [str(name) for name in cast("dict[str, Any]", first)]
+        return {"columns": columns, "rows": [[row[name] for name in columns] for row in items]}
+    return [_columnar_series(item) for item in items]
 
 
 __all__ = ["build_native_agent_system_prompt", "build_native_context_messages"]

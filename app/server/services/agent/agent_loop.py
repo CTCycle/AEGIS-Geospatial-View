@@ -12,7 +12,7 @@ import re
 from collections.abc import Awaitable, Collection, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Any, Callable, Literal, Protocol
+from typing import Any, Callable, Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from pydantic import ValidationError
@@ -4140,7 +4140,7 @@ class AgentLoop:
         if asking is not None and asking.error is not None:
             options = asking.data.get("options") if isinstance(asking.data, dict) else None
             state.clarification_options = normalize_clarification_options(
-                options if isinstance(options, list) else None
+                cast("list[Any]", options) if isinstance(options, list) else None
             )
             return "clarification_required", asking.error.message
         if AgentLoop._render_recovery_requires_map_action(state, results):

@@ -84,7 +84,7 @@ validity, relevance, and requested spatial/temporal coverage. Preparing a map or
 loading a raster source cannot substitute for those checks. Unknown raster
 visibility remains unsatisfied and enters the existing bounded render recovery.
 
-See the [2026-09-30 implementation report](../../QA/native-reliability-report-20260930.md)
+See the 2026-09-30 implementation report
 for validation and remaining live-render/benchmark limitations.
 
 There is one application execution path. It has no legacy/shadow/native mode

@@ -12,7 +12,7 @@ claims are expanded.
 | Slice | Capability | Required boundary | Primary regression evidence |
 | --- | --- | --- | --- |
 | `T1-01` | Navigation, route fallback, desktop gate | Direct and navbar routes, invalid-route redirect, and inert below-minimum viewport. | `app.routes.spec.ts`, `app.component.spec.ts`, wide/narrow browser proof. |
-| `T1-02` | Frontend tab-local state | Valid reload, TTL, corruption, schema, tab isolation, and retained UI/map state. | Focused state/map Karma suite and [headed Chrome reload evidence](../../QA/tier1-validation-develop-20260922/T1-02/report.md). |
+| `T1-02` | Frontend tab-local state | Valid reload, TTL, corruption, schema, tab isolation, and retained UI/map state. | Focused state/map Karma suite and headed Chrome reload evidence. |
 | `T1-03` | Conversation lifecycle and history | Create/list/search/select/hydrate, pagination, unknown ID, and no cross-conversation leakage. | Conversation API/repository tests plus history browser flow. |
 | `T1-04` | Realtime connect/replay/deduplication | Heartbeat, reconnect cursor, ordered replay, duplicate suppression, malformed envelope, and origin rejection. | Realtime API/service/parser suites plus one normal browser run. |
 | `T1-05` | Run start/steer/cancel/idempotency | Version changes, duplicate request IDs, stale work protection, and terminal cancellation. | Run lifecycle/orchestrator suites and a post-cancel normal run. |
@@ -26,11 +26,8 @@ claims are expanded.
 
 ## Current result
 
-The 2026-09-21 baseline remains available at
-[`../../QA/tier1-application-foundations-20260921/report.md`](../../QA/tier1-application-foundations-20260921/report.md),
-with its machine-readable ledger at
-[`../../QA/tier1-application-foundations-20260921/ledger.json`](../../QA/tier1-application-foundations-20260921/ledger.json).
-That historical result was `loop-dev` at
+The 2026-09-21 baseline (raw run folder removed at the 1.0.0 release)
+recorded the following. That historical result was `loop-dev` at
 `c615c5799e1d5fb01e0af0eccaab5c6490d554c0` and recorded 6 `PASS` and 6
 `PARTIAL` slices.
 
@@ -38,11 +35,11 @@ The 2026-09-22 continuation records `T1-02` as `PASS` on the `develop`
 working tree based at `8375fe071823e7f844f6bb125d86d6ebf36b3110`. Focused
 Angular state/map tests passed 90/90, and the headed Chrome chat-state browser
 file passed 8/8. Its five source hashes remain the tested boundary in the
-[T1-02 report](../../QA/tier1-validation-develop-20260922/T1-02/report.md)
-and [slice manifest](../../QA/tier1-validation-develop-20260922/T1-02/slice.json);
+T1-02 report
+and slice manifest;
 those changes were subsequently committed at `35d04f8399d0166d1a134ad9f45931bc15efda91`.
 
-The 2026-09-23 [T1-03 continuation](../../QA/tier1-validation-develop-20260923/T1-03/report.md)
+The 2026-09-23 T1-03 continuation
 passes focused conversation API/repository tests (9/9), the geospatial-page
 Karma suite (47/47), and in-app Browser evidence for search, two-page history,
 distinct conversation hydration, isolation, and stale-ID recovery. A focused
@@ -50,7 +47,7 @@ transcript top-spacing issue found during visual validation was repaired and
 rechecked. Tier 1 remains `PARTIAL` at 8 `PASS` and 4 `PARTIAL` slices across
 the cited source boundaries; this roll-up is not a same-commit campaign result.
 
-The 2026-09-23 [T1-06 continuation](../../QA/tier1-validation-develop-20260923/T1-06/report.md)
+The 2026-09-23 T1-06 continuation
 passes the exact-lane live `/api/chat/turn` matrix (`200`, `202`, genuine
 `409`, preflight `404`, and safe `503`), 14 focused API/OpenAPI tests, the
 corrected 397-test backend CI selection, and exact-head hosted CI. Its live
@@ -59,7 +56,7 @@ omitted nullable fields. At the T1-06 source boundary, Tier 1 was `PARTIAL` at
 9 `PASS` / 3 `PARTIAL`; the campaign then recorded 14 `PASS` / 3 `PARTIAL` /
 51 `UNRUN`. These results retain their dated source boundaries.
 
-The 2026-09-23 [T1-07 continuation](../../QA/tier1-validation-develop-20260923/T1-07/report.md)
+The 2026-09-23 T1-07 continuation
 is a historical result for the then-mounted job API and worker. It passed the
 job lifecycle cases (11/11 focused tests), the full backend unit suite
 (918/918), and one live job on the exact `opencode-go / deepseek-v4.1-flash`
@@ -75,7 +72,7 @@ provider pixels or `map.render_ack`. The stale toolbar `role=tab` locator was
 aligned with the Settings button contract in T1-09 and its focused browser
 regression now passes.
 
-The 2026-09-23 [T1-09 continuation](../../QA/tier1-validation-develop-20260923/T1-09/report.md)
+The 2026-09-23 T1-09 continuation
 passes the seven-section URL and rendered-panel flow, invalid-tab fallback,
 Back/Forward restoration, draft retention, controlled save, and return/reopen
 value check. The focused Settings component suite passed 31/31, the targeted
@@ -86,7 +83,7 @@ boundary is implementation commit
 11 `PASS` / 1 `PARTIAL`; the campaign is 16 `PASS` / 1 `PARTIAL` / 51
 `UNRUN`.
 
-The 2026-09-23 [T1-10 continuation](../../QA/tier1-validation-develop-20260923/T1-10/report.md)
+The 2026-09-23 T1-10 continuation
 passes 38 focused backend credential/settings tests, 33 Settings Angular tests,
 and five controlled browser regressions. The tests cover model and geospatial
 credential masking, safe save/clear, blank and invalid drafts, unreadable
@@ -101,7 +98,7 @@ Credentialed provider connectivity was not tested and remains a separate gate.
 
 Continue with `T2-01` and `T2-02`, the first core agent workflow slices. Their
 2026-09-23 live attempt is `BLOCKED` because the official launcher did not
-reach backend health; see the [current Tier 2 report](../../QA/tier2-validation-develop-20260923/report.md).
+reach backend health; see the current Tier 2 report.
 Preserve exact-location and no-fallback evidence boundaries. Tier 1 is 12/12
 `PASS`; the full campaign remains `PARTIAL` with 2 slices `BLOCKED`, 49
 `UNRUN`, and separate live/provider gates still open.

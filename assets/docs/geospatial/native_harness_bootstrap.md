@@ -221,8 +221,7 @@ the durable event stream for reconnect and replay.
 ## Remaining validation gates
 
 The implementation is not declared production-complete solely from local
-synthetic success. Current evidence is recorded in
-`assets/QA/native-agent-loop-remediation-20260917/final-report.md`:
+synthetic success. Evidence at the time of that report (consolidated here):
 
 - Server unit suites: `798 passed, 2 warnings`.
 - Focused native/render suites: `43 passed`; the render-completion subset is

@@ -5,7 +5,7 @@ Last updated: 2026-11-03
 The ordered long-term campaign is documented in the
 [comprehensive validation strategy](../../validation/strategy.md). The current
 application-foundations hand-off is the
-[Tier 1 QA package](../../../QA/tier1-application-foundations-20260921/report.md);
+Tier 1 validation record;
 its statuses are intentionally separate from this document's provider and
 ingestion contracts.
 
@@ -75,8 +75,7 @@ The validator is the canonical provider smoke matrix. It contains exactly one
 declarative case for every provider factory entry and classifies each case as
 public, credentialed, configured-source, or configuration-dependent. Missing
 credentials or sources are `SKIP`; transport failures, provider error payloads,
-and malformed semantic payloads are `FAIL`. Reports should be written to
-`assets/QA/` and retained by the scheduled workflow without including secrets.
+and malformed semantic payloads are `FAIL`. Reports should be retained by the scheduled workflow without including secrets; locally, scripts write run output under the unversioned `assets/QA/`.
 
 Live validation classifies upstream timeouts, rate limits, malformed responses,
 and missing credentials as provider availability failures. A failed provider
@@ -96,7 +95,7 @@ app\server\.venv\Scripts\python.exe scripts\benchmarks\live_model_eval.py `
 - Default mode drives the UI with Playwright (reusing `app/tests/e2e/helpers`), so a real browser acknowledges renders and the render verdict is verified. `--no-render` drives the realtime WebSocket protocol instead, cancels each run once its map is prepared and records render as `unverified`; the final answer is then not graded. Use it where no browser is available (CI); multi-turn follow-ups that depend on a rendered map are only faithful in browser mode.
 - `--scenario id1,id2`, `--limit N` and `--matrix main|holdout|both` narrow the run. Do not point it at a backend whose agent code is being edited.
 - Credentials come only from the app's stored settings or from the environment variable named by `--api-key-env` (default `AEGIS_EVAL_API_KEY`), which is written to the app's encrypted credential store. Without a key the run exits `3` (skipped). Exit codes: `0` gate passed, `1` gate failed, `2` infrastructure error.
-- Outputs per model under `--output-dir/<provider>-<model>/`: `results.json`, `summary.md`, `traces/` and (browser mode) `screenshots/`. Store them in `assets/QA/`.
+- Outputs per model under `--output-dir/<provider>-<model>/`: `results.json`, `summary.md`, `traces/` and (browser mode) `screenshots/`. They are local scratch under `assets/QA/`; summarize findings in the docs and delete the folder.
 - Baseline: `app/tests/agent_benchmark/live_eval_baseline.v1.json`, keyed `provider/model`. The gate fails on any false success, on a scenario that passed in the baseline and now fails, and on a failing scenario without a documented `explanation`. A model without a baseline entry is gated on false successes only. Record one with `--write-baseline`, then fill in every failing scenario's `explanation` and review the diff.
 - The route family check maps capability ids to families with the patterns in `FAMILY_PATTERNS`; extend them when new capabilities are added.
 - The exact-lane browser tests (`tests/e2e/helpers/model_capability_metadata.py`) target `opencode-go / deepseek-v4.1-flash` by default; set `APP_TEST_LANE_PROVIDER` and `APP_TEST_LANE_MODEL` to run them against another configured model.

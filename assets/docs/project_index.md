@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-11-07
+Last updated: 2026-11-10
 
 ## Purpose
 
@@ -173,9 +173,9 @@ conversation-scoped `agent_evidence` store rather than model messages.
   blocker, validation result, or revalidation requirement changes. Keep detailed
   reports in `assets/QA/` and link them instead of duplicating their narratives.
 - Include `Last updated: YYYY-MM-DD` whenever a document changes.
-- Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `assets/QA/` when they must be preserved.
-- Organize `assets/QA/` by topic, one subfolder per validation run: `agent-loop/`, `tiers/`, `tools/`, `e2e/`, `ui/`, `maintenance/`. Name runs `<scope>-<yyyymmdd>`.
-- Keep QA runs lightweight: preserve the `report.md`, scripts, and small baselines (JSON under 20 KB). Do not commit screenshots, raw logs, `turns.jsonl`, or raw provider/evidence JSON; summarize their findings in the report and delete them when the run is closed.
+- Remove obsolete docs and QA artifacts from `assets/docs`.
+- Validation evidence lives in the docs, not in the repository tree: record outcomes in `project_status_ledger.md` and `validation/gate_status.md`, and keep detailed narratives in the matching `validation/` leaf. There is no versioned QA folder; the 1.0.0 release consolidated and removed it.
+- `assets/QA/` is gitignored local scratch where scripts under `scripts/benchmarks/` and `scripts/validation/` write run output (reports, screenshots, logs, raw JSON). When a run closes, fold its findings into the docs above and delete its folder.
 
 ## Environment Rules
 
