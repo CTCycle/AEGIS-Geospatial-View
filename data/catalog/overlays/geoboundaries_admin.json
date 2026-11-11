@@ -1,0 +1,196 @@
+{
+  "id": "geoboundaries_admin",
+  "name": "geoBoundaries Administrative Units",
+  "provider": "geoboundaries",
+  "type": "vector-overlay",
+  "description": "Open administrative boundary polygons (country, regions, provinces and finer units) for one country from geoBoundaries gbOpen, simplified for mapping and spatial joins.",
+  "capabilities": [
+    "boundary",
+    "administrative",
+    "admin",
+    "region",
+    "province",
+    "district",
+    "polygon"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "geoBoundaries Administrative Units",
+    "requires_key": false,
+    "attribution": "geoBoundaries (Runfola et al., CC BY 4.0)",
+    "keywords": [
+      "administrative boundaries",
+      "admin boundaries",
+      "regions",
+      "provinces",
+      "districts",
+      "states",
+      "counties",
+      "subdivisions",
+      "geoboundaries"
+    ],
+    "action_tags": [
+      "boundary",
+      "region",
+      "compare"
+    ],
+    "task_tags": [
+      "per-region analysis",
+      "boundary map"
+    ],
+    "source_protocol": "geoBoundaries REST API + GeoJSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "Polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.geoboundaries.org/api.html",
+    "last_validated": "2026-11-11",
+    "rate_limit_notes": "Boundaries are static; cache for a day and request one country and level at a time.",
+    "parameters_json_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "country": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Country name or ISO code; defaults to the country of the resolved location."
+        },
+        "admin_level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 1,
+          "description": "0 country, 1 first-level units (regions, states), 2 and above finer units."
+        }
+      }
+    }
+  },
+  "version": 1,
+  "last_modified": "2026-11-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "geojson",
+  "sourceOfficialDocs": [
+    "https://www.geoboundaries.org/api.html",
+    "https://www.geoboundaries.org/"
+  ],
+  "license": {
+    "name": "CC BY 4.0 (geoBoundaries); per-country source licences apply",
+    "url": "https://www.geoboundaries.org/",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": [
+      "data_retrieval",
+      "map_rendering"
+    ],
+    "plannerHints": [
+      "administrative boundaries",
+      "regions",
+      "provinces",
+      "districts",
+      "per region",
+      "boundary"
+    ],
+    "requiredUserAction": [
+      "boundary",
+      "region"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "high precision parcel analysis"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-11-11",
+    "knownLimitations": [
+      "Live retrieval validated 2026-11-11 for Italy, Switzerland and India; browser rendering is not yet validated.",
+      "Simplified geometry: suitable for mapping and joins, not for legal or parcel precision.",
+      "Level meanings differ by country (Italy ADM1 is macro-regions, ADM2 regions)."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "static",
+    "fieldMap": {
+      "shapeName": "name",
+      "shapeISO": "shape_iso"
+    },
+    "expectedGeometry": "Polygon"
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "search",
+      "in",
+      "compare"
+    ],
+    "supported_scope_kinds": [
+      "administrative_geometry",
+      "bbox",
+      "point"
+    ],
+    "temporal_modes": [
+      "historical"
+    ],
+    "temporal_windows": [
+      "static"
+    ],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Polygon",
+    "render_support": "vector",
+    "result_kind": "vector",
+    "numeric_query": "numeric",
+    "crs": "EPSG:4326",
+    "spatial_resolution": "Simplified national boundaries",
+    "temporal_coverage": "Latest gbOpen release per country",
+    "coverage": "global",
+    "limitations": [
+      "One country and admin_level per request; at most 1000 units.",
+      "Units are filtered to the requested bbox when one is bound.",
+      "Polygons are the partner for transform_evidence spatial_join and area."
+    ],
+    "fallback_ids": []
+  }
+}

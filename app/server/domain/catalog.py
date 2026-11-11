@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class CountryReferenceEntry(BaseModel):
     iso2: str
     name: str
+    iso3: str | None = None
 
 ###############################################################################
 class CountryAliasReferenceEntry(BaseModel):

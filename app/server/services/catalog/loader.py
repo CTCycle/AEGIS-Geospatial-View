@@ -87,6 +87,7 @@ def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
     if not is_json_array(entries):
         raise ValueError("countries.json must contain a countries list.")
     seen_iso2: set[str] = set()
+    seen_iso3: set[str] = set()
     countries: list[CountryReferenceEntry] = []
     for item in entries:
         if not is_json_object(item):
@@ -96,7 +97,13 @@ def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
         if iso2 in seen_iso2:
             raise ValueError(f"Duplicate country ISO2 code: {iso2}")
         seen_iso2.add(iso2)
-        countries.append(CountryReferenceEntry(iso2=iso2, name=name))
+        iso3 = None
+        if item.get("iso3") is not None:
+            iso3 = _require_string(item.get("iso3"), field_name="country.iso3").upper()
+            if len(iso3) != 3 or not iso3.isalpha() or iso3 in seen_iso3:
+                raise ValueError(f"Invalid or duplicate country ISO3 code: {iso3}")
+            seen_iso3.add(iso3)
+        countries.append(CountryReferenceEntry(iso2=iso2, name=name, iso3=iso3))
     return countries
 
 ###############################################################################
@@ -290,6 +297,28 @@ def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEnt
         regions.append(region)
     return tuple(regions)
 
+
+###############################################################################
+@lru_cache(maxsize=1)
+def _country_iso3_index() -> dict[str, str]:
+    reference = load_reference_catalog()
+    by_iso2 = {entry.iso2: entry.iso3 for entry in reference.countries if entry.iso3}
+    index: dict[str, str] = {}
+    for entry in reference.countries:
+        if entry.iso3:
+            for key in (entry.iso2, entry.iso3, entry.name):
+                index[_normalize_alias_key(key)] = entry.iso3
+    for alias in reference.country_aliases:
+        if alias.iso2 in by_iso2:
+            index.setdefault(_normalize_alias_key(alias.alias), by_iso2[alias.iso2])
+    return index
+
+
+###############################################################################
+def country_iso3(text: str) -> str | None:
+    """ISO alpha-3 code for an ISO2/ISO3 code, country name or alias."""
+
+    return _country_iso3_index().get(_normalize_alias_key(text))
 
 ###############################################################################
 def find_macro_region_entry(text: str) -> MacroRegionEntry | None:

@@ -1,6 +1,6 @@
 # Reference Catalog
 
-Last updated: 2026-09-28
+Last updated: 2026-11-11
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-28
 
 ## Current Files
 
-- `countries.json`
+- `countries.json` (ISO2, ISO3 from GeoNames countryInfo, name, aliases)
 - `geospatial_layers.json`
 - `gibs_tile_matrix_sets.json`
 - `gibs_layer_defaults.json`

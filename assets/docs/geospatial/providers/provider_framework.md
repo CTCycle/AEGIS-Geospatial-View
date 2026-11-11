@@ -17,6 +17,7 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `gtfs_static.py`
 - `fema.py`
 - `gdacs.py` (disaster events as reported points, `footprint_basis: reported_point`)
+- `geoboundaries.py` (gbOpen admin polygons; the GitHub raw geometry link is rewritten to its fixed LFS media host because shared retrieval never follows redirects)
 - `local_open_data.py`
 - `mobility_database.py`
 - `nasa_gibs.py`

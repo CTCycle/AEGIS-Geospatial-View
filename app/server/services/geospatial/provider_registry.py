@@ -59,6 +59,7 @@ from server.services.geospatial.providers.mobility_database import (
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.emsc import EMSCProvider
 from server.services.geospatial.providers.gdacs import GDACSProvider
+from server.services.geospatial.providers.geoboundaries import GeoBoundariesProvider
 from server.services.geospatial.providers.wikidata import WikidataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
@@ -83,6 +84,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "usgs": lambda _credential: USGSProvider(),
     "emsc": lambda _credential: EMSCProvider(),
     "gdacs": lambda _credential: GDACSProvider(),
+    "geoboundaries": lambda _credential: GeoBoundariesProvider(),
     "noaa": lambda _credential: NOAAProvider(),
     "fema": lambda _credential: FEMAProvider(),
     "nasa_firms": lambda credential: NASAFIRMSProvider(api_key=credential),

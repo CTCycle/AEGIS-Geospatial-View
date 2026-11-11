@@ -198,6 +198,12 @@ PROVIDER_SMOKE_CHECKS = (
         required_payload_keys=("features",),
     ),
     LiveCheck(
+        provider_id="geoboundaries",
+        request=ProviderRequest(capability_id="geoboundaries_admin", params={"country": "CH", "live": True}),
+        response_contract="feature_collection",
+        required_payload_keys=("features",),
+    ),
+    LiveCheck(
         provider_id="noaa",
         request=ProviderRequest(
             capability_id="noaa_weather_alerts",

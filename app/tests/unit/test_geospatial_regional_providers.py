@@ -1,9 +1,11 @@
 from __future__ import annotations
 from datetime import UTC, datetime
 from tests.conftest import run_async_in_thread
+import json
+
 import pytest
 import asyncio
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderMalformedPayloadError, ProviderRequest, ProviderUnavailableError
 from server.services.geospatial.providers.fema import FEMA_NFHL_EXPORT_URL, FEMAProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
@@ -11,6 +13,8 @@ from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers import emsc as emsc_module
 from server.services.geospatial.providers.emsc import EMSC_FDSN_URL, EMSCProvider
 from server.services.geospatial.providers.gdacs import GDACS_EVENTS_URL, GDACSProvider
+from server.services.geospatial.providers.geoboundaries import GITHUB_MEDIA_PREFIX, GeoBoundariesProvider, media_url
+from server.services.catalog.loader import country_iso3
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
@@ -1024,3 +1028,51 @@ async def test_gdacs_requests_every_alert_level_and_pages_to_a_bounded_cap():
     assert "alertlevel=Green%3BOrange%3BRed" in urls[0] and len(urls) == 10
     assert len(response.payload["features"]) == 1000
     assert response.coverage["truncated"] is True and "capped at 1000" in response.warnings[0]
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_geoboundaries_resolves_country_rewrites_geometry_host_and_filters_bbox():
+    urls: list[str] = []
+
+    def ring(west: float) -> list[list[float]]:
+        return [[west, 45.0], [west + 1, 45.0], [west + 1, 46.0], [west, 46.0], [west, 45.0]]
+
+    async def fetcher(url, headers=None):
+        urls.append(url)
+        if url.endswith("/ADM2/"):
+            return json.dumps({"admUnitCount": "2", "boundarySource": "ISTAT", "boundaryLicense": "CC BY 3.0",
+                               "simplifiedGeometryGeoJSON": "https://github.com/wmgeolab/geoBoundaries/raw/abc/ITA_ADM2.geojson"}).encode()
+        return json.dumps({"type": "FeatureCollection", "features": [
+            {"type": "Feature", "properties": {"shapeName": name, "shapeID": name, "shapeISO": ""},
+             "geometry": {"type": "Polygon", "coordinates": [ring(west)]}} for name, west in (("Piemonte", 7.0), ("Veneto", 11.0))]}).encode()
+
+    response = await GeoBoundariesProvider(fetcher=fetcher).fetch(ProviderRequest(
+        capability_id="geoboundaries_admin", bbox=(6.5, 44.5, 8.5, 46.5), params={"country": "Italy", "admin_level": 2}))
+    assert urls == ["https://www.geoboundaries.org/api/current/gbOpen/ITA/ADM2/", GITHUB_MEDIA_PREFIX + "abc/ITA_ADM2.geojson"]
+    [unit] = response.payload["features"]
+    assert unit["properties"] == {"name": "Piemonte", "shape_iso": None, "shape_id": "Piemonte", "admin_level": 2, "country_iso3": "ITA"}
+    assert "Source: ISTAT (CC BY 3.0)" in response.attribution
+    assert country_iso3("CH") == "CHE" and country_iso3("che") == "CHE" and country_iso3("Atlantis") is None
+
+
+###############################################################################
+@pytest.mark.parametrize("url", ["https://example.com/x.geojson", "https://github.com/wmgeolab/geoBoundaries/raw/../evil"])
+def test_geoboundaries_refuses_geometry_links_off_the_repository(url):
+    with pytest.raises(ProviderMalformedPayloadError):
+        media_url(url)
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_geoboundaries_rejects_oversized_levels_before_downloading_geometry():
+    urls: list[str] = []
+
+    async def fetcher(url, headers=None):
+        urls.append(url)
+        return json.dumps({"admUnitCount": "7904", "simplifiedGeometryGeoJSON": ""}).encode()
+
+    with pytest.raises(ProviderInvalidQueryError, match="lower admin_level"):
+        await GeoBoundariesProvider(fetcher=fetcher).fetch(ProviderRequest(
+            capability_id="geoboundaries_admin", params={"country": "IT", "admin_level": 3}))
+    assert len(urls) == 1
