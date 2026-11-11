@@ -35,6 +35,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `emsc` | Euro-Mediterranean earthquake catalog (SeismicPortal FDSN) | public |
 | `gdacs` | Global disaster alerts (earthquake, cyclone, flood, volcano, drought, wildfire) as reported event points | public |
 | `geoboundaries` | Open administrative boundary polygons (ADM0–ADM5) per country, simplified | public |
+| `jrc` | JRC Global Surface Water 1984–2024 occurrence and change map tiles (render-only) | public |
 
 ## Basemaps
 
@@ -90,6 +91,7 @@ Representative implemented layers include:
 - `emsc_earthquakes`
 - `gdacs_disaster_events` (disabled by default until browser-validated)
 - `geoboundaries_admin` (disabled by default until browser-validated)
+- `jrc_surface_water_occurrence`, `jrc_surface_water_change` (disabled by default until browser-validated)
 - `usgs_earthquakes`
 - `usgs_water_gauges`
 - `gtfs_static`

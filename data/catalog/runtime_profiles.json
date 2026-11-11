@@ -805,6 +805,38 @@
       "auth_required": false
     },
     {
+      "capability_id": "jrc_surface_water_occurrence",
+      "enabled_by_default": false,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "raster-tile",
+      "health_status": "partial",
+      "planner_hints": ["surface water", "lakes", "rivers", "wetlands", "hydrology"],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "jrc_surface_water_change",
+      "enabled_by_default": false,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "raster-tile",
+      "health_status": "partial",
+      "planner_hints": ["surface water change", "water loss", "water gain", "shrinking lake", "hydrology"],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
       "capability_id": "eurostat_housing_market",
       "enabled_by_default": true,
       "credential_provider": null,

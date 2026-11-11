@@ -204,6 +204,12 @@ PROVIDER_SMOKE_CHECKS = (
         required_payload_keys=("features",),
     ),
     LiveCheck(
+        provider_id="jrc",
+        request=ProviderRequest(capability_id="jrc_surface_water_occurrence"),
+        response_contract="raster_metadata",
+        required_payload_keys=("tileUrl",),
+    ),
+    LiveCheck(
         provider_id="noaa",
         request=ProviderRequest(
             capability_id="noaa_weather_alerts",

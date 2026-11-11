@@ -1,0 +1,154 @@
+{
+  "provider": "jrc",
+  "type": "tile",
+  "coverage": "global",
+  "version": 1,
+  "last_modified": "2026-11-11T00:00:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "raster-tile",
+  "sourceOfficialDocs": [
+    "https://global-surface-water.appspot.com/download",
+    "https://doi.org/10.1038/nature20584"
+  ],
+  "license": {
+    "name": "Copernicus Programme data, free of charge without restriction of use; cite Pekel et al. 2016",
+    "url": "https://global-surface-water.appspot.com/download",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-11-11",
+    "knownLimitations": [
+      "Tiles validated live 2026-11-11 (zoom 0-13); browser rendering through the tile proxy is not yet validated.",
+      "RGB map tiles only: the provider states they are not suitable for analysis, so no values can be read."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  },
+  "id": "jrc_surface_water_occurrence",
+  "name": "JRC Global Surface Water Occurrence",
+  "description": "Where and how often surface water was present between 1984 and 2024 (JRC Global Surface Water, Landsat-derived), for lakes, rivers, wetlands and reservoirs.",
+  "capabilities": [
+    "tile",
+    "surface-water",
+    "hydrology"
+  ],
+  "metadata": {
+    "label": "JRC Global Surface Water Occurrence",
+    "default_opacity": 0.8,
+    "requires_key": false,
+    "attribution": "Source: EC JRC/Google (Pekel et al., Nature 2016)",
+    "url_template": "https://storage.googleapis.com/water-world/tiles2024/occurrence/{z}/{x}/{y}.png",
+    "tile_size": 256,
+    "max_zoom": 13,
+    "keywords": [
+      "surface water",
+      "water occurrence",
+      "lakes",
+      "rivers",
+      "wetlands",
+      "reservoirs",
+      "hydrology",
+      "jrc"
+    ],
+    "action_tags": [
+      "surface water",
+      "hydrology"
+    ],
+    "task_tags": [
+      "water resources",
+      "hydrology context"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "Static 1984-2024 release; tiles exist to zoom 13 and are RGB renderings without values.",
+    "human_summary": "Share of 1984-2024 observations with water: white/pink rarely wet, blue permanently wet.",
+    "source_protocol": "XYZ tiles via AEGIS backend proxy",
+    "data_format": "image/png tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://global-surface-water.appspot.com/download",
+    "rate_limit_notes": "Public static tiles; cache through the tile proxy.",
+    "retrieval_mode": "direct",
+    "last_validated": "2026-11-11"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "domains": [
+      "map_rendering",
+      "data_retrieval"
+    ],
+    "plannerHints": [
+      "surface water",
+      "water occurrence",
+      "lakes",
+      "rivers",
+      "wetlands",
+      "reservoirs"
+    ],
+    "requiredUserAction": [
+      "surface water",
+      "hydrology"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "numeric water statistics"
+    ]
+  },
+  "executionContract": {
+    "supported_operations": [
+      "show",
+      "overlay"
+    ],
+    "supported_scope_kinds": [
+      "bbox",
+      "viewport"
+    ],
+    "temporal_modes": [
+      "historical"
+    ],
+    "temporal_windows": [
+      "static"
+    ],
+    "supported_aggregations": [],
+    "required_inputs": [
+      "location"
+    ],
+    "output_geometry_type": "Raster",
+    "render_support": "raster",
+    "result_kind": "raster",
+    "numeric_query": "render_only",
+    "crs": "EPSG:3857",
+    "spatial_resolution": "30 m Landsat source, tiles to zoom 13",
+    "temporal_coverage": "1984-2024",
+    "coverage": "global",
+    "limitations": [
+      "Map imagery only: no water percentages or areas can be read from the tiles.",
+      "Share of 1984-2024 observations with water: white/pink rarely wet, blue permanently wet."
+    ],
+    "fallback_ids": []
+  }
+}

@@ -78,6 +78,7 @@ _QUERY_ALIASES: dict[str, set[str]] = {
     "emsc": {"emsc", "earthquake", "seismic", "hazard"},
     "gdacs": {"gdacs", "disaster", "hazard", "alert"},
     "geoboundaries": {"geoboundaries", "boundary", "administrative", "region"},
+    "jrc": {"jrc", "surface", "water", "hydrology"},
 }
 
 # Extremum, aggregation and spelling variants a query and a manifest may spell

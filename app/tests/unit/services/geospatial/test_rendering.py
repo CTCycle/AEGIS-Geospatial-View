@@ -624,6 +624,7 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     [
         ("noaa_radar", "opengeo.ncep.noaa.gov"),
         ("fema_nfhl_flood_zones", "hazards.fema.gov"),
+        ("jrc_surface_water_occurrence", "storage.googleapis.com"),
     ],
 )
 def test_catalog_raster_overlays_expose_provider_tile_templates(
@@ -640,7 +641,7 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert warnings == []
     assert descriptor["rendering_mode"] == "raster-tile"
     tile_url_template = str(descriptor["tile_url_template"])
-    if overlay_id in {"fema_nfhl_flood_zones", "noaa_radar"}:
+    if overlay_id in {"fema_nfhl_flood_zones", "noaa_radar", "jrc_surface_water_occurrence"}:
         assert tile_url_template == (
             f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
         )

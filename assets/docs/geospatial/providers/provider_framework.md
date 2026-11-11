@@ -17,6 +17,7 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `gtfs_static.py`
 - `fema.py`
 - `gdacs.py` (disaster events as reported points, `footprint_basis: reported_point`)
+- `jrc.py` (JRC Global Surface Water 1984-2024 occurrence and change tiles; render-only, proxied, zoom 0-13)
 - `geoboundaries.py` (gbOpen admin polygons; the GitHub raw geometry link is rewritten to its fixed LFS media host because shared retrieval never follows redirects)
 - `local_open_data.py`
 - `mobility_database.py`

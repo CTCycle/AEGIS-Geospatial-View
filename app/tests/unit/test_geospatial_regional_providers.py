@@ -15,6 +15,7 @@ from server.services.geospatial.providers.emsc import EMSC_FDSN_URL, EMSCProvide
 from server.services.geospatial.providers.gdacs import GDACS_EVENTS_URL, GDACSProvider
 from server.services.geospatial.providers.geoboundaries import GITHUB_MEDIA_PREFIX, GeoBoundariesProvider, media_url
 from server.services.catalog.loader import country_iso3
+from server.services.geospatial.providers.jrc import JRCSurfaceWaterProvider
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
@@ -1076,3 +1077,14 @@ async def test_geoboundaries_rejects_oversized_levels_before_downloading_geometr
         await GeoBoundariesProvider(fetcher=fetcher).fetch(ProviderRequest(
             capability_id="geoboundaries_admin", params={"country": "IT", "admin_level": 3}))
     assert len(urls) == 1
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_jrc_surface_water_is_a_render_only_tile_descriptor():
+    response = await JRCSurfaceWaterProvider().fetch(ProviderRequest(capability_id="jrc_surface_water_change"))
+    assert response.result_type == "raster" and response.coverage["numeric_values"] is False
+    assert response.payload["tileUrl"].endswith("/tiles2024/change/{z}/{x}/{y}.png")
+    assert response.payload["maxZoom"] == 13 and "EC JRC/Google" in response.attribution[0]
+    with pytest.raises(ProviderInvalidQueryError):
+        await JRCSurfaceWaterProvider().fetch(ProviderRequest(capability_id="jrc_surface_water_extent"))
