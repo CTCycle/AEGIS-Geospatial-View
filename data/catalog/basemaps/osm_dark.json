@@ -3,15 +3,15 @@
   "name": "Dark Basemap",
   "provider": "cartodb_tiles",
   "type": "tile",
-  "description": "Dark-themed OpenStreetMap basemap designed for high-contrast thematic overlays.",
+  "description": "Dark-themed CARTO Dark Matter basemap (OpenStreetMap data) designed for high-contrast thematic overlays.",
   "capabilities": [
     "tile"
   ],
   "coverage": "global",
   "metadata": {
     "label": "Dark Basemap",
-    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "attribution": "© OpenStreetMap contributors",
+    "tile_url": "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    "attribution": "© OpenStreetMap contributors © CARTO",
     "requires_key": false,
     "keywords": [
       "dark",
@@ -56,7 +56,7 @@
     "integration_requirements": [
       "No API key required"
     ],
-    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "official_docs_url": "https://github.com/CartoDB/basemap-styles",
     "source_protocol": "raster-tile",
     "data_format": "image tiles",
     "geometry_type": "raster-grid",
