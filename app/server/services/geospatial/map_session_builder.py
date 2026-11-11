@@ -299,9 +299,21 @@ class MapSessionBuilder:
                 if not numbers:
                     raise MapPlanBuildError("invalid_value_field", f"Field '{field}' has no numeric values; choose a numeric evidence field.")
                 low, high = min(numbers), max(numbers)
+                # Areas (per-region counts) are shaded; points are sized circles.
+                polygonal = any(
+                    json_object(feature.get("geometry")).get("type") in {"Polygon", "MultiPolygon"}
+                    for feature in features
+                )
+                if polygonal and action.value_encoding.mode == "heatmap":
+                    raise MapPlanBuildError(
+                        "invalid_value_encoding",
+                        "A heatmap needs point records; shade these areas with mode 'graduated'.",
+                    )
                 descriptor["value_encoding"] = {"mode": action.value_encoding.mode, "field": field, "min": low, "max": high}
                 descriptor["legend"] = _value_encoding_legend(field, low, high, evidence.provenance)
-                descriptor["rendering_mode"] = "circles"
+                descriptor["rendering_mode"] = "choropleth" if polygonal else "circles"
+                if polygonal:
+                    descriptor["geometry_type"] = "Polygon"
                 descriptor.pop("render", None)
             self._validate_render_descriptor(descriptor)
             additions = OverlayCollectionService.from_rendered_descriptors(

@@ -65,6 +65,17 @@ describe('map-preview-rendering', () => {
     }
   }
 
+  it('shades graduated per-area values as a fill instead of vertex circles', () => {
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {addSource: () => undefined, addLayer: (layer: Record<string, unknown>) => layers.push(layer)};
+    const overlay: MapOverlayEntry = {id: 'regions', label: 'Regions', provider: 'test', type: 'geojson',
+      rendering_mode: 'choropleth', geometry_type: 'Polygon', data: {type: 'FeatureCollection', features: []},
+      value_encoding: {mode: 'graduated', field: 'joined_count', min: 0, max: 6}};
+    expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status).toBe('loaded');
+    expect(layers.map((layer) => layer['type'])).toEqual(['fill']);
+    expect(getOverlayLayerIds(overlay)).toEqual(layers.map((layer) => String(layer['id'])));
+  });
+
   it('compares boolean records by keys and values', () => {
     expect(recordBooleanEqual({ a: true }, { a: true })).toBeTrue();
     expect(recordBooleanEqual({ a: true }, { a: false })).toBeFalse();

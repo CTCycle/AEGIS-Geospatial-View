@@ -569,11 +569,27 @@ describe('components/map-preview.component', () => {
       value_encoding: {mode: 'heatmap', field: 'count', min: 1, max: 10},
     }])}) as never };
     fixture.detectChanges();
+    fakeMap.getLayer.and.callFake((id: string) => ({ type: id.endsWith('-heatmap') ? 'heatmap' : 'circle' }));
     fakeMap.setPaintProperty.calls.reset();
     component.setOverlayOpacity('hotspots', '50');
     expect(fakeMap.setPaintProperty).toHaveBeenCalledWith('overlay-layer-hotspots-heatmap', 'heatmap-opacity', 0.5);
     expect(fakeMap.setPaintProperty).toHaveBeenCalledWith('overlay-layer-hotspots-centres', 'circle-opacity', 0.5);
     expect(fakeMap.setPaintProperty).not.toHaveBeenCalledWith('overlay-layer-hotspots-heatmap', 'circle-opacity', 0.5);
+  });
+
+  it('applies fill opacity to graduated area layers', () => {
+    component.payload = { map_session: makeMapSession({overlay_collection: makeOverlayCollection([{
+      id: 'regions', label: 'Regions', type: 'geojson', provider: 'geoboundaries',
+      rendering_mode: 'choropleth', geometry_type: 'Polygon',
+      data: {type: 'FeatureCollection', features: []},
+      value_encoding: {mode: 'graduated', field: 'joined_count', min: 0, max: 6},
+    }])}) as never };
+    fixture.detectChanges();
+    fakeMap.getLayer.and.returnValue({ type: 'fill' });
+    fakeMap.setPaintProperty.calls.reset();
+    component.setOverlayOpacity('regions', '50');
+    expect(fakeMap.setPaintProperty).toHaveBeenCalledWith('overlay-layer-regions', 'fill-opacity', 0.5);
+    expect(fakeMap.setPaintProperty).not.toHaveBeenCalledWith('overlay-layer-regions', 'circle-opacity', 0.5);
   });
 
   it('restores and emits a reconciled order for the active session', () => {

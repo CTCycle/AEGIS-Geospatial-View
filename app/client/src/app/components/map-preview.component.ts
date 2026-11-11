@@ -1622,8 +1622,13 @@ private fitMaxZoom(defaultMaxZoom: number): number {
       });
       setPlaceLabelsVisible(map, overlay.id, visible);
       if (overlay.value_encoding) {
-        map.setPaintProperty(layerIds[0], overlay.value_encoding.mode === 'heatmap'
-          ? 'heatmap-opacity' : 'circle-opacity', opacityValue);
+        // Encoded layers are heatmaps, circles or (for areas) fills.
+        const encodedType = map.getLayer(layerIds[0])?.type;
+        if (encodedType === 'fill') {
+          map.setPaintProperty(layerIds[0], 'fill-opacity', Math.min(opacityValue, 0.7));
+        } else if (encodedType === 'heatmap' || encodedType === 'circle') {
+          map.setPaintProperty(layerIds[0], `${encodedType}-opacity`, opacityValue);
+        }
         if (overlay.value_encoding.mode === 'heatmap' && map.getLayer(layerIds[1])) {
           map.setPaintProperty(layerIds[1], 'circle-opacity', opacityValue);
         }

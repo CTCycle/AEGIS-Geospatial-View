@@ -913,6 +913,35 @@ async def test_invalid_value_field_is_correctable_and_europe_needs_no_geocoder()
 
 
 ###############################################################################
+@pytest.mark.asyncio
+async def test_value_encoded_polygons_render_as_shaded_areas_and_refuse_heatmaps():
+    from server.domain.agent.evidence import AgentEvidenceEnvelope
+    from server.domain.agent.map_plan import AddEvidenceLayerAction, SetBasemapAction
+    from server.services.geospatial.map_session_builder import MapSessionBuilder, MapPlanBuildError
+    from server.services.geospatial.capability_registry import CapabilityRegistry
+    builder = MapSessionBuilder(capability_registry=CapabilityRegistry())
+    ring = [[8, 45], [9, 45], [9, 46], [8, 46], [8, 45]]
+    evidence = AgentEvidenceEnvelope(ok=True, status="available", evidence_ref="derived",
+        map_eligibility="renderable", summary={"bbox": [8, 45, 9, 46]},
+        payload={"features": [{"type": "Feature", "properties": {"name": "Zone", "joined_count": 4},
+                               "geometry": {"type": "Polygon", "coordinates": [ring]}}]})
+
+    def actions(mode: str) -> list[Any]:
+        return [SetBasemapAction(action="set_basemap", capability_id="osm_default"),
+                AddEvidenceLayerAction(action="add_evidence_layer", capability_id="geoboundaries_admin",
+                                       evidence_ref="derived", value_encoding={"mode": mode, "field": "joined_count"})]
+
+    session = await builder.build(location=find_macro_region("Europe"), evidence=[evidence],
+                                  actions=actions("graduated"), active_session=None)
+    overlay = session.overlay_collection.instances[-1].descriptor
+    assert overlay["rendering_mode"] == "choropleth" and overlay["geometry_type"] == "Polygon"
+    with pytest.raises(MapPlanBuildError) as error:
+        await builder.build(location=find_macro_region("Europe"), evidence=[evidence],
+                            actions=actions("heatmap"), active_session=None)
+    assert error.value.code == "invalid_value_encoding"
+
+
+###############################################################################
 def test_discovery_prompt_requires_disclosure_and_forbids_overclaiming():
     from server.prompts.agent import build_native_agent_system_prompt
     prompt = build_native_agent_system_prompt()
