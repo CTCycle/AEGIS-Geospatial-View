@@ -1,4 +1,4 @@
-import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
+import { DEFAULT_BASE_TILE_PROXY_URL, VALUE_ENCODING_RAMP } from '../core/constants';
 import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
@@ -74,6 +74,16 @@ describe('map-preview-rendering', () => {
     expect(addOverlayLayers(map as never, makeMapSession([overlay]))[0].status).toBe('loaded');
     expect(layers.map((layer) => layer['type'])).toEqual(['fill']);
     expect(getOverlayLayerIds(overlay)).toEqual(layers.map((layer) => String(layer['id'])));
+  });
+
+  it('shades a flat choropleth domain with the low ramp colour, not the hotspot colour', () => {
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {addSource: () => undefined, addLayer: (layer: Record<string, unknown>) => layers.push(layer)};
+    const overlay: MapOverlayEntry = {id: 'flat', label: 'Flat', provider: 'test', type: 'geojson',
+      rendering_mode: 'choropleth', geometry_type: 'Polygon', data: {type: 'FeatureCollection', features: []},
+      value_encoding: {mode: 'graduated', field: 'joined_count', min: 0, max: 0}};
+    addOverlayLayers(map as never, makeMapSession([overlay]));
+    expect((layers[0]['paint'] as Record<string, unknown>)['fill-color']).toBe(VALUE_ENCODING_RAMP.low);
   });
 
   it('compares boolean records by keys and values', () => {

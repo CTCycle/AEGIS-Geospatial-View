@@ -557,13 +557,14 @@ const addGeoJsonOverlayLayer = (
       }});
     } else if (renderingMode === 'choropleth' || overlay.geometry_type?.toLowerCase().includes('polygon')) {
       // Per-area values shade the areas; a circle layer would mark every vertex.
+      // A flat domain (min == max) carries no gradient, so it takes the low end rather than implying a hotspot.
       map.addLayer({id: layerId, source: sourceId, type: 'fill', paint: {
-        'fill-color': encoding.min === encoding.max ? VALUE_ENCODING_RAMP.high : ['interpolate', ['linear'], value, encoding.min, VALUE_ENCODING_RAMP.low, encoding.max, VALUE_ENCODING_RAMP.high],
+        'fill-color': encoding.min === encoding.max ? VALUE_ENCODING_RAMP.low : ['interpolate', ['linear'], value, encoding.min, VALUE_ENCODING_RAMP.low, encoding.max, VALUE_ENCODING_RAMP.high],
         'fill-opacity': Math.min(opacity, 0.7), 'fill-outline-color': '#ffffff',
       }});
     } else {
       map.addLayer({id: layerId, source: sourceId, type: 'circle', paint: {
-        'circle-color': encoding.min === encoding.max ? VALUE_ENCODING_RAMP.high : ['interpolate', ['linear'], value, encoding.min, VALUE_ENCODING_RAMP.low, encoding.max, VALUE_ENCODING_RAMP.high],
+        'circle-color': encoding.min === encoding.max ? VALUE_ENCODING_RAMP.low : ['interpolate', ['linear'], value, encoding.min, VALUE_ENCODING_RAMP.low, encoding.max, VALUE_ENCODING_RAMP.high],
         'circle-radius': encoding.min === encoding.max ? 9 : ['interpolate', ['linear'], value, encoding.min, 4, encoding.max, 16],
         'circle-opacity': opacity, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff',
       }});

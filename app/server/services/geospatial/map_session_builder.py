@@ -1188,14 +1188,14 @@ def _value_encoding_legend(
     units = json_object(declared).get(field) if isinstance(declared, dict) else declared
     unit_text = units if isinstance(units, str) and units.strip() else None
     suffix = f" {unit_text}" if unit_text else ""
+    entries = [{"color": VALUE_ENCODING_LOW_COLOR, "value": low, "label": f"{low:g}{suffix}"}]
+    if high != low:  # a flat domain has no gradient to show
+        entries.append({"color": VALUE_ENCODING_HIGH_COLOR, "value": high, "label": f"{high:g}{suffix}"})
     return {
         "kind": "continuous",
         "title": field,
         "units": unit_text,
-        "entries": [
-            {"color": VALUE_ENCODING_LOW_COLOR, "value": low, "label": f"{low:g}{suffix}"},
-            {"color": VALUE_ENCODING_HIGH_COLOR, "value": high, "label": f"{high:g}{suffix}"},
-        ],
+        "entries": entries,
         "nodata_colors": [],
     }
 
