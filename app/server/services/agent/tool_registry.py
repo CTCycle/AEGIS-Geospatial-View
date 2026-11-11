@@ -507,7 +507,8 @@ def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None or analysis_unsupported(state):
         return False
-    return (route.analysis is not None or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
+    return (route.analysis is not None or route.derived_geometry
+            or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
             or route.operation == "inspect_evidence")
 
 ###############################################################################
@@ -596,7 +597,8 @@ def follow_up_investigation_open(state: "AgentRunState") -> bool:
 
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:
-    if state.route is None or state.route.analysis is None or analysis_unsupported(state):
+    route = state.route
+    if route is None or (route.analysis is None and not route.derived_geometry) or analysis_unsupported(state):
         return True
     return any(
         result.tool_name == "transform_evidence"

@@ -4847,7 +4847,7 @@ class AgentLoop:
         requirements: list[str] = []
         if route.location_mode != "none":
             requirements.append("search_area_bound" if route.location_mode == "search_area" else "location_resolved")
-        if route.analysis is not None:
+        if route.analysis is not None or route.derived_geometry:
             requirements.append("result_locations_derived")
         route_domains = {route.primary_domain, *route.secondary_domains}
         text_location_resolution_only = is_text_location_lookup(route)

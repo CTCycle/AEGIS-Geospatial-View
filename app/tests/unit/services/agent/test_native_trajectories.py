@@ -15,7 +15,7 @@ from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.native_tools import register_agent_tools, _bind_execute_request
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_executor import ToolExecutor
-from server.services.agent.tool_registry import ToolRegistry, route_target_location_available, _data_obligation_unmet
+from server.services.agent.tool_registry import ToolRegistry, route_target_location_available, _data_obligation_unmet, _evidence_analysis_required
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver, find_macro_region
@@ -629,6 +629,19 @@ def test_stale_location_and_analysis_map_gate() -> None:
     value.tool_results.append(ToolResult(call_id="transform", tool_name="transform_evidence", status="success", summary="ranked",
                                       data={"located_record_count": 1}, metadata=ToolExecutionMetadata(duration_ms=0)))
     assert ToolRegistry._prerequisites_satisfied(frozenset({"analysis_complete_if_required"}), value)
+
+
+###############################################################################
+def test_derived_geometry_route_exposes_transform_and_requires_it_before_completion() -> None:
+    value = state("Italy")
+    value.context_hydrated = True
+    value.route = value.route.model_copy(update={"analysis": None, "derived_geometry": True})
+    AgentLoop._compile_native_goal(value, value.route)
+    assert _evidence_analysis_required(value)
+    assert "result_locations_derived" in AgentLoop._pending_native_requirements(value)
+    value.tool_results.append(ToolResult(call_id="area", tool_name="transform_evidence", status="success", summary="area",
+                                      data={"located_record_count": 20}, metadata=ToolExecutionMetadata(duration_ms=0)))
+    assert "result_locations_derived" not in AgentLoop._pending_native_requirements(value)
 
 
 ###############################################################################

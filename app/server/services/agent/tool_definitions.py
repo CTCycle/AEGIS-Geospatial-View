@@ -254,10 +254,14 @@ class CountryTagOperation(StrictToolInput):
 
 ###############################################################################
 class AreaOperation(StrictToolInput):
+    """Add each polygon record's geodesic area_km2."""
+
     op: Literal["area"]
 
 ###############################################################################
 class BufferOperation(StrictToolInput):
+    """Replace each located record with a polygon buffer zone of distance_km around it."""
+
     op: Literal["buffer"]
     distance_km: float = Field(gt=0, le=500)
 

@@ -55,6 +55,14 @@ class CapabilityRoute(BaseModel):
     # a new map or a semantic target needs a place, so the default is safe.
     location_mode: Literal["none", "target", "search_area"] = "none"
     analysis: AgentAnalysisIntent | None = None
+    derived_geometry: bool = Field(
+        default=False,
+        description=(
+            "True when the request needs a quantity or shape that no provider returns and "
+            "that is computed from retrieved geometry: the area of regions, a buffer zone "
+            "around a place or result, a spatial join, or an overlay/clip of two layers."
+        ),
+    )
     capability_queries: list[str] = Field(
         default_factory=lambda: list[str](), max_length=4
     )

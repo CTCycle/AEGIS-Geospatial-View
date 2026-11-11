@@ -549,9 +549,10 @@ class CapabilityRouter:
                 ),
             })
 
-        if proposed.analysis is not None:
-            # Analysis is performed by transform_evidence, never by inventing a
-            # provider operation such as rank_precipitation or grid_aggregate.
+        if proposed.analysis is not None or proposed.derived_geometry:
+            # Analysis and geometry derivation (area, buffer, join, overlay) are
+            # performed by transform_evidence, never by inventing a provider
+            # operation such as rank_precipitation, measure_area or buffer_and_clip.
             proposed = proposed.model_copy(update={"operation": "show" if proposed.presentation in {"map", "both"} else "inspect"})
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}

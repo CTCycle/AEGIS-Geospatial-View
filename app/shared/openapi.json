@@ -2470,6 +2470,12 @@
               }
             ]
           },
+          "derived_geometry": {
+            "type": "boolean",
+            "title": "Derived Geometry",
+            "description": "True when the request needs a quantity or shape that no provider returns and that is computed from retrieved geometry: the area of regions, a buffer zone around a place or result, a spatial join, or an overlay/clip of two layers.",
+            "default": false
+          },
           "capability_queries": {
             "items": {
               "type": "string"
