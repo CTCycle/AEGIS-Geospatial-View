@@ -508,6 +508,17 @@ def test_a_landmark_with_a_point_like_bbox_is_framed_at_street_level() -> None:
     ).violations(viewport.bbox)
 
 ###############################################################################
+def test_flat_derived_feature_keeps_its_fields_as_properties() -> None:
+    # A buffered record is typed "Feature" with a geometry but keeps flat fields.
+    square = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}
+    data = _geojson_render_data({"features": [
+        {"type": "Feature", "geometry": square, "magnitude": 2.4, "latitude": 1.0, "longitude": 2.0},
+    ]})
+
+    assert data is not None
+    assert data["features"][0]["properties"] == {"magnitude": 2.4}
+
+###############################################################################
 def test_normalized_polygon_feature_is_converted_to_renderable_geojson() -> None:
     data = _geojson_render_data(
         {

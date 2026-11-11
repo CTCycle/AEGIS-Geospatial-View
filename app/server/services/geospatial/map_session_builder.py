@@ -1226,6 +1226,7 @@ def _geojson_render_data(value: object) -> dict[str, Any] | None:
     if all(
         item.get("type") == "Feature"
         and isinstance(item.get("geometry"), dict)
+        and isinstance(item.get("properties"), dict)  # flat derived records are converted below
         for item in normalized_features
     ):
         return {"type": "FeatureCollection", "features": normalized_features}
