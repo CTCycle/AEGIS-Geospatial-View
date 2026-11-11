@@ -996,6 +996,7 @@ async def test_gdacs_events_are_reported_points_filtered_by_type_level_and_bbox(
         capability_id="gdacs_disaster_events", bbox=(90.0, -11.0, 141.0, 29.0),
         params={"live": True, "categories": ["flood", "orange"]}))
     assert urls[0].startswith(GDACS_EVENTS_URL) and "eventlist=FL" in urls[0] and "alertlevel=Orange" in urls[0]
+    assert "pagenumber=1" in urls[0] and len(urls) == 1  # a short page ends paging
     [event] = response.payload["features"]
     assert event["country"] == "Vietnam" and event["alert_level"] == "Orange"
     assert event["footprint_basis"] == "reported_point" and event["time"] == 1793836800000
@@ -1004,3 +1005,22 @@ async def test_gdacs_events_are_reported_points_filtered_by_type_level_and_bbox(
     with pytest.raises(ProviderInvalidQueryError):
         await GDACSProvider(fetcher=fetcher).fetch(ProviderRequest(
             capability_id="gdacs_disaster_events", params={"categories": ["tsunami"]}))
+
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_gdacs_requests_every_alert_level_and_pages_to_a_bounded_cap():
+    urls: list[str] = []
+
+    async def full_pages(url, headers=None):
+        urls.append(url)
+        page = int(url.rsplit("pagenumber=", 1)[1])
+        return {"type": "FeatureCollection", "features": [
+            {"geometry": {"type": "Point", "coordinates": [0, 0]},
+             "properties": {"eventtype": "EQ", "eventid": page * 1000 + index, "episodeid": 1, "alertlevel": "Green"}}
+            for index in range(100)]}
+
+    response = await GDACSProvider(fetcher=full_pages).fetch(ProviderRequest(capability_id="gdacs_disaster_events"))
+    assert "alertlevel=Green%3BOrange%3BRed" in urls[0] and len(urls) == 10
+    assert len(response.payload["features"]) == 1000
+    assert response.coverage["truncated"] is True and "capped at 1000" in response.warnings[0]

@@ -47,9 +47,9 @@
     "geometry_type": "Point",
     "queryable": true,
     "vectorizable": true,
-    "endpoint_health": "unknown",
+    "endpoint_health": "functional",
     "auth_mode": "none",
-    "official_docs_url": "https://www.gdacs.org/",
+    "official_docs_url": "https://www.gdacs.org/gdacsapi/swagger/index.html",
     "last_validated": "2026-11-11",
     "rate_limit_notes": "Use bounded date ranges and cache responses according to the manifest cache policy."
   },
@@ -58,13 +58,14 @@
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
-    "https://www.gdacs.org/"
+    "https://www.gdacs.org/gdacsapi/swagger/index.html",
+    "https://www.gdacs.org/About/termofuse.aspx"
   ],
   "license": {
-    "name": "GDACS terms of use (attribution required)",
-    "url": "https://www.gdacs.org/",
+    "name": "European Commission reuse policy (attribution required); GDACS terms of use",
+    "url": "https://commission.europa.eu/legal-notice_en#copyright-notice",
     "attributionRequired": true,
-    "commercialUse": "unknown",
+    "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
   "auth": {
@@ -102,9 +103,9 @@
     "status": "partial",
     "lastAudited": "2026-11-11",
     "knownLimitations": [
-      "Unit-validated against the documented response shape only; live retrieval and browser rendering are not yet validated.",
+      "Live retrieval validated 2026-11-11 (439 events worldwide over 7 days); browser rendering is not yet validated.",
       "Each event is a reported point location, not an affected-area footprint.",
-      "Licence terms and API documentation URLs still need confirmation against the official site."
+      "Earthquake, tsunami and cyclone notices are automated and unreviewed; GDACS terms ask users to confirm with official sources."
     ]
   },
   "cachePolicy": {
@@ -159,6 +160,7 @@
     "limitations": [
       "Without a dated range the last 7 days of events are returned.",
       "A dated range (start_time_iso, optional end_time_iso) is limited to 366 days.",
+      "At most 1000 events (10 pages of 100) are read; a capped result says so.",
       "categories selects event types (earthquake, cyclone, flood, volcano, drought, wildfire) and alert levels (green, orange, red).",
       "Each point is the reported event location; it is not an affected or inundated area."
     ],

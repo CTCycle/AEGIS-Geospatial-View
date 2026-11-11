@@ -25,6 +25,9 @@ GDACS_EVENTS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARC
 GDACS_ATTRIBUTION = "GDACS, Global Disaster Alert and Coordination System (UN, EC)"
 GDACS_RANGE_MAX_DAYS = 366
 GDACS_CURRENT_DAYS = 7
+# The event list returns pages of 100; a bounded number of pages is read.
+GDACS_PAGE_SIZE = 100
+GDACS_MAX_PAGES = 10
 EVENT_TYPES: dict[str, str] = {
     "earthquake": "EQ", "earthquakes": "EQ", "eq": "EQ",
     "cyclone": "TC", "cyclones": "TC", "tropical cyclone": "TC", "hurricane": "TC", "typhoon": "TC", "tc": "TC",
@@ -64,11 +67,21 @@ class GDACSProvider:
             "eventlist": ";".join(event_types or sorted(set(EVENT_TYPES.values()))),
             "fromDate": start.date().isoformat(),
             "toDate": end.date().isoformat(),
+            # Without alertlevel the API silently omits Green alerts.
+            "alertlevel": ";".join(alert_levels or list(ALERT_LEVELS.values())),
         }
-        if alert_levels:
-            query["alertlevel"] = ";".join(alert_levels)
         url = f"{GDACS_EVENTS_URL}?{urlencode(query)}"
-        features = _within_bbox(normalize_gdacs_events(await call_json_fetcher(self.fetcher, url)), request.bbox)
+        events: list[dict[str, object]] = []
+        truncated = True
+        for page in range(1, GDACS_MAX_PAGES + 1):
+            batch = normalize_gdacs_events(
+                await call_json_fetcher(self.fetcher, f"{url}&{urlencode({'pagenumber': page})}")
+            )
+            events.extend(batch)
+            if len(batch) < GDACS_PAGE_SIZE:
+                truncated = False
+                break
+        features = _within_bbox(_unique(events), request.bbox)
         times = [value for value in (item.get("time") for item in features) if isinstance(value, int)]
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -81,12 +94,18 @@ class GDACSProvider:
                 "totalResults": len(features),
             },
             attribution=[GDACS_ATTRIBUTION],
+            warnings=(
+                [f"Result capped at {GDACS_MAX_PAGES * GDACS_PAGE_SIZE} events; narrow the "
+                 "period, event types or alert levels for the full list."]
+                if truncated else []
+            ),
             result_status="ok" if features else "valid_empty",
             result_type="features",
             observation_time=datetime.fromtimestamp(max(times) / 1000, UTC).isoformat() if times else None,
             coverage={
                 "type": "bbox" if request.bbox else "global",
                 "temporal_scope_satisfied": True,
+                "truncated": truncated,
                 "footprint_basis": "reported_point",
                 "completeness_note": (
                     "GDACS lists events that crossed its alert models; each point is a "
@@ -191,6 +210,19 @@ def _within_bbox(
         if inside_lon and south <= lat <= north:
             kept.append(item)
     return kept
+
+
+###############################################################################
+def _unique(features: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Drop events repeated across pages (the list can shift while paging)."""
+
+    seen: set[object] = set()
+    unique: list[dict[str, object]] = []
+    for item in features:
+        if item["id"] not in seen:
+            seen.add(item["id"])
+            unique.append(item)
+    return unique
 
 
 ###############################################################################
