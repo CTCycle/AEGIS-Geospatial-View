@@ -164,6 +164,13 @@ describe('map-preview-rendering', () => {
     expect(basemapSource.tiles?.[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
   });
 
+  it('inverts the brightness ramp only for the dark basemap', () => {
+    const paintOf = (basemapId: string) => (buildStyle({ basemap_id: basemapId } as never).layers[0] as unknown as { paint: Record<string, number> }).paint;
+    const dark = paintOf('osm_dark');
+    expect(dark['raster-brightness-min']).toBeGreaterThan(dark['raster-brightness-max']);
+    expect(paintOf('osm_default')).toEqual({});
+  });
+
   it('does not silently substitute OSM when a non-OSM descriptor is unavailable', () => {
     const style = buildStyle({
       basemap_id: 'esri_world_imagery',

@@ -238,9 +238,12 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
   const baseTileUrl = buildBasemapTileUrl(mapSession);
   const basemapPaint = mapSession?.basemap_id === 'osm_dark'
     ? {
-      'raster-brightness-max': 0.45,
-      'raster-contrast': 0.35,
-      'raster-saturation': -0.8,
+      // Inverted brightness ramp (min > max) turns OSM into a dark map with light labels;
+      // the 180deg hue rotation restores roughly natural water/vegetation hues.
+      'raster-brightness-min': 0.94,
+      'raster-brightness-max': 0.06,
+      'raster-hue-rotate': 180,
+      'raster-saturation': -0.4,
     }
     : {};
   return {
