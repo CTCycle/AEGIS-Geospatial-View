@@ -41,6 +41,38 @@ describe('pages/capabilities-page.component', () => {
     expect(text).not.toContain('Ask agent');
   });
 
+  it('filters entries by search text and category and resets', async () => {
+    const fixture = TestBed.createComponent(CapabilitiesPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const total = component.catalogEntryCount;
+    const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+
+    input.value = 'tomtom';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(component.visibleEntryCount).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('1 of ' + total + ' entries');
+    expect(fixture.nativeElement.textContent).not.toContain('Windy Webcams');
+
+    input.value = 'nomatch';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No matching entries');
+
+    component.resetFilters();
+    component.setGroupFilter('cameras');
+    fixture.detectChanges();
+    expect(component.visibleEntryCount).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('Windy Webcams');
+    expect(fixture.nativeElement.textContent).not.toContain('TomTom Traffic Flow');
+
+    component.resetFilters();
+    expect(component.visibleEntryCount).toBe(total);
+  });
+
   it('falls back to an empty catalog and unavailable status text on fetch failure', async () => {
     apiClient.fetchCatalog.and.rejectWith(new Error('network failed'));
 

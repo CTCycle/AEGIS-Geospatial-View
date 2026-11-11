@@ -2,7 +2,7 @@
   <h1 class="page-title">Geospatial catalog</h1>
   <header class="capabilities-page__header">
     <div class="capabilities-page__summary">
-      <span>{{ catalogEntryCount }} entries</span>
+      <span>{{ hasActiveFilters ? visibleEntryCount + ' of ' + catalogEntryCount : catalogEntryCount }} entries</span>
       <span>{{ isLoading ? 'Loading' : catalogLoadFailed ? 'Unavailable' : 'Ready' }}</span>
     </div>
   </header>
@@ -21,6 +21,30 @@
         <p>The catalog API responded successfully but did not return any capabilities.</p>
       </section>
     } @else {
+      <section class="capabilities-filters" aria-label="Catalog filters">
+        <input
+          type="search"
+          aria-label="Search catalog"
+          placeholder="Search name, provider, coverage or purpose"
+          [value]="searchText"
+          (input)="setSearchText($any($event.target).value)"
+        />
+        <select aria-label="Filter by category" [value]="groupFilter" (change)="setGroupFilter($any($event.target).value)">
+          <option value="all">All categories</option>
+          @for (group of groups; track group.id) {
+            <option [value]="group.id">{{ group.label }}</option>
+          }
+        </select>
+        @if (hasActiveFilters) {
+          <button type="button" (click)="resetFilters()">Reset</button>
+        }
+      </section>
+      @if (visibleEntryCount === 0) {
+        <section class="capabilities-empty" aria-live="polite">
+          <h2>No matching entries</h2>
+          <p>No catalog entries match the current search and filter.</p>
+        </section>
+      }
       @for (group of groups; track group.id) {
         @if (itemsFor(group.id).length > 0) {
           <section class="capability-section" [attr.aria-label]="group.label">

@@ -29,6 +29,8 @@ export class CapabilitiesPageComponent implements OnInit {
   statusText = 'Loading capabilities';
   isLoading = true;
   catalogLoadFailed = false;
+  searchText = '';
+  groupFilter: CapabilityGroup | 'all' = 'all';
 
   readonly groups: Array<{ id: CapabilityGroup; label: string; description: string }> = [
     { id: 'providers', label: 'Data Providers', description: 'Source systems and access constraints.' },
@@ -60,18 +62,54 @@ export class CapabilitiesPageComponent implements OnInit {
     }
   }
 
+  setSearchText(value: string): void {
+    this.searchText = value;
+  }
+
+  setGroupFilter(value: string): void {
+    this.groupFilter = this.groups.some((group) => group.id === value) ? value as CapabilityGroup : 'all';
+  }
+
+  resetFilters(): void {
+    this.searchText = '';
+    this.groupFilter = 'all';
+  }
+
+  get hasActiveFilters(): boolean {
+    return this.searchText.trim() !== '' || this.groupFilter !== 'all';
+  }
+
   itemsFor(group: CapabilityGroup): CapabilityDescriptor[] {
-    return this.catalog[group] ?? [];
+    const items = this.catalog[group] ?? [];
+    if (this.groupFilter !== 'all' && this.groupFilter !== group) {
+      return [];
+    }
+    const query = this.searchText.trim().toLowerCase();
+    if (!query) {
+      return items;
+    }
+    return items.filter((item) => this.searchableText(item).includes(query));
   }
 
   get catalogEntryCount(): number {
+    return this.groups.reduce((count, group) => count + (this.catalog[group.id] ?? []).length, 0);
+  }
+
+  get visibleEntryCount(): number {
     return this.groups.reduce((count, group) => count + this.itemsFor(group.id).length, 0);
   }
 
   get emptyGroups(): string[] {
     return this.groups
-      .filter((group) => this.itemsFor(group.id).length === 0)
+      .filter((group) => (this.catalog[group.id] ?? []).length === 0)
       .map((group) => group.label);
+  }
+
+  private searchableText(item: CapabilityDescriptor): string {
+    return [item.name, item.id, item.provider, item.type, item.kind, item.coverage, this.capabilityPurpose(item)]
+      .filter((value): value is string => typeof value === 'string')
+      .join(' ')
+      .toLowerCase();
   }
 
   capabilityPurpose(item: CapabilityDescriptor): string {

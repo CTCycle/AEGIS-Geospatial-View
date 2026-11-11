@@ -232,3 +232,28 @@
     color: #8fa6b0;
     font-size: 0.76rem;
 }
+
+.capabilities-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.capabilities-filters input,
+.capabilities-filters select,
+.capabilities-filters button {
+    border: 1px solid #2b3f4a;
+    background: #101c23;
+    padding: 0.5rem 0.7rem;
+    color: #e6f1f5;
+    font: inherit;
+}
+
+.capabilities-filters input {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.capabilities-filters button {
+    cursor: pointer;
+}
