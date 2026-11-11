@@ -1088,3 +1088,11 @@ async def test_jrc_surface_water_is_a_render_only_tile_descriptor():
     assert response.payload["maxZoom"] == 13 and "EC JRC/Google" in response.attribution[0]
     with pytest.raises(ProviderInvalidQueryError):
         await JRCSurfaceWaterProvider().fetch(ProviderRequest(capability_id="jrc_surface_water_extent"))
+
+    since_1980 = await JRCSurfaceWaterProvider().fetch(ProviderRequest(
+        capability_id="jrc_surface_water_change", time=datetime(1980, 1, 1, tzinfo=UTC)))
+    assert since_1980.coverage["temporal_scope_satisfied"] is True and since_1980.coverage["period_composite"] is True
+    assert "starts in 1984" in since_1980.warnings[0]
+    future = await JRCSurfaceWaterProvider().fetch(ProviderRequest(
+        capability_id="jrc_surface_water_change", time=datetime(2025, 6, 1, tzinfo=UTC)))
+    assert future.coverage["temporal_scope_satisfied"] is False

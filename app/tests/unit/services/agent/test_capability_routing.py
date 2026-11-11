@@ -93,6 +93,15 @@ async def test_single_frame_raster_for_a_monthly_aggregation_is_disclosed_but_no
         for warning in result.data["warnings"]
     )
 
+    # A product that summarises the whole period is not a single frame.
+    composite = ProviderResponse(**{**response.__dict__, "coverage": {**(response.coverage or {}), "period_composite": True}})
+    summary = await _service(FakeProviderRegistry(composite)).execute_capability(
+        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[8, 45, 10, 46],
+                               start_time_iso="2026-07-01", end_time_iso="2026-07-31"),
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+    assert not any("Only one frame" in warning for warning in summary.data.get("warnings", []))
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope() -> None:

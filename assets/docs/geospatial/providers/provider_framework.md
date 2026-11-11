@@ -17,7 +17,7 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `gtfs_static.py`
 - `fema.py`
 - `gdacs.py` (disaster events as reported points, `footprint_basis: reported_point`)
-- `jrc.py` (JRC Global Surface Water 1984-2024 occurrence and change tiles; render-only, proxied, zoom 0-13)
+- `jrc.py` (JRC Global Surface Water 1984-2024 occurrence and change tiles; render-only, proxied, zoom 0-13; declares `period_composite`)
 - `geoboundaries.py` (gbOpen admin polygons; the GitHub raw geometry link is rewritten to its fixed LFS media host because shared retrieval never follows redirects)
 - `local_open_data.py`
 - `mobility_database.py`
@@ -78,6 +78,7 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced with stable semantics without leaking credentials. A valid empty result is emitted only after a successful semantic response; provider failures must not be converted into empty feature collections.
 - Shared HTTP retrieval does not follow redirects, bounds response bodies to the configured maximum, preserves `Retry-After` on rate-limit errors, and treats deterministic 4xx responses as non-retryable.
 - Hazard providers include legends and freshness labels where applicable.
+- A raster that summarises a whole period (rather than one dated frame) sets `coverage.period_composite: true` and its own `temporal_scope_satisfied` from the requested window's overlap with that period; it is then not reported as a single frame of a multi-day window.
 - Local open-data camera and dataset sources are selected by configured source IDs in `LOCAL_OPEN_DATA_SOURCES`; callers cannot supply arbitrary URLs, and private-network targets are rejected.
 - Mobility Database discovery reads a local CSV snapshot and refreshes it from the public catalog only when the snapshot is missing or explicitly requested; each feed's authentication and license metadata is preserved.
 - Provider adapters must not return credentials, credential-bearing URLs, or raw capability XML to frontend API responses.

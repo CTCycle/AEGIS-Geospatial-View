@@ -89,9 +89,9 @@ Representative implemented layers include:
 - `openchargemap_ev_charging`
 - `opentripmap_tourism_pois`
 - `emsc_earthquakes`
-- `gdacs_disaster_events` (disabled by default until browser-validated)
-- `geoboundaries_admin` (disabled by default until browser-validated)
-- `jrc_surface_water_occurrence`, `jrc_surface_water_change` (disabled by default until browser-validated)
+- `gdacs_disaster_events`
+- `geoboundaries_admin`
+- `jrc_surface_water_occurrence`, `jrc_surface_water_change`
 - `usgs_earthquakes`
 - `usgs_water_gauges`
 - `gtfs_static`

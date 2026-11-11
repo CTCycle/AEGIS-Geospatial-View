@@ -234,7 +234,7 @@
     },
     {
       "capability_id": "gdacs_disaster_events",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": true,
@@ -250,7 +250,7 @@
     },
     {
       "capability_id": "geoboundaries_admin",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": true,
@@ -806,7 +806,7 @@
     },
     {
       "capability_id": "jrc_surface_water_occurrence",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": false,
@@ -822,7 +822,7 @@
     },
     {
       "capability_id": "jrc_surface_water_change",
-      "enabled_by_default": false,
+      "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": false,

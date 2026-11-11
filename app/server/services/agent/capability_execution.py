@@ -914,6 +914,10 @@ def _single_frame_scope_warning(
 ) -> str | None:
     """Warn when one raster frame stands in for a window or an aggregation."""
 
+    if coverage.get("period_composite") is True:
+        # A product summarising a whole period (1984-2024 water change) is not
+        # one frame of a time series: it answers the window it covers.
+        return None
     def day(value: object) -> date | None:
         try:
             return date.fromisoformat(str(value)[:10])

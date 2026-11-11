@@ -1943,7 +1943,7 @@ class _PlaceResolver:
 ###############################################################################
 async def _raster_map_run(
     message: str, route: dict[str, Any], place: str, capability: str, *, first_try: str | None = None,
-    evidence: MemoryEvidence | None = None,
+    evidence: MemoryEvidence | None = None, excluded: tuple[str, ...] = (),
 ) -> tuple[AgentRunState, list[str]]:
     """Run route -> resolve -> (describe first_try) -> describe -> execute -> map with a keyless raster source."""
 
@@ -1963,7 +1963,7 @@ async def _raster_map_run(
     ])
     state = AgentRunState(
         phase=AgentPhase.RECEIVE_REQUEST, request_id="raster", conversation_id="raster", user_message=message,
-        context_hydrated=True,
+        context_hydrated=True, excluded_capability_ids=list(excluded),
     )
     await make_loop(model, providers, _PlaceResolver(), evidence or MemoryEvidence()).run(AgentLoopRequest(
         provider="scripted", model="scripted", state=state, budget=AgentExecutionBudget(total_seconds=10)))
@@ -2008,9 +2008,10 @@ async def test_coverage_rejection_hands_over_to_the_covering_equivalent_and_maps
 ###############################################################################
 @pytest.mark.asyncio
 async def test_imagery_only_evidence_on_an_analysis_route_is_mapped_and_the_analysis_disclosed_unsupported() -> None:
-    # S13: the only keyless fire source is raster imagery, so the hotspot
-    # analysis cannot be computed; the layer is still shown, without any
-    # unexposed or invalid tool call, and the answer discloses the gap.
+    # S13: when the only fire source is raster imagery, the hotspot analysis
+    # cannot be computed; the layer is still shown, without any unexposed or
+    # invalid tool call, and the answer discloses the gap. GDACS wildfire
+    # events (a numeric source) are excluded to keep that premise.
     route = {
         "primary_domain": "data_retrieval", "secondary_domains": ["map_rendering"], "task_mode": "execute",
         "presentation": "map", "location_mode": "search_area", "target_refs": ["Portugal"], "operation": "show",
@@ -2020,7 +2021,7 @@ async def test_imagery_only_evidence_on_an_analysis_route_is_mapped_and_the_anal
     }
     state, _ = await _raster_map_run(
         "Show me the current wildfire hotspots in Portugal on the map.", route, "Portugal",
-        "MODIS_Combined_Thermal_Anomalies_Fire",
+        "MODIS_Combined_Thermal_Anomalies_Fire", excluded=("gdacs_disaster_events",),
     )
 
     assert state.capability_ids == ["MODIS_Combined_Thermal_Anomalies_Fire"]

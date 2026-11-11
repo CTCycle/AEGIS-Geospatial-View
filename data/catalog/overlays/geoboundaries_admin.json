@@ -138,8 +138,7 @@
     "lastAudited": "2026-11-11",
     "knownLimitations": [
       "Live retrieval validated 2026-11-11 for Italy, Switzerland and India; browser rendering is not yet validated.",
-      "Simplified geometry: suitable for mapping and joins, not for legal or parcel precision.",
-      "Level meanings differ by country (Italy ADM1 is macro-regions, ADM2 regions)."
+      "Simplified geometry: suitable for mapping and joins, not for legal or parcel precision."
     ]
   },
   "cachePolicy": {
@@ -188,6 +187,7 @@
     "coverage": "global",
     "limitations": [
       "One country and admin_level per request; at most 1000 units.",
+      "Level meanings differ by country; pick the level whose units match the request (Italy: ADM1 = 5 macro-regions, ADM2 = 20 regions, ADM3 = provinces). The result reports the unit count.",
       "Units are filtered to the requested bbox when one is bound.",
       "Polygons are the partner for transform_evidence spatial_join and area."
     ],
