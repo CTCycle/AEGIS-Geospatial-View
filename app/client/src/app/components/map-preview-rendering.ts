@@ -236,6 +236,13 @@ const buildBasemapTileUrl = (mapSession?: MapSession): string | null => {
 export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
   const basemap = mapSession?.basemap;
   const baseTileUrl = buildBasemapTileUrl(mapSession);
+  const basemapPaint = mapSession?.basemap_id === 'osm_dark'
+    ? {
+      'raster-brightness-max': 0.45,
+      'raster-contrast': 0.35,
+      'raster-saturation': -0.8,
+    }
+    : {};
   return {
     version: 8,
     sources: {
@@ -254,6 +261,7 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
         source: 'basemap',
         minzoom: 0,
         maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
+        paint: basemapPaint,
       },
     ],
   };
