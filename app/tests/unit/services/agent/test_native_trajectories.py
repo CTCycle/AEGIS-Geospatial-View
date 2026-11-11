@@ -741,6 +741,29 @@ async def test_spatial_join_persists_traceable_polygon_evidence() -> None:
 
 
 ###############################################################################
+def test_unresolvable_extra_place_asks_only_while_a_route_target_is_unresolved() -> None:
+    value = state("Italy")
+    resolved = ToolResult(call_id="italy", tool_name="resolve_geospatial_location", status="success",
+                          summary="Resolved Italy.", metadata=ToolExecutionMetadata(duration_ms=1))
+    extra = ToolResult(
+        call_id="regions", tool_name="resolve_geospatial_location", status="failed",
+        summary="I could not safely resolve Italian regions.",
+        error=ToolExecutionError(error_type="state_conflict", code="clarification_required",
+                                 message="I could not safely resolve Italian regions.", retryable=False,
+                                 recovery="request_user_input"),
+        metadata=ToolExecutionMetadata(duration_ms=1))
+
+    def stop() -> tuple[str, str] | None:
+        return AgentLoop._evaluate_stop(value, value.route, [resolved, extra], max_consecutive_tool_failures=3,
+                                        max_validation_corrections=3, max_discovery_attempts=3)
+
+    assert stop() == ("clarification_required", "I could not safely resolve Italian regions.")
+    value.location_refs["Italy"] = ResolvedLocation(label="Italy", country="Italy", latitude=42.6, longitude=12.7,
+                                                    location_type="country")
+    assert stop() is None
+
+
+###############################################################################
 def test_checkpoint_preserves_typed_intent_but_redacts_unstructured_analysis() -> None:
     from server.repositories.agent_runs import redact_trace_payload
     intent = {"kind": "rank", "metric": "rain", "order": "descending", "top_k": 5}

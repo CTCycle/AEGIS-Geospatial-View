@@ -1533,11 +1533,13 @@ class AgentLoop:
         for item in json_array(json_object(result.data).get("preview"))[:5]:
             record = json_object(item)
             values = json_object(record.get("properties")) or record
+            # A record's own name is more specific than the place its
+            # request targeted (source_place only separates compared sets).
             label = str(
                 values.get("place_label")
-                or values.get("source_place")
                 or values.get("name")
                 or values.get("label")
+                or values.get("source_place")
                 or ""
             ).strip()
             measures = [
@@ -4125,6 +4127,10 @@ class AgentLoop:
         # A coverage rejection asks the user only when nothing else in the
         # batch succeeded; otherwise an in-coverage alternative is in hand.
         alternative_succeeded = any(result.status != "failed" for result in results)
+        # An unresolvable extra place (a model lookup of "Italian regions"
+        # beside "Italy") asks nothing once every route target is resolved:
+        # the request is answerable without it.
+        locations_settled = route_target_location_available(state)
         asking = next(
             (
                 result
@@ -4133,6 +4139,9 @@ class AgentLoop:
                 and result.error.recovery == "request_user_input"
                 and not (
                     result.error.code == "policy_rejection" and alternative_succeeded
+                )
+                and not (
+                    result.tool_name == "resolve_geospatial_location" and locations_settled
                 )
             ),
             None,
