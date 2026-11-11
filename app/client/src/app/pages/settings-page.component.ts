@@ -720,6 +720,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ollamaStatusText = detail;
     } finally {
       this.isRefreshingOllama = false;
+      if (!this.isDestroyed) {
+        this.syncState();
+        this.changeDetectorRef.detectChanges();
+      }
     }
   }
 

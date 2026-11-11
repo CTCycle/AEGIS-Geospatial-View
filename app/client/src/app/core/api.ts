@@ -88,7 +88,7 @@ const requestTimeoutMs = (url: string, init: RequestInit): number => {
   ) {
     return API_REQUEST_TIMEOUTS.long_operation;
   }
-  if (init.method?.toUpperCase() === 'GET') {
+  if (init.method?.toUpperCase() === 'GET' || normalizedUrl.includes('/ollama/refresh')) {
     return API_REQUEST_TIMEOUTS.metadata;
   }
   return API_REQUEST_TIMEOUTS.ordinary;

@@ -949,6 +949,19 @@ describe('pages/settings-page.component', () => {
     expect(component.isRefreshingOllama).toBeFalse();
   });
 
+  it('re-enables refresh and renders the error when refresh fails', async () => {
+    refreshOllamaModelsMock.and.rejectWith(new Error('Request timed out before completion.'));
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    await component.refreshOllamaLibrary();
+
+    expect(component.isRefreshingOllama).toBeFalse();
+    expect(fixture.nativeElement.textContent).not.toContain('Refreshing Ollama library');
+  });
+
   it('syncQueryState and persistence update URL and store', async () => {
     window.history.replaceState({}, '', '/settings');
     const fixture = TestBed.createComponent(SettingsPageComponent);
