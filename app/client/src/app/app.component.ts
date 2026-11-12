@@ -4,6 +4,7 @@ import {
   ElementRef,
   OnDestroy,
   OnInit,
+  signal,
   ViewChild,
 } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -20,7 +21,11 @@ import { WorkspaceStatusBarComponent } from './components/workspace-status-bar.c
 })
 export class AppComponent implements OnInit, OnDestroy {
   readonly minimumDesktopViewportWidth = 1024;
-  isDesktopViewport = true;
+  private readonly desktopViewport = signal(true);
+
+  get isDesktopViewport(): boolean {
+    return this.desktopViewport();
+  }
   /** The search workspace renders its own richer status bar. */
   showShellStatusBar = false;
 
@@ -78,12 +83,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private updateViewportSupport(): void {
     if (typeof window === 'undefined') {
-      this.isDesktopViewport = true;
       return;
     }
 
     const wasDesktopViewport = this.isDesktopViewport;
-    this.isDesktopViewport = window.innerWidth >= this.minimumDesktopViewportWidth;
+    this.desktopViewport.set(window.innerWidth >= this.minimumDesktopViewportWidth);
     if (wasDesktopViewport && !this.isDesktopViewport) {
       window.setTimeout(() => {
         if (!this.isDesktopViewport) {

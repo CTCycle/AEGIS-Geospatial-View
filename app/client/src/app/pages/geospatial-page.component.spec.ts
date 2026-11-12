@@ -933,7 +933,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Agent needs attention');
     expect(component.messages).toEqual([{ role: 'user', content: 'show map', kind: 'normal' }]);
     expect(component.runFailureSummary)
-      .toBe('The request could not be completed. Open Tool activity for execution details.');
+      .toBe('The request could not be completed.');
   });
 
   it('operation-aware alerts use the concise execution failure summary', () => {
@@ -973,6 +973,28 @@ describe('pages/geospatial-page.component', () => {
       tone: 'warn',
     });
     expect(component.activeAlertItems).toContain('Selected OpenAI credential needs attention (unreadable).');
+  });
+
+  it('keeps the draft and links to setup when the selected provider cannot run', async () => {
+    agentReadiness.loadReadiness.and.resolveTo({
+      status: 'needs_attention',
+      label: 'Needs attention',
+      message: 'Selected OpenAI model is missing its API key.',
+      settingsTab: 'model-providers',
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'Show the Colosseum in Rome.';
+
+    await component.sendMessage();
+
+    expect(component.composerDraft).toBe('Show the Colosseum in Rome.');
+    expect(apiClient.createConversation).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.chat-composer-error a')?.getAttribute('href'))
+      .toBe('/settings?tab=model-providers');
   });
 
   it('clarification run event applies partial map update and closes the run', () => {
@@ -1703,22 +1725,15 @@ describe('pages/geospatial-page.component', () => {
     expect((root.querySelector('.workspace-toolbar [aria-label="Layers"]') as HTMLButtonElement).disabled).toBeTrue();
   });
 
-  it('opens map tools and layers from the workspace toolbar', () => {
+  it('disables map tools and layers while the workspace has no map', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    const click = (name: string) => {
-      (root.querySelector(`.workspace-toolbar [aria-label="${name}"]`) as HTMLButtonElement).click();
-      fixture.detectChanges();
-    };
-
-    click('Map tools');
-    click('Layers');
-    expect(fixture.componentInstance.isMapToolsOpen).toBeTrue();
-    expect(fixture.componentInstance.isLayersOpen).toBeTrue();
-
-    click('Map tools');
-    expect(fixture.componentInstance.isMapToolsOpen).toBeFalse();
+    for (const name of ['Map tools', 'Layers']) {
+      const button = root.querySelector<HTMLButtonElement>(`.workspace-toolbar [aria-label="${name}"]`);
+      expect(button?.disabled).toBeTrue();
+      expect(button?.getAttribute('aria-expanded')).toBe('false');
+    }
   });
 
   it('collapses and reopens the history sidebar and lists recent sessions', async () => {

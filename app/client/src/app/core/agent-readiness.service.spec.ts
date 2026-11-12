@@ -135,6 +135,17 @@ describe('AgentReadinessService', () => {
     expect(apiClient.fetchChatModels).not.toHaveBeenCalled();
   });
 
+  it('treats an absent credential record as a missing key', async () => {
+    apiClient.fetchChatSettings.and.resolveTo(settings({ credentials: {}, credential_health: {} }));
+
+    const readiness = await service.loadReadiness();
+
+    expect(readiness.status).toBe('needs_attention');
+    expect(readiness.settingsTab).toBe('model-providers');
+    expect(readiness.message).toContain('missing its API key');
+    expect(apiClient.fetchChatModels).not.toHaveBeenCalled();
+  });
+
   it('reports unavailable local Ollama models', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings({
       active_provider_mode: 'local',

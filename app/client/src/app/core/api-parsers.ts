@@ -1558,6 +1558,7 @@ export const parseOllamaRefreshResponse = (value: unknown): GenericObjectRespons
   const record = requireApiRecord(value, endpoint);
   return {
     status: requireApiString(record, 'status', endpoint),
+    message: requireApiStringOrNull(record, 'message', endpoint),
     library_models: requireApiStringArray(record, 'library_models', endpoint),
     local_models: requireApiStringArray(record, 'local_models', endpoint),
     local_model_capabilities: normalizeModelCards(

@@ -18,19 +18,22 @@ type SatelliteState = 'checking' | 'available' | 'unavailable';
   changeDetection: ChangeDetectionStrategy.Eager,
 })
 export class WorkspaceStatusBarComponent implements OnInit, OnDestroy {
-  readonly interactions: Record<string, CapabilityStatusInteraction> = {
-    'Agent model': {
-      route: '/settings',
-      actionLabel: 'Open agent settings',
-      description: 'Review the configured agent model and provider.',
-    },
-    'Optional Keys': {
-      route: '/settings',
-      queryParams: { tab: 'geospatial-access' },
-      actionLabel: 'Open geospatial access settings',
-      description: 'Optional provider credentials are managed in Settings under Geospatial Access.',
-    },
-  };
+  get interactions(): Record<string, CapabilityStatusInteraction> {
+    return {
+      'Agent model': {
+        route: '/settings',
+        queryParams: { tab: this.agentReadiness.settingsTab || 'models' },
+        actionLabel: 'Open agent settings',
+        description: 'Review the configured agent model and provider.',
+      },
+      'Optional Keys': {
+        route: '/settings',
+        queryParams: { tab: 'geospatial-access' },
+        actionLabel: 'Open geospatial access settings',
+        description: 'Optional provider credentials are managed in Settings under Geospatial Access.',
+      },
+    };
+  }
 
   private agentReadiness: AgentReadinessState = INITIAL_AGENT_READINESS_STATE;
   private satellite: SatelliteState = 'checking';

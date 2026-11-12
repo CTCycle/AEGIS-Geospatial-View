@@ -325,8 +325,16 @@
             <header class="settings-row__label"><h3>Conversation</h3></header>
             <div class="settings-row__body runtime-settings__fields">
               <label>Maximum history messages
-                <input class="settings-control" type="number" min="1" max="500" [(ngModel)]="runtimeSettingsDraft.chat.max_history_messages" />
+                <input class="settings-control" type="number" min="1" max="500" required
+                  [attr.aria-invalid]="historyLimitInvalid ? 'true' : null"
+                  [attr.aria-describedby]="historyLimitInvalid ? 'history-limit-error' : null"
+                  [(ngModel)]="runtimeSettingsDraft.chat.max_history_messages" />
               </label>
+              @if (historyLimitInvalid) {
+                <p id="history-limit-error" class="settings-inline-status settings-inline-status--error" role="alert">
+                  Enter a whole number from 1 to 500.
+                </p>
+              }
               <label>Application timezone
                 <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
               </label>

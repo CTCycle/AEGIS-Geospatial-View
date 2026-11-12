@@ -42,6 +42,7 @@ def _models_payload() -> dict[str, Any]:
                 "description": "Cloud model",
                 "provider": "openai",
                 "capabilities": ["chat"],
+                "supports_tools": True,
                 "tool_support_source": "fixture",
                 "context_profile_source": "fixture",
                 "metadata": {},
@@ -165,7 +166,10 @@ def _setup_stubs(page: Page) -> None:
     page.route(
         re.compile(r".*/api/conversations$"),
         lambda route: _json_ok(
-            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
+            route,
+            {"conversations": [], "next_cursor": None}
+            if route.request.method == "GET"
+            else {"conversation_id": "conversation-e2e", "title": "E2E"},
         ),
     )
     page.route(
@@ -218,8 +222,8 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
 
     actual_path = DIFF_ROOT / f"actual_{baseline_name}"
     actual_path.write_bytes(actual_bytes)
-    actual = Image.open(actual_path).convert("RGBA")
-    expected = Image.open(baseline_path).convert("RGBA")
+    actual = Image.open(actual_path).convert("RGB")
+    expected = Image.open(baseline_path).convert("RGB")
     if actual.size != expected.size:
         raise AssertionError(
             f"Visual size mismatch for {baseline_name}: expected {expected.size}, got {actual.size}."
@@ -228,7 +232,7 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
     bbox = diff.getbbox()
     if bbox is None:
         return
-    diff_pixels = sum(1 for pixel in diff.getdata() if pixel != (0, 0, 0, 0))
+    diff_pixels = sum(1 for pixel in diff.get_flattened_data() if pixel != (0, 0, 0))
     if diff_pixels > 250:
         diff_path = DIFF_ROOT / f"diff_{baseline_name}"
         diff.save(diff_path)
@@ -236,25 +240,27 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
             f"Visual regression for {baseline_name}: {diff_pixels} pixels differ. See {diff_path}."
         )
 
-###############################################################################
-def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
+def _open_fixture_map(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 1280, "height": 720})
     _setup_stubs(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show fixture map")
     page.get_by_role("button", name="Send message").click()
+    expect(page.get_by_text("Loaded visual regression fixture.")).to_be_visible()
+    expect(page.get_by_text("Rome, Italy", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Layers", exact=True).click()
+    loaded_layer = page.locator('#map-layers-panel label[data-render-status="loaded"]')
+    expect(loaded_layer).to_contain_text("Visual fixture points")
 
+###############################################################################
+def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
+    _open_fixture_map(page, base_url)
     map_canvas = page.locator(".maplibregl-canvas:visible").last
-    expect(map_canvas).to_be_visible(timeout=15000)
-    page.wait_for_timeout(500)
-    map_canvas = page.locator(".maplibregl-canvas:visible").last
+    expect(map_canvas).to_be_visible()
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
 
 ###############################################################################
 def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> None:
-    _setup_stubs(page)
-    page.goto(base_url)
-    page.get_by_label("Chat message").fill("show fixture map")
-    page.get_by_role("button", name="Send message").click()
-
+    _open_fixture_map(page, base_url)
     page_root = page.locator("body")
     _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png")

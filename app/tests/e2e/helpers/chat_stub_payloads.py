@@ -293,18 +293,18 @@ def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, An
 ###############################################################################
 def model_settings_payload() -> dict[str, Any]:
     return {
-        "active_provider_mode": "local",
-        "agent_model_provider": "ollama",
-        "agent_model_name": "llama3.2",
+        "active_provider_mode": "cloud",
+        "agent_model_provider": "openai",
+        "agent_model_name": "gpt-4.1-mini",
         "ollama_url": "http://localhost:11434",
         "openai_base_url": None,
         "google_base_url": None,
         "deepseek_base_url": None,
-        "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
+        "credentials": {"openai": {"api_key": True}},
         "credential_health": {},
         "selected_model_context": {
-            "provider": "ollama",
-            "model": "llama3.2",
+            "provider": "openai",
+            "model": "gpt-4.1-mini",
             "context_window_tokens": None,
             "maximum_output_tokens": None,
             "context_profile_source": "fixture",

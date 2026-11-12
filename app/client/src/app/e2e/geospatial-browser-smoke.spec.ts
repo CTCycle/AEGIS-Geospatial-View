@@ -385,7 +385,7 @@ describe('e2e/geospatial browser smoke', () => {
     fixture.detectChanges();
 
     const pageElement: HTMLElement = fixture.nativeElement;
-    const expandButton = pageElement.querySelector('.overlay-controls__toggle') as HTMLButtonElement | null;
+    const expandButton = pageElement.querySelector('button[aria-label="Layers"]') as HTMLButtonElement | null;
     expect(expandButton).not.toBeNull();
     expandButton?.click();
     fixture.detectChanges();

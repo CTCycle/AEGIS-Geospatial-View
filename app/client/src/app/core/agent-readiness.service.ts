@@ -12,6 +12,7 @@ export interface AgentReadinessState {
   status: AgentReadinessStatus;
   label: string;
   message: string;
+  settingsTab?: 'models' | 'model-providers';
   /** Catalog-reported image input support; absent or null when unknown. */
   supportsVision?: boolean | null;
 }
@@ -44,7 +45,7 @@ export class AgentReadinessService {
       const provider = settings.agent_model_provider;
       const model = settings.agent_model_name.trim();
       if (!provider || !model) {
-        return this.needsAttention('No agent model is selected. Open Settings before using the workspace.');
+        return this.needsAttention('Select an agent model to send a message.');
       }
       if (!CANONICAL_LLM_PROVIDERS.has(provider)) {
         return this.needsAttention(
@@ -57,7 +58,7 @@ export class AgentReadinessService {
 
       const credentialIssue = this.resolveCloudCredentialIssue(settings, provider);
       if (credentialIssue) {
-        return this.needsAttention(credentialIssue);
+        return this.needsAttention(credentialIssue, 'model-providers');
       }
 
       const dynamicProvider = isDynamicCloudProvider(provider) ? provider : undefined;
@@ -79,7 +80,7 @@ export class AgentReadinessService {
     if (credentialHealth && credentialHealth !== 'healthy') {
       return `Selected ${providerDisplayLabel(provider)} credential needs attention (${credentialHealth}).`;
     }
-    if (settings.credentials?.[provider]?.['api_key'] === false) {
+    if (settings.credentials?.[provider]?.['api_key'] !== true) {
       return `Selected ${providerDisplayLabel(provider)} model is missing its API key.`;
     }
     return null;
@@ -96,17 +97,17 @@ export class AgentReadinessService {
     const descriptor = modelsResult.status === 'fulfilled'
       ? modelsResult.value.local.find((entry) => entry.id === model)
       : undefined;
-    if (modelsResult.status === 'fulfilled' && !descriptor) {
-      return this.needsAttention(`Selected local model unavailable. ${model} is selected but not installed in Ollama.`);
-    }
     if (healthResult.status === 'fulfilled' && healthResult.value.ok === false) {
       return this.needsAttention(this.userFacingErrorService.normalizeDisplayText(
         String(healthResult.value.detail ?? '').trim(),
         `Unable to reach Ollama at ${settings.ollama_url}.`,
-      ));
+      ), 'model-providers');
     }
     if (healthResult.status === 'rejected') {
-      return this.needsAttention(`Unable to verify Ollama at ${settings.ollama_url}.`);
+      return this.notVerified(`Unable to verify Ollama at ${settings.ollama_url}.`);
+    }
+    if (modelsResult.status === 'fulfilled' && !descriptor) {
+      return this.needsAttention(`Selected local model unavailable. ${model} is selected but not installed in Ollama.`);
     }
     if (!descriptor) {
       return this.notVerified('Could not load selected model capability metadata. Tool calling is not verified.');
@@ -138,8 +139,11 @@ export class AgentReadinessService {
     return `${model} is configured through ${providerDisplayLabel(provider)}.`;
   }
 
-  private needsAttention(message: string): AgentReadinessState {
-    return { status: 'needs_attention', label: 'Needs attention', message };
+  private needsAttention(
+    message: string,
+    settingsTab: NonNullable<AgentReadinessState['settingsTab']> = 'models',
+  ): AgentReadinessState {
+    return { status: 'needs_attention', label: 'Needs attention', message, settingsTab };
   }
 
   private notVerified(message: string): AgentReadinessState {

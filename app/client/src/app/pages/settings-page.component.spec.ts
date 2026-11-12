@@ -110,7 +110,7 @@ describe('pages/settings-page.component', () => {
     }));
     updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload) => payload as never);
     checkOllamaHealthMock = jasmine.createSpy('checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
-    refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
+    refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({ status: 'ok' });
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
     fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({ providers: [] });
     fetchRuntimeSettingsMock = jasmine.createSpy('fetchRuntimeSettings').and.resolveTo(runtimeSettingsResponse());
@@ -931,7 +931,7 @@ describe('pages/settings-page.component', () => {
   it('prevents overlapping refresh requests', async () => {
     let releaseRefresh: (() => void) | undefined;
     refreshOllamaModelsMock.and.returnValue(new Promise((resolve) => {
-      releaseRefresh = () => resolve({});
+      releaseRefresh = () => resolve({ status: 'ok' });
     }));
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -960,6 +960,20 @@ describe('pages/settings-page.component', () => {
 
     expect(component.isRefreshingOllama).toBeFalse();
     expect(fixture.nativeElement.textContent).not.toContain('Refreshing Ollama library');
+  });
+
+  it('reports an unavailable Ollama catalog when the refresh API returns HTTP success', async () => {
+    refreshOllamaModelsMock.and.resolveTo({
+      status: 'unavailable',
+      message: 'Unable to reach the local Ollama server.',
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await fixture.componentInstance.refreshOllamaLibrary();
+
+    expect(fixture.componentInstance.statusText).toContain('Unable to reach Ollama');
   });
 
   it('syncQueryState and persistence update URL and store', async () => {

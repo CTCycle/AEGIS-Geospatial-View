@@ -29,6 +29,7 @@ from server.services.agent_runs.render_completion import (
     RenderCompletionService,
 )
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderError
+from server.services.llm.errors import LLMConfigurationError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -211,10 +212,15 @@ class AgentRunOrchestrator:
                 run_version=snapshot.active_run_version,
             )
             safe_message = self._safe_failure_message(exc)
+            failure_code = (
+                "agent_configuration_failed"
+                if isinstance(exc, LLMConfigurationError)
+                else "agent_execution_failed"
+            )
             failed, transitioned = self.run_repository.mark_failed_if_current(
                 run_id,
                 snapshot.active_run_version,
-                "agent_execution_failed",
+                failure_code,
                 safe_message,
             )
             if not transitioned:
@@ -229,7 +235,7 @@ class AgentRunOrchestrator:
                 run_version=latest.active_run_version,
                 type=RunEventType.ERROR,
                 payload={
-                    "code": "agent_execution_failed",
+                    "code": failure_code,
                     "message": safe_message,
                 },
             )
@@ -736,8 +742,12 @@ class AgentRunOrchestrator:
         if isinstance(exc, ProviderError):
             return "The map data provider could not complete this request. Try again later."
         text = str(exc).strip().lower()
+        if isinstance(exc, LLMConfigurationError) and text.startswith("no agent model is selected."):
+            return "Select an agent model in Settings before sending a message."
         if "credential" in text or "api key" in text or "authentication" in text:
             return "The configured agent provider is not ready. Open Settings and configure its credential."
+        if isinstance(exc, LLMConfigurationError):
+            return "Review the selected agent model and provider in Settings."
         if "timeout" in text:
             return "The configured agent provider timed out before the request could be completed."
         return "The agent could not complete this request."

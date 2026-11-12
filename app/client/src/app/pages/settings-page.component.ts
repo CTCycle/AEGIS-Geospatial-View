@@ -709,10 +709,21 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.statusText = 'Refreshing Ollama library';
     this.syncState();
     try {
-      await this.apiClient.refreshOllamaModels();
+      const result = await this.apiClient.refreshOllamaModels();
       await this.reloadOllamaCatalog();
-      this.statusText = 'Ollama library refreshed';
-      this.ollamaStatusText = 'Model library refreshed.';
+      const status = result['status'];
+      const detail = result['message'];
+      const message = status === 'ok'
+        ? 'Ollama library refreshed.'
+        : this.getOllamaFailureMessage(
+          typeof detail === 'string' && detail
+            ? detail
+            : 'Ollama model discovery is unavailable.',
+        );
+      this.ollamaStatusText = status === 'degraded'
+        ? `Ollama discovery was incomplete. Cached models may be shown. ${message}`
+        : message;
+      this.statusText = this.ollamaStatusText;
       this.syncState();
     } catch (error: unknown) {
       const detail = this.getOllamaFailureMessage(error);
@@ -1433,8 +1444,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }, SETTINGS_AUTOSAVE_DELAY_MS);
   }
 
+  get historyLimitInvalid(): boolean {
+    const limit = this.runtimeSettingsDraft.chat.max_history_messages;
+    return !Number.isInteger(limit) || limit < 1 || limit > 500;
+  }
+
   async saveRuntimeSettings(): Promise<void> {
-    if (this.isLoadingRuntimeSettings) {
+    if (this.isLoadingRuntimeSettings || this.historyLimitInvalid) {
       return;
     }
     if (this.isSavingRuntimeSettings) {
@@ -1463,11 +1479,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) {
         return;
       }
-      this.runtimeSettingsError = this.userFacingErrorService.toUserFacingError(
-        error,
-        'Could not save runtime settings.',
-      );
-      this.statusText = this.runtimeSettingsError;
+      const detail = this.userFacingErrorService.toUserFacingError(error, 'Could not save runtime settings.');
+      this.runtimeSettingsError = detail.startsWith('Invalid application runtime settings:')
+        ? 'Some runtime settings are invalid. Check the values you changed.'
+        : detail;
     } finally {
       this.isSavingRuntimeSettings = false;
       if (this.runtimeSaveQueued) {

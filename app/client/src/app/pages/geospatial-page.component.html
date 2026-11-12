@@ -87,6 +87,9 @@
                 <span class="chat-activity-status__label">{{ activityLabel }}</span>
               </div>
             }
+            @if (runFailureSummary) {
+              <p class="chat-composer-error" role="alert">{{ runFailureSummary }}</p>
+            }
           </div>
 
           @if (activeClarification; as clarification) {
@@ -137,6 +140,7 @@
             <textarea
               #composerInput
               aria-label="Chat message"
+              [attr.aria-describedby]="agentReadiness.settingsTab ? 'agent-setup-required' : null"
               [value]="composerDraft"
               [attr.maxlength]="maxChatMessageLength"
               (input)="onComposerInput($event)"
@@ -189,6 +193,14 @@
           </div>
           @if (composerError) {
             <p class="chat-composer-error" role="alert">{{ composerError }}</p>
+          }
+          @if (agentReadiness.settingsTab; as settingsTab) {
+            <p id="agent-setup-required" class="chat-composer-error" role="status">
+              {{ agentReadiness.message }}
+              <a routerLink="/settings" [queryParams]="{ tab: settingsTab }">
+                {{ settingsTab === 'model-providers' ? 'Open Model Providers' : 'Open Models' }}
+              </a>
+            </p>
           }
         </section>
 
@@ -318,12 +330,12 @@
       <button
         type="button"
         class="panel-icon-button"
-        [class.panel-icon-button--active]="isMapToolsOpen"
+        [class.panel-icon-button--active]="isMapToolsOpen && !!payload?.map_session"
         aria-controls="map-tools"
         aria-label="Map tools"
-        title="Basemap and legend"
-        [attr.aria-expanded]="isMapToolsOpen"
-        [disabled]="isCanvasCollapsed"
+        [attr.title]="payload?.map_session ? 'Basemap and legend' : 'Load a map to use map tools'"
+        [attr.aria-expanded]="isMapToolsOpen && !!payload?.map_session"
+        [disabled]="isCanvasCollapsed || !payload?.map_session"
         (click)="toggleMapTools()"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
@@ -333,12 +345,12 @@
       <button
         type="button"
         class="panel-icon-button"
-        [class.panel-icon-button--active]="isLayersOpen"
+        [class.panel-icon-button--active]="isLayersOpen && hasMapLayers"
         aria-controls="map-layers-panel"
         aria-label="Layers"
-        title="Layers"
-        [attr.aria-expanded]="isLayersOpen"
-        [disabled]="isCanvasCollapsed"
+        [attr.title]="hasMapLayers ? 'Layers' : 'Add a map layer to manage layers'"
+        [attr.aria-expanded]="isLayersOpen && hasMapLayers"
+        [disabled]="isCanvasCollapsed || !hasMapLayers"
         (click)="toggleLayers()"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
@@ -367,6 +379,7 @@
           [interactions]="{
             'Agent model': {
               route: '/settings',
+              queryParams: { tab: agentReadiness.settingsTab || 'models' },
               actionLabel: 'Open agent settings',
               description: agentReadiness.message || 'Review the configured agent model and provider.'
             },

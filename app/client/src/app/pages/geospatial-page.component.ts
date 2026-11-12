@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import {
   CapabilityStatusItem,
@@ -82,6 +82,7 @@ const RUN_CANCELLED_MESSAGE = 'Run stopped. No result was produced.';
     ConversationHistoryComponent,
     MapPreviewComponent,
     ExecutionStatusComponent,
+    RouterLink,
   ],
   templateUrl: './geospatial-page.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -137,6 +138,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   composerImage?: PreparedImageAttachment;
   transcriptScrollTop = 0;
   agentReadiness = INITIAL_AGENT_READINESS_STATE;
+  private agentReadinessRequest?: Promise<void>;
   catalog?: CatalogResponse;
   mapRenderState: 'preparing' | 'ready' | 'failed' = 'preparing';
   presentationStatus?: PresentationStatus;
@@ -233,7 +235,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       void this.hydrateConversation(this.conversationId);
     }
     void this.loadConversationHistory();
-    void this.loadAgentStatus();
+    this.agentReadinessRequest = this.loadAgentStatus();
     void this.loadCatalog();
     void this.loadModelContext();
   }
@@ -581,6 +583,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   toggleMapTools(): void {
     this.isMapToolsOpen = !this.isMapToolsOpen;
+  }
+
+  get hasMapLayers(): boolean {
+    return mapSessionOverlayEntries(this.payload?.map_session).length > 0;
   }
 
   toggleLayers(): void {
@@ -1054,6 +1060,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (await this.tryHandleLocalCommand(message)) {
       return;
     }
+    if (this.agentReadiness.status === 'checking' && this.agentReadinessRequest) {
+      await this.agentReadinessRequest;
+      if (this.isDestroyed || requestNonce !== this.conversationNonce || this.composerDraft.trim() !== message) {
+        return;
+      }
+    }
+    if (!this.isLoading && this.agentReadiness.settingsTab) {
+      return;
+    }
     this.setComposerDraft('');
     if (this.isLoading && this.conversationId && this.progressStage !== 'awaiting_render') {
       if (this.activeRunId) {
@@ -1509,6 +1524,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
             parsed.operation,
             errorCode,
             presentationStatus,
+            this.readString(event.payload['message']),
           );
           this.agentReadiness = {
             status: 'needs_attention',
@@ -1769,6 +1785,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     operation: ChatOperationResult | null | undefined,
     errorCode: string | undefined,
     presentationStatus: string | undefined,
+    message?: string,
   ): string {
     if (presentationStatus === 'failed'
       || presentationStatus === 'render_timeout'
@@ -1779,6 +1796,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     const category = operation?.failure_category ?? errorCode;
     switch (category) {
+      case 'agent_configuration_failed':
+        return message || 'Review the selected agent model and provider in Settings.';
       case 'context_limit':
         return 'The selected model could not complete the request within its available context window.';
       case 'model_budget_exhausted':
@@ -1796,12 +1815,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       case 'insufficient_evidence':
         return 'The selected model or data provider could not complete the request.';
       case 'internal_error':
-        return 'The request stopped after an internal error. Open Tool activity for execution details.';
+        return 'The request stopped after an internal error.';
       case 'cancelled':
       case 'superseded':
         return 'The request stopped before completion.';
       default:
-        return 'The request could not be completed. Open Tool activity for execution details.';
+        return 'The request could not be completed.';
     }
   }
 

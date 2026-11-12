@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from io import BytesIO
 from pathlib import Path
 
+from PIL import Image
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.artifacts import (
@@ -24,8 +26,8 @@ from tests.e2e.helpers.chat_stub_payloads import (
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 ###############################################################################
-def _open_map_tools(page: Page) -> None:
-    toggle = page.get_by_role("button", name="Map tools", exact=True)
+def _open_layers(page: Page) -> None:
+    toggle = page.get_by_role("button", name="Layers", exact=True)
     if toggle.get_attribute("aria-expanded") != "true":
         toggle.click()
 
@@ -137,6 +139,20 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
         ),
     )
     page.route(re.compile(r".*/api/conversations/[^/]+$"), handle_snapshot)
+    with BytesIO() as buffer:
+        Image.new("RGB", (256, 256), "#28576a").save(buffer, format="PNG")
+        tile = buffer.getvalue()
+    page.route(
+        re.compile(
+            r"(https://(?:tile\.openstreetmap\.org|example\.test)/"
+            r"|.*/api/geospatial/tiles/)"
+        ),
+        lambda route: route.fulfill(
+            content_type="image/png",
+            headers={"Access-Control-Allow-Origin": "*"},
+            body=tile,
+        ),
+    )
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     return state
 
@@ -165,7 +181,7 @@ def test_documented_conversation_map_search_happy_path(
             "Search executed successfully. Showing Rome with air quality overlay."
         )
     ).to_be_visible()
-    _open_map_tools(page)
+    _open_layers(page)
     expect(page.locator(".overlay-controls")).to_be_visible()
     write_snapshot(page, dirs["screenshots"], "02-assistant-map")
     write_snapshot(page, dirs["screenshots"], "03-overlay-panel")
@@ -322,7 +338,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     page.get_by_label("Chat message").fill("Show me a map of Rome with air quality")
     page.get_by_role("button", name="Send message").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
-    _open_map_tools(page)
+    _open_layers(page)
     expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 
     page.get_by_role("link", name="Settings", exact=True).click()
@@ -337,7 +353,7 @@ def test_documented_conversation_settings_roundtrip_and_restore(
     page.get_by_role("link", name="Search").click()
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
     expect(page.get_by_text("Show me a map of Rome with air quality")).to_be_visible()
-    _open_map_tools(page)
+    _open_layers(page)
     expect(page.locator(".overlay-controls")).to_be_visible()
     write_snapshot(page, dirs["screenshots"], "02-back-to-chat")
 

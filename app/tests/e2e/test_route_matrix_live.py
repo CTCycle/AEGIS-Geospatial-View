@@ -212,8 +212,8 @@ class _RouteCapture(NetworkCapture):
 
 ###############################################################################
 def _expand_overlay_controls(page: Page) -> None:
-    toggle = page.locator(".overlay-controls__toggle")
-    if not toggle.count():
+    toggle = page.get_by_role("button", name="Layers", exact=True)
+    if not toggle.count() or toggle.is_disabled():
         return
     if toggle.get_attribute("aria-expanded") != "true":
         toggle.click()

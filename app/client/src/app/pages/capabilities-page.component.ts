@@ -133,11 +133,9 @@ export class CapabilitiesPageComponent implements OnInit {
       item.metadata?.['docs_url'],
       item.metadata?.['url'],
       item.metadata?.['tile_url'],
-      item.metadata?.['url_template'],
-      item.metadata?.['tile_url_template'],
     ];
     return candidates.find((candidate): candidate is string => (
-      typeof candidate === 'string' && this.isSafeUrl(candidate)
+      typeof candidate === 'string' && !/[{}]|%7[bd]/i.test(candidate) && this.isSafeUrl(candidate)
     ));
   }
 

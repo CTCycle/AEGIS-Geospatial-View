@@ -15,7 +15,7 @@ describe('pages/capabilities-page.component', () => {
       overlays: [{ id: 'tomtom_traffic_flow', name: 'TomTom Traffic Flow', kind: 'overlay', type: 'tile', description: 'Traffic', provider: 'tomtom', requires_credentials: true, is_available: false, supports_map: true, supports_direct_text: false, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
       cameras: [{ id: 'windy_webcams', name: 'Windy Webcams', kind: 'overlay', type: 'camera-network', description: 'Cameras', provider: 'windy_webcams', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', action_tags: [], task_tags: [], metadata: {} }],
       transit: [{ id: 'gtfs_static', name: 'GTFS Static', kind: 'overlay', type: 'vector', description: 'Transit feeds', provider: 'gtfs', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'regional', action_tags: [], task_tags: [], metadata: {} }],
-      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', type: 'direct-tool', description: 'Forecast', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
+      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', type: 'direct-tool', description: 'Forecast', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', action_tags: [], task_tags: [], metadata: { url: 'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}' } }],
     });
     apiClient.fetchCatalog.and.callFake(() => fetchCatalogMock());
 
@@ -39,6 +39,8 @@ describe('pages/capabilities-page.component', () => {
     expect(text).toContain('TomTom Traffic Flow');
     expect(text).toContain('Optional provider key required before use.');
     expect(text).not.toContain('Ask agent');
+    expect(fixture.nativeElement.querySelector('a[href="https://earthdata.nasa.gov/"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href*="api.open-meteo.com"]')).toBeNull();
   });
 
   it('filters entries by search text and category and resets', async () => {
