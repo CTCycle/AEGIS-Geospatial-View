@@ -675,6 +675,34 @@ def requested_transform_unmet(state: AgentRunState) -> bool:
     return latest is not None and latest.status == "failed"
 
 ###############################################################################
+def geometry_result(state: AgentRunState) -> ToolResult | None:
+    """Find evidence produced by the requested geometry operation."""
+
+    route = state.route
+    if route is None or not route.requires_geometry:
+        return None
+    expected = route.geometry_operation
+    return next(
+        (
+            result
+            for result in reversed(state.tool_results)
+            if result.tool_name == "transform_evidence"
+            and result.evidence_refs
+            and (
+                result.status == "valid_empty"
+                or (
+                    result.status == "success"
+                    and isinstance(count := json_object(result.data).get("located_record_count"), int)
+                    and count > 0
+                )
+            )
+            and result.metadata.geometry_operations
+            and (expected is None or result.metadata.geometry_operations[-1] == expected)
+        ),
+        None,
+    )
+
+###############################################################################
 def uncovered_data_obligations(state: AgentRunState) -> list[str]:
     """Return requested analytical components without validated evidence yet.
 
@@ -1257,7 +1285,11 @@ def _truncations(state: AgentRunState) -> list[tuple[int, int]]:
     return [(shown, total) for shown, total in map_layer_counts(state, session).values() if shown < total][-8:]
 
 ###############################################################################
-def _obligation_result(state: AgentRunState, kind: ObligationKind, target: str | None) -> ToolResult | None:
+def _obligation_result(state: AgentRunState, obligation: RequestObligation) -> ToolResult | None:
+    if obligation.id.startswith("analysis:geometry:"):
+        return geometry_result(state)
+    kind = obligation.kind
+    target = obligation.target_ids[0] if obligation.target_ids else None
     tools = (
         {"execute_geospatial_capability"}
         if kind == "data"
@@ -1323,6 +1355,8 @@ def _obligation_label(obligation: RequestObligation) -> str:
     if obligation.kind == "data":
         subject = f"{obligation.variable} data" if obligation.variable else "the requested data"
         return f"{subject} for {places}" if places else subject
+    if obligation.id == "analysis:geometry:derived":
+        return "the requested geometry operation"
     return f"the requested {obligation.id.split(':')[-1].replace('_', ' ')}"
 
 ###############################################################################
@@ -1408,7 +1442,11 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 status = "met" if known else "unmet"
             elif requirement is None:
                 status = "unmet"
-            elif obligation.kind == "analysis" and analysis_unsupported(state):
+            elif (
+                obligation.kind == "analysis"
+                and not obligation.id.startswith("analysis:geometry:")
+                and analysis_unsupported(state)
+            ):
                 status = "unsupported"
             elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
                 status = "failed"
@@ -1421,7 +1459,7 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                     location_ref_matches(target, name, name) for name in uncovered
                 )
                 status = "met" if checks.get(requirement, False) and not target_uncovered else "unmet"
-            result = None if obligation.kind == "location" else _obligation_result(state, obligation.kind, target)
+            result = None if obligation.kind == "location" else _obligation_result(state, obligation)
             # Retrieved figures stay deliverable when only a later analysis
             # step failed.
             if result is not None and (status == "met" or (obligation.kind == "data" and status == "failed")):
@@ -1514,9 +1552,8 @@ def ledger_outcomes(
             status = "blocked"
             stop = state.termination_reason
             reason = stop[:80] if stop and stop != "goal_satisfied" else "unmet"
-        target = obligation.target_ids[0] if obligation.target_ids else None
         result = (
-            _obligation_result(state, obligation.kind, target)
+            _obligation_result(state, obligation)
             if obligation.kind in {"data", "analysis"}
             else None
         )

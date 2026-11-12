@@ -4847,7 +4847,7 @@ class AgentLoop:
         requirements: list[str] = []
         if route.location_mode != "none":
             requirements.append("search_area_bound" if route.location_mode == "search_area" else "location_resolved")
-        if route.analysis is not None or route.derived_geometry:
+        if route.analysis is not None or route.requires_geometry:
             requirements.append("result_locations_derived")
         route_domains = {route.primary_domain, *route.secondary_domains}
         text_location_resolution_only = is_text_location_lookup(route)
@@ -4865,6 +4865,7 @@ class AgentLoop:
         measurement_route = (
             route.task_mode == "execute"
             and route.analysis is None
+            and not route.requires_geometry
             and route.location_mode != "none"
             and route.primary_domain
             in {CapabilityDomain.SPATIAL_ANALYSIS, CapabilityDomain.ROUTING}
@@ -4924,6 +4925,7 @@ class AgentLoop:
             operation=operation,
             location_mode=route.location_mode,
             analysis=route.analysis,
+            geometry_operation=route.geometry_operation,
             target_ids=target_ids,
             temporal_scope=temporal_scope,
             spatial_scope=spatial_scope,

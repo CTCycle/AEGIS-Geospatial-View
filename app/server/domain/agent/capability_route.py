@@ -27,6 +27,10 @@ class AgentAnalysisIntent(BaseModel):
     order: str = Field(default="descending", max_length=40)
     top_k: int = Field(default=5, ge=1, le=25)
 
+GeometryOperationKind = Literal[
+    "area", "buffer", "spatial_join", "intersection", "union", "difference", "clip"
+]
+
 # "identification": name or describe a place, e.g. what place coordinates are.
 ObligationKind = Literal["location", "data", "analysis", "presentation", "identification"]
 
@@ -62,6 +66,10 @@ class CapabilityRoute(BaseModel):
             "that is computed from retrieved geometry: the area of regions, a buffer zone "
             "around a place or result, a spatial join, or an overlay/clip of two layers."
         ),
+    )
+    geometry_operation: GeometryOperationKind | None = Field(
+        default=None,
+        description="Requested geometry operation. For a compound geometry workflow, name the final operation.",
     )
     capability_queries: list[str] = Field(
         default_factory=lambda: list[str](), max_length=4
@@ -109,6 +117,10 @@ class CapabilityRoute(BaseModel):
     @classmethod
     def _normalize_clarification_options(cls, value: list[str]) -> list[str]:
         return normalize_clarification_options(value)
+
+    @property
+    def requires_geometry(self) -> bool:
+        return self.derived_geometry or self.geometry_operation is not None
 
     @model_validator(mode="after")
     def _requirements_name_route_targets(self) -> "CapabilityRoute":
@@ -208,6 +220,7 @@ class AgentGoal(BaseModel):
     operation: str
     location_mode: Literal["none", "target", "search_area"]
     analysis: AgentAnalysisIntent | None = None
+    geometry_operation: GeometryOperationKind | None = None
     target_ids: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     temporal_scope: dict[str, object] = Field(
         default_factory=lambda: dict[str, object]()
@@ -666,6 +679,14 @@ def derive_request_obligations(
                 variable=route.analysis.metric if route.analysis else None,
             )
         )
+    if route.requires_geometry:
+        obligations.append(
+            RequestObligation(
+                id=f"analysis:geometry:{route.geometry_operation or 'derived'}",
+                kind="analysis",
+                target_ids=list(target_ids),
+            )
+        )
     if route.presentation in {"text", "both"} and route.location_mode != "none":
         # A text answer about bare coordinates must say where they are.
         obligations.extend(
@@ -771,9 +792,8 @@ def dropped_obligations(
 ) -> list[RequestObligation]:
     """Return prior required obligations a revised goal no longer carries.
 
-    A location, data or identification obligation is kept only when the
-    revision still names each of its places; analysis and presentation only
-    need the same kind.
+    Location, data, identification and geometry obligations retain their
+    places. A typed geometry operation must also survive the revision.
     """
 
     dropped: list[RequestObligation] = []
@@ -781,10 +801,19 @@ def dropped_obligations(
         if not item.required:
             continue
         same_kind = [other for other in current if other.required and other.kind == item.kind]
+        geometry = item.id.startswith("analysis:geometry:")
+        if geometry:
+            same_kind = [
+                other for other in same_kind
+                if other.id == item.id
+                or (item.id == "analysis:geometry:derived" and other.id.startswith("analysis:geometry:"))
+            ]
+        elif item.kind == "analysis":
+            same_kind = [other for other in same_kind if not other.id.startswith("analysis:geometry:")]
         if not same_kind:
             dropped.append(item)
             continue
-        if item.kind in {"location", "data", "identification"} and not all(
+        if (geometry or item.kind in {"location", "data", "identification"}) and not all(
             any(same_target(target, other_target) for other in same_kind for other_target in other.target_ids)
             for target in item.target_ids
         ):

@@ -549,7 +549,7 @@ class CapabilityRouter:
                 ),
             })
 
-        if proposed.analysis is not None or proposed.derived_geometry:
+        if proposed.analysis is not None or proposed.requires_geometry:
             # Analysis and geometry derivation (area, buffer, join, overlay) are
             # performed by transform_evidence, never by inventing a provider
             # operation such as rank_precipitation, measure_area or buffer_and_clip.

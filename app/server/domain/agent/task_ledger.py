@@ -188,9 +188,7 @@ def compatible_tasks(
             for target in targets
         ):
             return False
-        return not any(
-            key in task.filters and task.filters[key] != value for key, value in goal.filters.items()
-        )
+        return task.filters == goal.filters
 
     return [item for item in tasks if compatible(item)]
 

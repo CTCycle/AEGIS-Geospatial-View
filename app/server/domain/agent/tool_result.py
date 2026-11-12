@@ -90,6 +90,7 @@ class ToolExecutionMetadata(BaseModel):
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     source_url: str | None = None
     covered_queries: list[str] = Field(default_factory=lambda: list[str]())
+    geometry_operations: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
     # Stored facts about the evidence a map plan layered, for completion checks.
     layer_evidence: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
 

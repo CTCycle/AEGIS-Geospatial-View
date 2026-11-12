@@ -38,6 +38,7 @@ from server.services.agent.capability_execution import (
 from server.services.agent.completion import (
     analysis_unsupported,
     follow_up_location_keys,
+    geometry_result,
     requirement_for_location,
     uncovered_map_targets,
     uncovered_route_targets,
@@ -922,6 +923,9 @@ def _map_plan_semantic_validator(
 def _valid_empty_data_only(state: AgentRunState) -> bool:
     """Allow a location-only map when the provider found no matching data."""
 
+    if state.route is not None and state.route.requires_geometry:
+        result = geometry_result(state)
+        return result is not None and result.status == "valid_empty"
     if state.route is not None and state.route.analysis is not None:
         transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
         return bool(transforms) and transforms[-1].status == "valid_empty"

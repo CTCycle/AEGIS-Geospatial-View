@@ -632,16 +632,35 @@ def test_stale_location_and_analysis_map_gate() -> None:
 
 
 ###############################################################################
-def test_derived_geometry_route_exposes_transform_and_requires_it_before_completion() -> None:
+@pytest.mark.asyncio
+async def test_geometry_route_requires_evidence_from_the_requested_operation() -> None:
     value = state("Italy")
     value.context_hydrated = True
-    value.route = value.route.model_copy(update={"analysis": None, "derived_geometry": True})
+    value.route = value.route.model_copy(update={"analysis": None, "geometry_operation": "buffer"})
     AgentLoop._compile_native_goal(value, value.route)
     assert _evidence_analysis_required(value)
+    assert value.goal is not None and value.goal.geometry_operation == "buffer"
+    assert any(item.id == "analysis:geometry:buffer" for item in value.goal.obligations)
     assert "result_locations_derived" in AgentLoop._pending_native_requirements(value)
-    value.tool_results.append(ToolResult(call_id="area", tool_name="transform_evidence", status="success", summary="area",
-                                      data={"located_record_count": 20}, metadata=ToolExecutionMetadata(duration_ms=0)))
+    repo = MemoryEvidence()
+    original = repo.create(
+        kind="capability_result", media_type="application/json", status="available",
+        payload={"features": [{"latitude": 42.0, "longitude": 12.0}]}, summary={}, provenance={},
+    )
+    value.evidence_refs.append(original.evidence_id)
+    handler = EvidenceToolHandler(repository=repo)
+    for operation in ({"op": "limit", "value": 1}, {"op": "buffer", "distance_km": 10}):
+        result = await handler.transform(
+            TransformEvidenceInput(evidence_refs=[original.evidence_id], operations=[operation]), value,
+        )
+        assert result.status == "success"
+        value.tool_results.append(result)
+        pending = AgentLoop._pending_native_requirements(value)
+        assert ("result_locations_derived" in pending) == (operation["op"] != "buffer")
     assert "result_locations_derived" not in AgentLoop._pending_native_requirements(value)
+    outcome = next(item for item in AgentLoop.completion_summary(value).obligations if item.kind == "analysis")
+    assert outcome.status == "met"
+    assert outcome.evidence_ref == value.tool_results[-1].evidence_refs[0]
 
 
 ###############################################################################
@@ -2103,6 +2122,37 @@ async def test_changed_time_window_invalidates_evidence_reuse() -> None:
     assert not any(item.kind == "data" for item in second.prior_tasks)
     fetched = _executions(second)[-1].data
     assert isinstance(fetched, dict) and "reused_evidence_ref" not in fetched
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("previous_filters", "next_filters"),
+    [({}, {"min_magnitude": 4.5}), ({"min_magnitude": 4.5}, {}), ({"min_magnitude": 4.5}, {"min_magnitude": 6})],
+)
+async def test_changed_filters_exclude_previous_data_from_the_reuse_ledger(
+    previous_filters: dict[str, float], next_filters: dict[str, float],
+) -> None:
+    providers, evidence = DiscoveryProvider(), MemoryEvidence()
+    first = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_WEEK, filters=previous_filters)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="There were 2 earthquakes.") for _ in range(3)),
+    ], message="List earthquakes worldwide for the past week.",
+        providers=providers, evidence=evidence, request_id="t1")
+    assert any(item.kind == "data" and item.status == "completed" for item in ledger_outcomes(
+        first, AgentLoop.completion_summary(first), now=datetime.now(UTC),
+    ))
+
+    second = await _turn([
+        _call("route", "route_request", _quake_route(QUAKE_WEEK, filters=next_filters)),
+        _call("execute", "execute_geospatial_capability", {"capability_id": "usgs_earthquakes"}),
+        *(LLMResult(content="There were 2 earthquakes.") for _ in range(3)),
+    ], message="Run the search with the updated magnitude filter.",
+        providers=providers, evidence=evidence, prior=first, request_id="t2")
+
+    assert not any(item.kind == "data" for item in second.prior_tasks)
+    assert len(providers.requests) == 2
 
 
 ###############################################################################

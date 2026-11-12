@@ -372,6 +372,10 @@ class EvidenceToolHandler:
         provenance: dict[str, Any] = {"operation_count": len(request.operations), "parents": parents,
                       "coverage": coverage, "capability_id": capability_id}
         geometry_kinds = [str(item["op"]) for item in operations if item.get("op") in _GEOMETRY_OPS]
+        geometry_operations = [
+            str(item["kind"] if item["op"] == "overlay" else item["op"])
+            for item in operations if item.get("op") in _GEOMETRY_OPS
+        ]
         if geometry_kinds:
             # Derived areas, joins and overlays name the operations and the
             # result's footprint so a point location is never read as an area.
@@ -423,6 +427,7 @@ class EvidenceToolHandler:
                 evidence_refs=[evidence_ref],
                 coverage=coverage,
                 units=_shared_units(parents),
+                geometry_operations=geometry_operations,
             ),
         )
 
@@ -598,6 +603,8 @@ def _geometry_operation(
 ) -> list[dict[str, Any]]:
     op = str(operation.get("op"))
     if op == "area":
+        if records and not any(geometry_ops.is_polygonal(geometry_ops.record_geometry(item)) for item in records):
+            raise geometry_ops.GeometryOperationError("Area requires polygon footprints.")
         return [geometry_ops.with_area(item, _properties) for item in records]
     if op == "buffer":
         distance = float(operation["distance_km"])

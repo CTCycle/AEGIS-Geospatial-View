@@ -669,6 +669,42 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
 
 ###############################################################################
 @pytest.mark.asyncio
+@pytest.mark.parametrize("use_derived_layer", [False, True])
+async def test_geometry_candidate_requires_the_verified_result_layer(use_derived_layer: bool) -> None:
+    state = _state(active_map_session=_active_session())
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.SPATIAL_ANALYSIS,
+        task_mode="execute",
+        presentation="map",
+        geometry_operation="buffer",
+    )
+    state.tool_results.append(ToolResult(
+        call_id="buffer", tool_name="transform_evidence", status="success", summary="Buffered hospitals",
+        evidence_refs=["evidence:hospitals"], data={"located_record_count": 1},
+        metadata=ToolExecutionMetadata(duration_ms=0, geometry_operations=["buffer"]),
+    ))
+    actions = (
+        [AddEvidenceLayerAction(
+            action="add_evidence_layer", evidence_ref="evidence:hospitals", capability_id="places:hospitals",
+        )]
+        if use_derived_layer
+        else [SetViewportAction(action="set_viewport", strategy="fit_location")]
+    )
+    result = await _service().apply(
+        MapPlan(expected_collection_revision=2, actions=actions),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1", call_id="call-map-geometry"),
+    )
+    if use_derived_layer:
+        assert result.status == "success"
+        assert state.prepared_map_session is not None
+    else:
+        assert result.error is not None and result.error.code == "requested_geometry_missing"
+        assert state.prepared_map_session is None
+
+
+###############################################################################
+@pytest.mark.asyncio
 async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view() -> None:
     state = _state()
     state.evidence_refs = ["evidence:zurich", "evidence:lisbon"]

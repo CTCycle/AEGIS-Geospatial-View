@@ -35,7 +35,7 @@ from server.domain.agent.tool_result import (
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.completion import evidence_numbers, layer_edit_count
+from server.services.agent.completion import evidence_numbers, geometry_result, layer_edit_count
 from server.services.agent.final_answer_check import value_is_supported
 from server.services.agent.tool_registry import (
     is_active_map_update,
@@ -350,6 +350,23 @@ class MapPlanService:
                 actions=effective_actions,
             )
             candidate = self._mark_empty_tiles_expected(candidate)
+            derived_geometry = geometry_result(state)
+            if (
+                derived_geometry is not None
+                and derived_geometry.status == "success"
+                and not any(
+                    item.visible and item.descriptor.get("evidence_ref") in derived_geometry.evidence_refs
+                    for item in candidate.overlay_collection.instances
+                )
+            ):
+                return self._failure(
+                    context=context,
+                    started=started,
+                    error_type="semantic_validation",
+                    code="requested_geometry_missing",
+                    message="Show the requested geometry using the evidence_ref from its transform_evidence result.",
+                    recovery="correct_arguments",
+                )
             if state.route is not None and len(state.route.target_refs) > 1 and evidence:
                 candidate = viewport_covering_evidence(candidate, evidence)
             if self._valid_empty_data_only(state):
@@ -583,6 +600,9 @@ class MapPlanService:
     def _valid_empty_data_only(state: AgentRunState) -> bool:
         """Mark a location-only candidate when data retrieval was valid-empty."""
 
+        if state.route is not None and state.route.requires_geometry:
+            result = geometry_result(state)
+            return result is not None and result.status == "valid_empty"
         if state.route is not None and state.route.analysis is not None:
             transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
             return bool(transforms) and transforms[-1].status == "valid_empty"

@@ -10,6 +10,7 @@ from server.domain.agent.tools import RegisteredTool
 from server.services.agent.basemap_intent import names_centre, refers_to_layer
 from server.services.agent.completion import (
     analysis_unsupported,
+    geometry_result,
     requested_transform_unmet,
     uncovered_data_obligations,
     uncovered_route_targets,
@@ -505,9 +506,9 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
 ###############################################################################
 def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
-    if route is None or analysis_unsupported(state):
+    if route is None or (not route.requires_geometry and analysis_unsupported(state)):
         return False
-    return (route.analysis is not None or route.derived_geometry
+    return (route.analysis is not None or route.requires_geometry
             or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
             or route.operation == "inspect_evidence")
 
@@ -598,7 +599,11 @@ def follow_up_investigation_open(state: "AgentRunState") -> bool:
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:
     route = state.route
-    if route is None or (route.analysis is None and not route.derived_geometry) or analysis_unsupported(state):
+    if route is None:
+        return True
+    if route.requires_geometry:
+        return geometry_result(state) is not None
+    if route.analysis is None or analysis_unsupported(state):
         return True
     return any(
         result.tool_name == "transform_evidence"
