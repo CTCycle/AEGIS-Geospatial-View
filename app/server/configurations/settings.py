@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -194,6 +195,16 @@ class JsonMapSettings(StrictJsonSettings):
 class JsonChatRuntimeSettings(StrictJsonSettings):
     max_history_messages: int = Field(default=24, ge=1, le=500)
     application_timezone: str = "UTC"
+
+    # -------------------------------------------------------------------------
+    @field_validator("application_timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("Enter a valid IANA timezone such as Europe/Rome.") from exc
+        return value
 
 ###############################################################################
 class JsonAgentExecutionSettings(StrictJsonSettings):

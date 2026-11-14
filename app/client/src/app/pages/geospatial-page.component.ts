@@ -1305,6 +1305,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         if (message.payload['accepted'] !== false) {
           this.pendingRenderAcknowledgement = undefined;
           this.renderAckRetryCount = 0;
+          const last = this.messages.at(-1);
+          if (last?.role === 'assistant' && last.content === 'Data prepared; the map is loading.') {
+            this.messages = [...this.messages.slice(0, -1), { role: 'assistant', content: 'Map rendered; preparing the answer.' }];
+          }
         }
       }
       this.syncState();
@@ -2151,7 +2155,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   private appendAssistantEventMessage(content: string): void {
     const previous = this.messages.at(-1);
-    if (previous?.role === 'assistant' && previous.content === 'Data prepared; the map is loading.') {
+    if (previous?.role === 'assistant' && (previous.content === 'Data prepared; the map is loading.' || previous.content === 'Map rendered; preparing the answer.')) {
       this.messages = [...this.messages.slice(0, -1), { role: 'assistant', content }];
       return;
     }

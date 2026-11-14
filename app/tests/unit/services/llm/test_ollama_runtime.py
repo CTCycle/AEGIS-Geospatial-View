@@ -155,6 +155,40 @@ def test_ollama_structured_requests_allow_the_longer_local_inference_window() ->
     assert provider._DEFAULT_REQUEST_TIMEOUT_SECONDS == 30
 
 ###############################################################################
+def test_ollama_forced_single_tool_call_is_schema_constrained_and_decoded() -> None:
+    posted: list[dict] = []
+
+    ###############################################################################
+    class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
+        def _show_payload(self, model: str):
+            return None
+
+        # -------------------------------------------------------------------------
+        def _validate_request_capabilities(self, request) -> None:
+            return None
+
+        # -------------------------------------------------------------------------
+        def _post_json(self, path: str, payload: dict, **kwargs):
+            posted.append(payload)
+            return {"message": {"content": '{"task_mode": "answer"}'}}
+
+    request = LLMRequest(
+        model="m", messages=[{"role": "user", "content": "hi"}], temperature=0.0
+    )
+    result = _Provider(base_url="http://ollama-forced.test").chat(
+        request, tools=[_tool()], tool_choice="required"
+    )
+
+    assert posted[0]["format"] == _tool().parameters_json_schema
+    assert "tools" not in posted[0]
+    [call] = result.tool_calls
+    assert call.name == "execute_geospatial_capability"
+    assert call.arguments == {"task_mode": "answer"}
+    assert result.content == ""
+
+###############################################################################
 def test_ollama_emits_native_tool_result_message_format() -> None:
     schema = OllamaProvider.tool_to_ollama_schema(_tool())
     assert schema["type"] == "function"

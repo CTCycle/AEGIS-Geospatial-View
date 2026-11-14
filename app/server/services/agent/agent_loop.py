@@ -1333,10 +1333,33 @@ class AgentLoop:
         )
         notes = [
             item
-            for item in (self._basemap_mismatch_note(state), self._empty_raster_note(state))
+            for item in (
+                self._requested_coordinates_note(state, final),
+                self._basemap_mismatch_note(state),
+                self._empty_raster_note(state),
+            )
             if item
         ]
         return "\n\n".join([self._with_disclosure(state, final), *notes])
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _requested_coordinates_note(state: AgentRunState, final: str) -> str | None:
+        """State the mapped place's coordinates when asked for and not yet given."""
+
+        session = state.active_map_session
+        terms = set(re.findall(r"[a-z]+", state.user_message.casefold()))
+        if session is None or not terms.intersection(
+            {"coordinate", "coordinates", "latitude", "longitude"}
+        ):
+            return None
+        location = session.resolved_location
+        if f"{location.latitude:.2f}" in final and f"{location.longitude:.2f}" in final:
+            return None
+        return (
+            f"Coordinates of {location.label}: latitude {location.latitude:.4f}, "
+            f"longitude {location.longitude:.4f}."
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

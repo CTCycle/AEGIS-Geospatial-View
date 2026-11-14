@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 import sqlite3
 import threading
 import logging
@@ -53,6 +55,8 @@ class SQLiteTargetInspection:
     message: str
 
 
+_INVALID_WINDOWS_FILENAME = re.compile(r'[<>:"|?*\x00-\x1f]|[. ]$')
+
 ###############################################################################
 def inspect_database_configuration(
     configuration: DatabaseConfiguration,
@@ -63,6 +67,10 @@ def inspect_database_configuration(
     if path.exists() and not path.is_file():
         raise DatabaseConnectionError("The SQLite database path is not a file.")
     if not path.exists():
+        if os.name == "nt" and _INVALID_WINDOWS_FILENAME.search(path.name):
+            raise DatabaseConnectionError(
+                "The SQLite database filename contains characters Windows does not allow."
+            )
         if path.parent.exists() and not path.parent.is_dir():
             raise DatabaseConnectionError(
                 "The SQLite database parent is not a directory."

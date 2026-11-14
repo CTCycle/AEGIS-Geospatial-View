@@ -624,12 +624,26 @@ class OllamaProvider(LLMProvider):
         output_cap = request_output_token_cap(effective_request)
         if output_cap is not None:
             payload["options"]["num_predict"] = output_cap
-        if native_tools:
-            payload["tools"] = [
-                self.tool_to_ollama_schema(tool) for tool in native_tools
-            ]
-        if schema:
-            payload["format"] = schema
+        # Ollama's native API has no ``tool_choice``: a forced single-tool call
+        # is enforced by constraining the output to that tool's argument schema
+        # and decoding the JSON back into a tool call below.
+        forced_tool = (
+            native_tools[0]
+            if tool_choice == "required" and len(native_tools) == 1 and not schema
+            else None
+        )
+        if forced_tool is not None:
+            payload["format"] = forced_tool.parameters_json_schema
+            thinking_option = self._thinking_option(effective_request.model)
+            if thinking_option is not None:
+                payload["think"] = thinking_option
+        else:
+            if native_tools:
+                payload["tools"] = [
+                    self.tool_to_ollama_schema(tool) for tool in native_tools
+                ]
+            if schema:
+                payload["format"] = schema
         try:
             response = self._post_json_for_request(
                 "/api/chat",
@@ -648,10 +662,23 @@ class OllamaProvider(LLMProvider):
             ) from exc
         usage = apply_reported_usage(usage, response)
         message = json_object(response.get("message"))
+        content = str(message.get("content") or "")
+        tool_calls = self._parse_tool_calls(message)
+        if forced_tool is not None and not tool_calls:
+            args, parse_error = parse_native_tool_arguments(content)
+            tool_calls = [
+                LLMToolCall(
+                    id=None,
+                    name=forced_tool.name,
+                    arguments=args,
+                    parse_error=parse_error,
+                )
+            ]
+            content = ""
         return LLMResult(
-            content=str(message.get("content") or ""),
+            content=content,
             raw=response,
-            tool_calls=self._parse_tool_calls(message),
+            tool_calls=tool_calls,
             finish_reason=str(response.get("done_reason") or "") or None,
             context_usage=usage.to_dict(),
         )

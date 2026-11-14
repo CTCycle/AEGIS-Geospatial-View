@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
@@ -269,3 +270,22 @@ def test_current_revision_with_missing_application_tables_is_rejected(
         inspect_database_configuration(
             DatabaseConfiguration(database_path=str(database_path))
         )
+
+
+###############################################################################
+@pytest.mark.skipif(os.name != "nt", reason="Windows filename rules")
+def test_inspection_rejects_windows_invalid_filename(tmp_path: Path) -> None:
+    configuration = DatabaseConfiguration(database_path=str(tmp_path / "invalid?.db"))
+    with pytest.raises(DatabaseConnectionError):
+        inspect_database_configuration(configuration)
+
+
+###############################################################################
+def test_runtime_settings_reject_unknown_timezone() -> None:
+    from pydantic import ValidationError
+
+    from server.configurations.settings import JsonChatRuntimeSettings
+
+    assert JsonChatRuntimeSettings(application_timezone="Europe/Rome")
+    with pytest.raises(ValidationError):
+        JsonChatRuntimeSettings(application_timezone="Mars/Olympus_Mons")
