@@ -8,8 +8,36 @@ from typing import Any
 
 from playwright.sync_api import Page, WebSocketRoute
 
+from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+
 
 TurnPayloadFactory = Callable[[str, int], dict[str, Any]]
+
+###############################################################################
+def register_chat_stub(
+    page: Page,
+    turn_payload_factory: TurnPayloadFactory,
+    *,
+    error_message: str | None = None,
+) -> None:
+    """Provide a ready model and conversation for a controlled browser turn."""
+    conversation_id = "conversation-e2e"
+    page.route(
+        re.compile(r".*/api/chat/settings$"),
+        lambda route: route.fulfill(json=model_settings_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/conversations$"),
+        lambda route: route.fulfill(
+            json={"conversation_id": conversation_id, "title": "Controlled chat"}
+        ),
+    )
+    register_realtime_stub(
+        page,
+        turn_payload_factory,
+        conversation_id=conversation_id,
+        error_message=error_message,
+    )
 
 ###############################################################################
 def _envelope(
@@ -94,9 +122,11 @@ def register_realtime_stub(
                     message_type="run.ack",
                     payload={
                         "command": "run.start",
+                        "accepted": True,
                         "run_id": run_id,
                         "run_version": 1,
                         "duplicate": False,
+                        "state": "running",
                     },
                     message_id=f"server-ack-{run_number}",
                     correlation_id=message_id,

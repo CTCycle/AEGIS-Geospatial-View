@@ -189,6 +189,37 @@ def test_ollama_forced_single_tool_call_is_schema_constrained_and_decoded() -> N
     assert result.content == ""
 
 ###############################################################################
+@pytest.mark.parametrize(
+    ("message", "allocated"),
+    [("Map Rome", 40_960), ("abcd " * 9_000, 49_152)],
+    ids=["short", "long"],
+)
+def test_ollama_sizes_context_for_estimated_input_and_configured_output(
+    message: str, allocated: int
+) -> None:
+    class _Provider(OllamaProvider):
+        def _post_json(self, path: str, payload: dict, **kwargs):
+            assert payload["options"]["num_ctx"] == allocated
+            assert payload["options"]["num_predict"] == 32_768
+            return {"message": {"content": "OK"}}
+
+    result = _Provider(base_url="http://ollama-context.test").chat(
+        LLMRequest(
+            model="m",
+            messages=[{"role": "user", "content": message}],
+            temperature=0.0,
+            metadata={
+                "context_window_tokens": 262_144,
+                "max_tokens": 32_768,
+            },
+        )
+    )
+    assert result.context_usage is not None
+    assert result.context_usage["selected_context_window"] == allocated
+    assert result.context_usage["model_context_limit"] == 262_144
+
+
+###############################################################################
 def test_ollama_emits_native_tool_result_message_format() -> None:
     schema = OllamaProvider.tool_to_ollama_schema(_tool())
     assert schema["type"] == "function"

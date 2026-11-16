@@ -8,7 +8,11 @@ import re
 import time
 from typing import Any, Protocol, cast
 
-from server.common.identifiers import location_ref_matches, normalize_target_key
+from server.common.identifiers import (
+    location_ref_matches,
+    mentions_coordinates,
+    normalize_target_key,
+)
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession, OverlayInstance
@@ -252,7 +256,10 @@ class MapPlanService:
                     )
                 marked_locations[ref] = resolved
 
-        ungrounded = _ungrounded_annotation(plan, state)
+        coordinate_labels = _is_location_only_map(state) and mentions_coordinates(
+            state.user_message
+        )
+        ungrounded = None if coordinate_labels else _ungrounded_annotation(plan, state)
         if ungrounded is not None:
             return self._failure(
                 context=context,
@@ -305,6 +312,25 @@ class MapPlanService:
                 "",
             ),
         )
+        if coordinate_labels:
+            # A position label comes from the verified location for this
+            # marker. Model-written labels can round or swap the axes.
+            effective_actions = [
+                action.model_copy(
+                    update={
+                        "annotations": {
+                            ref: (
+                                f"Latitude {marked_locations[ref].latitude:.4f}, "
+                                f"longitude {marked_locations[ref].longitude:.4f}"
+                            )
+                            for ref in action.location_refs
+                        }
+                    },
+                )
+                if isinstance(action, MarkLocationsAction)
+                else action
+                for action in effective_actions
+            ]
         if names_centre(state.user_message):
             # "Zoom in on the city centre" centres on the shown place, whatever
             # anchor the model chose.

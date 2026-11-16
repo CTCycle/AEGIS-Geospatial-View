@@ -26,6 +26,10 @@ CONTEXT_HEADROOM_TOKENS = 512
 # Application resource policy, not a claim about an unknown model's capacity.
 UNKNOWN_MODEL_INPUT_CEILING = 32_768
 KNOWN_APPLICATION_INPUT_CEILING = 64_000
+# Round local allocations to a stable tier rather than reloading Ollama for
+# every small change in prompt length.
+OLLAMA_CONTEXT_ALLOCATION_STEP = 8_192
+OLLAMA_INPUT_ESTIMATE_HEADROOM_DIVISOR = 4  # +25% over the estimated input
 RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY = "_response_schema_embedded_in_messages"
 _LOGGER = logging.getLogger(__name__)
 _CONTEXT_WINDOW_ALIASES = (
@@ -388,10 +392,24 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
     )
     estimated = message_tokens + tool_tokens + schema_tokens
     limit = profile.context_window_tokens if profile is not None else None
+    selected_window = limit
+    if (
+        provider == "ollama"
+        and limit is not None
+        and request_output_token_cap(request) is not None
+    ):
+        # The input estimate is heuristic and Ollama silently drops the oldest
+        # prompt tokens once num_ctx is exceeded, so allocate with headroom.
+        required = (
+            estimated + estimated // OLLAMA_INPUT_ESTIMATE_HEADROOM_DIVISOR
+            + expected_output + safety_margin
+        )
+        step = OLLAMA_CONTEXT_ALLOCATION_STEP
+        selected_window = min(limit, ((required + step - 1) // step) * step)
     percent = calculate_context_usage_percent(estimated, limit)
     return ContextUsage(
         estimated_input_tokens=estimated,
-        selected_context_window=limit,
+        selected_context_window=selected_window,
         model_context_limit=limit,
         usage_percent=percent,
         provider=normalized,

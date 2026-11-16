@@ -22,12 +22,14 @@
 
         <div id="map-tools" class="map-tools" [hidden]="!toolsOpen">
         @if (availableBasemaps.length) {
-          <label class="basemap-selector">
-            <span>Basemap</span>
+          <div class="basemap-selector">
+            <label for="map-basemap">Basemap</label>
             <select
+              id="map-basemap"
               [value]="mapSession?.basemap_id || ''"
               [disabled]="basemapLocked"
               aria-label="Select map basemap"
+              aria-describedby="map-basemap-scope"
               (change)="onBasemapSelection($any($event.target).value)"
             >
               @for (basemap of availableBasemaps; track basemap.id) {
@@ -40,7 +42,8 @@
                 </option>
               }
             </select>
-          </label>
+            <span id="map-basemap-scope">Changes apply to this view only.</span>
+          </div>
         }
 
         @if (isLoading) {

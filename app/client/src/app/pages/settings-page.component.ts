@@ -80,6 +80,87 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string 
 
 const SETTINGS_AUTOSAVE_DELAY_MS = 400;
 
+interface RuntimeSettingsValidationIssue {
+  fieldPath: string;
+  label: string;
+  message: string;
+}
+
+const RUNTIME_SETTINGS_VALIDATION_PREFIX = 'Invalid application runtime settings:';
+const RUNTIME_SETTINGS_BLOCKS = new Set([
+  'nominatim', 'geospatial', 'map', 'chat', 'openmeteo', 'overpass', 'rainviewer', 'gibs', 'agent_execution',
+]);
+const RUNTIME_SETTINGS_BLOCK_LABELS: Record<string, string> = {
+  nominatim: 'Nominatim',
+  geospatial: 'Geospatial',
+  map: 'Map & Search',
+  chat: 'Application',
+  openmeteo: 'Open-Meteo',
+  overpass: 'Overpass',
+  rainviewer: 'RainViewer',
+  gibs: 'NASA GIBS',
+  agent_execution: 'Agent Runtime',
+};
+
+const runtimeSettingsValidationMessage = (detail: string): string => {
+  const message = detail.split(/\s+\[type=/, 1)[0].replace(/^Value error,\s*/i, '').trim();
+  const numericBound = message.match(/^Input should be greater than or equal to ([\d.]+)$/i);
+  if (numericBound) {
+    return `Enter a value of ${numericBound[1]} or greater.`;
+  }
+  const maximumBound = message.match(/^Input should be less than or equal to ([\d.]+)$/i);
+  if (maximumBound) {
+    return `Enter a value of ${maximumBound[1]} or less.`;
+  }
+  const exclusiveMinimum = message.match(/^Input should be greater than ([\d.]+)$/i);
+  if (exclusiveMinimum) {
+    return `Enter a value greater than ${exclusiveMinimum[1]}.`;
+  }
+  const exclusiveMaximum = message.match(/^Input should be less than ([\d.]+)$/i);
+  if (exclusiveMaximum) {
+    return `Enter a value less than ${exclusiveMaximum[1]}.`;
+  }
+  if (/^Input should be a valid integer$/i.test(message)) {
+    return 'Enter a whole number.';
+  }
+  if (/^Input should be a valid number/i.test(message)) {
+    return 'Enter a valid number.';
+  }
+  return message;
+};
+
+const parseRuntimeSettingsValidationIssues = (detail: string): RuntimeSettingsValidationIssue[] => {
+  if (!detail.startsWith(RUNTIME_SETTINGS_VALIDATION_PREFIX)) {
+    return [];
+  }
+
+  const lines = detail.slice(RUNTIME_SETTINGS_VALIDATION_PREFIX.length).split(/\r?\n/);
+  const issues: RuntimeSettingsValidationIssue[] = [];
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const fieldPath = lines[index].trim();
+    const fieldMatch = fieldPath.match(/^([a-z_]+)\.([a-zA-Z0-9_:-]+)$/);
+    if (!fieldMatch || !RUNTIME_SETTINGS_BLOCKS.has(fieldMatch[1])) {
+      continue;
+    }
+    const rawMessage = lines[index + 1].trim();
+    if (!rawMessage) {
+      continue;
+    }
+    const fieldName = fieldMatch[2];
+    const label = fieldPath === 'chat.application_timezone'
+      ? 'Application timezone'
+      : `${RUNTIME_SETTINGS_BLOCK_LABELS[fieldMatch[1]]}: ${fieldName.replace(/_/g, ' ').replace(/^\w/, (first) => first.toUpperCase())}`;
+    issues.push({ fieldPath, label, message: runtimeSettingsValidationMessage(rawMessage) });
+  }
+  return issues;
+};
+
+// Fields that render their own error, and the settings section that shows them.
+const RUNTIME_SETTINGS_INLINE_ERROR_SECTIONS: Record<string, SettingsSectionId> = {
+  'chat.application_timezone': 'application',
+  'agent_execution.initial_run_seconds': 'agent-runtime',
+};
+
 const normalizeSettingsSection = (value: string | null | undefined): SettingsSectionId => (
   SETTINGS_SECTIONS.some((section) => section.id === value)
     ? value as SettingsSectionId
@@ -314,6 +395,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly visionPolicyOptions = VISION_POLICY_OPTIONS;
   runtimeSettingsDraft: RuntimeSettingsResponse = cloneRuntimeSettings(this.runtimeSettings);
   runtimeSettingsError = '';
+  runtimeSettingsValidationIssues: RuntimeSettingsValidationIssue[] = [];
   isLoadingRuntimeSettings = false;
   isSavingRuntimeSettings = false;
   runtimeRestartRequired = false;
@@ -1434,6 +1516,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onRuntimeSettingChanged(): void {
     this.runtimeSettingsError = '';
+    this.runtimeSettingsValidationIssues = [];
     this.statusText = '';
     if (this.runtimeAutosaveTimer !== null) {
       clearTimeout(this.runtimeAutosaveTimer);
@@ -1447,6 +1530,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   get historyLimitInvalid(): boolean {
     const limit = this.runtimeSettingsDraft.chat.max_history_messages;
     return !Number.isInteger(limit) || limit < 1 || limit > 500;
+  }
+
+  runtimeSettingsFieldError(fieldPath: string): RuntimeSettingsValidationIssue | undefined {
+    return this.runtimeSettingsValidationIssues.find((issue) => issue.fieldPath === fieldPath);
+  }
+
+  get otherRuntimeSettingsValidationIssues(): RuntimeSettingsValidationIssue[] {
+    return this.runtimeSettingsValidationIssues.filter(
+      (issue) => RUNTIME_SETTINGS_INLINE_ERROR_SECTIONS[issue.fieldPath] !== this.activeSection,
+    );
   }
 
   async saveRuntimeSettings(): Promise<void> {
@@ -1464,6 +1557,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const sentDraft = JSON.stringify(this.runtimeSettingsDraft);
     this.isSavingRuntimeSettings = true;
     this.runtimeSettingsError = '';
+    this.runtimeSettingsValidationIssues = [];
     try {
       const saved = await this.apiClient.updateRuntimeSettings(patch);
       if (this.isDestroyed) {
@@ -1480,9 +1574,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       const detail = this.userFacingErrorService.toUserFacingError(error, 'Could not save runtime settings.');
-      this.runtimeSettingsError = detail.startsWith('Invalid application runtime settings:')
-        ? 'Some runtime settings are invalid. Check the values you changed.'
-        : detail;
+      this.runtimeSettingsValidationIssues = parseRuntimeSettingsValidationIssues(detail);
+      this.runtimeSettingsError = this.runtimeSettingsValidationIssues.length
+        ? 'Some runtime settings could not be saved. Check the field-specific errors and try again.'
+        : detail.startsWith(RUNTIME_SETTINGS_VALIDATION_PREFIX)
+          ? 'Some runtime settings are invalid. Check the values you changed.'
+          : detail;
     } finally {
       this.isSavingRuntimeSettings = false;
       if (this.runtimeSaveQueued) {

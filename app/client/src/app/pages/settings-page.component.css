@@ -507,6 +507,15 @@
     color: #ff9b9b;
 }
 
+.settings-inline-status--error > p {
+    margin: 0;
+}
+
+.settings-inline-status--error > ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1.2rem;
+}
+
 /* ---------- Warning banner ---------- */
 
 .settings-page__warning {

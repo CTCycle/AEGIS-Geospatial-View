@@ -10,6 +10,15 @@ COORDINATE_PAIR_RE = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;\s]\s*"
     r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
 )
+_DEGREES = r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)"
+LABELED_COORDINATE_PAIR_RE = re.compile(
+    r"\b(?P<first_axis>latitude|longitude|lat|lon|lng)\b\s*[:=]?\s*"
+    rf"(?P<first>{_DEGREES})\s*(?:[,;]\s*|\band\s+|\s+)"
+    r"(?P<second_axis>latitude|longitude|lat|lon|lng)\b\s*[:=]?\s*"
+    rf"(?P<second>{_DEGREES})(?!\w|\.\d)",
+    re.IGNORECASE,
+)
+
 
 ###############################################################################
 def normalize_target_key(value: str) -> str:
@@ -41,6 +50,12 @@ def location_ref_matches(requested: str, key: str, label: str | None) -> bool:
 
 ###############################################################################
 def _matches(requested: str, key: str, label: str | None) -> bool:
+    point = parse_coordinate_pair(requested)
+    if point is not None:
+        return any(
+            point == parse_coordinate_pair(candidate)
+            for candidate in (key, label or "")
+        )
     target = normalize_target_key(requested)
     if not target:
         return False
@@ -62,18 +77,48 @@ def _matches(requested: str, key: str, label: str | None) -> bool:
 def parse_coordinate_pair(value: str) -> tuple[float, float] | None:
     """Return (latitude, longitude) when ``value`` is a valid coordinate pair."""
 
-    match = COORDINATE_PAIR_RE.fullmatch(value)
-    if match is None:
+    pair = coordinate_values(value)
+    if pair is None:
         return None
-    latitude, longitude = (float(item) for item in match.groups())
+    latitude, longitude = pair
     if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
         return None
     return latitude, longitude
 
 
+###############################################################################
+def coordinate_values(value: str) -> tuple[float, float] | None:
+    """Read a complete bare or axis-labeled pair without validating bounds."""
+
+    match = COORDINATE_PAIR_RE.fullmatch(value)
+    if match is not None:
+        first, second = match.groups()
+        return float(first), float(second)
+    match = LABELED_COORDINATE_PAIR_RE.fullmatch(value.strip())
+    if match is None:
+        return None
+    first_latitude = match["first_axis"].casefold().startswith("lat")
+    second_latitude = match["second_axis"].casefold().startswith("lat")
+    if first_latitude == second_latitude:
+        return None
+    first, second = float(match["first"]), float(match["second"])
+    return (first, second) if first_latitude else (second, first)
+
+
+###############################################################################
+def mentions_coordinates(value: str) -> bool:
+    return (
+        re.search(r"\b(?:coordinates?|latitude|longitude)\b", value, re.IGNORECASE)
+        is not None
+    )
+
+
 __all__ = [
     "COORDINATE_PAIR_RE",
+    "LABELED_COORDINATE_PAIR_RE",
+    "coordinate_values",
     "location_ref_matches",
+    "mentions_coordinates",
     "normalize_target_key",
     "parse_coordinate_pair",
 ]

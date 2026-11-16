@@ -1675,6 +1675,42 @@ async def test_marker_value_labels_must_come_from_the_retrieved_data() -> None:
     properties = markers.descriptor["data"]["features"][0]["properties"]
     assert properties["name"] == "Kunsthaus: 18.3 °C" and properties["annotation"] == "18.3 °C"
 
+###############################################################################
+@pytest.mark.asyncio
+async def test_marker_coordinate_labels_come_from_the_resolved_place() -> None:
+    state = _marking_state(
+        {
+            "Kunsthaus": ResolvedLocation(
+                label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548
+            ),
+        }
+    )
+    state.user_message = "Mark Kunsthaus and include its decimal coordinates."
+    result = await _service().apply(
+        MapPlan(
+            expected_collection_revision=2,
+            actions=[
+                MarkLocationsAction(
+                    action="mark_locations",
+                    location_refs=["Kunsthaus"],
+                    annotations={"Kunsthaus": "Latitude 8.548, longitude 47.37"},
+                )
+            ],
+        ),
+        state,
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
+
+    assert result.status == "success"
+    assert state.prepared_map_session is not None
+    markers = next(
+        item
+        for item in state.prepared_map_session.overlay_collection.instances
+        if item.rendering_mode == "place-markers"
+    )
+    properties = markers.descriptor["data"]["features"][0]["properties"]
+    assert properties["annotation"] == "Latitude 47.3700, longitude 8.5480"
+
 
 ###############################################################################
 @pytest.mark.asyncio

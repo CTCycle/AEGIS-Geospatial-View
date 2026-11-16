@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from tests.e2e.helpers.artifacts import (
     write_report,
     write_snapshot,
 )
-from tests.e2e.helpers.realtime_stub import register_realtime_stub
+from tests.e2e.helpers.realtime_stub import register_chat_stub
 from tests.e2e.helpers.model_capability_metadata import (
     selected_model_tool_support_metadata,
 )
@@ -202,23 +203,38 @@ def test_live_new_chat_reset(
     )
 
 ###############################################################################
-def test_live_degraded_path_shows_user_failure_without_crash(
+def test_controlled_degraded_path_shows_user_failure_without_crash(
     page: Page, base_url: str
 ) -> None:
-    register_realtime_stub(
+    register_chat_stub(
         page,
         lambda _message, _run_number: {},
         error_message="Provider unavailable for this test",
     )
+    page.route(
+        re.compile(r".*/api/conversations/conversation-e2e/runs/stub-run-1/trace(?:\?.*)?$"),
+        lambda route: route.fulfill(
+            json={
+                "conversation_id": "conversation-e2e",
+                "run_id": "stub-run-1",
+                "entries": [],
+            }
+        ),
+    )
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
     page.get_by_role("button", name="Send message").click()
-    # Execution failures are reported in Tool activity, not as chat messages.
     activity = page.get_by_role("button", name="Tool activity and execution details")
     expect(activity).to_contain_text("Needs attention", timeout=15000)
+    transcript = page.get_by_role("log", name="Conversation transcript")
+    expect(transcript.get_by_role("alert")).to_have_text(
+        "The request could not be completed."
+    )
     expect(page.locator(".chat-message--assistant")).to_have_count(0)
     activity.click()
     expect(
-        page.get_by_text("The request could not be completed.", exact=False)
+        page.get_by_role("region", name="Execution details").get_by_text(
+            "The request could not be completed.", exact=True
+        )
     ).to_be_visible()
     expect(page.get_by_label("Chat message")).to_be_visible()

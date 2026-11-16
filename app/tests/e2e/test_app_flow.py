@@ -9,9 +9,11 @@ from typing import Any
 from playwright.sync_api import Page, Route, expect
 from server.configurations.settings import AppSettings
 from tests.e2e.helpers.chat_stub_payloads import (
+    chat_completion_text_payload,
     model_catalog_payload,
     selected_agent_settings_payload,
 )
+from tests.e2e.helpers.realtime_stub import register_chat_stub
 
 
 ###############################################################################
@@ -38,15 +40,19 @@ class TestChatFlow:
 
     # -------------------------------------------------------------------------
     def test_chat_composer_visible_and_send_prompt(self, page: Page, base_url: str):
+        response = "The requested point is at latitude 41.9028 and longitude 12.4964."
+        register_chat_stub(
+            page, lambda _message, _run_number: chat_completion_text_payload(1, response)
+        )
         page.goto(base_url)
         composer = page.get_by_label("Chat message")
         expect(composer).to_be_visible()
-        composer.fill("show map at 41.9028, 12.4964")
+        prompt = "Confirm the coordinates 41.9028, 12.4964"
+        composer.fill(prompt)
         page.get_by_role("button", name="Send message").click()
-        expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
-        expect(page.locator(".chat-message--assistant").last).to_be_visible(
-            timeout=45000
-        )
+        transcript = page.get_by_role("log", name="Conversation transcript")
+        expect(transcript.get_by_text(prompt, exact=True)).to_be_visible()
+        expect(transcript.get_by_text(response, exact=True)).to_be_visible()
 
     # -------------------------------------------------------------------------
     def test_settings_page_opens_from_toolbar(self, page: Page, base_url: str):

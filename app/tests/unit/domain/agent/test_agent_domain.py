@@ -468,4 +468,4 @@ def test_ledger_eviction_drops_superseded_then_completed_before_unresolved() -> 
 
 def test_route_prompt_reserves_map_presentation_for_map_requests() -> None:
     # The route model chose "both" for plain value questions (S09).
-    assert "text for value, comparison or fact questions" in CAPABILITY_ROUTE_SYSTEM_PROMPT
+    assert "Use text for values and facts; map or both only when requested" in CAPABILITY_ROUTE_SYSTEM_PROMPT

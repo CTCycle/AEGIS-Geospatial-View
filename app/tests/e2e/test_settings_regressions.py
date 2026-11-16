@@ -16,6 +16,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_completion_text_payload,
     geospatial_catalog_payload,
     model_catalog_payload,
+    model_settings_payload,
     selected_agent_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -717,6 +718,7 @@ def test_ollama_url_autosaves_without_confirmation_and_restores_after_reload(
     _setup_stub_harness(page, patch_payloads=patch_payloads)
     page.goto(f"{base_url.rstrip('/')}/settings?tab=model-providers")
     url_input = page.get_by_label("Ollama server URL")
+    expect(url_input).to_have_value(selected_agent_settings_payload()["ollama_url"])
 
     with page.expect_response(
         lambda response: response.request.method == "PATCH"
@@ -890,6 +892,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 ) -> None:
     _setup_stub_harness(
         page,
+        settings_payload=model_settings_payload(),
         turn_payload_factory=lambda _message: chat_completion_text_payload(
             12001,
             "This is the latest assistant response and it must remain visible above the composer.",
@@ -1307,7 +1310,11 @@ def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
             11001, "Place search rendered with an interactive map."
         )
 
-    _setup_stub_harness(page, turn_payload_factory=turn_payload)
+    _setup_stub_harness(
+        page,
+        settings_payload=model_settings_payload(),
+        turn_payload_factory=turn_payload,
+    )
 
     page.goto(base_url)
     composer = page.get_by_label("Chat message")

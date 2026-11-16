@@ -354,8 +354,23 @@ class ApplyMapPlanInput(StrictToolInput):
     actions: list[MapAction] = Field(min_length=1, max_length=32)
 
 ###############################################################################
+def _require_route_fields(schema: dict[str, Any]) -> None:
+    # Demand these choices on the wire, while retaining defaults when internal
+    # code constructs a route or validates a legacy provider's arguments.
+    fields = ["location_mode", "capability_queries"]
+    schema["required"] = [*schema.get("required", []), *fields]
+    properties = schema["properties"]
+    properties["location_mode"].pop("default", None)
+    properties["capability_queries"]["description"] = (
+        "Distinct dataset search concepts for new provider data, or [] when none is requested."
+    )
+
+
+###############################################################################
 class RouteRequestInput(CapabilityRoute):
-    """Named alias used when registering the internal bootstrap tool."""
+    """Routing fields the model states explicitly, even when empty or none."""
+
+    model_config = ConfigDict(json_schema_extra=_require_route_fields)
 
 
 __all__ = [

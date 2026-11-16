@@ -687,8 +687,13 @@ def derive_request_obligations(
                 target_ids=list(target_ids),
             )
         )
-    if route.presentation in {"text", "both"} and route.location_mode != "none":
-        # A text answer about bare coordinates must say where they are.
+    if (
+        route.presentation in {"text", "both"}
+        and route.location_mode != "none"
+        and "required_data_retrieved" not in requirements
+    ):
+        # Coordinates used as inputs to a data query do not require a second
+        # service to identify the place unless the user also asks for its name.
         obligations.extend(
             RequestObligation(
                 id=f"identification:{_safe_task_id(target)}",

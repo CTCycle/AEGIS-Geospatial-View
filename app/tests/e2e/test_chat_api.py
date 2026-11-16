@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
+
 import pytest
-from playwright.sync_api import APIRequestContext, Error as PlaywrightError
+from playwright.sync_api import APIRequestContext
 
 ###############################################################################
 def _post(api_context: APIRequestContext, path: str, payload: dict):
@@ -162,22 +164,13 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
 
 ###############################################################################
 def test_ollama_refresh_pull_health(api_context: APIRequestContext) -> None:
-    refresh_base = _post(api_context, "/api/chat/models/ollama/refresh", {})
-    refresh_prefixed = _post(api_context, "/api/chat/models/ollama/refresh", {})
-    assert refresh_base.ok and refresh_prefixed.ok
+    model = os.environ.get("APP_TEST_OLLAMA_PULL_MODEL", "").strip()
+    if not model:
+        pytest.skip("Set APP_TEST_OLLAMA_PULL_MODEL to test a live Ollama model pull.")
 
-    try:
-        pull_base = _post(
-            api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"}
-        )
-        pull_prefixed = _post(
-            api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"}
-        )
-    except PlaywrightError as exc:
-        pytest.skip(f"Ollama pull timed out ({exc})")
-    assert pull_base.status in {200, 400, 502}
-    assert pull_prefixed.status in {200, 400, 502}
-
-    health_base = _get(api_context, "/api/chat/models/ollama/health")
-    health_prefixed = _get(api_context, "/api/chat/models/ollama/health")
-    assert health_base.ok and health_prefixed.ok
+    refresh = _post(api_context, "/api/chat/models/ollama/refresh", {})
+    assert refresh.ok, refresh.text()
+    pull = _post(api_context, "/api/chat/models/ollama/pull", {"model": model})
+    assert pull.ok, pull.text()
+    health = _get(api_context, "/api/chat/models/ollama/health")
+    assert health.ok, health.text()

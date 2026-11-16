@@ -53,7 +53,8 @@ def _turn_payload() -> dict[str, Any]:
 
 ###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
-    register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
+    turn = _turn_payload()
+    register_realtime_stub(page, lambda _message, _run_number: turn)
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),
@@ -68,12 +69,17 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     )
     page.route(
         re.compile(r".*/api/conversations/[^/]+$"),
-        lambda route: _json_ok(route, conversation_snapshot_payload()),
+        lambda route: _json_ok(
+            route, conversation_snapshot_payload(map_session=turn["map_session"])
+        ),
     )
     page.route(
-        re.compile(r".*/api/conversations$"),
+        re.compile(r".*/api/conversations(?:\?.*)?$"),
         lambda route: _json_ok(
-            route, {"conversation_id": "conversation-e2e", "title": "E2E"}
+            route,
+            {"conversations": [], "next_cursor": None}
+            if route.request.method == "GET"
+            else {"conversation_id": "conversation-e2e", "title": "E2E"},
         ),
     )
 
@@ -173,8 +179,8 @@ def test_refresh_restores_rendered_map_without_console_errors(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
     page.get_by_role("button", name="Send message").click()
+    expect(page.get_by_text("Search executed successfully.")).to_be_visible()
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
-    page.wait_for_timeout(500)
 
     page.reload()
 

@@ -51,6 +51,7 @@ def _manager(
     shutdown: list[Any] = []
 
     def build_candidate(settings: DatabaseSettings) -> Any:
+        Path(settings.database_path).touch()
         return SimpleNamespace(
             database=SimpleNamespace(settings=settings), name="candidate"
         )
@@ -152,7 +153,8 @@ async def test_database_switch_is_rejected_while_requests_or_runs_are_active(
 
     assert manager.configuration == previous
     assert published == []
-    assert shutdown[0].name == "candidate"
+    assert shutdown == []
+    assert not Path(target.database_path).exists()
 
 
 ###############################################################################
@@ -176,7 +178,8 @@ async def test_database_switch_is_rejected_when_current_database_state_cannot_be
 
     assert manager.configuration == previous
     assert published == []
-    assert shutdown[0].name == "candidate"
+    assert shutdown == []
+    assert not Path(target.database_path).exists()
 
 
 ###############################################################################
@@ -197,7 +200,8 @@ async def test_database_switch_is_rejected_during_an_inflight_request(
 
     assert manager.configuration == previous
     assert published == []
-    assert shutdown[0].name == "candidate"
+    assert shutdown == []
+    assert not Path(target.database_path).exists()
 
 
 ###############################################################################

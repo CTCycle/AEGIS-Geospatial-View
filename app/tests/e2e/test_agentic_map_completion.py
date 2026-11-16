@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import ConsoleMessage, Page, Route, WebSocketRoute, expect
+from playwright.sync_api import ConsoleMessage, Locator, Page, Route, WebSocketRoute, expect
+from server.domain.realtime import RealtimeRenderAckPayload
 
 from tests.e2e.helpers.chat_stub_payloads import (
     ROME_MAP_SESSION,
@@ -63,6 +64,7 @@ def _envelope(
     message_id: str,
     sequence: int | None = None,
     run_id: str = RUN_ID,
+    correlation_id: str | None = None,
 ) -> str:
     envelope: dict[str, Any] = {
         "protocol_version": 1,
@@ -71,6 +73,8 @@ def _envelope(
         "conversation_id": CONVERSATION_ID,
         "payload": payload,
     }
+    if correlation_id is not None:
+        envelope["correlation_id"] = correlation_id
     if sequence is not None:
         envelope["payload"] = {
             "event_id": f"{run_id}-event-{sequence}",
@@ -431,12 +435,14 @@ def _controlled_socket(
             if not isinstance(request, dict):
                 return
             request_type = request.get("type")
+            message_id = request["message_id"]
             if request_type == "session.resume":
                 socket.send(
                     _envelope(
                         message_type="session.resumed",
                         payload={"state": "idle", "run_id": None, "after_sequence": 0},
                         message_id="controlled-resumed",
+                        correlation_id=message_id,
                     )
                 )
                 return
@@ -461,6 +467,7 @@ def _controlled_socket(
                             "state": "running",
                         },
                         message_id="controlled-start-ack",
+                        correlation_id=message_id,
                     )
                 )
                 send_event(
@@ -500,6 +507,7 @@ def _controlled_socket(
                             "presentation_status": "failed",
                         },
                         message_id="controlled-cancel-ack",
+                        correlation_id=message_id,
                     )
                 )
                 send_event(socket, "cancelled", {"message": "Map update cancelled."})
@@ -521,6 +529,7 @@ def _controlled_socket(
                             "state": "running",
                         },
                         message_id="controlled-steer-ack",
+                        correlation_id=message_id,
                     )
                 )
                 send_event(
@@ -539,6 +548,12 @@ def _controlled_socket(
             payload = request.get("payload")
             if not isinstance(payload, dict):
                 return
+            if scenario not in {"superseded", "cancelled"} and not fixture_state.get(
+                "release_initial_render_ack"
+            ):
+                # Keep the candidate pending until the browser test observes it.
+                fixture_state["answer_initial_render_ack"] = lambda: handle_message(raw)
+                return
             acknowledgments.append(deepcopy(payload))
             if scenario == "cancelled":
                 if not cancelled:
@@ -553,6 +568,7 @@ def _controlled_socket(
                             "accepted": False,
                         },
                         message_id="controlled-cancelled-render-ack",
+                        correlation_id=message_id,
                     )
                 )
                 return
@@ -585,6 +601,7 @@ def _controlled_socket(
                             },
                         },
                         message_id="controlled-mismatched-render-ack",
+                        correlation_id=message_id,
                     )
                 )
                 return
@@ -616,6 +633,7 @@ def _controlled_socket(
                             "accepted": False,
                         },
                         message_id="controlled-stale-ack",
+                        correlation_id=message_id,
                     )
                 )
                 return
@@ -638,6 +656,7 @@ def _controlled_socket(
                             "presentation_status": "pending",
                         },
                         message_id="controlled-failed-render-ack",
+                        correlation_id=message_id,
                     )
                 )
                 send_event(
@@ -717,6 +736,7 @@ def _controlled_socket(
                             "presentation_status": "render_timeout",
                         },
                         message_id="controlled-retry-exhausted-ack",
+                        correlation_id=message_id,
                     )
                 )
                 fixture_state["final_presentation_status"] = "render_timeout"
@@ -744,6 +764,7 @@ def _controlled_socket(
                         "presentation_status": "ready",
                     },
                     message_id="controlled-render-ack",
+                    correlation_id=message_id,
                 )
             )
             fixture_state["final_presentation_status"] = "ready"
@@ -761,6 +782,7 @@ def _controlled_socket(
                             "presentation_status": "ready",
                         },
                         message_id="controlled-duplicate-render-ack",
+                        correlation_id=message_id,
                     )
                 )
             send_event(
@@ -911,6 +933,20 @@ def _setup_controlled_routes(
     )
 
 ###############################################################################
+def _pending_map_message(page: Page) -> Locator:
+    transcript = page.get_by_role("log", name="Conversation transcript")
+    return transcript.get_by_text("Data prepared; the map is loading.", exact=True)
+
+###############################################################################
+def _observe_pending_map_and_release_ack(page: Page, fixture_state: dict[str, Any]) -> None:
+    expect(_pending_map_message(page)).to_be_visible(timeout=15000)
+    expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+    fixture_state["release_initial_render_ack"] = True
+    answer = fixture_state.pop("answer_initial_render_ack", None)
+    if answer is not None:
+        answer()
+
+###############################################################################
 def test_controlled_map_completion_requires_and_records_visible_rendering(
     page: Page,
     base_url: str,
@@ -931,10 +967,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
     page.get_by_label("Chat message").fill("Show recent earthquakes around Rome")
     page.get_by_role("button", name="Send message").click()
 
-    expect(page.get_by_role("status").first).to_contain_text(
-        "Map data ready; rendering", timeout=15000
-    )
-    expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
+    _observe_pending_map_and_release_ack(page, fixture_state)
     for _ in range(150):
         if acknowledgments:
             break
@@ -942,6 +975,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
     assert acknowledgments, "MapLibre never sent a render acknowledgment"
 
     acknowledgment = acknowledgments[0]
+    RealtimeRenderAckPayload.model_validate(acknowledgment)
     assert acknowledgment["run_id"] == RUN_ID
     assert acknowledgment["map_session_id"] == MAP_SESSION_ID
     assert acknowledgment["collection_revision"] == COLLECTION_REVISION
@@ -950,6 +984,7 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
         "required_sources_loaded": True,
         "required_layers_present": True,
         "viewport_valid": True,
+        "targets_in_view": True,
     }
     overlay_results = acknowledgment["overlay_results"]
     assert overlay_results[0]["overlay_id"] == "earthquake-rome-1"
@@ -1053,21 +1088,22 @@ def test_controlled_render_fault_scenarios(
         composer.fill("Focus on Milan instead")
         composer.press("Enter")
     elif scenario == "cancelled":
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Map data ready; rendering", timeout=15000
-        )
+        expect(_pending_map_message(page)).to_be_visible(timeout=15000)
+        expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Stop generating").click()
     else:
-        expect(page.get_by_role("status").first).to_contain_text(
-            "Map data ready; rendering", timeout=15000
-        )
+        _observe_pending_map_and_release_ack(page, fixture_state)
 
     if scenario in {"failed_layer", "viewport_mismatch", "duplicate_ack"}:
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
             "Map ready.", timeout=15000
         )
-        assert len(acknowledgments) >= (2 if scenario != "duplicate_ack" else 1)
+        if scenario == "duplicate_ack":
+            assert len(acknowledgments) == 1
+            expect(page.get_by_text("Map ready.", exact=True)).to_have_count(1)
+        else:
+            assert len(acknowledgments) == 2
     elif scenario == "retry_exhausted":
         for _ in range(150):
             if fixture_state.get("final_presentation_status") == "render_timeout":
@@ -1077,8 +1113,7 @@ def test_controlled_render_fault_scenarios(
         assert len(acknowledgments) == 3
         assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
         assert assistant_messages and "Map ready." not in assistant_messages[-1]
-        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
-        assert page.get_by_role("button", name="Stop generating").count() == 0
+        expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
         execution_status = page.locator("app-execution-status")
         execution_status.locator("button").click()
         expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
@@ -1093,8 +1128,7 @@ def test_controlled_render_fault_scenarios(
         assert len(acknowledgments) == 1
         assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
         assert assistant_messages and "Map ready." not in assistant_messages[-1]
-        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
-        assert page.get_by_role("button", name="Stop generating").count() == 0
+        expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
         execution_status = page.locator("app-execution-status")
         execution_status.locator("button").click()
         expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
@@ -1110,10 +1144,12 @@ def test_controlled_render_fault_scenarios(
         assert rejected and rejected[0].get("rejection_reason") == "mismatched_identity"
         assert fixture_state.get("final_presentation_status") == "ready"
     elif scenario == "cancelled":
-        assistant_messages = page.locator(".chat-message--assistant").all_inner_texts()
-        assert assistant_messages and assistant_messages[-1] != "Map ready."
-        assert "Map data ready; rendering" not in _bounded_text(page.locator("body").inner_text())
-        assert page.get_by_role("button", name="Stop generating").count() == 0
+        transcript = page.get_by_role("log", name="Conversation transcript")
+        expect(transcript.get_by_text("Run stopped. No result was produced.")).to_be_visible()
+        expect(transcript.get_by_text("Map ready.", exact=True)).to_have_count(0)
+        expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
+        expect(page.locator(".maplibregl-canvas")).to_have_count(0)
+        assert fixture_state.get("final_presentation_status") == "failed"
     elif scenario == "superseded":
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(

@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import re
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +25,6 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
-DIFF_ROOT = (
-    Path(__file__).resolve().parents[3] / "assets" / "QA" / "e2e" / "visual_diffs"
-)
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
@@ -164,7 +162,7 @@ def _setup_stubs(page: Page) -> None:
         lambda route: _json_ok(route, geospatial_catalog_payload()),
     )
     page.route(
-        re.compile(r".*/api/conversations$"),
+        re.compile(r".*/api/conversations(?:\?.*)?$"),
         lambda route: _json_ok(
             route,
             {"conversations": [], "next_cursor": None}
@@ -206,9 +204,10 @@ def _setup_stubs(page: Page) -> None:
     )
 
 ###############################################################################
-def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
+def _assert_visual_baseline(
+    actual_bytes: bytes, baseline_name: str, artifact_root: Path
+) -> None:
     BASELINE_ROOT.mkdir(parents=True, exist_ok=True)
-    DIFF_ROOT.mkdir(parents=True, exist_ok=True)
     baseline_path = BASELINE_ROOT / baseline_name
     if os.getenv("UPDATE_VISUAL_BASELINES") == "1" or not baseline_path.exists():
         baseline_path.write_bytes(actual_bytes)
@@ -220,21 +219,21 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
             f"Baseline created at {baseline_path}. Re-run without UPDATE_VISUAL_BASELINES=1."
         )
 
-    actual_path = DIFF_ROOT / f"actual_{baseline_name}"
-    actual_path.write_bytes(actual_bytes)
-    actual = Image.open(actual_path).convert("RGB")
+    actual = Image.open(BytesIO(actual_bytes)).convert("RGB")
     expected = Image.open(baseline_path).convert("RGB")
     if actual.size != expected.size:
         raise AssertionError(
             f"Visual size mismatch for {baseline_name}: expected {expected.size}, got {actual.size}."
         )
     diff = ImageChops.difference(actual, expected)
-    bbox = diff.getbbox()
-    if bbox is None:
-        return
-    diff_pixels = sum(1 for pixel in diff.get_flattened_data() if pixel != (0, 0, 0))
+    # Chromium can round translucent drawer colors one RGB level differently.
+    # Keep the existing changed-pixel budget for differences above that level.
+    diff_pixels = sum(1 for pixel in diff.get_flattened_data() if max(pixel) > 1)
     if diff_pixels > 250:
-        diff_path = DIFF_ROOT / f"diff_{baseline_name}"
+        diff_root = artifact_root / "visual_diffs"
+        diff_root.mkdir(parents=True, exist_ok=True)
+        (diff_root / f"actual_{baseline_name}").write_bytes(actual_bytes)
+        diff_path = diff_root / f"diff_{baseline_name}"
         diff.save(diff_path)
         raise AssertionError(
             f"Visual regression for {baseline_name}: {diff_pixels} pixels differ. See {diff_path}."
@@ -253,14 +252,18 @@ def _open_fixture_map(page: Page, base_url: str) -> None:
     expect(loaded_layer).to_contain_text("Visual fixture points")
 
 ###############################################################################
-def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
+def test_map_canvas_matches_visual_baseline(
+    page: Page, base_url: str, artifact_root: Path
+) -> None:
     _open_fixture_map(page, base_url)
     map_canvas = page.locator(".maplibregl-canvas:visible").last
     expect(map_canvas).to_be_visible()
-    _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
+    _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png", artifact_root)
 
 ###############################################################################
-def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> None:
+def test_overlay_panel_matches_visual_baseline(
+    page: Page, base_url: str, artifact_root: Path
+) -> None:
     _open_fixture_map(page, base_url)
     page_root = page.locator("body")
-    _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png")
+    _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png", artifact_root)

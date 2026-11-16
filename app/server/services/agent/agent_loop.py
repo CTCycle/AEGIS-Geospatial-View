@@ -17,7 +17,11 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from server.common.identifiers import location_ref_matches, normalize_target_key
+from server.common.identifiers import (
+    location_ref_matches,
+    mentions_coordinates,
+    normalize_target_key,
+)
 from server.common.logging_handlers import log_unexpected_failure
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 from server.contracts.geospatial import MapSession
@@ -397,7 +401,8 @@ class AgentLoop:
                 return self._failed(
                     state,
                     request,
-                    "The request could not be routed to a supported capability.",
+                    "The selected model did not produce a valid route, so no map-data "
+                    "tool ran. Try naming the place and the data or map change you want.",
                     category="response_parsing",
                 )
             state.route = route
@@ -691,23 +696,42 @@ class AgentLoop:
                 category="model_capability",
             )
         self._transition(state, AgentPhase.MODEL_STEP, request.budget)
-        result = (
-            LLMResult(content="", tool_calls=[LLMToolCall(
+        server_call: LLMToolCall | None = None
+        if catalog_cursor is not None:
+            server_call = LLMToolCall(
                 id=f"catalog-page-{state.current_iteration}-{catalog_cursor}",
                 name="discover_geospatial_capabilities",
                 arguments={"cursor": catalog_cursor, "limit": 12},
-            )]) if catalog_cursor is not None
+            )
+        elif (
+            state.route_source == "fast"
+            and route.operation == "show_location_on_map"
+            and route.presentation == "both"
+            and not state.tool_results
+            and "resolve_geospatial_location" in exposed_tool_names
+            and len(targets := unresolved_route_targets(state)) == 1
+        ):
+            # On the narrow coordinate-display route, the input already fixes
+            # the exact place. An extra model step can only drop qualifiers.
+            server_call = LLMToolCall(
+                id=f"server-target-resolution-{state.request_id}",
+                name="resolve_geospatial_location",
+                arguments={"query": targets[0]},
+            )
+        result = (
+            LLMResult(content="", tool_calls=[server_call]) if server_call is not None
             else await self._model_step(request, provider, messages, tools)
         )
         await self._emit_trace(request, AgentTraceEvent(
             kind="stage", run_id=state.run_id or state.request_id,
             run_version=state.run_version, sequence=self._trace_sequence(state),
             iteration=state.current_iteration,
-            payload={"stage": "model_decision", "tool_names": [call.name for call in result.tool_calls],
+            payload={"stage": "model_decision" if server_call is None else "server_decision",
+                     "tool_names": [call.name for call in result.tool_calls],
                      "finish_reason": result.finish_reason, "model_calls": state.model_calls},
         ))
         if result.tool_calls:
-            if catalog_cursor is None:
+            if server_call is None:
                 messages.extend(self._assistant_and_tool_messages(result))
             tool_results = await self._execute_calls(
                 request,
@@ -720,7 +744,7 @@ class AgentLoop:
             ) or await self._revise_route(
                 request, provider, messages, route, result.tool_calls, tool_results
             ):
-                if catalog_cursor is None:
+                if server_call is None:
                     messages.extend(
                         self._tool_result_messages(
                             result.tool_calls,
@@ -761,7 +785,7 @@ class AgentLoop:
                 # exhausted instead of issuing the required map plan.
                 tool_results.extend(location_map_recovery)
             self._ensure_run_control(request)
-            if catalog_cursor is None:
+            if server_call is None:
                 messages.extend(
                     self._tool_result_messages(
                         result.tool_calls,
@@ -1316,16 +1340,40 @@ class AgentLoop:
         provider: AgentProvider,
         messages: list[dict[str, Any]],
     ) -> str:
-        """Synthesize the final answer after a verified browser render."""
+        """Report the verified map, using synthesis when the answer needs it."""
 
         state = request.state
-        candidate = await self._verified_answer_text(
-            request,
-            await self._terminal_synthesis(
-                request, provider, messages, reason="verified_render"
-            ),
-            reason="verified_render",
-        )
+        route = state.route
+        contract = state.completion_contract
+        if (
+            state.render_verified
+            and state.active_map_session is not None
+            and route is not None
+            and route.primary_domain is CapabilityDomain.MAP_RENDERING
+            and route.location_mode == "target"
+            and len(route.target_refs) == 1
+            and not route.secondary_domains
+            and route.analysis is None
+            and not route.requires_geometry
+            and contract is not None
+            and not contract.evidence_required
+            and not self._pending_native_requirements(state)
+        ):
+            candidate = self._verified_map_fallback(state)
+            await self._emit_finalization_trace(
+                request,
+                reason="verified_render",
+                kind="finalization_completed",
+                outcome="verified_map_summary",
+            )
+        else:
+            candidate = await self._verified_answer_text(
+                request,
+                await self._terminal_synthesis(
+                    request, provider, messages, reason="verified_render"
+                ),
+                reason="verified_render",
+            )
         final = (
             self._verified_map_state_summary(state)
             or candidate
@@ -1348,10 +1396,7 @@ class AgentLoop:
         """State the mapped place's coordinates when asked for and not yet given."""
 
         session = state.active_map_session
-        terms = set(re.findall(r"[a-z]+", state.user_message.casefold()))
-        if session is None or not terms.intersection(
-            {"coordinate", "coordinates", "latitude", "longitude"}
-        ):
+        if session is None or not mentions_coordinates(state.user_message):
             return None
         location = session.resolved_location
         if f"{location.latitude:.2f}" in final and f"{location.longitude:.2f}" in final:
@@ -2415,10 +2460,10 @@ class AgentLoop:
         # describes tools this call cannot use and would contradict them.
         native_prompt = build_native_agent_system_prompt()
         correction_messages = [
-            {"role": "system", "content": build_capability_route_prompt()},
             {
                 "role": "system",
-                "content": "Current time: "
+                "content": build_capability_route_prompt()
+                + "\n\nCurrent time: "
                 + datetime.now(UTC).replace(microsecond=0).isoformat()
                 + " (UTC).",
             },
@@ -2468,6 +2513,7 @@ class AgentLoop:
             )
             call = result.tool_calls[0] if result.tool_calls else None
             validation_errors: list[dict[str, str]] = []
+            schema_errors: list[dict[str, str]] = []
             if (
                 call is not None
                 and call.name == route_tool.name
@@ -2490,11 +2536,31 @@ class AgentLoop:
                         }
                         for error in exc.errors()[:8]
                     ]
+                    schema_errors = [
+                        {
+                            "field": ".".join(str(part) for part in error["loc"])
+                            or "(root)",
+                            "code": error["type"],
+                        }
+                        for error in exc.errors(
+                            include_input=False, include_context=False
+                        )[:8]
+                    ]
                 if proposed is not None:
                     decision = self.capability_router.validate_route(
                         proposed,
                         user_message=request.state.user_message,
                         active_state=request.state,
+                    )
+                    await self._trace_route_attempt(
+                        request,
+                        attempt,
+                        decision.status,
+                        revision=revision is not None,
+                        details={
+                            "reason_codes": decision.reason_codes,
+                            "schema_errors": schema_errors,
+                        },
                     )
                     if decision.status in {"accepted", "discovery_required"}:
                         request.state.capability_ids = list(decision.capability_ids)
@@ -2535,6 +2601,27 @@ class AgentLoop:
                         )
                         request.state.route_corrections = attempt + 1
                         continue
+            await self._trace_route_attempt(
+                request,
+                attempt,
+                "invalid",
+                revision=revision is not None,
+                details={
+                    "cause": (
+                        "schema_validation"
+                        if schema_errors
+                        else "missing_tool_call"
+                        if call is None
+                        else "unexpected_tool"
+                        if call.name != route_tool.name
+                        else "malformed_arguments"
+                        if call.parse_error is not None
+                        else "missing_arguments"
+                    ),
+                    "schema_errors": schema_errors,
+                    "finish_reason": result.finish_reason,
+                },
+            )
             request.state.route_corrections = attempt + 1
             correction_messages.append(
                 {
@@ -2576,6 +2663,35 @@ class AgentLoop:
                 request.state.route_source = "fallback"
                 return None, "", decision.route
         return None, "", None
+
+    # -------------------------------------------------------------------------
+    async def _trace_route_attempt(
+        self,
+        request: AgentLoopRequest,
+        attempt: int,
+        status: str,
+        *,
+        revision: bool,
+        details: dict[str, Any],
+    ) -> None:
+        state = request.state
+        await self._emit_trace(
+            request,
+            AgentTraceEvent(
+                kind="stage",
+                run_id=state.run_id or state.request_id,
+                run_version=state.run_version,
+                sequence=self._trace_sequence(state),
+                tool_name="route_request",
+                payload={
+                    "stage": "route_validation",
+                    "attempt": attempt + 1,
+                    "status": status,
+                    "revision": revision,
+                    **details,
+                },
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -3403,15 +3519,13 @@ class AgentLoop:
             )
             request.budget.record_model_call(terminal=terminal)
             request.state.model_calls += 1
+            stage_metadata: dict[str, Any] = {
+                "provider": request.provider,
+                "model": request.model,
+                "attempt": attempts,
+            }
             try:
-                with request.budget.observe(
-                    budget_stage,
-                    metadata={
-                        "provider": request.provider,
-                        "model": request.model,
-                        "attempt": attempts,
-                    },
-                ):
+                with request.budget.observe(budget_stage, metadata=stage_metadata):
                     result = await asyncio.wait_for(
                         provider.achat(
                             llm_request,
@@ -3420,6 +3534,19 @@ class AgentLoop:
                         ),
                         timeout=timeout,
                     )
+                    if request.provider == "ollama":
+                        # Ollama reports processing durations in ns. Keep these
+                        # separate from observed wall time; it has no standalone
+                        # queue metric, and the difference also includes transport.
+                        for field, label in (
+                            ("total_duration", "provider_total_ms"),
+                            ("load_duration", "provider_load_ms"),
+                            ("prompt_eval_duration", "provider_prompt_eval_ms"),
+                            ("eval_duration", "provider_eval_ms"),
+                        ):
+                            value = result.raw.get(field)
+                            if type(value) is int and value >= 0:
+                                stage_metadata[label] = value // 1_000_000
                 self._ensure_run_control(request)
                 self._record_context_usage(
                     request,

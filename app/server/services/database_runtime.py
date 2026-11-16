@@ -57,6 +57,7 @@ class SQLiteTargetInspection:
 
 _INVALID_WINDOWS_FILENAME = re.compile(r'[<>:"|?*\x00-\x1f]|[. ]$')
 
+
 ###############################################################################
 def inspect_database_configuration(
     configuration: DatabaseConfiguration,
@@ -275,19 +276,9 @@ class DatabaseRuntimeManager:
             database_path=target.database_path,
             sqlite_lock_timeout_seconds=target.sqlite_lock_timeout_seconds,
         )
+        self._begin_switch()
+        candidate = None
         try:
-            candidate = await asyncio.to_thread(
-                self._build_candidate, candidate_settings
-            )
-        except Exception as exc:
-            raise DatabaseRuntimeSwitchError(
-                "AEGIS could not initialize and validate the target database. The active database is unchanged."
-            ) from exc
-
-        owns_switch_gate = False
-        try:
-            self._begin_switch()
-            owns_switch_gate = True
             try:
                 busy = await asyncio.to_thread(self._busy_reasons, self._runtime_bundle)
             except Exception as exc:
@@ -298,6 +289,15 @@ class DatabaseRuntimeManager:
                 raise DatabaseRuntimeBusyError(
                     "Switching is unavailable while " + ", ".join(busy) + " are active."
                 )
+
+            try:
+                candidate = await asyncio.to_thread(
+                    self._build_candidate, candidate_settings
+                )
+            except Exception as exc:
+                raise DatabaseRuntimeSwitchError(
+                    "AEGIS could not initialize and validate the target database. The active database is unchanged."
+                ) from exc
 
             previous_configuration = self._configuration
             previous_runtime = self._runtime_bundle
@@ -325,20 +325,18 @@ class DatabaseRuntimeManager:
                     "The previous database runtime did not shut down cleanly after a successful switch."
                 )
             return database_settings_response(target)
-        except DatabaseRuntimeBusyError:
-            await self._shutdown_runtime(candidate)
-            raise
-        except DatabaseRuntimeSwitchError:
-            await self._shutdown_runtime(candidate)
+        except DatabaseRuntimeBusyError, DatabaseRuntimeSwitchError:
+            if candidate is not None:
+                await self._shutdown_runtime(candidate)
             raise
         except Exception as exc:
-            await self._shutdown_runtime(candidate)
+            if candidate is not None:
+                await self._shutdown_runtime(candidate)
             raise DatabaseRuntimeSwitchError(
                 "AEGIS could not switch databases. The previous database remains active."
             ) from exc
         finally:
-            if owns_switch_gate:
-                self._finish_switch()
+            self._finish_switch()
 
     # -------------------------------------------------------------------------
     def _begin_switch(self) -> None:

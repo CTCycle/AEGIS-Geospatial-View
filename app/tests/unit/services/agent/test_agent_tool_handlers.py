@@ -241,6 +241,56 @@ async def test_coordinate_query_is_resolved_without_geocoder_egress() -> None:
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "query",
+    [
+        "latitude:48.8584, longitude:2.2945",
+        "longitude 2.2945 and latitude 48.8584",
+        "2.2945, 48.8584",
+    ],
+)
+async def test_weather_axis_labels_bind_a_point_in_latitude_longitude_order(
+    query: str,
+) -> None:
+    target = "latitude:48.8584, longitude:2.2945"
+    state = AgentRunState(
+        request_id="request-1",
+        conversation_id="conversation-1",
+        phase=AgentPhase.BUILD_TOOL_CONTEXT,
+        user_message=(
+            "Get current weather for latitude 48.8584, longitude 2.2945 using Open-Meteo. "
+            "Return the current temperature in Celsius plus observation time."
+        ),
+        route=CapabilityRoute(
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="execute",
+            presentation="text",
+            location_mode="target",
+            target_refs=[target],
+            capability_queries=["Open-Meteo weather"],
+        ),
+    )
+    assert state.route is not None
+    obligations = derive_request_obligations(
+        state.route,
+        target_ids=[target],
+        target_requirements=[],
+        requirements=["required_data_retrieved"],
+        data_variables=["temperature"],
+    )
+    assert [item.kind for item in obligations] == ["location", "data"]
+    result = await LocationToolHandler(resolver=LocationResolver()).resolve(
+        ResolveLocationInput(target_id=target, query=query),
+        state,
+    )
+    assert result.status == "success"
+    assert result.data is not None
+    assert result.data["coordinates"] == [2.2945, 48.8584]
+    assert state.location_refs[target].location_type == "coordinates"
+
+
+###############################################################################
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "address", [{"city": "Lugano", "county": "Lugano", "state": "Ticino", "country": "Switzerland"}, None]
 )
 async def test_coordinates_to_identify_are_reverse_geocoded_and_the_answer_must_name_them(
@@ -706,12 +756,15 @@ def test_unknown_location_type_is_not_accepted_as_a_legacy_alias() -> None:
 )
 def test_text_coordinates_ignore_calendar_dates(text: str, expected) -> None:
     from server.services.agent.tool_handlers.location import (
-        _parse_coordinate_pair_from_text,
+        _coordinates_from_match,
         _search_text_coordinates,
     )
 
-    assert _parse_coordinate_pair_from_text(text) == expected
-    assert (_search_text_coordinates(text) is not None) is (expected is not None)
+    match = _search_text_coordinates(text)
+    assert _coordinates_from_match(match) == expected
+    assert (match is not None) is (expected is not None)
+
+
 ###############################################################################
 class _KeylessRuntime(_RuntimeRegistry):
 
@@ -760,3 +813,21 @@ def test_empty_count_discovery_names_missing_credential_without_other_subjects()
         item["alternatives"] for item in data["diagnostics"]["unmet_constraints"]
     ):
         assert all("charg" in str(item["id"]) for item in alternatives)
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("latitude 41.9, longitude 12.5", (41.9, 12.5)),
+        ("lon 12.5 and lat 41.9", (41.9, 12.5)),
+        ("lat 41.9 lon 12.5m", None),
+        ("lat 41.9 lat 12.5", None),
+    ],
+)
+def test_labeled_coordinate_pairs_require_a_clean_pair(
+    text: str, expected: tuple[float, float] | None
+) -> None:
+    from server.common.identifiers import coordinate_values
+
+    assert coordinate_values(text) == expected

@@ -315,7 +315,7 @@ def _route_call_with(*, drop: str | None = None, **updates: Any) -> LLMResult:
     )
 
 ###############################################################################
-async def _run_route(provider: FakeProvider) -> AgentLoopOutcome:
+async def _run_route(provider: FakeProvider, **options: Any) -> AgentLoopOutcome:
     return await _loop(provider).run(
         AgentLoopRequest(
             provider="fake",
@@ -323,6 +323,7 @@ async def _run_route(provider: FakeProvider) -> AgentLoopOutcome:
             state=_state(),
             budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
             max_route_corrections=1,
+            **options,
         )
     )
 
@@ -337,12 +338,27 @@ async def test_invalid_route_retry_reports_the_failing_fields() -> None:
         ]
     )
 
-    outcome = await _run_route(provider)
+    events = []
+
+    async def trace(event) -> None:  # noqa: ANN001
+        events.append(event)
+
+    outcome = await _run_route(provider, trace_callback=trace)
 
     assert outcome.stopped_reason == "goal_satisfied"
     correction = json.loads(provider.requests[1]["request"].messages[-1]["content"])
     assert correction["route_invalid"] is True
     assert [error["field"] for error in correction["errors"]] == ["primary_domain"]
+    validation = [
+        event.payload
+        for event in events
+        if event.payload.get("stage") == "route_validation"
+    ]
+    assert [event["status"] for event in validation] == ["invalid", "accepted"]
+    assert validation[0]["schema_errors"] == [
+        {"field": "primary_domain", "code": "enum"}
+    ]
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -369,7 +385,8 @@ async def test_route_missing_required_field_is_never_salvaged() -> None:
 
     assert outcome.stopped_reason == "failed"
     assert outcome.final_text == (
-        "The request could not be routed to a supported capability."
+        "The selected model did not produce a valid route, so no map-data "
+        "tool ran. Try naming the place and the data or map change you want."
     )
 
 ###############################################################################
@@ -830,6 +847,50 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     )
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
+
+###############################################################################
+@pytest.mark.asyncio
+async def test_verified_single_place_map_reports_coordinates_without_another_model_call() -> (
+    None
+):
+    provider = FakeProvider([])
+    state = _state()
+    state.user_message = "Map the Colosseum and return decimal coordinates."
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="both",
+        location_mode="target",
+        target_refs=["Colosseum"],
+    )
+    state.completion_contract = CompletionContract(operation="show_location_on_map")
+    state.render_verified = True
+    state.active_map_session = MapSession(
+        session_id="map-colosseum",
+        resolved_location=ResolvedLocation(
+            label="Colosseum, Rome",
+            latitude=41.8909,
+            longitude=12.4919,
+        ),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(center_latitude=41.8909, center_longitude=12.4919),
+        basemap={"id": "osm_default", "label": "OpenStreetMap"},
+        overlay_collection=OverlayCollectionState(revision=1),
+    )
+    answer = await _loop(provider)._finalize_verified_render(  # pyright: ignore[reportPrivateUsage]
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        ),
+        provider,
+        [],
+    )
+    assert "The map now shows Colosseum, Rome on the OpenStreetMap basemap." in answer
+    assert "latitude 41.8909, longitude 12.4919" in answer
+    assert not provider.requests
+
 
 ###############################################################################
 @pytest.mark.asyncio

@@ -336,8 +336,16 @@
                 </p>
               }
               <label>Application timezone
-                <input class="settings-control" type="text" [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
+                <input id="application-timezone" class="settings-control" type="text"
+                  [attr.aria-invalid]="runtimeSettingsFieldError('chat.application_timezone') ? 'true' : null"
+                  [attr.aria-describedby]="runtimeSettingsFieldError('chat.application_timezone') ? 'application-timezone-error' : null"
+                  [(ngModel)]="runtimeSettingsDraft.chat.application_timezone" />
               </label>
+              @if (runtimeSettingsFieldError('chat.application_timezone'); as timezoneError) {
+                <p id="application-timezone-error" class="settings-inline-status settings-inline-status--error">
+                  {{ timezoneError.message }}
+                </p>
+              }
             </div>
           </div>
         </section>
@@ -575,7 +583,15 @@
               <p>New runs use saved values immediately. Active and suspended runs retain their original limits.</p>
             </header>
             <div class="settings-row__body runtime-settings__fields">
-            <label>Initial run seconds <input class="settings-control" type="number" max="3600" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
+            <label>Initial run seconds <input id="initial-run-seconds" class="settings-control" type="number" max="3600" min="1"
+              [attr.aria-invalid]="runtimeSettingsFieldError('agent_execution.initial_run_seconds') ? 'true' : null"
+              [attr.aria-describedby]="runtimeSettingsFieldError('agent_execution.initial_run_seconds') ? 'initial-run-seconds-error' : null"
+              [(ngModel)]="runtimeSettingsDraft.agent_execution.initial_run_seconds" /></label>
+            @if (runtimeSettingsFieldError('agent_execution.initial_run_seconds'); as initialRunSecondsError) {
+              <p id="initial-run-seconds-error" class="settings-inline-status settings-inline-status--error">
+                {{ initialRunSecondsError.message }}
+              </p>
+            }
             <label>Simple run seconds <input class="settings-control" type="number" max="3600" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_seconds" /></label>
             <label>Complex run seconds <input class="settings-control" type="number" max="3600" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.complex_seconds" /></label>
             <label>Simple model calls <input class="settings-control" type="number" max="1000" min="1" [(ngModel)]="runtimeSettingsDraft.agent_execution.simple_max_model_calls" /></label>
@@ -757,7 +773,16 @@
 
     <div class="settings-page__status" role="status" aria-live="polite">{{ visibleStatusText }}</div>
     @if (runtimeSettingsError) {
-      <p class="settings-inline-status settings-inline-status--error" role="alert">{{ runtimeSettingsError }}</p>
+      <div class="settings-inline-status settings-inline-status--error" role="alert">
+        <p>{{ runtimeSettingsError }}</p>
+        @if (otherRuntimeSettingsValidationIssues.length) {
+          <ul>
+            @for (issue of otherRuntimeSettingsValidationIssues; track issue.fieldPath) {
+              <li><strong>{{ issue.label }}:</strong> {{ issue.message }}</li>
+            }
+          </ul>
+        }
+      </div>
     }
     @if (runtimeRestartRequired) {
       <p class="settings-inline-status" role="status" aria-live="polite">Runtime settings saved. Restart AEGIS to apply the changes to active services.</p>

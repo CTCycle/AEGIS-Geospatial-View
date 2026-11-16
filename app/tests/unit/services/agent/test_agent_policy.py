@@ -16,7 +16,7 @@ def test_route_prompt_owns_route_scope_without_execution_arguments() -> None:
     assert "coordinates" in prompt
     assert "radius" in prompt
     assert "provider arguments" in prompt
-    assert "execute a provider" in prompt
+    assert "Never invent provider arguments" in prompt
 
 # --- test_vision_policy.py ---
 

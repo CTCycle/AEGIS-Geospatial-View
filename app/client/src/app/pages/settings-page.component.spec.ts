@@ -883,6 +883,43 @@ describe('pages/settings-page.component', () => {
     expect(component.runtimeSettings.chat.max_history_messages).toBe(19);
   });
 
+  it('shows backend runtime validation beside the rejected timezone and numeric field', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    errors.toUserFacingError.and.callFake((error: unknown, fallback: string) => (
+      error instanceof Error ? error.message : fallback
+    ));
+
+    component.activeSection = 'application';
+    component.runtimeSettingsDraft.chat.application_timezone = 'Mars/Olympus_Mons';
+    updateRuntimeSettingsMock.and.rejectWith(new Error(
+      "Invalid application runtime settings: 1 validation error for AppSettings\nchat.application_timezone\n  Value error, Enter a valid IANA timezone such as Europe/Rome. [type=value_error, input_value='Mars/Olympus_Mons', input_type=str]",
+    ));
+    await component.saveRuntimeSettings();
+    fixture.detectChanges();
+
+    const timezoneInput = fixture.nativeElement.querySelector('#application-timezone') as HTMLInputElement;
+    expect(timezoneInput.getAttribute('aria-invalid')).toBe('true');
+    expect(timezoneInput.getAttribute('aria-describedby')).toBe('application-timezone-error');
+    expect(fixture.nativeElement.querySelector('#application-timezone-error')?.textContent).toContain('Europe/Rome');
+
+    component.activeSection = 'agent-runtime';
+    component.runtimeSettingsDraft.chat.application_timezone = 'UTC';
+    component.runtimeSettingsDraft.agent_execution.initial_run_seconds = 0;
+    updateRuntimeSettingsMock.and.rejectWith(new Error(
+      'Invalid application runtime settings: 1 validation error for AppSettings\nagent_execution.initial_run_seconds\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]',
+    ));
+    await component.saveRuntimeSettings();
+    fixture.detectChanges();
+
+    const budgetInput = fixture.nativeElement.querySelector('#initial-run-seconds') as HTMLInputElement;
+    expect(budgetInput.getAttribute('aria-invalid')).toBe('true');
+    expect(budgetInput.getAttribute('aria-describedby')).toBe('initial-run-seconds-error');
+    expect(fixture.nativeElement.querySelector('#initial-run-seconds-error')?.textContent).toContain('1 or greater');
+  });
+
   it('reports unreadable credential health in model provider state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',

@@ -1861,6 +1861,11 @@ def _catalog_router() -> CapabilityRouter:
     "message, target",
     [
         ("Show the Colosseum", "Colosseum"),
+        ("Map the Colosseum and return decimal coordinates.", "Colosseum"),
+        (
+            "Show the Colosseum in Rome on the map and include its latitude and longitude in decimal degrees.",
+            "Colosseum, Rome",
+        ),
         ("show me Rome on the map", "Rome"),
         ("Show 41.89, 12.49", "41.89, 12.49"),
         ("Show EUR Roma", "EUR Roma"),
@@ -1883,6 +1888,34 @@ def test_fast_route_accepts_single_place_display(message: str, target: str) -> N
     # The loop proceeds on either status, exactly as for a model route.
     assert decision.status in {"accepted", "discovery_required"}
     assert decision.route.operation == "show_location_on_map"
+    if "decimal" in message:
+        assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+        assert decision.route.presentation == "both"
+
+
+###############################################################################
+@pytest.mark.parametrize("target", ["Colosseum, Rome", "Colosseum in Rome"])
+def test_model_spelling_of_fast_target_keeps_coordinate_output_off_the_catalog(
+    target: str,
+) -> None:
+    message = "Show the Colosseum in Rome on the map and include its latitude and longitude in decimal degrees."
+    decision = _catalog_router().validate_route(
+        _route(
+            primary_domain=CapabilityDomain.MAP_RENDERING,
+            presentation="both",
+            operation="show_location_on_map",
+            capability_queries=["coordinates"],
+            target_refs=[target],
+        ),
+        user_message=message,
+        active_state=AgentRunState(
+            request_id="fast", conversation_id="fast", phase=AgentPhase.ROUTE_REQUEST, user_message=message
+        ),
+    )
+
+    assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
+    assert CapabilityDomain.DATA_RETRIEVAL not in decision.route.secondary_domains
+    assert "catalog_entity_route_normalized" not in decision.reason_codes
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1898,6 +1931,7 @@ def test_fast_route_accepts_single_place_display(message: str, target: str) -> N
         "show Rome then zoom out",
         "how far is Rome from Milan",
         "Show airports",
+        "Map airports and return coordinates",
         "show me the city centre",
         "show 95, 12",
         "show Rome?",

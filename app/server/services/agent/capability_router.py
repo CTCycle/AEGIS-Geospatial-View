@@ -126,8 +126,11 @@ _COORDINATES_WORD = re.compile(r"\bcoordinates\b", re.IGNORECASE)
 # Fast routing accepts one display verb and one target, nothing else: a
 # wrong deterministic route costs more than the routing call it saves.
 _FAST_ROUTE_PATTERN = re.compile(
-    r"^(?:please\s+)?(?:show|display|locate)(?:\s+me)?\s+(?:the\s+)?(?P<target>.+?)"
-    r"(?:\s+on\s+(?:the\s+|a\s+)?map)?\s*[.!]?$",
+    r"^(?:please\s+)?(?:show|display|locate|map)(?:\s+me)?\s+(?:the\s+)?(?P<target>.+?)"
+    r"(?:\s+on\s+(?:the\s+|a\s+)?map)?"
+    r"(?P<coordinate_output>\s+and\s+(?:give|return|include)\s+(?:its\s+)?"
+    r"(?:(?:decimal\s+)?coordinates|latitude\s+and\s+longitude(?:\s+in\s+decimal\s+degrees)?))?"
+    r"\s*[.!]?$",
     re.IGNORECASE,
 )
 _FAST_ROUTE_COORDINATES = re.compile(
@@ -204,23 +207,38 @@ def is_location_only_map_request(
     )
 
 ###############################################################################
-def _fast_route_target(user_message: str) -> str | None:
+def _fast_route_target(user_message: str) -> tuple[str, bool] | None:
     match = _FAST_ROUTE_PATTERN.match(" ".join(user_message.split()))
     if match is None:
         return None
     target = match.group("target").strip()
+    coordinate_output = bool(match["coordinate_output"])
     coordinates = _FAST_ROUTE_COORDINATES.match(target)
     if coordinates is not None:
         latitude, longitude = float(coordinates["lat"]), float(coordinates["lon"])
-        return target if abs(latitude) <= 90 and abs(longitude) <= 180 else None
-    if _FAST_ROUTE_PLACE.match(target) is None:
+        return (
+            (target, coordinate_output)
+            if abs(latitude) <= 90 and abs(longitude) <= 180
+            else None
+        )
+    components = re.split(r"\s+in\s+", target, maxsplit=1, flags=re.IGNORECASE) if coordinate_output else [target]
+    if any(_FAST_ROUTE_PLACE.fullmatch(component) is None for component in components):
         return None
+    target = ", ".join(components)
     tokens = re.findall(r"[^\W\d_]+", target.casefold())
     if not tokens or len(tokens) > _FAST_ROUTE_MAX_PLACE_TOKENS:
         return None
     if _FAST_ROUTE_EXCLUDED_TERMS.intersection(tokens) or names_centre(target):
         return None
-    return target
+    return target, coordinate_output
+
+
+###############################################################################
+def _fast_target_identity(target: str) -> str:
+    """Treat 'Colosseum in Rome' and 'Colosseum, Rome' as the same target."""
+
+    return normalize_target_key(re.sub(r"\s+in\s+", ", ", target, flags=re.IGNORECASE))
+
 
 ###############################################################################
 def build_conversation_fallback_route() -> CapabilityRoute:
@@ -255,9 +273,10 @@ class CapabilityRouter:
         returns None, so the caller falls back to model routing.
         """
 
-        target = _fast_route_target(user_message)
-        if target is None:
+        match = _fast_route_target(user_message)
+        if match is None:
             return None
+        target, coordinate_output = match
         if not _FAST_ROUTE_COORDINATES.match(target):
             # A catalog word ("airports", "webcams") names a layer, not a place.
             mentions_capability = getattr(
@@ -265,7 +284,16 @@ class CapabilityRouter:
             )
             if not callable(mentions_capability) or mentions_capability(target):
                 return None
-        return build_location_map_route([target])
+        route = build_location_map_route([target])
+        if coordinate_output:
+            return route.model_copy(
+                update={
+                    "presentation": "both",
+                    "primary_domain": CapabilityDomain.MAP_RENDERING,
+                    "secondary_domains": [],
+                }
+            )
+        return route
 
     # -------------------------------------------------------------------------
     def requests_catalog_entities(self, user_message: str) -> bool:
@@ -390,6 +418,16 @@ class CapabilityRouter:
             if coordinate_reason is not None
             else user_message
         )
+        if (
+            proposed.operation == "show_location_on_map"
+            and (simple_display := _fast_route_target(user_message)) is not None
+            and simple_display[1]
+            and [_fast_target_identity(ref) for ref in proposed.target_refs]
+            == [_fast_target_identity(simple_display[0])]
+        ):
+            # The exact fast syntax asks for the resolved position, not the
+            # catalog's coordinate lookup tool as separate provider data.
+            requests_entities = False
         proposed, map_data_reason = _normalize_data_bearing_map_route(
             proposed, user_message=user_message, requests_entities=requests_entities
         )

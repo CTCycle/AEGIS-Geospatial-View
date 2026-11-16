@@ -9,7 +9,12 @@ import re
 from pydantic import ValidationError
 
 from server.common.logging_handlers import log_unexpected_failure
-from server.common.identifiers import COORDINATE_PAIR_RE, location_ref_matches, parse_coordinate_pair
+from server.common.identifiers import (
+    LABELED_COORDINATE_PAIR_RE,
+    coordinate_values,
+    location_ref_matches,
+    parse_coordinate_pair,
+)
 from server.common.typing import json_object
 from server.contracts.geospatial import ClientMapView
 from server.contracts.location import LocationSignal
@@ -137,7 +142,9 @@ class LocationToolHandler:
                 recovery="correct_arguments",
                 started=started,
             )
-        query = _retain_user_stated_location_components(query, state.user_message)
+        query_values = coordinate_values(query)
+        if query_values is None:
+            query = _retain_user_stated_location_components(query, state.user_message)
 
         expected_type = str(request.expected_location_type or "city").casefold()
         if expected_type not in _LOCATION_TYPES:
@@ -153,18 +160,32 @@ class LocationToolHandler:
         coordinates = parse_coordinate_pair(query)
         coordinate_source = "model"
         text_coordinate_match = _search_text_coordinates(state.user_message)
-        if coordinates is None and text_coordinate_match is not None:
-            coordinates = _parse_coordinate_pair_from_text(state.user_message)
+        text_coordinates = _coordinates_from_match(text_coordinate_match)
+        labeled_values = (
+            coordinate_values(text_coordinate_match.group(0))
+            if text_coordinate_match is not None
+            and text_coordinate_match.re is LABELED_COORDINATE_PAIR_RE
+            else None
+        )
+        if (
+            labeled_values is not None
+            and (state.route is None or len(state.route.target_refs) <= 1)
+            and query_values in (labeled_values, labeled_values[::-1])
+        ):
+            # Axis labels in the request outrank a reversed model paraphrase.
+            coordinates = text_coordinates
             coordinate_source = "text"
-        query_coordinate_match = COORDINATE_PAIR_RE.fullmatch(query)
+        elif coordinates is None and text_coordinate_match is not None:
+            coordinates = text_coordinates
+            coordinate_source = "text"
         if coordinates is None:
             invalid_coordinate_text: str | None = None
-            if query_coordinate_match is not None:
-                invalid_coordinate_text = query
-            elif text_coordinate_match is not None:
+            if coordinate_source == "text" and text_coordinate_match is not None:
                 invalid_coordinate_text = (
                     text_coordinate_match.group(0).strip().rstrip(".,;")
                 )
+            elif query_values is not None:
+                invalid_coordinate_text = query
             if invalid_coordinate_text is not None:
                 return _failure(
                     code="invalid_coordinates",
@@ -361,16 +382,25 @@ def _retain_user_stated_location_components(query: str, user_message: str) -> st
 def _search_text_coordinates(text: str) -> re.Match[str] | None:
     """Find a coordinate pair in free text, ignoring calendar dates ("March 7, 2024")."""
 
+    labeled = [
+        match
+        for match in LABELED_COORDINATE_PAIR_RE.finditer(text)
+        if coordinate_values(match.group(0)) is not None
+    ]
+    if labeled:
+        # Do not substitute the first point for another target in a comparison.
+        return labeled[0] if len(labeled) == 1 else None
     for match in _COORDINATE_PAIR_SEARCH_RE.finditer(text):
         if _MONTH_BEFORE_RE.search(text[: match.start()]) is None:
             return match
     return None
 
 ###############################################################################
-def _parse_coordinate_pair_from_text(text: str) -> tuple[float, float] | None:
-    match = _search_text_coordinates(text)
+def _coordinates_from_match(match: re.Match[str] | None) -> tuple[float, float] | None:
     if match is None:
         return None
+    if match.re is LABELED_COORDINATE_PAIR_RE:
+        return parse_coordinate_pair(match.group(0))
     latitude = float(match.group("latitude"))
     longitude = float(match.group("longitude"))
     latitude_hemisphere = (match.group("latitude_hemisphere") or "").casefold()
