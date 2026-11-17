@@ -30,9 +30,11 @@ from server.services.chat.conversation_snapshot import (
 
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["conversations"])
 
+
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService:
     return request.app.state.run_lifecycle_service
+
 
 ###############################################################################
 def get_conversation_snapshot_service(
@@ -40,13 +42,16 @@ def get_conversation_snapshot_service(
 ) -> ConversationSnapshotService:
     return request.app.state.conversation_snapshot_service
 
+
 ###############################################################################
 def get_conversation_repository(request: Request) -> ConversationRepository:
     return request.app.state.conversation_repository
 
+
 ###############################################################################
 def get_run_repository(request: Request) -> AgentRunRepository:
     return request.app.state.run_repository
+
 
 ###############################################################################
 def _owner_user_id(request: Request) -> str | None:
@@ -54,6 +59,7 @@ def _owner_user_id(request: Request) -> str | None:
 
     value = getattr(request.state, "user_id", None)
     return str(value).strip() if value is not None and str(value).strip() else None
+
 
 ###############################################################################
 @router.post(
@@ -70,6 +76,7 @@ def create_conversation(
         title=payload.title,
         owner_user_id=_owner_user_id(request),
     )
+
 
 ###############################################################################
 @router.get(
@@ -141,6 +148,7 @@ def list_conversations(
             detail=str(exc),
         ) from exc
 
+
 ###############################################################################
 @router.get(
     "/{conversation_id}",
@@ -162,7 +170,9 @@ def get_conversation_snapshot(
             conversation_id,
             owner_user_id=_owner_user_id(request),
         )
-        return ConversationSnapshotResponse.model_validate(public_protocol_projection(snapshot.model_dump(mode="json")))
+        return ConversationSnapshotResponse.model_validate(
+            public_protocol_projection(snapshot.model_dump(mode="json"))
+        )
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -178,6 +188,7 @@ def get_conversation_snapshot(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found.",
         ) from exc
+
 
 ###############################################################################
 @router.get(
@@ -210,10 +221,12 @@ def get_run_status(
             snapshot = snapshot.model_copy(
                 update={"response": response.model_dump(mode="json")}
             )
-        return snapshot.model_copy(update={
-            "presentation": public_protocol_projection(snapshot.presentation),
-            "response": public_protocol_projection(snapshot.response),
-        })
+        return snapshot.model_copy(
+            update={
+                "presentation": public_protocol_projection(snapshot.presentation),
+                "response": public_protocol_projection(snapshot.response),
+            }
+        )
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -224,6 +237,7 @@ def get_run_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Run not found.",
         ) from exc
+
 
 ###############################################################################
 @router.get(

@@ -25,7 +25,10 @@ from server.domain.agent.tool_result import (
     ToolExecutionMetadata,
     ToolResult,
 )
-from server.services.agent.location_resolver import NO_CANDIDATE_REASON, LocationResolver
+from server.services.agent.location_resolver import (
+    NO_CANDIDATE_REASON,
+    LocationResolver,
+)
 from server.services.agent.tool_definitions import ResolveLocationInput
 
 
@@ -41,7 +44,7 @@ _LOCATION_TYPES = frozenset(
         "landmark",
         "poi",
         "region",
-    "macro_region",
+        "macro_region",
         "river",
         "road",
         "street",
@@ -83,9 +86,9 @@ _COORDINATE_PAIR_SEARCH_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 ###############################################################################
 class LocationToolHandler:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, resolver: LocationResolver) -> None:
         self.resolver = resolver
@@ -99,7 +102,9 @@ class LocationToolHandler:
         started = time.perf_counter()
         target_key = _target_key(request)
         if request.query is None and request.target_id in state.location_refs:
-            location = await self._identified(state, target_key, state.location_refs[request.target_id])
+            location = await self._identified(
+                state, target_key, state.location_refs[request.target_id]
+            )
             state.location_refs[request.target_id] = location
             return _success(
                 location=location,
@@ -150,9 +155,7 @@ class LocationToolHandler:
         if expected_type not in _LOCATION_TYPES:
             return _failure(
                 code="invalid_location_type",
-                message=(
-                    f"Unsupported canonical location type: {expected_type}."
-                ),
+                message=(f"Unsupported canonical location type: {expected_type}."),
                 recovery="retry_request",
                 started=started,
             )
@@ -226,9 +229,7 @@ class LocationToolHandler:
                 source="model",
             )
         memory_snapshot = _memory_snapshot(state)
-        result = await self.resolver.resolve_location_signals(
-            [signal], memory_snapshot
-        )
+        result = await self.resolver.resolve_location_signals([signal], memory_snapshot)
         if request.expected_location_type is None and coordinates is None:
             if isinstance(result, ResolvedLocation):
                 result = await self._prefer_prominent_landmark(
@@ -281,7 +282,10 @@ class LocationToolHandler:
             item.kind == "identification"
             and (
                 not item.target_ids
-                or any(location_ref_matches(target, target_key, location.label) for target in item.target_ids)
+                or any(
+                    location_ref_matches(target, target_key, location.label)
+                    for target in item.target_ids
+                )
             )
             for item in obligations
         ):
@@ -310,7 +314,10 @@ class LocationToolHandler:
         except Exception as exc:
             # The settlement already resolved; a failed second look keeps it.
             log_unexpected_failure(
-                LOGGER, exc, stage="landmark_lookup", level=logging.WARNING,
+                LOGGER,
+                exc,
+                stage="landmark_lookup",
+                level=logging.WARNING,
                 run_id=state.run_id or state.request_id,
             )
             return settlement
@@ -321,10 +328,12 @@ class LocationToolHandler:
         )
         if (
             distance > _DISTINCT_PLACE_DEGREES
-            and landmark.confidence > settlement.confidence + _LANDMARK_CONFIDENCE_MARGIN
+            and landmark.confidence
+            > settlement.confidence + _LANDMARK_CONFIDENCE_MARGIN
         ):
             return landmark
         return settlement
+
 
 ###############################################################################
 def _current_view_location(state: AgentRunState) -> ResolvedLocation | None:
@@ -350,10 +359,12 @@ def _current_view_location(state: AgentRunState) -> ResolvedLocation | None:
         bbox_source=CURRENT_VIEW_SOURCE,
     )
 
+
 ###############################################################################
 def _target_key(request: ResolveLocationInput) -> str:
     value = request.target_id or request.candidate_id or request.query or "location"
     return " ".join(value.casefold().split())
+
 
 ###############################################################################
 def _retain_user_stated_location_components(query: str, user_message: str) -> str:
@@ -378,6 +389,7 @@ def _retain_user_stated_location_components(query: str, user_message: str) -> st
             retained.append(component)
     return ", ".join(retained)
 
+
 ###############################################################################
 def _search_text_coordinates(text: str) -> re.Match[str] | None:
     """Find a coordinate pair in free text, ignoring calendar dates ("March 7, 2024")."""
@@ -394,6 +406,7 @@ def _search_text_coordinates(text: str) -> re.Match[str] | None:
         if _MONTH_BEFORE_RE.search(text[: match.start()]) is None:
             return match
     return None
+
 
 ###############################################################################
 def _coordinates_from_match(match: re.Match[str] | None) -> tuple[float, float] | None:
@@ -417,6 +430,7 @@ def _coordinates_from_match(match: re.Match[str] | None) -> tuple[float, float] 
         return None
     return latitude, longitude
 
+
 ###############################################################################
 def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
     location: ResolvedLocation | None = None
@@ -424,9 +438,8 @@ def _memory_snapshot(state: AgentRunState) -> dict[str, object]:
         location = state.active_map_session.resolved_location
     if location is None and state.location_refs:
         location = next(iter(state.location_refs.values()))
-    return {
-        "active_location": location.model_dump(mode="json") if location else None
-    }
+    return {"active_location": location.model_dump(mode="json") if location else None}
+
 
 ###############################################################################
 def _success(
@@ -452,6 +465,7 @@ def _success(
             duration_ms=max(0, int((time.perf_counter() - started) * 1000))
         ),
     )
+
 
 ###############################################################################
 def _failure(

@@ -42,7 +42,6 @@ CREATE TABLE agent_evidence (
 	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE, 
 	FOREIGN KEY(run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
 )""",
-
     # Table: agent_run_events
     """
 CREATE TABLE agent_run_events (
@@ -60,7 +59,6 @@ CREATE TABLE agent_run_events (
 	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE, 
 	CONSTRAINT ux_agent_run_events_sequence UNIQUE (run_id, sequence)
 )""",
-
     # Table: agent_runs
     """
 CREATE TABLE agent_runs (
@@ -86,7 +84,6 @@ CREATE TABLE agent_runs (
 	CONSTRAINT ux_agent_runs_active_slot UNIQUE (conversation_id, active_slot), 
 	CONSTRAINT ck_agent_runs_active_slot CHECK (active_slot IS NULL OR active_slot = 1)
 )""",
-
     # Table: agent_steering_messages
     """
 CREATE TABLE agent_steering_messages (
@@ -102,7 +99,6 @@ CREATE TABLE agent_steering_messages (
 	CONSTRAINT ux_agent_steering_mutation UNIQUE (run_id, client_mutation_id), 
 	CONSTRAINT ux_agent_steering_version UNIQUE (run_id, run_version)
 )""",
-
     # Table: application_runtime_settings
     """
 CREATE TABLE application_runtime_settings (
@@ -113,7 +109,6 @@ CREATE TABLE application_runtime_settings (
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL, 
 	PRIMARY KEY (id)
 )""",
-
     # Table: chat_messages
     """
 CREATE TABLE chat_messages (
@@ -133,7 +128,6 @@ CREATE TABLE chat_messages (
 	CONSTRAINT ux_chat_messages_request UNIQUE (conversation_id, role, request_id), 
 	CONSTRAINT ck_chat_messages_sequence_nonnegative CHECK (turn_index >= 0)
 )""",
-
     # Table: conversations
     """
 CREATE TABLE "conversations" (
@@ -147,7 +141,6 @@ CREATE TABLE "conversations" (
 	conversation_state JSON, 
 	PRIMARY KEY (id)
 )""",
-
     # Table: credential_encryption_materials
     """
 CREATE TABLE credential_encryption_materials (
@@ -165,7 +158,6 @@ CREATE TABLE credential_encryption_materials (
 	CONSTRAINT ux_credential_material_version UNIQUE (key_purpose, key_version), 
 	CONSTRAINT ux_credential_material_active_slot UNIQUE (key_purpose, active_slot)
 )""",
-
     # Table: model_credentials
     """
 CREATE TABLE model_credentials (
@@ -184,7 +176,6 @@ CREATE TABLE model_credentials (
 	FOREIGN KEY(encryption_material_id) REFERENCES credential_encryption_materials (id) ON DELETE RESTRICT, 
 	CONSTRAINT ux_model_credentials_logical_key UNIQUE (provider, label_key)
 )""",
-
     # Table: model_provider_settings
     """
 CREATE TABLE model_provider_settings (
@@ -200,7 +191,6 @@ CREATE TABLE model_provider_settings (
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL, 
 	PRIMARY KEY (id)
 )""",
-
     # Table: reference_countries
     """
 CREATE TABLE reference_countries (
@@ -212,7 +202,6 @@ CREATE TABLE reference_countries (
 	UNIQUE (name), 
 	UNIQUE (name_key)
 )""",
-
     # Table: reference_country_aliases
     """
 CREATE TABLE reference_country_aliases (
@@ -222,7 +211,6 @@ CREATE TABLE reference_country_aliases (
 	PRIMARY KEY (alias_key), 
 	FOREIGN KEY(iso2) REFERENCES reference_countries (iso2) ON DELETE CASCADE
 )""",
-
     # Table: reference_geospatial_layer_aliases
     """
 CREATE TABLE reference_geospatial_layer_aliases (
@@ -232,7 +220,6 @@ CREATE TABLE reference_geospatial_layer_aliases (
 	PRIMARY KEY (alias_key), 
 	FOREIGN KEY(layer_id) REFERENCES reference_geospatial_layers (layer_id) ON DELETE CASCADE
 )""",
-
     # Table: reference_geospatial_layer_keywords
     """
 CREATE TABLE reference_geospatial_layer_keywords (
@@ -244,7 +231,6 @@ CREATE TABLE reference_geospatial_layer_keywords (
 	FOREIGN KEY(layer_id) REFERENCES reference_geospatial_layers (layer_id) ON DELETE CASCADE, 
 	CONSTRAINT ux_reference_layer_keyword UNIQUE (layer_id, keyword_key)
 )""",
-
     # Table: reference_geospatial_layers
     """
 CREATE TABLE reference_geospatial_layers (
@@ -254,7 +240,6 @@ CREATE TABLE reference_geospatial_layers (
 	provider VARCHAR(64), 
 	PRIMARY KEY (layer_id)
 )""",
-
     # Table: reference_gibs_layer_defaults
     """
 CREATE TABLE reference_gibs_layer_defaults (
@@ -263,7 +248,6 @@ CREATE TABLE reference_gibs_layer_defaults (
 	date_fallback_days INTEGER, 
 	PRIMARY KEY (layer_id)
 )""",
-
     # Table: reference_gibs_tile_matrix_sets
     """
 CREATE TABLE reference_gibs_tile_matrix_sets (
@@ -272,69 +256,63 @@ CREATE TABLE reference_gibs_tile_matrix_sets (
 	PRIMARY KEY (tile_matrix_set_id), 
 	CONSTRAINT ck_gibs_meters_per_pixel_positive CHECK (meters_per_pixel > 0)
 )""",
-
     # Index: ix_agent_evidence_conversation_created
     """
 CREATE INDEX ix_agent_evidence_conversation_created ON agent_evidence (conversation_id, created_at)""",
-
     # Index: ix_agent_evidence_run_id
     """
 CREATE INDEX ix_agent_evidence_run_id ON agent_evidence (run_id)""",
-
     # Index: ix_agent_run_events_run_id_sequence
     """
 CREATE INDEX ix_agent_run_events_run_id_sequence ON agent_run_events (run_id, sequence)""",
-
     # Index: ix_agent_runs_conversation_id
     """
 CREATE INDEX ix_agent_runs_conversation_id ON agent_runs (conversation_id)""",
-
     # Index: ix_agent_steering_messages_run_id
     """
 CREATE INDEX ix_agent_steering_messages_run_id ON agent_steering_messages (run_id)""",
-
     # Index: ix_chat_messages_conversation_role_sequence
     """
 CREATE INDEX ix_chat_messages_conversation_role_sequence ON chat_messages (conversation_id, role, turn_index)""",
-
     # Index: ix_model_credentials_active_provider_label
     """
 CREATE INDEX ix_model_credentials_active_provider_label ON model_credentials (is_active, provider, label_key)""",
-
     # Index: ix_reference_country_aliases_iso2
     """
 CREATE INDEX ix_reference_country_aliases_iso2 ON reference_country_aliases (iso2)""",
-
     # Index: ix_reference_geospatial_layer_aliases_layer_id
     """
 CREATE INDEX ix_reference_geospatial_layer_aliases_layer_id ON reference_geospatial_layer_aliases (layer_id)""",
-
 )
+
 
 ###############################################################################
 def upgrade() -> None:
     for statement in _SCHEMA_STATEMENTS:
         op.execute(sa.text(statement))
 
+
 ###############################################################################
 def downgrade() -> None:
-    for name in reversed([
-        "agent_evidence",
-        "agent_run_events",
-        "agent_runs",
-        "agent_steering_messages",
-        "application_runtime_settings",
-        "chat_messages",
-        "conversations",
-        "credential_encryption_materials",
-        "model_credentials",
-        "model_provider_settings",
-        "reference_countries",
-        "reference_country_aliases",
-        "reference_geospatial_layer_aliases",
-        "reference_geospatial_layer_keywords",
-        "reference_geospatial_layers",
-        "reference_gibs_layer_defaults",
-        "reference_gibs_tile_matrix_sets",
-    ]):
+    for name in reversed(
+        [
+            "agent_evidence",
+            "agent_run_events",
+            "agent_runs",
+            "agent_steering_messages",
+            "application_runtime_settings",
+            "chat_messages",
+            "conversations",
+            "credential_encryption_materials",
+            "model_credentials",
+            "model_provider_settings",
+            "reference_countries",
+            "reference_country_aliases",
+            "reference_geospatial_layer_aliases",
+            "reference_geospatial_layer_keywords",
+            "reference_geospatial_layers",
+            "reference_gibs_layer_defaults",
+            "reference_gibs_tile_matrix_sets",
+        ]
+    ):
         op.execute(sa.text('DROP TABLE IF EXISTS "' + name + '"'))

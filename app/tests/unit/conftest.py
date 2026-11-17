@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+
 ###############################################################################
 @pytest.fixture(autouse=True)
 def offline_models_dev(monkeypatch: pytest.MonkeyPatch) -> None:

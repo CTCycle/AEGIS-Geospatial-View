@@ -23,7 +23,10 @@ from server.domain.agent.decision import (
 from server.common.identifiers import normalize_target_key
 from server.contracts.location import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
-from server.services.catalog.loader import find_macro_region_entry, load_reference_catalog
+from server.services.catalog.loader import (
+    find_macro_region_entry,
+    load_reference_catalog,
+)
 
 # Reason for a target the geocoder never matched, as opposed to an ambiguity.
 NO_CANDIDATE_REASON = (
@@ -41,11 +44,16 @@ def find_macro_region(text: str) -> ResolvedLocation | None:
         return None
     w, south, e, north = region.bbox
     return ResolvedLocation(
-        label=region.name, latitude=(south + north) / 2,
-        longitude=(w + e) / 2, bbox=list(region.bbox),
-        location_type="macro_region", source="aegis_macro_regions",
-        bbox_source="aegis_macro_regions", confidence=1.0,
+        label=region.name,
+        latitude=(south + north) / 2,
+        longitude=(w + e) / 2,
+        bbox=list(region.bbox),
+        location_type="macro_region",
+        source="aegis_macro_regions",
+        bbox_source="aegis_macro_regions",
+        confidence=1.0,
     )
+
 
 ###############################################################################
 class LocationResolver:
@@ -84,9 +92,30 @@ class LocationResolver:
     # Common nouns that name no specific place on their own.
     GENERIC_FEATURE_WORDS = frozenset(
         {
-            "centre", "center", "downtown", "station", "airport", "port", "harbor",
-            "harbour", "square", "hospital", "stadium", "park", "university",
-            "museum", "market", "cathedral", "church", "bridge", "hall", "old", "historic", "train", "bus", "railway",
+            "centre",
+            "center",
+            "downtown",
+            "station",
+            "airport",
+            "port",
+            "harbor",
+            "harbour",
+            "square",
+            "hospital",
+            "stadium",
+            "park",
+            "university",
+            "museum",
+            "market",
+            "cathedral",
+            "church",
+            "bridge",
+            "hall",
+            "old",
+            "historic",
+            "train",
+            "bus",
+            "railway",
         }
     )
     # A city's centre is the city itself: these phrases are never geocoded
@@ -94,9 +123,16 @@ class LocationResolver:
     CENTRE_PHRASES = tuple(
         tuple(phrase.split())
         for phrase in (
-            "city centre", "city center", "town centre", "town center",
-            "historic centre", "historic center", "old town", "centre",
-            "center", "downtown",
+            "city centre",
+            "city center",
+            "town centre",
+            "town center",
+            "historic centre",
+            "historic center",
+            "old town",
+            "centre",
+            "center",
+            "downtown",
         )
     )
     CENTRE_FILLER_WORDS = frozenset({"the", "a", "an", "of", "in", "at"})
@@ -205,7 +241,9 @@ class LocationResolver:
         self._catalog_codes: dict[str, str] | None = None
 
     # -------------------------------------------------------------------------
-    async def reverse_geocode(self, location: ResolvedLocation) -> ResolvedLocation | None:
+    async def reverse_geocode(
+        self, location: ResolvedLocation
+    ) -> ResolvedLocation | None:
         """Name the place at ``location``: its settlement, region and country.
 
         Uses the resolver's keyless Nominatim service, whose request pacing,
@@ -224,18 +262,30 @@ class LocationResolver:
             "addressdetails": "1",
             "accept-language": "en",
         }
-        response = await asyncio.to_thread(self.nominatim_service.perform_reverse_request, params)
+        response = await asyncio.to_thread(
+            self.nominatim_service.perform_reverse_request, params
+        )
         address = response.get("address") if response else None
         if not is_json_object(address):
             return None
 
         def component(*keys: str) -> str | None:
-            return next((str(address[key]).strip() for key in keys if str(address.get(key) or "").strip()), None)
+            return next(
+                (
+                    str(address[key]).strip()
+                    for key in keys
+                    if str(address.get(key) or "").strip()
+                ),
+                None,
+            )
 
         names = [
             (kind, value)
             for kind, value in (
-                ("city", component("city", "town", "village", "municipality", "hamlet")),
+                (
+                    "city",
+                    component("city", "town", "village", "municipality", "hamlet"),
+                ),
                 ("region", component("state", "region", "province", "county")),
                 ("country", component("country")),
             )
@@ -345,7 +395,9 @@ class LocationResolver:
             )
 
         if len(explicit_signals) == 1:
-            macro = find_macro_region(explicit_signals[0].normalized_value or explicit_signals[0].raw_value)
+            macro = find_macro_region(
+                explicit_signals[0].normalized_value or explicit_signals[0].raw_value
+            )
             if macro is not None:
                 return macro
 
@@ -380,9 +432,7 @@ class LocationResolver:
             bare, with_parent, self.AMBIGUOUS_PARENT_MAX_SEPARATION_DEGREES
         ):
             return ClarificationRequest(
-                question=(
-                    f"Do you mean {bare.label} or {with_parent.label}?"
-                ),
+                question=(f"Do you mean {bare.label} or {with_parent.label}?"),
                 reason="The name resolves to different places with and without the previous location.",
                 missing_fields=["location"],
                 options=[bare.label, with_parent.label],
@@ -441,9 +491,10 @@ class LocationResolver:
                 city_name = str(active.get("label") or "").split(",")[0].strip()
             if not city_name:
                 return None
-            if self._normalize_text(
-                str(active.get("location_type") or "")
-            ) in {"city", "municipality"}:
+            if self._normalize_text(str(active.get("location_type") or "")) in {
+                "city",
+                "municipality",
+            }:
                 remembered = self._location_from_memory(active)
                 if remembered is not None:
                     return remembered
@@ -458,7 +509,9 @@ class LocationResolver:
 
     # -------------------------------------------------------------------------
     def _has_deictic_signal(self, signals: Sequence[LocationSignal]) -> bool:
-        return any(signal.signal_type in self.DEICTIC_SIGNAL_TYPES for signal in signals)
+        return any(
+            signal.signal_type in self.DEICTIC_SIGNAL_TYPES for signal in signals
+        )
 
     # -------------------------------------------------------------------------
     def _within_degrees(
@@ -565,8 +618,7 @@ class LocationResolver:
             [
                 signal
                 for signal in context_signals
-                if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0)
-                == highest
+                if self.SPECIFICITY_BY_SIGNAL_TYPE.get(signal.signal_type, 0) == highest
             ]
         )
         if len(target_signals) <= 1:
@@ -576,10 +628,7 @@ class LocationResolver:
             )
             if isinstance(result, ResolvedLocation):
                 key = self._normalize_text(
-                    (
-                        target_signals[0].normalized_value
-                        or target_signals[0].raw_value
-                    )
+                    (target_signals[0].normalized_value or target_signals[0].raw_value)
                     if target_signals
                     else result.label
                 )
@@ -608,7 +657,9 @@ class LocationResolver:
                     reason="A requested peer target could not be resolved.",
                     missing_fields=["location"],
                 )
-            resolved[self._normalize_text(target.normalized_value or target.raw_value)] = candidate
+            resolved[
+                self._normalize_text(target.normalized_value or target.raw_value)
+            ] = candidate
         return resolved
 
     # -------------------------------------------------------------------------
@@ -695,7 +746,9 @@ class LocationResolver:
         ambiguous: street-like or address-like names that exist in many cities.
         """
 
-        text = self._normalize_text(f"{signal.raw_value} {signal.normalized_value or ''}")
+        text = self._normalize_text(
+            f"{signal.raw_value} {signal.normalized_value or ''}"
+        )
         if has_deictic_signal or self.REFERENCE_CUE_PATTERN.search(text):
             return "previous-reference"
         active_names = [
@@ -716,7 +769,9 @@ class LocationResolver:
             or coarser_signal
         ):
             return "explicit-parent"
-        words = [word for word in text.split() if word not in self.REFERENCE_FILLER_WORDS]
+        words = [
+            word for word in text.split() if word not in self.REFERENCE_FILLER_WORDS
+        ]
         if words and all(word in self.GENERIC_FEATURE_WORDS for word in words):
             return "previous-reference"
         if signal.signal_type in self.AMBIGUOUS_SIGNAL_TYPES:
@@ -954,7 +1009,9 @@ class LocationResolver:
                     question=f"Which location do you mean: {', '.join(options)}?",
                     reason="The geocoder returned multiple same-level candidates with similar confidence.",
                     missing_fields=["location"],
-                    options=options if len(options) <= CLARIFICATION_MAX_OPTIONS else [],
+                    options=options
+                    if len(options) <= CLARIFICATION_MAX_OPTIONS
+                    else [],
                 )
         if not self._candidate_matches_target(
             geocoded,
@@ -1020,28 +1077,39 @@ class LocationResolver:
             # validated locality in its address details preserves the explicit
             # target granularity for viewport policy and telemetry.
             resolved_type = signal.signal_type
-        elif signal.signal_type == "country" and geocoder_type in {
-            "administrative",
-            "region",
-            "state",
-            "province",
-            "county",
-        } and self._verified_country_administrative_candidate(geocoded, signal):
+        elif (
+            signal.signal_type == "country"
+            and geocoder_type
+            in {
+                "administrative",
+                "region",
+                "state",
+                "province",
+                "county",
+            }
+            and self._verified_country_administrative_candidate(geocoded, signal)
+        ):
             # Nominatim may return a country boundary as an administrative
             # object. Preserve the requested country granularity only when the
             # candidate carries matching country name and ISO evidence.
             resolved_type = "country"
         label = str(geocoded.get("display_name") or signal.raw_value).strip()
-        if signal.signal_type in {"city", "municipality"} and resolved_type == signal.signal_type:
+        if (
+            signal.signal_type in {"city", "municipality"}
+            and resolved_type == signal.signal_type
+        ):
             locality = self._address_component(
                 geocoded, "city", "town", "village", "municipality"
             )
             if locality:
                 locality_key = self._normalize_text(locality)
-                duplicate_locality = sum(
-                    self._normalize_text(part) == locality_key
-                    for part in label.split(",")
-                ) > 1
+                duplicate_locality = (
+                    sum(
+                        self._normalize_text(part) == locality_key
+                        for part in label.split(",")
+                    )
+                    > 1
+                )
                 if duplicate_locality:
                     components = (
                         locality,
@@ -1091,7 +1159,7 @@ class LocationResolver:
                 provenance=self._provenance_from_geocoded(geocoded),
                 hierarchy=hierarchy,
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -1173,8 +1241,12 @@ class LocationResolver:
             # is what lets a model-labelled city be discovered as a district.
             pass
         elif signal.signal_type == "country":
-            if result_type and result_type != "country" and not self._verified_country_administrative_candidate(
-                candidate, signal
+            if (
+                result_type
+                and result_type != "country"
+                and not self._verified_country_administrative_candidate(
+                    candidate, signal
+                )
             ):
                 return False
         elif signal.signal_type in {"city", "municipality"}:
@@ -1426,7 +1498,11 @@ class LocationResolver:
             candidate_text, target_without_country
         ):
             return True
-        if signal_type in {"city", "municipality", "administrative_geometry"} and self._matches_hierarchical_administrative_target(
+        if signal_type in {
+            "city",
+            "municipality",
+            "administrative_geometry",
+        } and self._matches_hierarchical_administrative_target(
             candidate_text, target_components, candidate_parent_values
         ):
             return True
@@ -1475,7 +1551,9 @@ class LocationResolver:
         lightly misspelled administrative parent such as Lombardia/Lombardy.
         """
 
-        components = [self._normalize_text(component) for component in target_components]
+        components = [
+            self._normalize_text(component) for component in target_components
+        ]
         components = [component for component in components if component]
         if len(components) < 2:
             return False
@@ -1497,8 +1575,7 @@ class LocationResolver:
                 else {component}
             )
             if any(
-                self._contains_location_text(candidate_text, alias)
-                for alias in aliases
+                self._contains_location_text(candidate_text, alias) for alias in aliases
             ):
                 exact_matches += 1
                 continue
@@ -1938,7 +2015,7 @@ class LocationResolver:
                     else None
                 ),
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -1948,7 +2025,7 @@ class LocationResolver:
             return None
         try:
             number = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return number if math.isfinite(number) else None
 
@@ -2013,7 +2090,7 @@ class LocationResolver:
                     "result_type": value.get("result_type") or "location",
                 }
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------
@@ -2026,7 +2103,7 @@ class LocationResolver:
             return None
         try:
             return LocationResolutionProvenance.model_validate(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------

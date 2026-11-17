@@ -28,7 +28,11 @@ from server.common.typing import (
     with_nested_scalars,
 )
 from server.domain.agent.capability_route import ConversationTask
-from server.domain.agent.evidence import AgentEvidenceSummary, EvidenceKind, EvidenceStatus
+from server.domain.agent.evidence import (
+    AgentEvidenceSummary,
+    EvidenceKind,
+    EvidenceStatus,
+)
 from server.domain.agent.task_ledger import freshness_seconds
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.tool_result import (
@@ -67,9 +71,9 @@ LOGGER = logging.getLogger(__name__)
 # Hourly rows kept in the model-facing summary of a dated window.
 WINDOW_HOURS_LIMIT = 72
 
+
 ###############################################################################
 class EvidenceStore(Protocol):
-
     # -------------------------------------------------------------------------
     def create(
         self,
@@ -90,6 +94,7 @@ class EvidenceStore(Protocol):
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> AgentEvidenceSummary | None: ...
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ToolExecutionContext:
@@ -98,6 +103,7 @@ class ToolExecutionContext:
     conversation_id: str
     run_id: str | None = None
     call_id: str = field(default_factory=lambda: f"call_{uuid4().hex}")
+
 
 ###############################################################################
 class CapabilityExecutionService:
@@ -142,8 +148,12 @@ class CapabilityExecutionService:
             manifest = self.capability_registry.get_capability(capability_id)
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="capability_lookup", run_id=context.run_id,
-                capability=capability_id, call_id=context.call_id,
+                LOGGER,
+                exc,
+                stage="capability_lookup",
+                run_id=context.run_id,
+                capability=capability_id,
+                call_id=context.call_id,
             )
             return self._failure(
                 context=context,
@@ -188,8 +198,12 @@ class CapabilityExecutionService:
                 )
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="runtime_eligibility", run_id=context.run_id,
-                capability=capability_id, call_id=context.call_id,
+                LOGGER,
+                exc,
+                stage="runtime_eligibility",
+                run_id=context.run_id,
+                capability=capability_id,
+                call_id=context.call_id,
             )
             return self._failure(
                 context=context,
@@ -227,7 +241,9 @@ class CapabilityExecutionService:
                 retryable=True,
             )
 
-        provider_params = _provider_params(request, location=location, manifest=manifest)
+        provider_params = _provider_params(
+            request, location=location, manifest=manifest
+        )
         manifest_metadata = manifest.get("metadata")
         if is_json_object(manifest_metadata):
             provider_params.setdefault("metadata", dict(manifest_metadata))
@@ -271,9 +287,14 @@ class CapabilityExecutionService:
                 f"This source does not provide the requested {', '.join(unmet_attributes)}.",
             ]
         coverage = dict(response.coverage or {})
-        if request.arguments.get("sampling") == "area" and "sampling" not in provider_params:
+        if (
+            request.arguments.get("sampling") == "area"
+            and "sampling" not in provider_params
+        ):
             coverage["area_sampling"] = (
-                "bbox_query" if request.bbox is not None and coverage.get("bbox") == list(request.bbox)
+                "bbox_query"
+                if request.bbox is not None
+                and coverage.get("bbox") == list(request.bbox)
                 else "single_point_center"
             )
         if coverage.get("type") == "grid_sample" and request.bbox is not None:
@@ -297,7 +318,9 @@ class CapabilityExecutionService:
         elif request.bbox is not None:
             features = response.payload.get("features")
             if is_json_array(features) and features:
-                area = box(request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3])
+                area = box(
+                    request.bbox[0], request.bbox[1], request.bbox[2], request.bbox[3]
+                )
                 try:
                     satisfied = True
                     for feature in features:
@@ -312,7 +335,7 @@ class CapabilityExecutionService:
                             satisfied = False
                             break
                     coverage["spatial_scope_satisfied"] = satisfied
-                except (ValueError, TypeError, KeyError, GEOSException):
+                except ValueError, TypeError, KeyError, GEOSException:
                     coverage["spatial_scope_satisfied"] = False
             elif response.result_status == "valid_empty":
                 # A bounded empty result still applied the requested extent.
@@ -323,9 +346,7 @@ class CapabilityExecutionService:
             # mirroring the raster spatial-scope contract. Bbox requests take
             # the intersection-check branch above.
             coverage["spatial_scope_satisfied"] = True
-        if (
-            request.start_time_iso is None and request.end_time_iso is None
-        ):
+        if request.start_time_iso is None and request.end_time_iso is None:
             # Current/recent/none temporal requests without an explicit dated
             # range are satisfied by the provider feed as-is (mirrors
             # RainViewer's provider coverage declaration). Explicit dated
@@ -346,7 +367,9 @@ class CapabilityExecutionService:
             # no-results boundary (mirrors the valid-empty evidence contract).
             coverage["query_complete"] = True
         summary["coverage"] = coverage
-        summary["value_kind"] = response.payload.get("value_kind") or coverage.get("value_kind")
+        summary["value_kind"] = response.payload.get("value_kind") or coverage.get(
+            "value_kind"
+        )
         try:
             evidence_ref = await self._persist_evidence(
                 context=context,
@@ -411,14 +434,18 @@ class CapabilityExecutionService:
         if repository is None:
             return None
         started = time.perf_counter()
-        ttl = freshness_seconds(self.capability_registry.get_capability(request.capability_id))
+        ttl = freshness_seconds(
+            self.capability_registry.get_capability(request.capability_id)
+        )
         key = request_key(request)
         for task in reversed(tasks):
             if task.kind != "data" or task.capability_id != request.capability_id:
                 continue
             for evidence_ref in reversed(task.evidence_refs):
                 record = await asyncio.to_thread(
-                    repository.get_summary, evidence_ref, conversation_id=context.conversation_id
+                    repository.get_summary,
+                    evidence_ref,
+                    conversation_id=context.conversation_id,
                 )
                 if record is None or record.status in {"failed", "superseded"}:
                     continue
@@ -432,7 +459,11 @@ class CapabilityExecutionService:
                 ):
                     continue
                 return _reused_result(
-                    record, request=request, context=context, started=started, fetched_at=fetched_at
+                    record,
+                    request=request,
+                    context=context,
+                    started=started,
+                    fetched_at=fetched_at,
                 )
         return None
 
@@ -496,7 +527,9 @@ class CapabilityExecutionService:
 
         if classify_provider_error(error) not in {"transient", "capacity"}:
             return None
-        declared = json_object(manifest.get("executionContract")).get("fallback_ids", [])
+        declared = json_object(manifest.get("executionContract")).get(
+            "fallback_ids", []
+        )
         for raw_id in declared if is_json_array(declared) else []:
             fallback_id = str(raw_id).strip()
             try:
@@ -505,7 +538,8 @@ class CapabilityExecutionService:
                 if (
                     equivalent is None
                     or not fallback_provider
-                    or (fallback_id, fallback_provider) == (request.capability_id, provider_id)
+                    or (fallback_id, fallback_provider)
+                    == (request.capability_id, provider_id)
                     or not self.runtime_registry.is_enabled(fallback_id)
                     or not self.runtime_registry.access_available(fallback_id)
                 ):
@@ -522,7 +556,9 @@ class CapabilityExecutionService:
             except Exception as exc:
                 LOGGER.info(
                     "capability fallback failed capability=%s fallback=%s error=%s",
-                    request.capability_id, fallback_id, type(exc).__name__,
+                    request.capability_id,
+                    fallback_id,
+                    type(exc).__name__,
                 )
                 continue
             note = (
@@ -543,7 +579,9 @@ class CapabilityExecutionService:
         error: Exception,
         fallbacks_tried: list[str] | None = None,
     ) -> ToolResult:
-        error_type, code, message, recovery, retryable, timeout_origin = _failure_shape(error)
+        error_type, code, message, recovery, retryable, timeout_origin = _failure_shape(
+            error
+        )
         failure_class = classify_provider_error(error)
         attempts = error.attempts if isinstance(error, ProviderError) else 1
         data: dict[str, Any] | None = None
@@ -553,7 +591,9 @@ class CapabilityExecutionService:
                 "attempts": attempts,
                 "fallbacks_tried": list(fallbacks_tried or []),
             }
-            message = f"{message} (failure class: {failure_class}; {attempts} attempt(s))"
+            message = (
+                f"{message} (failure class: {failure_class}; {attempts} attempt(s))"
+            )
             if isinstance(error, ProviderInvalidQueryError) and str(error).strip():
                 # Query rejections are deterministic and carry the provider's
                 # own explanation, which is what the next call must change.
@@ -610,8 +650,10 @@ class CapabilityExecutionService:
             ),
         )
 
+
 ###############################################################################
 _REQUEST_TIME_KEYS = ("start_time_iso", "end_time_iso")
+
 
 ###############################################################################
 def request_key(request: ExecuteCapabilityInput) -> dict[str, Any]:
@@ -621,23 +663,32 @@ def request_key(request: ExecuteCapabilityInput) -> dict[str, Any]:
         "capability_id": request.capability_id,
         "operation": request.operation,
         "temporal_mode": request.temporal_mode,
-        "location_ref": normalize_target_key(request.location_ref) if request.location_ref else None,
+        "location_ref": normalize_target_key(request.location_ref)
+        if request.location_ref
+        else None,
         "evidence_refs": sorted(request.evidence_refs),
         "radius_m": request.radius_m,
-        "bbox": [round(value, 6) for value in request.bbox] if request.bbox is not None else None,
+        "bbox": [round(value, 6) for value in request.bbox]
+        if request.bbox is not None
+        else None,
         "start_time_iso": request.start_time_iso,
         "end_time_iso": request.end_time_iso,
         "filters": json.loads(json.dumps(request.filters, sort_keys=True, default=str)),
-        "arguments": json.loads(json.dumps(request.arguments, sort_keys=True, default=str)),
+        "arguments": json.loads(
+            json.dumps(request.arguments, sort_keys=True, default=str)
+        ),
     }
 
+
 ###############################################################################
-def _same_request(stored: dict[str, Any], key: dict[str, Any], *, tolerance_seconds: int) -> bool:
+def _same_request(
+    stored: dict[str, Any], key: dict[str, Any], *, tolerance_seconds: int
+) -> bool:
     """Equal request identity; time bounds may drift within the evidence lifetime."""
 
-    if {name: value for name, value in stored.items() if name not in _REQUEST_TIME_KEYS} != {
-        name: value for name, value in key.items() if name not in _REQUEST_TIME_KEYS
-    }:
+    if {
+        name: value for name, value in stored.items() if name not in _REQUEST_TIME_KEYS
+    } != {name: value for name, value in key.items() if name not in _REQUEST_TIME_KEYS}:
         return False
     for name in _REQUEST_TIME_KEYS:
         left, right = stored.get(name), key.get(name)
@@ -653,10 +704,12 @@ def _same_request(stored: dict[str, Any], key: dict[str, Any], *, tolerance_seco
             return False
     return True
 
+
 ###############################################################################
 def _aware_instant(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
 
 ###############################################################################
 def _reused_result(
@@ -697,13 +750,17 @@ def _reused_result(
             result_status=str(summary.get("result_status") or "") or None,
             stale=bool(summary.get("stale")),
             fetched_at=fetched_at,
-            observation_time=str(record.provenance.get("observation_time") or "") or None,
+            observation_time=str(record.provenance.get("observation_time") or "")
+            or None,
             units={str(name): str(value) for name, value in units.items()},
             coverage=coverage or None,
-            warnings=[str(item)[:300] for item in json_array(summary.get("warnings"))[:8]],
+            warnings=[
+                str(item)[:300] for item in json_array(summary.get("warnings"))[:8]
+            ],
             source_url=str(summary.get("source_url") or "")[:500] or None,
         ),
     )
+
 
 ###############################################################################
 def _failure_shape(error: Exception) -> tuple[Any, str, str, Any, bool, str | None]:
@@ -711,49 +768,84 @@ def _failure_shape(error: Exception) -> tuple[Any, str, str, Any, bool, str | No
 
     if isinstance(error, ProviderInvalidQueryError):
         return (
-            "semantic_validation", "provider_invalid_query",
-            "The provider rejected the validated query.", "correct_arguments", True, None,
+            "semantic_validation",
+            "provider_invalid_query",
+            "The provider rejected the validated query.",
+            "correct_arguments",
+            True,
+            None,
         )
     if isinstance(error, ProviderUnsupportedError):
         return (
-            "provider_unavailable", "provider_unsupported",
+            "provider_unavailable",
+            "provider_unsupported",
             "The provider cannot serve this capability at query time.",
-            "choose_alternate_tool", False, None,
+            "choose_alternate_tool",
+            False,
+            None,
         )
     if isinstance(error, ProviderAuthError):
         return (
-            "authentication", "provider_authentication",
-            "Provider authentication is unavailable.", "choose_alternate_tool", False, None,
+            "authentication",
+            "provider_authentication",
+            "Provider authentication is unavailable.",
+            "choose_alternate_tool",
+            False,
+            None,
         )
     if isinstance(error, ProviderRateLimitError):
         return (
-            "rate_limit", "provider_rate_limit",
-            "The provider rate limit was reached.", "retry_transport", False, None,
+            "rate_limit",
+            "provider_rate_limit",
+            "The provider rate limit was reached.",
+            "retry_transport",
+            False,
+            None,
         )
     if isinstance(error, ProviderTimeoutError):
         return (
-            "timeout", "provider_timeout",
+            "timeout",
+            "provider_timeout",
             "The provider did not respond within its execution deadline.",
-            "replan", False, "provider_transport",
+            "replan",
+            False,
+            "provider_transport",
         )
     if isinstance(error, ProviderMalformedPayloadError):
         return (
-            "provider_malformed_response", "provider_malformed_response",
+            "provider_malformed_response",
+            "provider_malformed_response",
             "The provider response could not be normalized or stored.",
-            "choose_alternate_tool", False, None,
+            "choose_alternate_tool",
+            False,
+            None,
         )
     if isinstance(
         error,
-        (ProviderCircuitOpenError, ProviderUnavailableError, ProviderNotRegisteredError, ProviderError),
+        (
+            ProviderCircuitOpenError,
+            ProviderUnavailableError,
+            ProviderNotRegisteredError,
+            ProviderError,
+        ),
     ):
         return (
-            "provider_unavailable", "provider_unavailable",
-            "The provider is temporarily unavailable.", "choose_alternate_tool", False, None,
+            "provider_unavailable",
+            "provider_unavailable",
+            "The provider is temporarily unavailable.",
+            "choose_alternate_tool",
+            False,
+            None,
         )
     return (
-        "internal_error", "capability_execution_failed",
-        "The capability failed during execution.", "terminal", False, None,
+        "internal_error",
+        "capability_execution_failed",
+        "The capability failed during execution.",
+        "terminal",
+        False,
+        None,
     )
+
 
 ###############################################################################
 def _with_honest_partial(response: ProviderResponse) -> ProviderResponse:
@@ -780,15 +872,18 @@ def _with_honest_partial(response: ProviderResponse) -> ProviderResponse:
         )
     return response
 
+
 ###############################################################################
 def _provider_id(manifest: dict[str, Any]) -> str:
     return str(manifest.get("provider") or manifest.get("provider_id") or "").strip()
+
 
 ###############################################################################
 def _bbox(value: list[float] | None) -> tuple[float, float, float, float] | None:
     if value is None:
         return None
     return tuple(float(item) for item in value)  # type: ignore[return-value]
+
 
 ###############################################################################
 def _provider_params(
@@ -798,7 +893,9 @@ def _provider_params(
     manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params = dict(request.arguments)
-    scopes = json_object((manifest or {}).get("executionContract")).get("supported_scope_kinds", [])
+    scopes = json_object((manifest or {}).get("executionContract")).get(
+        "supported_scope_kinds", []
+    )
     if "grid_sample" not in scopes:
         params.pop("sampling", None)
     if location is not None:
@@ -834,6 +931,7 @@ def _provider_params(
         params.setdefault("end_time_iso", request.end_time_iso)
     return params
 
+
 ###############################################################################
 def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]:
     if not value:
@@ -846,6 +944,7 @@ def _parse_request_time(value: str | None) -> tuple[datetime | None, str | None]
         parsed = parsed.replace(tzinfo=UTC)
     return parsed, None
 
+
 ###############################################################################
 def _tool_status(response: ProviderResponse) -> Any:
     if response.result_status == "valid_empty":
@@ -853,6 +952,7 @@ def _tool_status(response: ProviderResponse) -> Any:
     if response.result_status in {"partial", "stale"} or response.partial:
         return "partial"
     return "success"
+
 
 ###############################################################################
 def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
@@ -862,6 +962,7 @@ def _evidence_status(response: ProviderResponse) -> EvidenceStatus:
         return "partial"
     return "available"
 
+
 ###############################################################################
 def _evidence_kind(result_type: str) -> EvidenceKind:
     if result_type == "features":
@@ -870,15 +971,26 @@ def _evidence_kind(result_type: str) -> EvidenceKind:
         return "raster_descriptor"
     return "capability_result"
 
+
 ###############################################################################
 def _requested_attributes(request: ExecuteCapabilityInput | None) -> list[str]:
-    values = request.arguments.get("requested_attributes") if request is not None else None
+    values = (
+        request.arguments.get("requested_attributes") if request is not None else None
+    )
     if not is_json_array(values):
         return []
-    return list(dict.fromkeys(
-        name for item in values
-        if (name := re.sub(r"[^a-z0-9]+", "_", str(item).strip().casefold()).strip("_"))
-    ))
+    return list(
+        dict.fromkeys(
+            name
+            for item in values
+            if (
+                name := re.sub(r"[^a-z0-9]+", "_", str(item).strip().casefold()).strip(
+                    "_"
+                )
+            )
+        )
+    )
+
 
 ###############################################################################
 def _unmet_requested_attributes(
@@ -894,19 +1006,25 @@ def _unmet_requested_attributes(
     if not requested:
         return []
     features = response.payload.get("features")
-    if str((response.coverage or {}).get("type") or "") == "grid_sample" and is_json_array(features):
+    if str(
+        (response.coverage or {}).get("type") or ""
+    ) == "grid_sample" and is_json_array(features):
         rows: list[Any] = features[:200]
     elif response.payload.get("kind") in {"weather_forecast", "air_quality_forecast"}:
         rows = json_array(summary.get("hourly_forecast"))
     else:
         return []
-    keys = {str(key).replace("_", "") for row in rows if is_json_object(row) for key in row}
+    keys = {
+        str(key).replace("_", "") for row in rows if is_json_object(row) for key in row
+    }
     if not keys:
         return []
     return [
-        name for name in requested
+        name
+        for name in requested
         if not any(key.startswith(name.replace("_", "")) for key in keys)
     ]
+
 
 ###############################################################################
 def _single_frame_scope_warning(
@@ -918,6 +1036,7 @@ def _single_frame_scope_warning(
         # A product summarising a whole period (1984-2024 water change) is not
         # one frame of a time series: it answers the window it covers.
         return None
+
     def day(value: object) -> date | None:
         try:
             return date.fromisoformat(str(value)[:10])
@@ -999,7 +1118,10 @@ def _response_summary(
     window_summary = payload.get("window_summary")
     if is_json_object(window_summary):
         summary["window_summary"] = window_summary
-    if payload.get("kind") == "weather_forecast" and payload.get("current_in_window") is not False:
+    if (
+        payload.get("kind") == "weather_forecast"
+        and payload.get("current_in_window") is not False
+    ):
         current = payload.get("current")
         if is_json_object(current):
             observations = {
@@ -1049,24 +1171,28 @@ def _response_summary(
                     "sulphur_dioxide",
                 )
             )
-            fields = (*base_fields, *(name for name in requested if name not in base_fields))
+            fields = (
+                *base_fields,
+                *(name for name in requested if name not in base_fields),
+            )
             summary["requested_fields"] = [
-                name for name in fields[len(base_fields):]
+                name
+                for name in fields[len(base_fields) :]
                 if any(is_json_object(row) and name in row for row in hourly)
             ]
             timezone = payload.get("timezone")
             try:
-                timezone_info = (
-                    ZoneInfo(timezone) if isinstance(timezone, str) else UTC
-                )
-            except (ZoneInfoNotFoundError, ValueError):
+                timezone_info = ZoneInfo(timezone) if isinstance(timezone, str) else UTC
+            except ZoneInfoNotFoundError, ValueError:
                 timezone_info = None
             selected_rows: list[dict[str, Any]] = []
             windowed = is_json_object(window_summary)
             if windowed:
                 # The provider already restricted the hours to the requested
                 # window; a rolling window from now would answer another day.
-                selected_rows = [row for row in hourly if is_json_object(row)][:WINDOW_HOURS_LIMIT]
+                selected_rows = [row for row in hourly if is_json_object(row)][
+                    :WINDOW_HOURS_LIMIT
+                ]
             elif timezone_info is not None:
                 window_start = response.fetched_at.astimezone(timezone_info)
                 window_end = window_start + timedelta(hours=24)
@@ -1088,17 +1214,20 @@ def _response_summary(
                     if len(selected_rows) == 24:
                         break
             rows = [
-                {key: row[key] for key in fields if key in row}
-                for row in selected_rows
+                {key: row[key] for key in fields if key in row} for row in selected_rows
             ]
             window_hours = (
-                int(window_summary.get("hours") or 0) if is_json_object(window_summary) else 24
+                int(window_summary.get("hours") or 0)
+                if is_json_object(window_summary)
+                else 24
             )
             summary["forecast_hours_requested"] = window_hours
             summary["forecast_hours"] = len(rows)
             summary["forecast_truncated"] = len(rows) < window_hours
             summary["forecast_window_status"] = (
-                "ok" if len(rows) == min(window_hours, WINDOW_HOURS_LIMIT) else "partial"
+                "ok"
+                if len(rows) == min(window_hours, WINDOW_HOURS_LIMIT)
+                else "partial"
             )
             if rows:
                 summary["hourly_forecast"] = rows
@@ -1147,6 +1276,7 @@ def _record_fields(features: Any, payload: dict[str, Any]) -> str:
         }
     return ", ".join(sorted(names))[:300]
 
+
 ###############################################################################
 def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
     """Expose a small, allowlisted feature sample for bounded answer synthesis."""
@@ -1183,6 +1313,7 @@ def _feature_preview(features: list[Any]) -> list[dict[str, Any]]:
             preview.append(item)
     return preview
 
+
 ###############################################################################
 def _map_eligibility(response: ProviderResponse) -> str:
     """Classify provider evidence before it is admitted to a map plan."""
@@ -1208,6 +1339,7 @@ def _map_eligibility(response: ProviderResponse) -> str:
         return "not_renderable"
     return "unknown"
 
+
 ###############################################################################
 def _feature_has_geometry(value: object) -> bool:
     feature = value if is_json_object(value) else {}
@@ -1226,14 +1358,15 @@ def _feature_has_geometry(value: object) -> bool:
         and not isinstance(longitude, bool)
     )
 
+
 ###############################################################################
 def _has_render_source(value: object) -> bool:
     payload = value if is_json_object(value) else {}
-    mode = str(
-        payload.get("renderingMode")
-        or payload.get("rendering_mode")
-        or ""
-    ).strip().casefold()
+    mode = (
+        str(payload.get("renderingMode") or payload.get("rendering_mode") or "")
+        .strip()
+        .casefold()
+    )
     if mode in {"metadata-only", "metadata_only"}:
         return False
     return any(
@@ -1250,6 +1383,7 @@ def _has_render_source(value: object) -> bool:
             "features_url",
         )
     )
+
 
 ###############################################################################
 def _feature_bbox(value: object) -> list[float] | None:
@@ -1277,6 +1411,7 @@ def _feature_bbox(value: object) -> list[float] | None:
     longitudes = [item[0] for item in coordinates]
     latitudes = [item[1] for item in coordinates]
     return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
 
 ###############################################################################
 def _geometry_positions(value: object) -> list[tuple[float, float]]:
@@ -1311,6 +1446,7 @@ def _geometry_positions(value: object) -> list[tuple[float, float]]:
     visit(coordinates)
     return positions
 
+
 ###############################################################################
 def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
     count = summary.get("feature_count")
@@ -1326,12 +1462,14 @@ def _summary_text(response: ProviderResponse, summary: dict[str, Any]) -> str:
         f"{response.result_type} result from provider '{response.provider_id}'."
     )
 
+
 ###############################################################################
 def _json_size(value: Any) -> int | None:
     try:
         return len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8"))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _duration_ms(started: float) -> int:

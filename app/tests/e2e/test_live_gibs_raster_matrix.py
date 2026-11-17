@@ -153,9 +153,7 @@ def test_live_gibs_raster_layer(
     )
     backend_tail = read_backend_log_tail(500)
     raster_diagnostics = [
-        line
-        for line in backend_tail.splitlines()
-        if "geospatial_tile_proxy" in line
+        line for line in backend_tail.splitlines() if "geospatial_tile_proxy" in line
     ][-64:]
     result["backend_raster_diagnostics"] = raster_diagnostics
     write_log_tail(
@@ -186,9 +184,7 @@ def test_live_gibs_raster_layer(
                 or trace_temporal.get("provider_time")
                 or "unobserved"
             ),
-            "provider_default_time": trace_temporal.get(
-                "provider_default_time"
-            )
+            "provider_default_time": trace_temporal.get("provider_default_time")
             or trace_temporal.get("default_time"),
             "proxy_time_parameters": proxy_temporal,
             "provider_descriptor_time": trace_temporal.get("layer_time"),

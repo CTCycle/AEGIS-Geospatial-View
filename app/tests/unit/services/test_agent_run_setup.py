@@ -4,8 +4,16 @@ from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 from server.domain.agent.decision import ResolvedLocation
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
-from server.contracts.chat import ChatOperationResult, ChatTurnResponse, ContextUsageResponse
-from server.contracts.geospatial import MapSession, OverlayCollectionState, ViewportPolicy
+from server.contracts.chat import (
+    ChatOperationResult,
+    ChatTurnResponse,
+    ContextUsageResponse,
+)
+from server.contracts.geospatial import (
+    MapSession,
+    OverlayCollectionState,
+    ViewportPolicy,
+)
 from server.contracts.events import RunEventType
 from server.repositories.agent_runs import AgentRunControl
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
@@ -15,17 +23,16 @@ from server.domain.agent.presentation_contract import (
     ContractTarget,
     PresentationContract,
 )
-from server.services.geospatial.map_session_builder import _geojson_render_data, _viewport_for_location
+from server.services.geospatial.map_session_builder import (
+    _geojson_render_data,
+    _viewport_for_location,
+)
 
 # --- test_agent_run_orchestrator.py ---
 
 
-
-
-
 ###############################################################################
 class _FakeAgentOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(self, response: ChatTurnResponse) -> None:
         self.response = response
@@ -47,9 +54,9 @@ class _FakeAgentOrchestrator:
             )
         return self.response
 
+
 ###############################################################################
 class _FakeRunRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, snapshot: AgentRunSnapshot) -> None:
         self.snapshot = snapshot
@@ -159,9 +166,9 @@ class _FakeRunRepository:
     def request_cancel_once(self, run_id: str) -> tuple[AgentRunSnapshot, bool]:
         return self.request_cancel(run_id), True
 
+
 ###############################################################################
 class _FakeEventRepository:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def get_latest_checkpoint_state(
@@ -169,9 +176,9 @@ class _FakeEventRepository:
     ) -> dict[str, object] | None:
         return None
 
+
 ###############################################################################
 class _FakeEventPublisher:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, object]] = []
@@ -181,9 +188,9 @@ class _FakeEventPublisher:
     async def publish(self, **kwargs):  # noqa: ANN003
         self.events.append(kwargs)
 
+
 ###############################################################################
 class _FakeRenderCompletionService:
-
     # -------------------------------------------------------------------------
     def __init__(self, run_repository: _FakeRunRepository) -> None:
         self.run_repository = run_repository
@@ -222,6 +229,7 @@ class _FakeRenderCompletionService:
         )
         return presentation, transitioned
 
+
 ###############################################################################
 def _snapshot() -> AgentRunSnapshot:
     return AgentRunSnapshot(
@@ -233,6 +241,7 @@ def _snapshot() -> AgentRunSnapshot:
         state=AgentRunState.PENDING,
         created_at=datetime.now(UTC),
     )
+
 
 ###############################################################################
 def _failed_response() -> ChatTurnResponse:
@@ -254,6 +263,7 @@ def _failed_response() -> ChatTurnResponse:
             model="deepseek-v4-flash",
         ),
     )
+
 
 ###############################################################################
 def _pending_map_response() -> ChatTurnResponse:
@@ -284,6 +294,7 @@ def _pending_map_response() -> ChatTurnResponse:
         map_session=map_session,
         presentation_status="prepared",
     )
+
 
 ###############################################################################
 def test_execute_run_marks_failed_operation_as_failed_run() -> None:
@@ -320,6 +331,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
     )
     assert context_event["payload"]["phase"] == "native_loop"
 
+
 ###############################################################################
 def test_execute_run_defers_pending_native_map_until_render_ack() -> None:
     repository = _FakeRunRepository(_snapshot())
@@ -341,10 +353,15 @@ def test_execute_run_defers_pending_native_map_until_render_ack() -> None:
     assert repository.snapshot.presentation_status == "pending"
     assert repository.prepared is not None
     map_prepared = next(
-        event for event in publisher.events if event["type"] == RunEventType.MAP_PREPARED
+        event
+        for event in publisher.events
+        if event["type"] == RunEventType.MAP_PREPARED
     )
     assert map_prepared["payload"]["presentation"]["map_session_id"] == "map_1"
-    assert not any(event["type"] == RunEventType.COMPLETED for event in publisher.events)
+    assert not any(
+        event["type"] == RunEventType.COMPLETED for event in publisher.events
+    )
+
 
 ###############################################################################
 def test_execute_run_includes_context_usage_in_clarification_event() -> None:
@@ -374,9 +391,10 @@ def test_execute_run_includes_context_usage_in_clarification_event() -> None:
         for event in publisher.events
         if event["type"] == RunEventType.CLARIFICATION_NEEDED
     )
-    assert clarification_event["payload"]["context_usage"][
-        "estimated_input_tokens"
-    ] == 321
+    assert (
+        clarification_event["payload"]["context_usage"]["estimated_input_tokens"] == 321
+    )
+
 
 ###############################################################################
 def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
@@ -412,6 +430,7 @@ def test_execute_run_publishes_context_samples_before_terminal_event() -> None:
     )
     assert context_index < terminal_index
 
+
 ###############################################################################
 def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text():
     message = AgentRunOrchestrator._safe_failure_message(
@@ -421,6 +440,7 @@ def test_geospatial_auth_failure_points_to_access_without_exposing_provider_text
     assert "Settings under Geospatial Access" in message
     assert "secret-token" not in message
 
+
 ###############################################################################
 def test_native_response_payload_has_no_legacy_projections() -> None:
     payload = AgentRunOrchestrator._response_payload(_pending_map_response())
@@ -429,6 +449,7 @@ def test_native_response_payload_has_no_legacy_projections() -> None:
     assert "turn_contract" not in payload
     assert "decision" not in payload
     assert payload["operation"]["kind"] == "map_session"
+
 
 # --- test_map_session_builder.py ---
 
@@ -449,6 +470,7 @@ def test_city_with_parent_scale_bbox_keeps_point_centered_viewport() -> None:
     assert viewport.center_longitude == location.longitude
     assert viewport.bbox is None
 
+
 ###############################################################################
 def test_country_view_skips_distant_islands_but_keeps_the_data_bbox() -> None:
     # S13: Nominatim's Portugal box reaches the Azores (lon -32.6), which pushed
@@ -468,6 +490,7 @@ def test_country_view_skips_distant_islands_but_keeps_the_data_bbox() -> None:
     assert -10.5 < viewport.bbox[0] and viewport.bbox[2] < -5.1
     assert location.bbox == bbox
 
+
 ###############################################################################
 def test_compact_country_keeps_its_geocoder_bbox_as_the_view() -> None:
     bbox = [5.9, 45.8, 10.5, 47.8]
@@ -480,6 +503,7 @@ def test_compact_country_keeps_its_geocoder_bbox_as_the_view() -> None:
     )
 
     assert _viewport_for_location(location).bbox == bbox
+
 
 ###############################################################################
 def test_a_landmark_with_a_point_like_bbox_is_framed_at_street_level() -> None:
@@ -501,22 +525,40 @@ def test_a_landmark_with_a_point_like_bbox_is_framed_at_street_level() -> None:
     assert viewport.bbox[0] < location.longitude < viewport.bbox[2]
     assert viewport.bbox[1] < location.latitude < viewport.bbox[3]
     assert not PresentationContract(
-        targets=[ContractTarget(
-            ref="gate", label=location.label, latitude=location.latitude,
-            longitude=location.longitude, location_type=location.location_type, bbox=location.bbox,
-        )]
+        targets=[
+            ContractTarget(
+                ref="gate",
+                label=location.label,
+                latitude=location.latitude,
+                longitude=location.longitude,
+                location_type=location.location_type,
+                bbox=location.bbox,
+            )
+        ]
     ).violations(viewport.bbox)
+
 
 ###############################################################################
 def test_flat_derived_feature_keeps_its_fields_as_properties() -> None:
     # A buffered record is typed "Feature" with a geometry but keeps flat fields.
     square = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}
-    data = _geojson_render_data({"features": [
-        {"type": "Feature", "geometry": square, "magnitude": 2.4, "latitude": 1.0, "longitude": 2.0},
-    ]})
+    data = _geojson_render_data(
+        {
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": square,
+                    "magnitude": 2.4,
+                    "latitude": 1.0,
+                    "longitude": 2.0,
+                },
+            ]
+        }
+    )
 
     assert data is not None
     assert data["features"][0]["properties"] == {"magnitude": 2.4}
+
 
 ###############################################################################
 def test_normalized_polygon_feature_is_converted_to_renderable_geojson() -> None:

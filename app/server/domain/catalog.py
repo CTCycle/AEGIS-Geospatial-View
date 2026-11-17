@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+
 ###############################################################################
 class CountryReferenceEntry(BaseModel):
     iso2: str
     name: str
     iso3: str | None = None
 
+
 ###############################################################################
 class CountryAliasReferenceEntry(BaseModel):
     alias: str
     iso2: str
+
 
 ###############################################################################
 class GeospatialLayerReferenceEntry(BaseModel):
@@ -22,16 +25,19 @@ class GeospatialLayerReferenceEntry(BaseModel):
     aliases: tuple[str, ...] = ()
     keywords: tuple[str, ...] = ()
 
+
 ###############################################################################
 class GibsTileMatrixSetReferenceEntry(BaseModel):
     tile_matrix_set_id: str
     meters_per_pixel: float
+
 
 ###############################################################################
 class GibsLayerDefaultReferenceEntry(BaseModel):
     layer_id: str
     native_resolution_m: float | None
     date_fallback_days: int | None
+
 
 ###############################################################################
 class ReferenceCatalog(BaseModel):

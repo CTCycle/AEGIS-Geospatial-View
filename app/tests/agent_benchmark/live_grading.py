@@ -39,7 +39,9 @@ MODEL_INDUCED_ERRORS = frozenset(
 MAX_INVALID_CALLS = 3
 DEFAULT_MAX_TURN_SECONDS = 180.0
 TERMINAL_RENDER_FAILURES = frozenset({"failed", "render_timeout"})
-COMPOUND_ASSERTIONS = frozenset({"compound_tasks", "two_capabilities", "poi_and_weather", "append_layer"})
+COMPOUND_ASSERTIONS = frozenset(
+    {"compound_tasks", "two_capabilities", "poi_and_weather", "append_layer"}
+)
 _DISCLOSURE = re.compile(
     r"\b(unavailable|could not|couldn't|unable|missing|only|partial(?:ly)?|no data|"
     r"not (?:available|supported|completed|retrieved)|failed|don't have|do not have|"
@@ -108,7 +110,9 @@ def _capability_ids(tool: str, arguments: Mapping[str, Any]) -> list[str]:
     actions = arguments.get("actions")
     if tool == "apply_map_plan" and isinstance(actions, list):
         for action in actions:  # type: ignore[union-attr]
-            if isinstance(action, Mapping) and isinstance(action.get("capability_id"), str):
+            if isinstance(action, Mapping) and isinstance(
+                action.get("capability_id"), str
+            ):
                 ids.append(action["capability_id"])  # type: ignore[index]
     return ids
 
@@ -141,7 +145,9 @@ def extract_tool_calls(events: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         kind, inner = event.get("kind"), _inner(event)
         if kind == "tool_selected":
             arguments = inner.get("arguments")
-            record["arguments"] = dict(arguments) if isinstance(arguments, Mapping) else {}
+            record["arguments"] = (
+                dict(arguments) if isinstance(arguments, Mapping) else {}
+            )
             record["parse_error"] = inner.get("parse_error")
         elif kind == "tool_result":
             result = inner.get("result")
@@ -163,24 +169,38 @@ def _families(call: Mapping[str, Any]) -> set[str]:
     if tool == "resolve_geospatial_location":
         found.add("location")
     for capability in _capability_ids(tool, arguments):
-        found.update(name for name, pattern in FAMILY_PATTERNS.items() if pattern.search(capability))
+        found.update(
+            name
+            for name, pattern in FAMILY_PATTERNS.items()
+            if pattern.search(capability)
+        )
     if tool == "apply_map_plan" and "fit_location" in str(arguments):
         found.add("location")
     return found
 
 
 # -----------------------------------------------------------------------------
-def _unrecovered_failures(calls: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+def _unrecovered_failures(
+    calls: Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
     """Failed data calls not followed by a later success of the same tool and capability."""
 
     unresolved: list[Mapping[str, Any]] = []
     for index, call in enumerate(calls):
-        if call["tool"] not in DATA_TOOLS or call["status"] in SUCCESS_STATUSES or call["status"] is None:
+        if (
+            call["tool"] not in DATA_TOOLS
+            or call["status"] in SUCCESS_STATUSES
+            or call["status"] is None
+        ):
             continue
         key = (call["tool"], tuple(_capability_ids(call["tool"], call["arguments"])))
         recovered = any(
             later["status"] in SUCCESS_STATUSES
-            and (later["tool"], tuple(_capability_ids(later["tool"], later["arguments"]))) == key
+            and (
+                later["tool"],
+                tuple(_capability_ids(later["tool"], later["arguments"])),
+            )
+            == key
             for later in calls[index + 1 :]
         )
         if not recovered:
@@ -194,12 +214,20 @@ def _final_text(runs: Sequence[Mapping[str, Any]]) -> tuple[str, str | None]:
 
     events: Sequence[Mapping[str, Any]] = runs[-1]["events"]
     terminal = next(
-        (e for e in reversed(events) if e.get("type") in {"completed", "clarification_needed"}), None
+        (
+            e
+            for e in reversed(events)
+            if e.get("type") in {"completed", "clarification_needed"}
+        ),
+        None,
     )
     if terminal is not None:
         message = _text(_inner(terminal).get("assistant_message"))
         return message, _text(terminal.get("type"))
-    drafted = next((e for e in reversed(events) if e.get("type") == "assistant_text_completed"), None)
+    drafted = next(
+        (e for e in reversed(events) if e.get("type") == "assistant_text_completed"),
+        None,
+    )
     return (_text(_inner(drafted).get("content")) if drafted else ""), None
 
 
@@ -275,15 +303,21 @@ def grade_scenario(
 
     # Termination -------------------------------------------------------------
     deadline = float(scenario.get("max_turn_seconds") or DEFAULT_MAX_TURN_SECONDS)
-    slowest = max((float(run.get("duration_seconds") or 0) for run in runs), default=0.0)
+    slowest = max(
+        (float(run.get("duration_seconds") or 0) for run in runs), default=0.0
+    )
     asked = terminal_type == "clarification_needed"
     reasons: list[str] = []
     if any(run.get("timed_out") for run in runs) or slowest > deadline:
         reasons.append(f"exceeded {deadline:.0f}s turn deadline")
-    if not asked and last["state"] != "completed" and not (
-        render_mode == "none" and last.get("render_pending")
+    if (
+        not asked
+        and last["state"] != "completed"
+        and not (render_mode == "none" and last.get("render_pending"))
     ):
-        reasons.append(f"run ended {last['state']} ({_text(last.get('error_code')) or 'no error code'})")
+        reasons.append(
+            f"run ended {last['state']} ({_text(last.get('error_code')) or 'no error code'})"
+        )
     if clarification == "required" and not asked:
         reasons.append("clarification required but not requested")
     if clarification == "not_required" and asked:
@@ -296,15 +330,23 @@ def grade_scenario(
     )
 
     # Route: domain families and targets --------------------------------------
-    observed = set().union(*[_families(call) for call in data_calls]) if data_calls else set()
+    observed = (
+        set().union(*[_families(call) for call in data_calls]) if data_calls else set()
+    )
     route_reasons: list[str] = []
     if families_expected:
-        needed_all = len(families_expected) >= 2 and int(expected["minimum_tool_count"]) >= 2 or bool(
-            COMPOUND_ASSERTIONS & set(scenario.get("assertions", []))
+        needed_all = (
+            len(families_expected) >= 2
+            and int(expected["minimum_tool_count"]) >= 2
+            or bool(COMPOUND_ASSERTIONS & set(scenario.get("assertions", [])))
         )
         hits = [family for family in families_expected if family in observed]
-        if (needed_all and len(hits) < len(families_expected)) or (not needed_all and not hits):
-            route_reasons.append(f"expected {families_expected}, routed {sorted(observed)}")
+        if (needed_all and len(hits) < len(families_expected)) or (
+            not needed_all and not hits
+        ):
+            route_reasons.append(
+                f"expected {families_expected}, routed {sorted(observed)}"
+            )
     off_target = [
         call["location"]
         for call in successful
@@ -315,7 +357,10 @@ def grade_scenario(
             for segment in [call["location"], *str(call["location"]).split(",")]
             if segment.strip()
         )
-        and not (isinstance(call["arguments"].get("query"), str) and _fold(call["arguments"]["query"]) in prompt_blob)
+        and not (
+            isinstance(call["arguments"].get("query"), str)
+            and _fold(call["arguments"]["query"]) in prompt_blob
+        )
         and not re.search(r"-?\d+\.\d+", prompt_blob)
     ]
     if off_target:
@@ -336,13 +381,17 @@ def grade_scenario(
     tool_reasons: list[str] = []
     minimum = int(expected["minimum_tool_count"])
     if len(executed) < minimum and not asked:
-        tool_reasons.append(f"{len(executed)} successful data calls, expected at least {minimum}")
+        tool_reasons.append(
+            f"{len(executed)} successful data calls, expected at least {minimum}"
+        )
     if len(invalid) > MAX_INVALID_CALLS:
-        tool_reasons.append(f"{len(invalid)} model-induced invalid calls (limit {MAX_INVALID_CALLS})")
+        tool_reasons.append(
+            f"{len(invalid)} model-induced invalid calls (limit {MAX_INVALID_CALLS})"
+        )
     signatures = [(c["tool"], repr(sorted(c["arguments"].items()))) for c in successful]
-    if any(signatures.count(sig) > 1 for sig in signatures) and "no_duplicate_layer_call" in scenario.get(
-        "assertions", []
-    ):
+    if any(
+        signatures.count(sig) > 1 for sig in signatures
+    ) and "no_duplicate_layer_call" in scenario.get("assertions", []):
         tool_reasons.append("duplicate identical successful call")
     dims["tools"] = _dimension(
         FAIL if tool_reasons else PASS,
@@ -357,7 +406,9 @@ def grade_scenario(
         if not executed:
             provenance_reasons.append("no successful tool result backs the answer")
     dims["provenance"] = _dimension(
-        FAIL if provenance_reasons else (PASS if expected["provenance_required"] else NA),
+        FAIL
+        if provenance_reasons
+        else (PASS if expected["provenance_required"] else NA),
         reasons=provenance_reasons,
         evidence_refs=sum(len(c["evidence_refs"]) for c in executed),
     )
@@ -367,17 +418,25 @@ def grade_scenario(
     observations = [e for e in events if e.get("type") == "render_observed"]
     needs_map = "rendered_map" in scenario.get("assertions", [])
     if not map_prepared:
-        render = _dimension(FAIL, reasons=["no map was prepared"]) if needs_map and not asked else _dimension(NA)
+        render = (
+            _dimension(FAIL, reasons=["no map was prepared"])
+            if needs_map and not asked
+            else _dimension(NA)
+        )
     elif render_mode == "none":
         render = _dimension(UNVERIFIED, reasons=["no browser acknowledged the render"])
-    elif observations and _text(observations[-1].get("status")) == "ready" and last.get(
-        "presentation_status"
-    ) not in TERMINAL_RENDER_FAILURES:
+    elif (
+        observations
+        and _text(observations[-1].get("status")) == "ready"
+        and last.get("presentation_status") not in TERMINAL_RENDER_FAILURES
+    ):
         render = _dimension(PASS, attempts=len(observations))
     else:
         render = _dimension(
             FAIL,
-            reasons=[f"presentation {_text(last.get('presentation_status')) or 'unacknowledged'}"],
+            reasons=[
+                f"presentation {_text(last.get('presentation_status')) or 'unacknowledged'}"
+            ],
             attempts=len(observations),
         )
     dims["render"] = render
@@ -387,10 +446,16 @@ def grade_scenario(
     answer_violations: list[str] = []
     answer_reasons: list[str] = []
     if not final_answer_available:
-        dims["answer"] = _dimension(NA, reasons=["no final answer was produced in this mode"])
+        dims["answer"] = _dimension(
+            NA, reasons=["no final answer was produced in this mode"]
+        )
     else:
         targets = [call["location"] for call in successful if call["location"]]
-        overlays = [r for o in observations[-1:] for r in o.get("payload", {}).get("overlay_results", [])]
+        overlays = [
+            r
+            for o in observations[-1:]
+            for r in o.get("payload", {}).get("overlay_results", [])
+        ]
         layer_count = (
             sum(1 for r in overlays if r.get("loaded") and r.get("layer_present"))
             if render["verdict"] == PASS
@@ -404,7 +469,9 @@ def grade_scenario(
             unmet=unmet,
         )
         answer_reasons = list(answer_violations)
-        dims["answer"] = _dimension(FAIL if answer_reasons else PASS, reasons=answer_reasons)
+        dims["answer"] = _dimension(
+            FAIL if answer_reasons else PASS, reasons=answer_reasons
+        )
 
     # False success -----------------------------------------------------------
     false_reasons: list[str] = []
@@ -420,7 +487,9 @@ def grade_scenario(
     if last["state"] == "completed" and render["verdict"] == FAIL and map_prepared:
         false_reasons.append("completed although the render was not acknowledged")
     false_reasons.extend(f"answer: {violation}" for violation in answer_violations)
-    dims["false_success"] = _dimension(FAIL if false_reasons else PASS, reasons=false_reasons)
+    dims["false_success"] = _dimension(
+        FAIL if false_reasons else PASS, reasons=false_reasons
+    )
 
     failed = [name for name, dim in dims.items() if dim["verdict"] == FAIL]
     return {
@@ -462,14 +531,18 @@ def compare_to_baseline(
         failed = result["verdict"] == FAIL
         if entry is None:
             if failed and model_baseline is not None:
-                regressions.append(f"{result['scenario_id']}: failed and is not in the baseline")
+                regressions.append(
+                    f"{result['scenario_id']}: failed and is not in the baseline"
+                )
             continue
         if failed and entry["verdict"] == PASS:
             regressions.append(
                 f"{result['scenario_id']}: regressed ({', '.join(result.get('failed_dimensions', []))})"
             )
         elif failed and not entry.get("explanation"):
-            regressions.append(f"{result['scenario_id']}: fails without a documented explanation")
+            regressions.append(
+                f"{result['scenario_id']}: fails without a documented explanation"
+            )
         elif not failed and entry["verdict"] == FAIL:
             improvements.append(result["scenario_id"])
     false_successes = [r["scenario_id"] for r in results if r["false_success"]]
@@ -484,11 +557,17 @@ def compare_to_baseline(
 
 
 ###############################################################################
-def render_markdown(model_key: str, results: Sequence[Mapping[str, Any]], comparison: Mapping[str, Any]) -> str:
+def render_markdown(
+    model_key: str, results: Sequence[Mapping[str, Any]], comparison: Mapping[str, Any]
+) -> str:
     """Render the per-model summary."""
 
     passed = sum(1 for r in results if r["verdict"] == PASS)
-    unverified = sum(1 for r in results if r["dimensions"].get("render", {}).get("verdict") == UNVERIFIED)
+    unverified = sum(
+        1
+        for r in results
+        if r["dimensions"].get("render", {}).get("verdict") == UNVERIFIED
+    )
     lines = [
         f"# Live evaluation: {model_key}",
         "",
@@ -508,7 +587,10 @@ def render_markdown(model_key: str, results: Sequence[Mapping[str, Any]], compar
             f"{result['dimensions'].get('render', {}).get('verdict', '-')} | "
             f"{'YES' if result['false_success'] else 'no'} |"
         )
-    for title, key in (("Regressions", "regressions"), ("False successes", "false_successes")):
+    for title, key in (
+        ("Regressions", "regressions"),
+        ("False successes", "false_successes"),
+    ):
         if comparison[key]:
             lines += ["", f"## {title}", *[f"- {item}" for item in comparison[key]]]
     failures = [r for r in results if r["verdict"] == FAIL]

@@ -18,9 +18,9 @@ from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.provider_contract import require_canonical_provider
 from server.services.llm.transport import LLMTransportPolicy
 
+
 ###############################################################################
 class LLMFactory:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

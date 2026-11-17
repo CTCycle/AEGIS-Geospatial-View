@@ -8,7 +8,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from server.api.chat import get_chat_runtime, router, get_models, pull_ollama_model
 from server.common.paths import CHAT_TURN_ROUTE, FASTAPI_API_PREFIX
-from server.contracts.chat import ChatOperationResult, ContextUsageResponse, ChatTurnRequest, ChatTurnResponse, OllamaPullRequest
+from server.contracts.chat import (
+    ChatOperationResult,
+    ContextUsageResponse,
+    ChatTurnRequest,
+    ChatTurnResponse,
+    OllamaPullRequest,
+)
 from server.contracts.runs import AgentRunCreateResult, AgentRunSnapshot, AgentRunState
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
@@ -28,7 +34,10 @@ from server.domain.agent.conversation import ConversationState
 from collections.abc import Iterator
 from starlette.websockets import WebSocketDisconnect
 from tests.conftest import run_async_in_thread
-from server.api.realtime import metrics_router as realtime_metrics_router, router as realtime_router
+from server.api.realtime import (
+    metrics_router as realtime_metrics_router,
+    router as realtime_router,
+)
 from server.contracts.events import RunEventType
 from server.domain.realtime import REALTIME_SUBPROTOCOL, RealtimeServerMessage
 from server.repositories.agent_steering import AgentSteeringRepository
@@ -40,14 +49,13 @@ from server.domain.agent.trace import public_protocol_projection
 # --- test_chat_contracts.py ---
 
 
-
-
 ###############################################################################
 def _app() -> FastAPI:
     application = FastAPI()
     application.include_router(router, prefix="/api")
     application.dependency_overrides[get_chat_runtime] = lambda: object()
     return application
+
 
 ###############################################################################
 def test_chat_turn_requires_conversation_id_over_http() -> None:
@@ -61,6 +69,7 @@ def test_chat_turn_requires_conversation_id_over_http() -> None:
         error["loc"][-1] == "conversation_id" for error in response.json()["detail"]
     )
 
+
 ###############################################################################
 def test_chat_response_openapi_marks_conversation_id_required() -> None:
     schema = _app().openapi()
@@ -69,12 +78,14 @@ def test_chat_response_openapi_marks_conversation_id_required() -> None:
     assert "conversation_id" in request_schema["required"]
     assert "/api/chat/turn" in schema["paths"]
 
+
 ###############################################################################
 def test_chat_settings_update_uses_patch_semantics() -> None:
     settings_path = _app().openapi()["paths"]["/api/chat/settings"]
 
     assert "patch" in settings_path
     assert "put" not in settings_path
+
 
 ###############################################################################
 def test_chat_turn_request_rejects_missing_conversation_id() -> None:
@@ -84,6 +95,7 @@ def test_chat_turn_request_rejects_missing_conversation_id() -> None:
         assert "conversation_id" in str(exc)
     else:
         raise AssertionError("conversation_id must be required")
+
 
 ###############################################################################
 def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
@@ -100,6 +112,7 @@ def test_chat_turn_does_not_expose_map_commit_switch_over_http() -> None:
     assert any(
         error["loc"][-1] == "defer_map_commit" for error in response.json()["detail"]
     )
+
 
 ###############################################################################
 def test_native_turn_response_does_not_require_legacy_parser_projections() -> None:
@@ -118,13 +131,13 @@ def test_native_turn_response_does_not_require_legacy_parser_projections() -> No
     assert response.goal is None
     assert "turn_contract" not in response.model_dump(mode="json")
 
+
 ###############################################################################
 def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     orchestrator_called = False
 
     ###############################################################################
     class _ConversationRepository:
-
         # -------------------------------------------------------------------------
         def get_conversation(self, conversation_id: str) -> None:  # noqa: ARG002
             return None
@@ -149,6 +162,7 @@ def test_chat_turn_preflights_conversation_before_orchestrator() -> None:
     assert response.json()["detail"] == "Conversation not found."
     assert orchestrator_called is False
 
+
 ###############################################################################
 @pytest.mark.parametrize("route", [CHAT_TURN_ROUTE])
 def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -> None:
@@ -170,9 +184,9 @@ def test_chat_entry_points_reject_invalid_message_with_422_not_404(route: str) -
     assert "message is too long" in response.text
     assert "xxxx" not in response.text
 
+
 ###############################################################################
 class _ChatTurnLifecycleStub(RunLifecycleService):
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -284,7 +298,6 @@ def test_chat_turn_hydrates_completed_event_as_terminal_200() -> None:
 
     ###############################################################################
     class _PersistedTerminalLifecycleStub(_ChatTurnLifecycleStub):
-
         # -------------------------------------------------------------------------
         async def run_turn(self, *args, **kwargs):  # noqa: ANN002, ANN003
             response = self.read_completed_response("conv-1", "run-1")
@@ -367,14 +380,12 @@ def test_chat_turn_returns_503_for_unusable_provider() -> None:
     assert response.status_code == 503
     assert response.json()["detail"] == "The selected provider is unavailable."
 
+
 # --- test_chat_exception_safety.py ---
-
-
 
 
 ###############################################################################
 class _FailingModelLibrary:
-
     # -------------------------------------------------------------------------
     def list_models(self, **kwargs):  # noqa: ANN003
         _ = kwargs
@@ -382,15 +393,16 @@ class _FailingModelLibrary:
             "api-key=sk-test https://provider.invalid/v1 C:\\private\\models.json"
         )
 
+
 ###############################################################################
 class _FailingMaintenance:
-
     # -------------------------------------------------------------------------
     def pull_ollama_model(self, payload):  # noqa: ANN001
         _ = payload
         raise RuntimeError(
             "api-key=sk-test https://ollama.invalid/api C:\\private\\ollama.log"
         )
+
 
 ###############################################################################
 def test_model_catalog_exception_has_stable_public_message() -> None:
@@ -409,6 +421,7 @@ def test_model_catalog_exception_has_stable_public_message() -> None:
     assert "provider.invalid" not in str(raised.value.detail)
     assert "models.json" not in str(raised.value.detail)
 
+
 ###############################################################################
 def test_ollama_pull_exception_has_stable_public_message() -> None:
     runtime = SimpleNamespace(maintenance_service=_FailingMaintenance())
@@ -424,8 +437,8 @@ def test_ollama_pull_exception_has_stable_public_message() -> None:
     assert "ollama.invalid" not in str(raised.value.detail)
     assert "ollama.log" not in str(raised.value.detail)
 
-# --- test_conversations_api.py ---
 
+# --- test_conversations_api.py ---
 
 
 ###############################################################################
@@ -441,6 +454,7 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -468,6 +482,7 @@ def conversations_api_client() -> TestClient:
     client = TestClient(app)
     yield client
     client.close()
+
 
 ###############################################################################
 def test_create_conversation_returns_persisted_conversation(
@@ -501,6 +516,7 @@ def test_create_conversation_returns_persisted_conversation(
     assert snapshot_payload["map_session"] is None
     assert snapshot_payload["active_run"] is None
 
+
 ###############################################################################
 def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
     conversations_api_client: TestClient,
@@ -508,6 +524,7 @@ def test_get_conversation_snapshot_returns_not_found_for_unknown_conversation(
     response = conversations_api_client.get("/api/conversations/missing")
 
     assert response.status_code == 404
+
 
 ###############################################################################
 def test_terminal_assistant_message_and_state_rollback_together() -> None:
@@ -549,6 +566,7 @@ def test_terminal_assistant_message_and_state_rollback_together() -> None:
         item["content"]
         for item in history.list_message_headers(conversation_id=conversation.id)
     ] == ["First response"]
+
 
 ###############################################################################
 def test_native_provisional_assistant_is_upserted_on_resume() -> None:
@@ -592,22 +610,38 @@ def test_native_provisional_assistant_is_upserted_on_resume() -> None:
         for item in history.list_message_headers(conversation_id=conversation.id)
     ] == ["The map is ready."]
 
+
 # --- test_realtime_api.py ---
 
 
-
-
-
 ###############################################################################
-def test_public_transports_omit_private_provider_continuation_without_mutation() -> None:
-    private = {"execution_trace": {"checkpoint": {"execution_policy": {"max_iterations": 12},
-        "provider_continuation": [{"google_content": {"parts": [{"thought_signature": "opaque"}]}}]}}}
-    websocket = RealtimeServerMessage(type="run.completed", conversation_id="conversation", payload=private)
+def test_public_transports_omit_private_provider_continuation_without_mutation() -> (
+    None
+):
+    private = {
+        "execution_trace": {
+            "checkpoint": {
+                "execution_policy": {"max_iterations": 12},
+                "provider_continuation": [
+                    {"google_content": {"parts": [{"thought_signature": "opaque"}]}}
+                ],
+            }
+        }
+    }
+    websocket = RealtimeServerMessage(
+        type="run.completed", conversation_id="conversation", payload=private
+    )
     output = websocket.model_dump(mode="json")
-    assert "provider_continuation" not in output["payload"]["execution_trace"]["checkpoint"]
+    assert (
+        "provider_continuation"
+        not in output["payload"]["execution_trace"]["checkpoint"]
+    )
     assert "opaque" not in public_protocol_projection(private)
     assert "provider_continuation" in private["execution_trace"]["checkpoint"]
-    assert output["payload"]["execution_trace"]["checkpoint"]["execution_policy"] == {"max_iterations": 12}
+    assert output["payload"]["execution_trace"]["checkpoint"]["execution_policy"] == {
+        "max_iterations": 12
+    }
+
 
 ###############################################################################
 class _Backend:
@@ -623,9 +657,9 @@ class _Backend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
+
 ###############################################################################
 class _Agent:
-
     # -------------------------------------------------------------------------
     def __init__(self, runs: AgentRunRepository, publisher: RunEventPublisher) -> None:
         self.runs = runs
@@ -657,6 +691,7 @@ class _Agent:
             payload={"state": "completed"},
         )
         self.runs.mark_completed(run_id)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -701,6 +736,7 @@ def realtime_client(
     finally:
         client.close()
 
+
 ###############################################################################
 def _receive_until_terminal(socket) -> list[dict]:
     messages: list[dict] = []
@@ -712,6 +748,7 @@ def _receive_until_terminal(socket) -> list[dict]:
             and message.get("payload", {}).get("type") == "completed"
         ):
             return messages
+
 
 ###############################################################################
 def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
@@ -767,6 +804,7 @@ def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
         assert duplicate_ack["type"] == "run.ack"
         assert duplicate_ack["payload"]["duplicate"] is True
 
+
 ###############################################################################
 def test_websocket_route_rejects_wrong_origin(
     realtime_client: tuple[TestClient, FastAPI],
@@ -781,6 +819,7 @@ def test_websocket_route_rejects_wrong_origin(
             headers={"origin": "http://evil.example"},
         ):
             pass
+
 
 ###############################################################################
 def test_websocket_route_accepts_backend_served_origin(
@@ -797,6 +836,7 @@ def test_websocket_route_accepts_backend_served_origin(
         headers={"origin": "http://127.0.0.1:5002"},
     ) as socket:
         assert socket.receive_json()["type"] == "connection.ready"
+
 
 ###############################################################################
 def test_websocket_reconnect_replays_only_events_after_sequence(
@@ -855,6 +895,7 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
         assert [item["sequence"] for item in replayed] == [2, 3]
         assert all(item["conversation_id"] == conversation_id for item in replayed)
 
+
 ###############################################################################
 async def _assert_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
@@ -899,6 +940,7 @@ async def _assert_concurrent_conversations_keep_event_routing_isolated(
     assert first_events == [(first, 1), (first, 2), (first, 3)]
     assert second_events == [(second, 1), (second, 2), (second, 3)]
 
+
 ###############################################################################
 def test_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
@@ -906,6 +948,7 @@ def test_concurrent_conversations_keep_event_routing_isolated(
     run_async_in_thread(
         _assert_concurrent_conversations_keep_event_routing_isolated(realtime_client)
     )
+
 
 ###############################################################################
 def test_realtime_metrics_are_loopback_only(

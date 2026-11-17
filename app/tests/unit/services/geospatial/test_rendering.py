@@ -3,10 +3,19 @@ from server.services.geospatial.inspection import MapInspectionService
 import base64
 import time
 import pytest
-from server.services.geospatial.render_capture import MAX_CAPTURE_BASE64_CHARS, RenderCapture, RenderCaptureStore
+from server.services.geospatial.render_capture import (
+    MAX_CAPTURE_BASE64_CHARS,
+    RenderCapture,
+    RenderCaptureStore,
+)
 from datetime import UTC, datetime
 from tests.conftest import run_async_in_thread
-from server.contracts.geospatial import GeospatialLayerRenderDescriptor, GeospatialProviderLayerDescriptor, LocationSearchRequest, ViewportPolicy
+from server.contracts.geospatial import (
+    GeospatialLayerRenderDescriptor,
+    GeospatialProviderLayerDescriptor,
+    LocationSearchRequest,
+    ViewportPolicy,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.providers import ProviderResponse
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -61,6 +70,7 @@ def test_feature_metadata_is_bounded_and_allowlisted() -> None:
         for field in inspection.fields
     )
 
+
 ###############################################################################
 def test_feature_provenance_links_are_exposed_as_approved_source() -> None:
     inspections = MapInspectionService.build_for_descriptor(
@@ -100,6 +110,7 @@ def test_feature_provenance_links_are_exposed_as_approved_source() -> None:
         "datasetTitle",
     }
 
+
 ###############################################################################
 def test_location_metadata_gets_point_association() -> None:
     inspections = MapInspectionService.build_for_descriptor(
@@ -122,6 +133,7 @@ def test_location_metadata_gets_point_association() -> None:
     assert inspection.association == "location"
     assert inspection.geometry == {"type": "Point", "coordinates": [8.5417, 47.3769]}
     assert inspection.source_url == "https://example.test/camera/1"
+
 
 ###############################################################################
 def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
@@ -147,6 +159,7 @@ def test_raster_metadata_is_overlay_level_and_rejects_unsafe_links() -> None:
     assert inspection.source_url is None
     assert any(field.key == "units" for field in inspection.fields)
     assert inspection.warnings == ["Values are not available per raster cell."]
+
 
 ###############################################################################
 def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
@@ -176,6 +189,7 @@ def test_non_spatial_dataset_metadata_remains_inspectable() -> None:
         "license",
         "update_time",
     }
+
 
 ###############################################################################
 def test_weather_feature_inspection_exposes_bounded_measurements_and_provenance() -> (
@@ -226,9 +240,8 @@ def test_weather_feature_inspection_exposes_bounded_measurements_and_provenance(
     assert fields["wind_speed_10m"].unit == "km/h"
     assert inspections[0].source_url == "https://api.open-meteo.com/v1/forecast"
 
+
 # --- test_render_capture_store.py ---
-
-
 
 
 ###############################################################################
@@ -241,6 +254,7 @@ def _png_base64() -> str:
             "bfabd40000000049454e44ae426082"
         )
     ).decode("ascii")
+
 
 ###############################################################################
 def test_save_and_get_round_trips_by_run_identity() -> None:
@@ -268,6 +282,7 @@ def test_save_and_get_round_trips_by_run_identity() -> None:
 
     assert store.get("run-1", "map-1", 3) is None
     assert store.get("run-2", "map-1", 2) is None
+
 
 ###############################################################################
 def test_save_rejects_invalid_mime_size_base64_and_identity() -> None:
@@ -324,24 +339,58 @@ def test_save_rejects_invalid_mime_size_base64_and_identity() -> None:
             height=10,
         )
 
+
 ###############################################################################
 def test_delete_for_run_removes_all_captures_for_that_run() -> None:
     store = RenderCaptureStore()
     payload = _png_base64()
-    store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=payload, width=10, height=10)
-    store.save(run_id="run-1", map_session_id="map-2", collection_revision=1, mime_type="image/jpeg", image_base64=payload, width=10, height=10)
-    store.save(run_id="run-2", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=payload, width=10, height=10)
+    store.save(
+        run_id="run-1",
+        map_session_id="map-1",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=payload,
+        width=10,
+        height=10,
+    )
+    store.save(
+        run_id="run-1",
+        map_session_id="map-2",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=payload,
+        width=10,
+        height=10,
+    )
+    store.save(
+        run_id="run-2",
+        map_session_id="map-1",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=payload,
+        width=10,
+        height=10,
+    )
 
     assert store.delete_for_run("run-1") == 2
     assert len(store) == 1
     assert store.get("run-1", "map-1", 1) is None
     assert store.get("run-2", "map-1", 1) is not None
 
+
 ###############################################################################
 def test_ttl_expiry_reclaims_stale_captures() -> None:
     store = RenderCaptureStore(ttl_seconds=1.0)
     payload = _png_base64()
-    store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=payload, width=10, height=10)
+    store.save(
+        run_id="run-1",
+        map_session_id="map-1",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=payload,
+        width=10,
+        height=10,
+    )
     assert store.get("run-1", "map-1", 1) is not None
 
     # A capture recorded beyond the TTL is reclaimed on read.
@@ -360,14 +409,24 @@ def test_ttl_expiry_reclaims_stale_captures() -> None:
     assert stale.get("run-1", "map-1", 1) is None
     assert len(stale) == 0
 
+
 ###############################################################################
 def test_clear_empties_the_store() -> None:
     store = RenderCaptureStore()
-    store.save(run_id="run-1", map_session_id="map-1", collection_revision=1, mime_type="image/jpeg", image_base64=_png_base64(), width=10, height=10)
+    store.save(
+        run_id="run-1",
+        map_session_id="map-1",
+        collection_revision=1,
+        mime_type="image/jpeg",
+        image_base64=_png_base64(),
+        width=10,
+        height=10,
+    )
     store.bind_map_view("run-1", {"zoom": 5})
     store.clear()
     assert len(store) == 0
     assert store.map_view_for_run("run-1") is None
+
 
 ###############################################################################
 def test_viewport_expiry_reclaims_unread_runs(monkeypatch) -> None:
@@ -379,11 +438,16 @@ def test_viewport_expiry_reclaims_unread_runs(monkeypatch) -> None:
     assert "old-run" not in store._map_views
     assert store.map_view_for_run("new-run") == {"zoom": 6}
 
+
 ###############################################################################
 def test_user_attachment_binds_once_to_a_run_of_its_conversation() -> None:
     store = RenderCaptureStore()
     attachment_id = store.save_attachment(
-        conversation_id="conv-1", mime_type="image/png", image_base64=_png_base64(), width=1, height=1
+        conversation_id="conv-1",
+        mime_type="image/png",
+        image_base64=_png_base64(),
+        width=1,
+        height=1,
     )
     assert not store.has_attachment(attachment_id, "conv-2")
     assert not store.bind_attachment(attachment_id, "conv-2", "run-1")
@@ -394,15 +458,12 @@ def test_user_attachment_binds_once_to_a_run_of_its_conversation() -> None:
     store.delete_for_run("run-1")
     assert store.attachment_for_run("run-1") is None
 
+
 # --- test_render_descriptors.py ---
-
-
-
 
 
 ###############################################################################
 class _CapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, capability: dict) -> None:
         self.capability = capability
@@ -410,6 +471,7 @@ class _CapabilityRegistry:
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict | None:
         return self.capability if self.capability["id"] == capability_id else None
+
 
 ###############################################################################
 def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
@@ -419,12 +481,15 @@ def test_openaq_auth_failure_cannot_be_a_deferred_success(monkeypatch) -> None:
         raise ProviderAuthError("OpenAQ API key is required.")
 
     monkeypatch.setattr(registry, "fetch", unavailable)
-    with pytest.raises(ProviderAuthError, match="Configure them in Settings under Geospatial Access"):
+    with pytest.raises(
+        ProviderAuthError, match="Configure them in Settings under Geospatial Access"
+    ):
         run_async_in_thread(
             RenderDescriptorService(
                 provider_registry=registry
             ).build_overlay_descriptor("openaq_air_quality", request=_request())
         )
+
 
 ###############################################################################
 def _request():
@@ -443,6 +508,7 @@ def _request():
         ),
     )
 
+
 ###############################################################################
 def _sanremo_request():
     location = ResolvedLocation(
@@ -459,6 +525,7 @@ def _sanremo_request():
             radius_m=25_000,
         ),
     )
+
 
 ###############################################################################
 class _SanremoWeatherProvider:
@@ -499,6 +566,7 @@ class _SanremoWeatherProvider:
             source_url="https://api.open-meteo.com/v1/forecast",
             warnings=["Provider warning"],
         )
+
 
 ###############################################################################
 def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -> None:
@@ -546,6 +614,7 @@ def test_provider_backed_sanremo_weather_descriptor_contains_renderable_data() -
     assert feature["geometry"]["coordinates"] == [7.777, 43.817]
     assert feature["properties"]["relative_humidity_2m"] == 68
 
+
 ###############################################################################
 def test_render_descriptor_service_exposes_configurable_openfreemap_style(
     monkeypatch,
@@ -573,6 +642,7 @@ def test_render_descriptor_service_exposes_configurable_openfreemap_style(
     assert result is not None
     assert result["style_url"] == "https://maps.internal.example/styles/liberty"
 
+
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
     template = RenderDescriptorService.build_wms_tile_template(
@@ -596,6 +666,7 @@ def test_render_descriptor_service_builds_complete_wms_template() -> None:
     assert "transparent=true" in template
     assert "time=2026-06-18" in template
 
+
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     template = RenderDescriptorService.build_wmts_tile_template(
@@ -617,6 +688,7 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "tilecol={x}" in template
     assert "format=image/png" in template
     assert "time=2026-06-18" in template
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -641,7 +713,11 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
     assert warnings == []
     assert descriptor["rendering_mode"] == "raster-tile"
     tile_url_template = str(descriptor["tile_url_template"])
-    if overlay_id in {"fema_nfhl_flood_zones", "noaa_radar", "jrc_surface_water_occurrence"}:
+    if overlay_id in {
+        "fema_nfhl_flood_zones",
+        "noaa_radar",
+        "jrc_surface_water_occurrence",
+    }:
         assert tile_url_template == (
             f"/api/geospatial/tiles/{overlay_id}/{{z}}/{{x}}/{{y}}.png"
         )
@@ -650,6 +726,7 @@ def test_catalog_raster_overlays_expose_provider_tile_templates(
         assert expected_host in tile_url_template
         assert "{bbox-epsg-3857}" in tile_url_template
     assert descriptor["render"]["tile_url_template"] == tile_url_template
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -692,6 +769,7 @@ def test_catalog_public_raster_descriptors_use_backend_proxy(
             "/api/geospatial/tiles/esa_worldcover/{z}/{x}/{y}.png"
         )
 
+
 ###############################################################################
 class _GibsProvider:
     provider_id = "gibs"
@@ -729,6 +807,7 @@ class _GibsProvider:
             attribution=["© NASA GIBS"],
         )
 
+
 ###############################################################################
 def test_provider_discovered_gibs_raster_descriptor_uses_proxy_and_keeps_time() -> None:
     service = RenderDescriptorService(
@@ -747,14 +826,14 @@ def test_provider_discovered_gibs_raster_descriptor_uses_proxy_and_keeps_time() 
 
     assert warnings == []
     assert descriptor["url"] == (
-        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/"
-        "{z}/{x}/{y}.png?time={time}"
+        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/{z}/{x}/{y}.png?time={time}"
     )
     assert descriptor["source_url"] == (
         "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
     )
     assert descriptor["default_time"] == "2026-09-28"
     assert descriptor["render"]["tile_url_template"] == descriptor["url"]
+
 
 ###############################################################################
 def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
@@ -770,7 +849,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
                 "metadata": {
                     "url": "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png",
                     "default_opacity": 0.7,
-                        "fit_max_zoom": 6,
+                    "fit_max_zoom": 6,
                 },
             }
         ),
@@ -789,6 +868,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     assert descriptor["tile_url_template"] == (
         "/api/geospatial/tiles/rainviewer_precipitation_radar/{z}/{x}/{y}.png"
     )
+
 
 ###############################################################################
 def test_census_demographic_render_uses_server_provider_endpoint() -> None:
@@ -809,6 +889,7 @@ def test_census_demographic_render_uses_server_provider_endpoint() -> None:
     assert "live=true" in str(descriptor["url"])
     assert descriptor["rendering_mode"] == "choropleth"
     assert warnings == []
+
 
 ###############################################################################
 @pytest.mark.parametrize(

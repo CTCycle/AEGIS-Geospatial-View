@@ -5,7 +5,13 @@ import json
 
 import pytest
 import asyncio
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderMalformedPayloadError, ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.fema import FEMA_NFHL_EXPORT_URL, FEMAProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
@@ -13,7 +19,11 @@ from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers import emsc as emsc_module
 from server.services.geospatial.providers.emsc import EMSC_FDSN_URL, EMSCProvider
 from server.services.geospatial.providers.gdacs import GDACS_EVENTS_URL, GDACSProvider
-from server.services.geospatial.providers.geoboundaries import GITHUB_MEDIA_PREFIX, GeoBoundariesProvider, media_url
+from server.services.geospatial.providers.geoboundaries import (
+    GITHUB_MEDIA_PREFIX,
+    GeoBoundariesProvider,
+    media_url,
+)
 from server.services.catalog.loader import country_iso3
 from server.services.geospatial.providers.jrc import JRCSurfaceWaterProvider
 from server.services.geospatial.cache import GeospatialCache
@@ -26,9 +36,6 @@ from server.services.geospatial.providers.soilgrids import SoilGridsProvider
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 # --- test_hazard_provider_adapters.py ---
-
-
-
 
 
 ###############################################################################
@@ -54,6 +61,7 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     )
     assert "bbox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
     assert water.payload["freshnessLabel"]
+
 
 ###############################################################################
 def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
@@ -84,6 +92,7 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "earthquake"
     assert response.payload["features"][0]["magnitude"] == 2.5
+
 
 ###############################################################################
 def test_usgs_dated_range_queries_catalog_with_bbox_and_reports_scope() -> None:
@@ -126,6 +135,7 @@ def test_usgs_dated_range_queries_catalog_with_bbox_and_reports_scope() -> None:
     assert "M4.5" in response.coverage["completeness_note"]
     assert response.observation_time == "2024-03-09T16:00:00+00:00"
 
+
 ###############################################################################
 def test_usgs_dated_range_empty_is_valid_empty_and_bad_ranges_are_rejected() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
@@ -155,6 +165,7 @@ def test_usgs_dated_range_empty_is_valid_empty_and_bad_ranges_are_rejected() -> 
                     )
                 )
             )
+
 
 ###############################################################################
 def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
@@ -196,6 +207,7 @@ def test_usgs_bbox_filter_preserves_antimeridian_scope() -> None:
         "west-edge",
     ]
 
+
 ###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
@@ -231,6 +243,7 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
     assert response.payload["features"][0]["id"] == "01646500"
     assert response.payload["features"][0]["metadata"]["unit"] == "ft"
 
+
 ###############################################################################
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     alerts = run_async_in_thread(
@@ -250,6 +263,7 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert coops.payload["status"] == "server-side-only"
     assert "featuresUrl" not in coops.payload
     assert coops.payload["freshnessLabel"]
+
 
 ###############################################################################
 def test_noaa_provider_normalizes_live_alert_geojson() -> None:
@@ -292,6 +306,7 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "weather_alert"
     assert response.payload["features"][0]["severity"] == "Severe"
+
 
 ###############################################################################
 def test_noaa_provider_resolves_missing_alert_geometry_from_affected_zones() -> None:
@@ -360,8 +375,11 @@ def test_noaa_provider_resolves_missing_alert_geometry_from_affected_zones() -> 
     assert response.partial is False
     assert response.warnings == []
 
+
 ###############################################################################
-def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavailable() -> None:
+def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavailable() -> (
+    None
+):
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         if "api.weather.gov/alerts/active" in url:
             return {
@@ -396,6 +414,7 @@ def test_noaa_provider_keeps_alert_data_when_zone_geometry_is_temporarily_unavai
     assert response.payload["features"][0]["metadata"]["geometrySource"] == "unresolved"
     assert any("zone" in warning.casefold() for warning in response.warnings)
 
+
 ###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     response = run_async_in_thread(
@@ -406,12 +425,14 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert response.result_type == "raster"
     assert response.payload["renderingMode"] == "raster-tile"
     assert response.payload["tileUrl"] == FEMA_NFHL_EXPORT_URL
-    assert "/arcgis/rest/services/public/NFHL/MapServer/export" in response.payload[
-        "tileUrl"
-    ]
+    assert (
+        "/arcgis/rest/services/public/NFHL/MapServer/export"
+        in response.payload["tileUrl"]
+    )
     assert "layers=show:28" in response.payload["tileUrl"]
     assert response.payload["layer"] == "28"
     assert response.payload["legend"]["type"]
+
 
 ###############################################################################
 def test_nasa_firms_requires_key_before_descriptor() -> None:
@@ -436,6 +457,7 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
     assert response.payload["status"] == "server-side-only"
     assert "test-key" not in str(response.payload)
     assert response.payload["freshnessLabel"]
+
 
 ###############################################################################
 def test_nasa_firms_normalizes_live_csv() -> None:
@@ -465,17 +487,41 @@ def test_nasa_firms_normalizes_live_csv() -> None:
 @pytest.mark.asyncio
 async def test_usgs_magnitude_filter_feed_and_dated_query():
     urls = []
+
     async def fetcher(url, headers=None):
         urls.append(url)
-        return {"type": "FeatureCollection", "features": [
-            {"id": str(mag), "properties": {"mag": mag}, "geometry": {"type": "Point", "coordinates": [8, 45]}}
-            for mag in [1, 3, 5]]}
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": str(mag),
+                    "properties": {"mag": mag},
+                    "geometry": {"type": "Point", "coordinates": [8, 45]},
+                }
+                for mag in [1, 3, 5]
+            ],
+        }
+
     provider = USGSProvider(fetcher=fetcher)
-    feed = await provider.fetch(ProviderRequest(capability_id="usgs_earthquakes", params={"live": True, "filters": {"min_magnitude": 2.5}}))
+    feed = await provider.fetch(
+        ProviderRequest(
+            capability_id="usgs_earthquakes",
+            params={"live": True, "filters": {"min_magnitude": 2.5}},
+        )
+    )
     assert [item["magnitude"] for item in feed.payload["features"]] == [3, 5]
     assert feed.coverage["min_magnitude"] == 2.5
-    await provider.fetch(ProviderRequest(capability_id="usgs_earthquakes", time=datetime(2026, 10, 19, tzinfo=UTC),
-        params={"live": True, "end_time_iso": "2026-10-20T00:00:00Z", "filters": {"min_magnitude": 2.5}}))
+    await provider.fetch(
+        ProviderRequest(
+            capability_id="usgs_earthquakes",
+            time=datetime(2026, 10, 19, tzinfo=UTC),
+            params={
+                "live": True,
+                "end_time_iso": "2026-10-20T00:00:00Z",
+                "filters": {"min_magnitude": 2.5},
+            },
+        )
+    )
     assert "minmagnitude=2.5" in urls[-1]
 
 
@@ -483,11 +529,24 @@ async def test_usgs_magnitude_filter_feed_and_dated_query():
 @pytest.mark.asyncio
 async def test_usgs_honours_magnitude_min_alias():
     async def fetcher(url, headers=None):
-        return {"type": "FeatureCollection", "features": [
-            {"id": str(mag), "properties": {"mag": mag}, "geometry": {"type": "Point", "coordinates": [8, 45]}}
-            for mag in [1, 3, 5]]}
-    feed = await USGSProvider(fetcher=fetcher).fetch(ProviderRequest(
-        capability_id="usgs_earthquakes", params={"live": True, "filters": {"magnitude_min": 5}}))
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": str(mag),
+                    "properties": {"mag": mag},
+                    "geometry": {"type": "Point", "coordinates": [8, 45]},
+                }
+                for mag in [1, 3, 5]
+            ],
+        }
+
+    feed = await USGSProvider(fetcher=fetcher).fetch(
+        ProviderRequest(
+            capability_id="usgs_earthquakes",
+            params={"live": True, "filters": {"magnitude_min": 5}},
+        )
+    )
     assert [item["magnitude"] for item in feed.payload["features"]] == [5]
     assert feed.coverage["min_magnitude"] == 5
 
@@ -496,18 +555,48 @@ async def test_usgs_honours_magnitude_min_alias():
 @pytest.mark.asyncio
 async def test_emsc_queries_seismicportal_and_normalizes_events():
     urls = []
+
     async def fetcher(url, headers=None):
         urls.append(url)
-        return {"type": "FeatureCollection", "features": [{"id": "20261020_0000162", "properties": {
-            "unid": "20261020_0000162", "time": "2026-10-20T11:54:53.055513Z", "flynn_region": "FRANCE",
-            "lat": 45.5955, "lon": 3.9241, "depth": 0.0, "mag": 2.1, "magtype": "ml", "auth": "ReNaSS"}}]}
-    response = await EMSCProvider(fetcher=fetcher).fetch(ProviderRequest(
-        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0),
-        params={"live": True, "filters": {"min_magnitude": 2}}))
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "20261020_0000162",
+                    "properties": {
+                        "unid": "20261020_0000162",
+                        "time": "2026-10-20T11:54:53.055513Z",
+                        "flynn_region": "FRANCE",
+                        "lat": 45.5955,
+                        "lon": 3.9241,
+                        "depth": 0.0,
+                        "mag": 2.1,
+                        "magtype": "ml",
+                        "auth": "ReNaSS",
+                    },
+                }
+            ],
+        }
+
+    response = await EMSCProvider(fetcher=fetcher).fetch(
+        ProviderRequest(
+            capability_id="emsc_earthquakes",
+            bbox=(-25.0, 34.0, 45.0, 72.0),
+            params={"live": True, "filters": {"min_magnitude": 2}},
+        )
+    )
     assert urls[0].startswith(EMSC_FDSN_URL) and "format=json" in urls[0]
-    assert "minmagnitude=2.0" in urls[0] and "minlatitude=34.0" in urls[0] and "starttime=" in urls[0]
+    assert (
+        "minmagnitude=2.0" in urls[0]
+        and "minlatitude=34.0" in urls[0]
+        and "starttime=" in urls[0]
+    )
     [event] = response.payload["features"]
-    assert event["name"] == "France" and event["magnitude"] == 2.1 and event["time"] == 1792497293055
+    assert (
+        event["name"] == "France"
+        and event["magnitude"] == 2.1
+        and event["time"] == 1792497293055
+    )
     assert response.attribution == ["EMSC-CSEM SeismicPortal"]
     assert "M2.5-3" in response.coverage["completeness_note"]
 
@@ -517,28 +606,59 @@ async def test_emsc_queries_seismicportal_and_normalizes_events():
 async def test_emsc_empty_204_body_is_valid_empty(monkeypatch):
     async def empty_body(url, headers=None):
         return b""
+
     monkeypatch.setattr(emsc_module, "fetch_bytes_url", empty_body)
-    response = await EMSCProvider().fetch(ProviderRequest(
-        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0), params={"live": True}))
+    response = await EMSCProvider().fetch(
+        ProviderRequest(
+            capability_id="emsc_earthquakes",
+            bbox=(-25.0, 34.0, 45.0, 72.0),
+            params={"live": True},
+        )
+    )
     assert response.result_status == "valid_empty"
 
 
 ###############################################################################
 @pytest.mark.asyncio
 async def test_macro_region_keeps_member_and_nearby_offshore_events_only():
-    events = {"anatolia": (39.5, 28.5), "aegean_off_greece": (38.6, 24.3), "athens": (37.98, 23.73)}
+    events = {
+        "anatolia": (39.5, 28.5),
+        "aegean_off_greece": (38.6, 24.3),
+        "athens": (37.98, 23.73),
+    }
+
     async def fetcher(url, headers=None):
-        return {"type": "FeatureCollection", "features": [{"properties": {
-            "unid": name, "time": "2026-10-20T11:54:53Z", "lat": lat, "lon": lon, "mag": 3.0}}
-            for name, (lat, lon) in events.items()]}
-    response = await EMSCProvider(fetcher=fetcher).fetch(ProviderRequest(
-        capability_id="emsc_earthquakes", bbox=(-25.0, 34.0, 45.0, 72.0),
-        params={"live": True, "macro_region": "Europe"}))
-    assert {event["id"] for event in response.payload["features"]} == {"aegean_off_greece", "athens"}
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "properties": {
+                        "unid": name,
+                        "time": "2026-10-20T11:54:53Z",
+                        "lat": lat,
+                        "lon": lon,
+                        "mag": 3.0,
+                    }
+                }
+                for name, (lat, lon) in events.items()
+            ],
+        }
+
+    response = await EMSCProvider(fetcher=fetcher).fetch(
+        ProviderRequest(
+            capability_id="emsc_earthquakes",
+            bbox=(-25.0, 34.0, 45.0, 72.0),
+            params={"live": True, "macro_region": "Europe"},
+        )
+    )
+    assert {event["id"] for event in response.payload["features"]} == {
+        "aegean_off_greece",
+        "athens",
+    }
     assert response.coverage["excluded_outside_region_events"] == 1
 
-# --- test_regional_provider_adapters.py ---
 
+# --- test_regional_provider_adapters.py ---
 
 
 ###############################################################################
@@ -570,6 +690,7 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     )
     assert response.result_type == "raster"
     assert response.attribution == ["EEA"]
+
 
 ###############################################################################
 def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
@@ -605,6 +726,7 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
     assert stale.payload["liveValidation"]["layers"] == ["0"]
     assert stale.warnings
 
+
 ###############################################################################
 def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -622,6 +744,7 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
                 )
             )
         )
+
 
 ###############################################################################
 def test_esa_provider_returns_wms_descriptor_with_metadata() -> None:
@@ -658,6 +781,7 @@ def test_esa_provider_returns_wms_descriptor_with_metadata() -> None:
     assert response.result_type == "raster"
     assert response.attribution == ["ESA"]
 
+
 ###############################################################################
 def test_esa_provider_preserves_wmts_descriptor_compatibility() -> None:
     response = run_async_in_thread(
@@ -685,6 +809,7 @@ def test_esa_provider_preserves_wmts_descriptor_compatibility() -> None:
     assert response.payload["format"] == "image/png"
     assert response.payload["style"] == "default"
     assert response.payload["legend"]["source"] == "ESA WorldCover / Terrascope"
+
 
 ###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
@@ -725,6 +850,7 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     assert stale.stale is True
     assert stale.payload["liveValidation"]["service"] == "WMS"
 
+
 ###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:
     response = run_async_in_thread(
@@ -739,6 +865,7 @@ def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["joinRequired"] is True
     assert response.payload["joinKey"] == "NUTS_ID"
+
 
 ###############################################################################
 def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None:
@@ -782,6 +909,7 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
     assert stale.stale is True
     assert stale.payload["jsonStatMetadata"]["label"] == "Population density"
 
+
 ###############################################################################
 def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -799,6 +927,7 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
                 )
             )
         )
+
 
 ###############################################################################
 def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
@@ -852,6 +981,7 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
     assert feature["properties"]["metric"] == "population_density"
     assert feature["properties"]["marginOfError"] == 1.5
 
+
 ###############################################################################
 def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     response = run_async_in_thread(
@@ -867,9 +997,8 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     assert response.payload["status"] == "dataset-ingestion"
     assert response.payload["joinKey"] == "NUTS_ID"
 
+
 # --- test_soilgrids_provider.py ---
-
-
 
 
 ###############################################################################
@@ -890,6 +1019,7 @@ def test_soilgrids_provider_builds_default_wcs_descriptors() -> None:
     assert "REQUEST=DescribeCoverage" in response.payload["describeCoverageUrl"]
     assert response.payload["coverageDownloadUrl"] is None
     assert response.payload["spatialResolution"] == "250 m"
+
 
 ###############################################################################
 def test_soilgrids_provider_builds_bounded_geotiff_coverage_url() -> None:
@@ -919,6 +1049,7 @@ def test_soilgrids_provider_builds_bounded_geotiff_coverage_url() -> None:
     assert "SUBSETTINGCRS=" in coverage_url
     assert coverage_url.count("SUBSET=") == 2
 
+
 ###############################################################################
 def test_soilgrids_provider_handles_organic_carbon_stock_depth_constraints() -> None:
     response = asyncio.run(
@@ -934,9 +1065,12 @@ def test_soilgrids_provider_handles_organic_carbon_stock_depth_constraints() -> 
     assert response.payload["availableDepths"] == ["0-30cm"]
     assert response.payload["availableQuantiles"] == ["mean"]
 
+
 ###############################################################################
 def test_soilgrids_provider_rejects_unknown_property() -> None:
-    with pytest.raises(ProviderUnavailableError, match="Unsupported SoilGrids property"):
+    with pytest.raises(
+        ProviderUnavailableError, match="Unsupported SoilGrids property"
+    ):
         asyncio.run(
             SoilGridsProvider().fetch(
                 ProviderRequest(
@@ -946,14 +1080,13 @@ def test_soilgrids_provider_rejects_unknown_property() -> None:
             )
         )
 
+
 ###############################################################################
 def test_soilgrids_manifest_and_runtime_profile_are_loaded() -> None:
     loaded = GeospatialManifestLoader().load_all()
 
     capability = next(
-        item
-        for item in loaded["overlays"]
-        if item["id"] == "soilgrids_soil_properties"
+        item for item in loaded["overlays"] if item["id"] == "soilgrids_soil_properties"
     )
     profile = next(
         item
@@ -969,6 +1102,7 @@ def test_soilgrids_manifest_and_runtime_profile_are_loaded() -> None:
     assert profile["supports_direct_text"] is True
     assert profile["auth_required"] is False
 
+
 ###############################################################################
 def test_soilgrids_is_available_to_runtime_and_provider_registries() -> None:
     runtime_registry = RuntimeRegistry()
@@ -981,6 +1115,7 @@ def test_soilgrids_is_available_to_runtime_and_provider_registries() -> None:
     assert "soilgrids" in provider_registry.list_provider_ids()
     assert isinstance(provider_registry.get("soilgrids"), SoilGridsProvider)
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_gdacs_events_are_reported_points_filtered_by_type_level_and_bbox():
@@ -988,28 +1123,67 @@ async def test_gdacs_events_are_reported_points_filtered_by_type_level_and_bbox(
 
     async def fetcher(url, headers=None):
         urls.append(url)
-        def event(eid, lon, lat, country):
-            return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
-                    "properties": {"eventtype": "FL", "eventid": eid, "episodeid": 1, "name": f"Flood in {country}",
-                                   "alertlevel": "Orange", "alertscore": 2, "country": country,
-                                   "fromdate": "2026-11-05T00:00:00", "todate": "2026-11-09T00:00:00",
-                                   "severitydata": {"severity": 0, "severitytext": "Magnitude 0", "severityunit": ""},
-                                   "url": {"report": f"https://www.gdacs.org/report.aspx?eventid={eid}"}}}
-        return {"type": "FeatureCollection", "features": [event(1, 105.8, 21.0, "Vietnam"), event(2, -60.0, -10.0, "Brazil")]}
 
-    response = await GDACSProvider(fetcher=fetcher).fetch(ProviderRequest(
-        capability_id="gdacs_disaster_events", bbox=(90.0, -11.0, 141.0, 29.0),
-        params={"live": True, "categories": ["flood", "orange"]}))
-    assert urls[0].startswith(GDACS_EVENTS_URL) and "eventlist=FL" in urls[0] and "alertlevel=Orange" in urls[0]
+        def event(eid, lon, lat, country):
+            return {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": {
+                    "eventtype": "FL",
+                    "eventid": eid,
+                    "episodeid": 1,
+                    "name": f"Flood in {country}",
+                    "alertlevel": "Orange",
+                    "alertscore": 2,
+                    "country": country,
+                    "fromdate": "2026-11-05T00:00:00",
+                    "todate": "2026-11-09T00:00:00",
+                    "severitydata": {
+                        "severity": 0,
+                        "severitytext": "Magnitude 0",
+                        "severityunit": "",
+                    },
+                    "url": {
+                        "report": f"https://www.gdacs.org/report.aspx?eventid={eid}"
+                    },
+                },
+            }
+
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                event(1, 105.8, 21.0, "Vietnam"),
+                event(2, -60.0, -10.0, "Brazil"),
+            ],
+        }
+
+    response = await GDACSProvider(fetcher=fetcher).fetch(
+        ProviderRequest(
+            capability_id="gdacs_disaster_events",
+            bbox=(90.0, -11.0, 141.0, 29.0),
+            params={"live": True, "categories": ["flood", "orange"]},
+        )
+    )
+    assert (
+        urls[0].startswith(GDACS_EVENTS_URL)
+        and "eventlist=FL" in urls[0]
+        and "alertlevel=Orange" in urls[0]
+    )
     assert "pagenumber=1" in urls[0] and len(urls) == 1  # a short page ends paging
     [event] = response.payload["features"]
     assert event["country"] == "Vietnam" and event["alert_level"] == "Orange"
-    assert event["footprint_basis"] == "reported_point" and event["time"] == 1793836800000
+    assert (
+        event["footprint_basis"] == "reported_point" and event["time"] == 1793836800000
+    )
     assert response.coverage["footprint_basis"] == "reported_point"
 
     with pytest.raises(ProviderInvalidQueryError):
-        await GDACSProvider(fetcher=fetcher).fetch(ProviderRequest(
-            capability_id="gdacs_disaster_events", params={"categories": ["tsunami"]}))
+        await GDACSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="gdacs_disaster_events",
+                params={"categories": ["tsunami"]},
+            )
+        )
 
 
 ###############################################################################
@@ -1020,15 +1194,31 @@ async def test_gdacs_requests_every_alert_level_and_pages_to_a_bounded_cap():
     async def full_pages(url, headers=None):
         urls.append(url)
         page = int(url.rsplit("pagenumber=", 1)[1])
-        return {"type": "FeatureCollection", "features": [
-            {"geometry": {"type": "Point", "coordinates": [0, 0]},
-             "properties": {"eventtype": "EQ", "eventid": page * 1000 + index, "episodeid": 1, "alertlevel": "Green"}}
-            for index in range(100)]}
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "geometry": {"type": "Point", "coordinates": [0, 0]},
+                    "properties": {
+                        "eventtype": "EQ",
+                        "eventid": page * 1000 + index,
+                        "episodeid": 1,
+                        "alertlevel": "Green",
+                    },
+                }
+                for index in range(100)
+            ],
+        }
 
-    response = await GDACSProvider(fetcher=full_pages).fetch(ProviderRequest(capability_id="gdacs_disaster_events"))
+    response = await GDACSProvider(fetcher=full_pages).fetch(
+        ProviderRequest(capability_id="gdacs_disaster_events")
+    )
     assert "alertlevel=Green%3BOrange%3BRed" in urls[0] and len(urls) == 10
     assert len(response.payload["features"]) == 1000
-    assert response.coverage["truncated"] is True and "capped at 1000" in response.warnings[0]
+    assert (
+        response.coverage["truncated"] is True
+        and "capped at 1000" in response.warnings[0]
+    )
 
 
 ###############################################################################
@@ -1037,28 +1227,78 @@ async def test_geoboundaries_resolves_country_rewrites_geometry_host_and_filters
     urls: list[str] = []
 
     def ring(west: float) -> list[list[float]]:
-        return [[west, 45.0], [west + 1, 45.0], [west + 1, 46.0], [west, 46.0], [west, 45.0]]
+        return [
+            [west, 45.0],
+            [west + 1, 45.0],
+            [west + 1, 46.0],
+            [west, 46.0],
+            [west, 45.0],
+        ]
 
     async def fetcher(url, headers=None):
         urls.append(url)
         if url.endswith("/ADM2/"):
-            return json.dumps({"admUnitCount": "2", "boundarySource": "ISTAT", "boundaryLicense": "CC BY 3.0",
-                               "simplifiedGeometryGeoJSON": "https://github.com/wmgeolab/geoBoundaries/raw/abc/ITA_ADM2.geojson"}).encode()
-        return json.dumps({"type": "FeatureCollection", "features": [
-            {"type": "Feature", "properties": {"shapeName": name, "shapeID": name, "shapeISO": ""},
-             "geometry": {"type": "Polygon", "coordinates": [ring(west)]}} for name, west in (("Piemonte", 7.0), ("Veneto", 11.0))]}).encode()
+            return json.dumps(
+                {
+                    "admUnitCount": "2",
+                    "boundarySource": "ISTAT",
+                    "boundaryLicense": "CC BY 3.0",
+                    "simplifiedGeometryGeoJSON": "https://github.com/wmgeolab/geoBoundaries/raw/abc/ITA_ADM2.geojson",
+                }
+            ).encode()
+        return json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "shapeName": name,
+                            "shapeID": name,
+                            "shapeISO": "",
+                        },
+                        "geometry": {"type": "Polygon", "coordinates": [ring(west)]},
+                    }
+                    for name, west in (("Piemonte", 7.0), ("Veneto", 11.0))
+                ],
+            }
+        ).encode()
 
-    response = await GeoBoundariesProvider(fetcher=fetcher).fetch(ProviderRequest(
-        capability_id="geoboundaries_admin", bbox=(6.5, 44.5, 8.5, 46.5), params={"country": "Italy", "admin_level": 2}))
-    assert urls == ["https://www.geoboundaries.org/api/current/gbOpen/ITA/ADM2/", GITHUB_MEDIA_PREFIX + "abc/ITA_ADM2.geojson"]
+    response = await GeoBoundariesProvider(fetcher=fetcher).fetch(
+        ProviderRequest(
+            capability_id="geoboundaries_admin",
+            bbox=(6.5, 44.5, 8.5, 46.5),
+            params={"country": "Italy", "admin_level": 2},
+        )
+    )
+    assert urls == [
+        "https://www.geoboundaries.org/api/current/gbOpen/ITA/ADM2/",
+        GITHUB_MEDIA_PREFIX + "abc/ITA_ADM2.geojson",
+    ]
     [unit] = response.payload["features"]
-    assert unit["properties"] == {"name": "Piemonte", "shape_iso": None, "shape_id": "Piemonte", "admin_level": 2, "country_iso3": "ITA"}
+    assert unit["properties"] == {
+        "name": "Piemonte",
+        "shape_iso": None,
+        "shape_id": "Piemonte",
+        "admin_level": 2,
+        "country_iso3": "ITA",
+    }
     assert "Source: ISTAT (CC BY 3.0)" in response.attribution
-    assert country_iso3("CH") == "CHE" and country_iso3("che") == "CHE" and country_iso3("Atlantis") is None
+    assert (
+        country_iso3("CH") == "CHE"
+        and country_iso3("che") == "CHE"
+        and country_iso3("Atlantis") is None
+    )
 
 
 ###############################################################################
-@pytest.mark.parametrize("url", ["https://example.com/x.geojson", "https://github.com/wmgeolab/geoBoundaries/raw/../evil"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/x.geojson",
+        "https://github.com/wmgeolab/geoBoundaries/raw/../evil",
+    ],
+)
 def test_geoboundaries_refuses_geometry_links_off_the_repository(url):
     with pytest.raises(ProviderMalformedPayloadError):
         media_url(url)
@@ -1071,28 +1311,54 @@ async def test_geoboundaries_rejects_oversized_levels_before_downloading_geometr
 
     async def fetcher(url, headers=None):
         urls.append(url)
-        return json.dumps({"admUnitCount": "7904", "simplifiedGeometryGeoJSON": ""}).encode()
+        return json.dumps(
+            {"admUnitCount": "7904", "simplifiedGeometryGeoJSON": ""}
+        ).encode()
 
     with pytest.raises(ProviderInvalidQueryError, match="lower admin_level"):
-        await GeoBoundariesProvider(fetcher=fetcher).fetch(ProviderRequest(
-            capability_id="geoboundaries_admin", params={"country": "IT", "admin_level": 3}))
+        await GeoBoundariesProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="geoboundaries_admin",
+                params={"country": "IT", "admin_level": 3},
+            )
+        )
     assert len(urls) == 1
 
 
 ###############################################################################
 @pytest.mark.asyncio
 async def test_jrc_surface_water_is_a_render_only_tile_descriptor():
-    response = await JRCSurfaceWaterProvider().fetch(ProviderRequest(capability_id="jrc_surface_water_change"))
-    assert response.result_type == "raster" and response.coverage["numeric_values"] is False
+    response = await JRCSurfaceWaterProvider().fetch(
+        ProviderRequest(capability_id="jrc_surface_water_change")
+    )
+    assert (
+        response.result_type == "raster"
+        and response.coverage["numeric_values"] is False
+    )
     assert response.payload["tileUrl"].endswith("/tiles2024/change/{z}/{x}/{y}.png")
-    assert response.payload["maxZoom"] == 13 and "EC JRC/Google" in response.attribution[0]
+    assert (
+        response.payload["maxZoom"] == 13 and "EC JRC/Google" in response.attribution[0]
+    )
     with pytest.raises(ProviderInvalidQueryError):
-        await JRCSurfaceWaterProvider().fetch(ProviderRequest(capability_id="jrc_surface_water_extent"))
+        await JRCSurfaceWaterProvider().fetch(
+            ProviderRequest(capability_id="jrc_surface_water_extent")
+        )
 
-    since_1980 = await JRCSurfaceWaterProvider().fetch(ProviderRequest(
-        capability_id="jrc_surface_water_change", time=datetime(1980, 1, 1, tzinfo=UTC)))
-    assert since_1980.coverage["temporal_scope_satisfied"] is True and since_1980.coverage["period_composite"] is True
+    since_1980 = await JRCSurfaceWaterProvider().fetch(
+        ProviderRequest(
+            capability_id="jrc_surface_water_change",
+            time=datetime(1980, 1, 1, tzinfo=UTC),
+        )
+    )
+    assert (
+        since_1980.coverage["temporal_scope_satisfied"] is True
+        and since_1980.coverage["period_composite"] is True
+    )
     assert "starts in 1984" in since_1980.warnings[0]
-    future = await JRCSurfaceWaterProvider().fetch(ProviderRequest(
-        capability_id="jrc_surface_water_change", time=datetime(2025, 6, 1, tzinfo=UTC)))
+    future = await JRCSurfaceWaterProvider().fetch(
+        ProviderRequest(
+            capability_id="jrc_surface_water_change",
+            time=datetime(2025, 6, 1, tzinfo=UTC),
+        )
+    )
     assert future.coverage["temporal_scope_satisfied"] is False

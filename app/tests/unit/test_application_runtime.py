@@ -22,13 +22,14 @@ from server.configurations.settings import AppSettings, DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.schemas import Base
-from server.configurations.environment import ensure_environment_loaded, reset_environment_bootstrap_for_tests
+from server.configurations.environment import (
+    ensure_environment_loaded,
+    reset_environment_bootstrap_for_tests,
+)
 from server.api.settings import router
 from server.services.settings.runtime_settings import RuntimeSettingsService
 
 # --- test_app_factory.py ---
-
-
 
 
 ###############################################################################
@@ -40,6 +41,7 @@ def _settings():  # noqa: ANN202
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
+
 
 ###############################################################################
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
@@ -55,6 +57,7 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         maintenance_service=SimpleNamespace(),
     )
 
+
 ###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
     return SimpleNamespace(
@@ -65,9 +68,9 @@ def _build_geospatial_runtime() -> SimpleNamespace:
         catalog_snapshot=object(),
     )
 
+
 ###############################################################################
 class _LifecycleStub:
-
     # -------------------------------------------------------------------------
     def __init__(self, call_order: list[str]) -> None:
         self.call_order = call_order
@@ -85,10 +88,12 @@ class _LifecycleStub:
 async def _record_async(call_order: list[str], label: str) -> None:
     call_order.append(label)
 
+
 ###############################################################################
 def _response_schema_ref(schema: dict, path: str, method: str, status_code: str) -> str:
     response = schema["paths"][path][method]["responses"][status_code]
     return response["content"]["application/json"]["schema"]["$ref"]
+
 
 ###############################################################################
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
@@ -109,6 +114,7 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     )
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
     assert f"{FASTAPI_API_PREFIX}/settings/runtime" in route_paths
+
 
 ###############################################################################
 def test_create_app_uses_only_canonical_router_composition(monkeypatch) -> None:
@@ -138,6 +144,7 @@ def test_create_app_uses_only_canonical_router_composition(monkeypatch) -> None:
     response = TestClient(created).get("/", follow_redirects=False)
     assert response.status_code == 307
     assert response.headers["location"] == "/docs"
+
 
 ###############################################################################
 def test_create_app_mounts_client_root_assets_and_spa_fallback(
@@ -170,6 +177,7 @@ def test_create_app_mounts_client_root_assets_and_spa_fallback(
     assert "console.log" in asset.text
     assert fallback.status_code == 200
     assert fallback.text == "<html>client</html>"
+
 
 ###############################################################################
 def test_openapi_declares_stable_response_models(monkeypatch) -> None:
@@ -208,6 +216,7 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
     )
     assert schema["info"]["version"] == "1.0.0"
 
+
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
@@ -241,7 +250,9 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
             )
         ),
     )
-    monkeypatch.setattr(app_module, "RuntimeSettingsService", lambda repository: object())
+    monkeypatch.setattr(
+        app_module, "RuntimeSettingsService", lambda repository: object()
+    )
     monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: database)
     monkeypatch.setattr(
         app_module,
@@ -287,7 +298,9 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         lambda snapshot: (
             call_order.append("run_startup_validations")
             if snapshot is geospatial_runtime.catalog_snapshot
-            else (_ for _ in ()).throw(AssertionError("startup snapshot was not shared"))
+            else (_ for _ in ()).throw(
+                AssertionError("startup snapshot was not shared")
+            )
         ),
     )
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
@@ -309,6 +322,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "run_lifecycle.shutdown",
         "sqlite.dispose",
     ]
+
 
 ###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:
@@ -336,7 +350,9 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
             )
         ),
     )
-    monkeypatch.setattr(app_module, "RuntimeSettingsService", lambda repository: object())
+    monkeypatch.setattr(
+        app_module, "RuntimeSettingsService", lambda repository: object()
+    )
     monkeypatch.setattr(app_module, "SQLiteRepository", lambda settings: object())
     monkeypatch.setattr(
         app_module, "initialize_database", lambda backend, **kwargs: None
@@ -377,12 +393,10 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
         "run_lifecycle.shutdown",
     ]
 
+
 # --- test_browser_network_capture.py ---
 
 """Prevent truncated browser samples from producing false zero-request proof."""
-
-
-
 
 
 ###############################################################################
@@ -433,14 +447,12 @@ def test_failed_scenario_saves_capture_and_closes_context(tmp_path: Path) -> Non
 
     ###############################################################################
     class FakePage:
-
         # -------------------------------------------------------------------------
         def screenshot(self, **kwargs: Any) -> None:
             calls.append("failure_screenshot")
 
     ###############################################################################
     class FakeContext:
-
         # -------------------------------------------------------------------------
         def __enter__(self) -> "FakeContext":
             return self
@@ -459,7 +471,6 @@ def test_failed_scenario_saves_capture_and_closes_context(tmp_path: Path) -> Non
 
     ###############################################################################
     class FakeBrowser:
-
         # -------------------------------------------------------------------------
         def new_context(self, **kwargs: Any) -> FakeContext:
             assert kwargs["service_workers"] == "block"
@@ -467,7 +478,6 @@ def test_failed_scenario_saves_capture_and_closes_context(tmp_path: Path) -> Non
 
     ###############################################################################
     class Capture(NetworkCapture):
-
         # -------------------------------------------------------------------------
         def attach(self, page: Any) -> None:
             calls.append("attached")
@@ -490,10 +500,8 @@ def test_failed_scenario_saves_capture_and_closes_context(tmp_path: Path) -> Non
     assert saved["failure_type"] == "RuntimeError"
     assert "private response" not in output.read_text()
 
+
 # --- test_configuration_management.py ---
-
-
-
 
 
 ###############################################################################
@@ -595,9 +603,8 @@ def test_agent_execution_rejects_unknown_vision_policy() -> None:
     with pytest.raises(Exception):
         AppSettings.model_validate(payload)
 
+
 # --- test_runtime_env_loading.py ---
-
-
 
 
 ###############################################################################
@@ -640,6 +647,7 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     assert os.getenv("KERAS_BACKEND") == "tensorflow"
     assert os.getenv("MPLBACKEND") == "Agg"
 
+
 ###############################################################################
 def test_process_environment_values_are_not_overwritten(
     monkeypatch: pytest.MonkeyPatch,
@@ -656,6 +664,7 @@ def test_process_environment_values_are_not_overwritten(
     ensure_environment_loaded()
 
     assert os.getenv("AEGIS_DATA_DIR") == "from-process"
+
 
 ###############################################################################
 def test_missing_runtime_env_is_created_from_example(
@@ -681,6 +690,7 @@ def test_missing_runtime_env_is_created_from_example(
     assert env_file.read_bytes() == example_file.read_bytes()
     assert os.getenv("FASTAPI_PORT") == "6101"
 
+
 ###############################################################################
 def test_existing_runtime_env_is_not_overwritten(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -705,10 +715,8 @@ def test_existing_runtime_env_is_not_overwritten(
     assert env_file.read_bytes() == existing
     assert os.getenv("FASTAPI_PORT") == "6200"
 
+
 # --- test_runtime_settings_api.py ---
-
-
-
 
 
 ###############################################################################
@@ -724,7 +732,9 @@ def _client(tmp_path: Path) -> tuple[TestClient, RuntimeSettingsRepository]:
 
 
 ###############################################################################
-def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(tmp_path: Path) -> None:
+def test_runtime_settings_api_returns_typed_blocks_and_restart_metadata(
+    tmp_path: Path,
+) -> None:
     client, repository = _client(tmp_path)
 
     response = client.get("/api/settings/runtime")
@@ -822,13 +832,21 @@ def test_runtime_settings_survive_database_reopen_after_patch(tmp_path: Path) ->
 
 
 ###############################################################################
-def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(tmp_path: Path) -> None:
+def test_agent_policy_patch_applies_to_new_runs_and_rejects_invalid_values_atomically(
+    tmp_path: Path,
+) -> None:
     client, repository = _client(tmp_path)
-    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}})
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"agent_execution": {"max_iterations": 7, "max_discovery_attempts": 5}},
+    )
     assert response.status_code == 200
     assert response.json()["restart_required"] is False
     assert repository.get_required().agent_execution.max_discovery_attempts == 5
-    response = client.patch("/api/settings/runtime", json={"agent_execution": {"max_iterations": 8, "max_discovery_attempts": 0}})
+    response = client.patch(
+        "/api/settings/runtime",
+        json={"agent_execution": {"max_iterations": 8, "max_discovery_attempts": 0}},
+    )
     assert response.status_code == 400
     assert repository.get_required().agent_execution.max_iterations == 7
 
@@ -849,6 +867,7 @@ def test_agent_policy_accepts_limits_above_former_ceilings(tmp_path: Path) -> No
     assert response.status_code == 200
     stored = repository.get_required().agent_execution
     assert {name: getattr(stored, name) for name in limits} == limits
+
 
 ###############################################################################
 def test_runtime_settings_api_rejects_unknown_nested_fields(tmp_path: Path) -> None:
@@ -876,12 +895,13 @@ def test_runtime_settings_api_rejects_unknown_blocks(tmp_path: Path) -> None:
     assert response.status_code == 422
     assert repository.get_required().map.tiles == "OpenStreetMap"
 
-# --- test_canonical_runtime_contract.py ---
 
+# --- test_canonical_runtime_contract.py ---
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPOSITORY_ROOT / "app"
+
 
 ###############################################################################
 def test_launcher_has_one_canonical_backend_entrypoint() -> None:
@@ -899,6 +919,7 @@ def test_launcher_has_one_canonical_backend_entrypoint() -> None:
     assert "app.server.app:app" not in launcher
     assert "Start-Process -FilePath 'cmd.exe'" not in launcher
     assert "/k" not in launcher
+
 
 ###############################################################################
 def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
@@ -932,6 +953,7 @@ def test_launcher_uses_confirmed_port_guard_and_process_aware_startup() -> None:
     assert "[System.Diagnostics.Process]$Process" in health_wait
     assert "HasExited" in health_wait
 
+
 ###############################################################################
 def test_launcher_separates_dependency_sync_from_build_state() -> None:
     launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
@@ -959,6 +981,7 @@ def test_launcher_separates_dependency_sync_from_build_state() -> None:
     assert "postbuild" in package_json["scripts"]
     assert "test:frontend-state" in package_json["scripts"]
 
+
 ###############################################################################
 def test_old_import_root_is_rejected_when_only_app_is_on_pythonpath() -> None:
     environment = os.environ.copy()
@@ -977,6 +1000,7 @@ def test_old_import_root_is_rejected_when_only_app_is_on_pythonpath() -> None:
     )
 
     assert result.returncode != 0
+
 
 ###############################################################################
 def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> None:
@@ -1009,29 +1033,28 @@ def test_public_api_exposes_native_routes_without_shadow_or_legacy_routes() -> N
     )
 
     composition = (
-        APP_ROOT / "server" / "services" / "chat" / "composition.py"
-    ).read_text(encoding="utf-8").casefold()
+        (APP_ROOT / "server" / "services" / "chat" / "composition.py")
+        .read_text(encoding="utf-8")
+        .casefold()
+    )
     assert "nativeagentorchestrator" in composition
     assert "shadow" not in composition
     assert "legacy" not in composition
+
 
 ###############################################################################
 def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> None:
     launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )
-    batch_runner = (APP_ROOT / "tests" / "run_tests.bat").read_text(
-        encoding="utf-8"
-    )
+    batch_runner = (APP_ROOT / "tests" / "run_tests.bat").read_text(encoding="utf-8")
     server_config = tomllib.loads(
         (APP_ROOT / "server" / "pyproject.toml").read_text(encoding="utf-8")
     )
     angular_config = json.loads(
         (APP_ROOT / "client" / "angular.json").read_text(encoding="utf-8")
     )
-    karma_config = (APP_ROOT / "client" / "karma.conf.cjs").read_text(
-        encoding="utf-8"
-    )
+    karma_config = (APP_ROOT / "client" / "karma.conf.cjs").read_text(encoding="utf-8")
     workflow_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (REPOSITORY_ROOT / ".github" / "workflows").glob("*.yml")
@@ -1064,10 +1087,19 @@ def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> N
     assert "$ToolCacheDir" not in launcher
     assert "$LegacyCache" not in launcher
     assert "$LegacyUvCache" not in launcher
-    assert "ValidateSet('Launch', 'ClearCache', 'RemoveLogs', 'Uninstall', 'RemoveAllData')" in launcher
+    assert (
+        "ValidateSet('Launch', 'ClearCache', 'RemoveLogs', 'Uninstall', 'RemoveAllData')"
+        in launcher
+    )
     assert "Clear-ApplicationCache" in launcher
-    assert "Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: clear caches and generated frontend output' -Strict" in launcher
-    assert "-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'clear application caches" in launcher
+    assert (
+        "Invoke-CleanupTargets -Targets $targets -Activity 'AEGIS: clear caches and generated frontend output' -Strict"
+        in launcher
+    )
+    assert (
+        "-not $ConfirmRemoval -and -not (Confirm-DestructiveAction 'clear application caches"
+        in launcher
+    )
     assert "-WhatIf" in launcher
     assert "'.ruff_cache'" in launcher
     assert "'.pytest_cache'" in launcher
@@ -1080,7 +1112,9 @@ def test_all_tooling_resolves_disposable_state_under_canonical_cache_root() -> N
         "." + "tmp_pytest",
         "." + "angular",
     )
-    cache_configuration_text = "\n".join((batch_runner, karma_config, workflow_text, vscode_launch, gitignore_text)).replace("\\", "/")
+    cache_configuration_text = "\n".join(
+        (batch_runner, karma_config, workflow_text, vscode_launch, gitignore_text)
+    ).replace("\\", "/")
     for fragment in forbidden_fragments:
         assert fragment not in cache_configuration_text
 

@@ -5,10 +5,18 @@ import pytest
 import io
 import zipfile
 from pathlib import Path
-from server.services.geospatial.ingestion import IngestionManifestError, build_ingestion_plan, execute_ingestion_plan, validate_ingestion_manifest
+from server.services.geospatial.ingestion import (
+    IngestionManifestError,
+    build_ingestion_plan,
+    execute_ingestion_plan,
+    validate_ingestion_manifest,
+)
 from server.services.geospatial.materialization_runner import materialize_datasets
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 from datetime import UTC, datetime
@@ -17,8 +25,6 @@ from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 from google.transit import gtfs_realtime_pb2
 
 # --- test_geospatial_ingestion.py ---
-
-
 
 
 ###############################################################################
@@ -52,6 +58,7 @@ def _manifest():
         },
     }
 
+
 ###############################################################################
 def test_build_ingestion_plan_from_manifest() -> None:
     plan = build_ingestion_plan(_manifest())
@@ -59,6 +66,7 @@ def test_build_ingestion_plan_from_manifest() -> None:
     assert plan.capability_id == "natural_earth_admin"
     assert plan.expected_format == "shapefile"
     assert plan.spatial_index is True
+
 
 ###############################################################################
 def test_validate_ingestion_manifest_reports_missing_fields() -> None:
@@ -70,6 +78,7 @@ def test_validate_ingestion_manifest_reports_missing_fields() -> None:
     assert errors
     assert "sourceUrl" in errors[0]
 
+
 ###############################################################################
 def test_build_ingestion_plan_rejects_non_ingestion_manifest() -> None:
     try:
@@ -78,6 +87,7 @@ def test_build_ingestion_plan_rejects_non_ingestion_manifest() -> None:
         assert "dataset-ingestion" in str(exc)
     else:
         raise AssertionError("Non-ingestion manifest unexpectedly produced a plan.")
+
 
 ###############################################################################
 def test_execute_ingestion_plan_normalizes_csv_and_writes_indexes(tmp_path) -> None:
@@ -104,6 +114,7 @@ def test_execute_ingestion_plan_normalizes_csv_and_writes_indexes(tmp_path) -> N
     assert result.text_index_file is not None
     assert result.tile_manifest_file is not None
 
+
 ###############################################################################
 def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
     source = tmp_path / "source.geojson"
@@ -121,6 +132,7 @@ def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
         assert "Checksum mismatch" in str(exc)
     else:
         raise AssertionError("Checksum mismatch did not fail ingestion.")
+
 
 ###############################################################################
 def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
@@ -142,6 +154,7 @@ def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
     assert '"checksumSource": "checksumUrl"' in Path(result.metadata_file).read_text(
         encoding="utf-8"
     )
+
 
 ###############################################################################
 def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None:
@@ -185,6 +198,7 @@ def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None
     assert result.spatial_index_file is not None
     assert '"bbox": [' in Path(result.spatial_index_file).read_text(encoding="utf-8")
 
+
 ###############################################################################
 def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
     source = tmp_path / "source.geojson"
@@ -221,6 +235,7 @@ def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
     else:
         raise AssertionError("Non-intersecting bbox did not fail ingestion.")
 
+
 ###############################################################################
 def _geojson_plan(tmp_path: Path, features: str, validation: dict, **download):
     source = tmp_path / "source.geojson"
@@ -236,10 +251,12 @@ def _geojson_plan(tmp_path: Path, features: str, validation: dict, **download):
     manifest["validation"] = validation
     return build_ingestion_plan(manifest)
 
+
 _OUTSIDE_POINT = (
     '{"type":"Feature","id":"p","properties":{},'
     '"geometry":{"type":"Point","coordinates":[7.0,45.0]}}'
 )
+
 
 ###############################################################################
 def _snapshot(tmp_path: Path) -> dict[str, bytes]:
@@ -248,6 +265,7 @@ def _snapshot(tmp_path: Path) -> dict[str, bytes]:
         for path in (tmp_path / "data").rglob("*")
         if path.is_file()
     }
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -273,8 +291,11 @@ def test_failed_ingestion_leaves_no_artifacts_behind(
 
     assert not (tmp_path / "data").exists()
 
+
 ###############################################################################
-def test_unsupported_heavy_format_keeps_raw_artifact_and_reports_partial(tmp_path) -> None:
+def test_unsupported_heavy_format_keeps_raw_artifact_and_reports_partial(
+    tmp_path,
+) -> None:
     source = tmp_path / "boundaries.shp"
     source.write_bytes(b"not-a-real-shapefile")
     manifest = _manifest()
@@ -292,7 +313,11 @@ def test_unsupported_heavy_format_keeps_raw_artifact_and_reports_partial(tmp_pat
     assert result.normalized_file is None
     assert Path(result.raw_file).read_bytes() == b"not-a-real-shapefile"
     assert "optional geospatial ingestion dependencies" in result.warnings[0]
-    assert json.loads(Path(result.health_file).read_text(encoding="utf-8"))["status"] == "partial"
+    assert (
+        json.loads(Path(result.health_file).read_text(encoding="utf-8"))["status"]
+        == "partial"
+    )
+
 
 ###############################################################################
 def test_failed_reingestion_restores_previous_materialization(tmp_path) -> None:
@@ -306,6 +331,7 @@ def test_failed_reingestion_restores_previous_materialization(tmp_path) -> None:
         execute_ingestion_plan(failing, workspace_root=tmp_path)
 
     assert _snapshot(tmp_path) == before
+
 
 ###############################################################################
 def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(
@@ -407,8 +433,8 @@ def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_h
         assert health["status"] == "functional"
         assert health["featureCount"] == result.feature_count
 
-# --- test_geospatial_materialization_runner.py ---
 
+# --- test_geospatial_materialization_runner.py ---
 
 
 ###############################################################################
@@ -448,6 +474,7 @@ def _write_manifest(path: Path, capability_id: str, source_file: Path) -> None:
         encoding="utf-8",
     )
 
+
 ###############################################################################
 def test_materialize_datasets_filters_by_capability_id(tmp_path: Path) -> None:
     manifest_root = tmp_path / "manifests"
@@ -477,8 +504,8 @@ def test_materialize_datasets_filters_by_capability_id(tmp_path: Path) -> None:
     assert results[0]["capabilityId"] == "dataset_b"
     assert results[0]["featureCount"] == 1
 
-# --- test_geospatial_infrastructure_sources.py ---
 
+# --- test_geospatial_infrastructure_sources.py ---
 
 
 ###############################################################################
@@ -509,6 +536,7 @@ def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     assert response.payload["features"][0]["category"] == "ev_charging"
     assert response.payload["features"][0]["source"] == "openchargemap"
 
+
 ###############################################################################
 def test_overture_maps_queries_ingested_places_index(tmp_path) -> None:
     index = tmp_path / "places.geojson"
@@ -524,6 +552,7 @@ def test_overture_maps_queries_ingested_places_index(tmp_path) -> None:
 
     assert response.payload["features"][0]["source"] == "overture"
     assert response.payload["totalResults"] == 1
+
 
 ###############################################################################
 def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(
@@ -573,9 +602,8 @@ def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(
     assert response.payload["totalResults"] == 1
     assert "© OpenStreetMap contributors (ODbL)" in response.attribution
 
+
 # --- test_gtfs_providers.py ---
-
-
 
 
 ###############################################################################
@@ -608,6 +636,7 @@ def _gtfs_zip() -> bytes:
         )
     return buffer.getvalue()
 
+
 ###############################################################################
 def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     response = run_async_in_thread(
@@ -627,6 +656,7 @@ def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     assert response.payload["shapes"][0]["geometry"]["type"] == "LineString"
     assert response.payload["summary"]["shapePointCount"] == 2
 
+
 ###############################################################################
 def test_gtfs_static_provider_rejects_bad_zip() -> None:
     with pytest.raises(ProviderUnavailableError):
@@ -638,6 +668,7 @@ def test_gtfs_static_provider_rejects_bad_zip() -> None:
                 )
             )
         )
+
 
 ###############################################################################
 def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
@@ -681,6 +712,7 @@ def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     assert response.payload["feedTimestamp"]
     assert response.payload["vehicleRenderingAllowed"] is True
 
+
 ###############################################################################
 def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     response = run_async_in_thread(
@@ -713,8 +745,8 @@ def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     assert response.payload["vehicles"] == []
     assert response.payload["vehicleRenderingAllowed"] is False
 
-# --- test_gtfs_realtime_alerts.py ---
 
+# --- test_gtfs_realtime_alerts.py ---
 
 
 ###############################################################################
@@ -750,8 +782,8 @@ def test_gtfs_realtime_alerts_render_popup_fields() -> None:
     assert alert["description"] == "Use alternate stop."
     assert alert["activePeriodCount"] == 1
 
-# --- test_gtfs_realtime_provider.py ---
 
+# --- test_gtfs_realtime_provider.py ---
 
 
 ###############################################################################
@@ -787,6 +819,7 @@ def test_gtfs_realtime_provider_normalizes_trip_updates_alerts_and_vehicles() ->
     assert response.payload["summary"]["vehicleCount"] == 1
     assert response.payload["vehicleRenderingAllowed"] is True
 
+
 ###############################################################################
 def test_gtfs_realtime_provider_fetches_configured_protobuf_feed_url() -> None:
     feed = gtfs_realtime_pb2.FeedMessage()
@@ -815,8 +848,8 @@ def test_gtfs_realtime_provider_fetches_configured_protobuf_feed_url() -> None:
     assert response.payload["feedUrl"] == "https://agency.example/gtfs-rt.pb"
     assert response.payload["summary"]["alertCount"] == 1
 
-# --- test_gtfs_static_ingestion.py ---
 
+# --- test_gtfs_static_ingestion.py ---
 
 
 ###############################################################################
@@ -843,6 +876,7 @@ def _sample_gtfs_static_zip() -> bytes:
             "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence\nsh1,41.9,12.5,1\nsh1,42.0,12.6,2\n",
         )
     return buffer.getvalue()
+
 
 ###############################################################################
 def test_gtfs_static_provider_fetches_configured_feed_url() -> None:

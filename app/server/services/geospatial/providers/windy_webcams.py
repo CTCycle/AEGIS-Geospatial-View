@@ -25,6 +25,7 @@ from server.services.geospatial.providers.http import (
 WINDY_WEBCAMS_ENDPOINT = "https://api.windy.com/webcams/api/v3/webcams"
 STALE_CAMERA_AFTER = timedelta(hours=24)
 
+
 ###############################################################################
 class WindyWebcamsProvider(GeospatialProvider):
     provider_id = "windy_webcams"
@@ -102,6 +103,7 @@ class WindyWebcamsProvider(GeospatialProvider):
             attribution=["Windy Webcams"],
         )
 
+
 ###############################################################################
 def _build_windy_webcams_url(request: ProviderRequest) -> str:
     params = ["include=images,location,urls,player", "limit=50"]
@@ -114,6 +116,7 @@ def _build_windy_webcams_url(request: ProviderRequest) -> str:
         params.append(f"categories={camera_type}")
     return f"{WINDY_WEBCAMS_ENDPOINT}?{'&'.join(params)}"
 
+
 ###############################################################################
 def _extract_windy_cameras(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
@@ -124,6 +127,7 @@ def _extract_windy_cameras(payload: object) -> list[dict[str, object]]:
     if not is_json_array(raw_items):
         return []
     return [_normalize_windy_camera(item) for item in raw_items if is_json_object(item)]
+
 
 ###############################################################################
 def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
@@ -159,6 +163,7 @@ def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
         "source_payload": item,
     }
 
+
 ###############################################################################
 def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
     if not is_json_object(payload):
@@ -172,6 +177,7 @@ def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
             if isinstance(nested, str) and nested:
                 return nested
     return None
+
 
 ###############################################################################
 def _preview_image_url(images: object) -> str | None:
@@ -189,6 +195,7 @@ def _preview_image_url(images: object) -> str | None:
                 return nested
     return None
 
+
 ###############################################################################
 def _embedding_allowed(item: dict[str, object], player: object) -> bool:
     if item.get("embedding_allowed") is True or item.get("embeddingAllowed") is True:
@@ -200,6 +207,7 @@ def _embedding_allowed(item: dict[str, object], player: object) -> bool:
         )
     return False
 
+
 ###############################################################################
 def _is_stale_timestamp(value: object) -> bool:
     timestamp = _parse_timestamp(value)
@@ -207,12 +215,14 @@ def _is_stale_timestamp(value: object) -> bool:
         return False
     return datetime.now(UTC) - timestamp > STALE_CAMERA_AFTER
 
+
 ###############################################################################
 def _is_expired_timestamp(value: object) -> bool:
     timestamp = _parse_timestamp(value)
     if timestamp is None:
         return False
     return timestamp <= datetime.now(UTC)
+
 
 ###############################################################################
 def _parse_timestamp(value: object) -> datetime | None:

@@ -17,6 +17,7 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.runtime_settings import RuntimeSettingsRepository
 from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord
 
+
 ###############################################################################
 def required_seed_data_missing(database: SQLiteRepository) -> bool:
     return (
@@ -25,6 +26,7 @@ def required_seed_data_missing(database: SQLiteRepository) -> bool:
         or database.count_records(ApplicationRuntimeSettingsRecord) == 0
         or ReferenceCatalogSeeder(database).needs_seed()
     )
+
 
 ###############################################################################
 def initialize_database(

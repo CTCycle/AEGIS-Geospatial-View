@@ -1,16 +1,21 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from server.services.chat import model_library as model_library_module
-from server.services.chat.model_library import ChatModelLibraryService, ModelLibrarySourceError
+from server.services.chat.model_library import (
+    ChatModelLibraryService,
+    ModelLibrarySourceError,
+)
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.types import ModelDescriptor
 from typing import Any
 import pytest
 from server.contracts.chat import ModelSettingsUpdateRequest
-from server.services.chat.settings_service import ChatSettingsService, ChatSettingsValidationError
+from server.services.chat.settings_service import (
+    ChatSettingsService,
+    ChatSettingsValidationError,
+)
 
 # --- test_model_library_service.py ---
-
 
 
 ###############################################################################
@@ -21,6 +26,7 @@ class _DeepSeekProviderStub:
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         return self.models
+
 
 ###############################################################################
 @dataclass
@@ -36,9 +42,9 @@ class _FlakyDynamicProvider:
             raise response
         return response
 
+
 ###############################################################################
 class _ProviderFactoryStub:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: _DeepSeekProviderStub | Exception) -> None:
         self.provider = provider
@@ -49,6 +55,7 @@ class _ProviderFactoryStub:
         if isinstance(self.provider, Exception):
             raise self.provider
         return self.provider
+
 
 ###############################################################################
 class _OllamaProviderUnavailableStub:
@@ -72,12 +79,14 @@ class _OllamaProviderUnavailableStub:
         type(self).calls += 1
         return []
 
+
 ###############################################################################
 def _build_service() -> ChatModelLibraryService:
     return ChatModelLibraryService(
         provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
         ollama_unavailable_ttl_s=30.0,
     )
+
 
 ###############################################################################
 def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
@@ -97,6 +106,7 @@ def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(
     assert response["sources"]["ollama"]["reachable"] is False
     assert response["sources"]["ollama"]["ok"] is False
 
+
 ###############################################################################
 def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     _OllamaProviderUnavailableStub.calls = 0
@@ -113,6 +123,7 @@ def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
     assert first["sources"]["ollama"]["reachable"] is False
     assert second["sources"]["ollama"]["reachable"] is False
     assert _OllamaProviderUnavailableStub.calls == 1
+
 
 ###############################################################################
 def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
@@ -135,6 +146,7 @@ def test_list_models_reports_deepseek_failure_in_sources(monkeypatch) -> None:
     assert response["cloud"]
     assert response["sources"]["deepseek"]["ok"] is False
     assert "DeepSeek credentials" in str(response["sources"]["deepseek"]["message"])
+
 
 ###############################################################################
 def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
@@ -189,6 +201,7 @@ def test_dynamic_catalog_failure_can_recover_and_success_remains_cached(
     assert fourth["sources"]["deepseek"]["ok"] is True
     assert dynamic_provider.calls == 3
 
+
 ###############################################################################
 def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -215,6 +228,7 @@ def test_find_model_raises_when_deepseek_catalog_cannot_be_loaded(monkeypatch) -
         raise AssertionError(
             "Expected ModelLibrarySourceError for unavailable DeepSeek catalog."
         )
+
 
 ###############################################################################
 def test_find_model_loads_dynamic_metadata_for_context_profile_lookup(
@@ -247,12 +261,12 @@ def test_find_model_loads_dynamic_metadata_for_context_profile_lookup(
     assert result is not None
     assert result["name"] == "runtime-model"
 
+
 ###############################################################################
 def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None:
 
     ###############################################################################
     class _ProviderThatMustNotBeCalled:
-
         # -------------------------------------------------------------------------
         def list_models(self):  # noqa: ANN201
             raise AssertionError("context lookup must not refresh a provider catalog")
@@ -284,6 +298,7 @@ def test_find_cached_model_never_refreshes_dynamic_provider(monkeypatch) -> None
     assert result is not None
     assert result["name"] == "cached-model"
 
+
 ###############################################################################
 def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
     service = _build_service()
@@ -296,6 +311,7 @@ def test_find_cached_model_returns_none_without_catalog_refresh() -> None:
         )
         is None
     )
+
 
 ###############################################################################
 def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
@@ -326,12 +342,14 @@ def test_expired_dynamic_catalog_failure_does_not_reuse_stale_model() -> None:
     assert all(item["id"] != "stale-model" for item in response["cloud"])
     assert response["sources"]["deepseek"]["ok"] is False
 
+
 ###############################################################################
 def test_normalize_ollama_url_rewrites_localhost() -> None:
     assert (
         ChatModelLibraryService.normalize_ollama_url("http://localhost:11434")
         == "http://127.0.0.1:11434"
     )
+
 
 ###############################################################################
 def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
@@ -340,7 +358,6 @@ def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
 
     ###############################################################################
     class _OllamaProviderWithContext:
-
         # -------------------------------------------------------------------------
         def __init__(self, **_kwargs) -> None:  # noqa: ANN003
             self.last_list_models_error = None
@@ -388,9 +405,8 @@ def test_ollama_selected_context_enrichment_updates_the_shared_model_cache(
     assert cached is not None
     assert cached["context_window_tokens"] == 40_960
 
+
 # --- test_settings_service.py ---
-
-
 
 
 ###############################################################################
@@ -399,12 +415,14 @@ class EncryptedValue:
     value: str
     key_version: str
 
+
 ###############################################################################
 @dataclass
 class FakeCredentialRecord:
     provider: str
     label: str
     encrypted_value: str
+
 
 ###############################################################################
 @dataclass
@@ -417,9 +435,9 @@ class FakeSettingsRecord:
     google_base_url: str | None = "https://google.example/v1"
     deepseek_base_url: str | None = "https://deepseek.example/v1"
 
+
 ###############################################################################
 class FakeSettingsRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, record: FakeSettingsRecord | None = None) -> None:
         self.record = record or FakeSettingsRecord()
@@ -436,9 +454,9 @@ class FakeSettingsRepository:
             setattr(self.record, key, value)
         return self.record
 
+
 ###############################################################################
 class FakeCredentialsRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, active_items: list[FakeCredentialRecord] | None = None) -> None:
         self.active_items = active_items or []
@@ -459,9 +477,9 @@ class FakeCredentialsRepository:
     ) -> None:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
+
 ###############################################################################
 class FakeCryptoService:
-
     # -------------------------------------------------------------------------
     def encrypt(self, value: str) -> EncryptedValue:
         return EncryptedValue(value=f"enc:{value}", key_version="v1")
@@ -470,9 +488,9 @@ class FakeCryptoService:
     def decrypt(self, value: str) -> str:
         return value
 
+
 ###############################################################################
 class FakeModelLibraryService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -541,28 +559,29 @@ class FakeModelLibraryService:
                     return item
         return None
 
+
 ###############################################################################
 class NoLiveCatalogModelLibraryService(FakeModelLibraryService):
-
     # -------------------------------------------------------------------------
     def find_model(self, **kwargs: Any) -> dict[str, object] | None:
         _ = kwargs
         raise AssertionError("reading settings must not query a live model catalog")
 
+
 ###############################################################################
 class NoSelectedModelResolution:
-
     # -------------------------------------------------------------------------
     def resolve_selected(self, *_args: object, **_kwargs: object) -> None:
         raise AssertionError("startup validation must not resolve model metadata")
 
+
 ###############################################################################
 class UnreadableCredentialCrypto:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def decrypt(_value: str) -> str:
         raise ValueError("Credential cannot be decrypted with current key.")
+
 
 ###############################################################################
 def build_service(
@@ -577,6 +596,7 @@ def build_service(
         crypto_service=FakeCryptoService(),  # type: ignore[arg-type]
         model_library_service=model_library_service or FakeModelLibraryService(),  # type: ignore[arg-type]
     )
+
 
 ###############################################################################
 def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
@@ -595,6 +615,7 @@ def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
         "deepseek_base_url": "https://deepseek.example/v1",
     }
 
+
 ###############################################################################
 def test_update_settings_rejects_blank_agent_selection() -> None:
     service = build_service()
@@ -603,6 +624,7 @@ def test_update_settings_rejects_blank_agent_selection() -> None:
         service.update_settings(
             ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name="")
         )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -620,27 +642,36 @@ def test_update_settings_rejects_noncanonical_provider_ids(provider: str) -> Non
             )
         )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "provider",
     ["OpenAI", "openai-compatible", "opencode_go", "not-registered"],
 )
-def test_update_settings_rejects_noncanonical_credential_provider_ids(provider: str) -> None:
+def test_update_settings_rejects_noncanonical_credential_provider_ids(
+    provider: str,
+) -> None:
     service = build_service()
 
-    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential provider"):
+    with pytest.raises(
+        ChatSettingsValidationError, match="Unsupported credential provider"
+    ):
         service.update_settings(
             ModelSettingsUpdateRequest(credentials={provider: {"api_key": "secret"}})
         )
+
 
 ###############################################################################
 def test_update_settings_rejects_noncanonical_credential_labels() -> None:
     service = build_service()
 
-    with pytest.raises(ChatSettingsValidationError, match="Unsupported credential label"):
+    with pytest.raises(
+        ChatSettingsValidationError, match="Unsupported credential label"
+    ):
         service.update_settings(
             ModelSettingsUpdateRequest(credentials={"openai": {"token": "secret"}})
         )
+
 
 ###############################################################################
 def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> None:
@@ -654,6 +685,7 @@ def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> No
     assert response.agent_model_provider == ""
     assert response.agent_model_name == ""
     assert settings_repo.last_update is None
+
 
 ###############################################################################
 def test_get_settings_uses_canonical_static_context_without_live_catalog() -> None:
@@ -669,6 +701,7 @@ def test_get_settings_uses_canonical_static_context_without_live_catalog() -> No
         "context_profile_source": "openai_model_catalog",
         "context_metadata_authority": "configured",
     }
+
 
 ###############################################################################
 def test_validate_persisted_settings_avoids_provider_and_model_lookups() -> None:
@@ -688,6 +721,7 @@ def test_validate_persisted_settings_avoids_provider_and_model_lookups() -> None
 
     service.validate_persisted_settings()
 
+
 ###############################################################################
 def test_validate_persisted_settings_rejects_unreadable_credentials() -> None:
     service = build_service(
@@ -699,6 +733,7 @@ def test_validate_persisted_settings_rejects_unreadable_credentials() -> None:
     service.crypto_service = UnreadableCredentialCrypto()  # type: ignore[assignment]
     with pytest.raises(ChatSettingsValidationError, match="cannot be decrypted"):
         service.validate_persisted_settings()
+
 
 ###############################################################################
 def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> None:
@@ -719,6 +754,7 @@ def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> 
     assert settings_repo.last_update["agent_model_provider"] == ""
     assert settings_repo.last_update["agent_model_name"] == ""
 
+
 ###############################################################################
 def test_updating_only_ollama_url_is_allowed_before_first_agent_selection() -> None:
     settings_repo = FakeSettingsRepository(
@@ -733,6 +769,7 @@ def test_updating_only_ollama_url_is_allowed_before_first_agent_selection() -> N
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["ollama_url"] == "http://127.0.0.1:11500"
     assert settings_repo.last_update["agent_model_provider"] == ""
+
 
 ###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
@@ -751,6 +788,7 @@ def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> N
     assert settings_repo.last_update["agent_model_provider"] == "openai"
     assert settings_repo.last_update["agent_model_name"] == "gpt-4.1"
     assert settings_repo.last_update["openai_base_url"] == "https://openai.example/v1"
+
 
 ###############################################################################
 def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
@@ -776,6 +814,7 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 
+
 ###############################################################################
 def test_local_model_validation_rejects_unavailable_agent_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
@@ -786,6 +825,7 @@ def test_local_model_validation_rejects_unavailable_agent_model() -> None:
                 agent_model_provider="ollama", agent_model_name="missing-agent"
             )
         )
+
 
 ###############################################################################
 def test_available_local_model_allows_update() -> None:
@@ -807,6 +847,7 @@ def test_available_local_model_allows_update() -> None:
     assert settings_repo.last_update["agent_model_provider"] == "ollama"
     assert settings_repo.last_update["agent_model_name"] == "llama3.2"
 
+
 ###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
@@ -827,6 +868,7 @@ def test_agent_model_without_tools_is_rejected() -> None:
             )
         )
 
+
 ###############################################################################
 def test_agent_model_without_structured_output_is_rejected() -> None:
     service = build_service(
@@ -846,6 +888,7 @@ def test_agent_model_without_structured_output_is_rejected() -> None:
                 agent_model_provider="google", agent_model_name="no-structured"
             )
         )
+
 
 ###############################################################################
 def test_agent_model_with_tools_and_structured_output_is_accepted() -> None:

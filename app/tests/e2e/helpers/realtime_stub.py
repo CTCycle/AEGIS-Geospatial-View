@@ -13,6 +13,7 @@ from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
 
 TurnPayloadFactory = Callable[[str, int], dict[str, Any]]
 
+
 ###############################################################################
 def register_chat_stub(
     page: Page,
@@ -39,6 +40,7 @@ def register_chat_stub(
         error_message=error_message,
     )
 
+
 ###############################################################################
 def _envelope(
     *,
@@ -58,6 +60,7 @@ def _envelope(
     if correlation_id is not None:
         envelope["correlation_id"] = correlation_id
     return json.dumps(envelope)
+
 
 ###############################################################################
 def register_realtime_stub(

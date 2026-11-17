@@ -32,6 +32,7 @@ from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCach
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 from server.services.llm.transport import LLMTransportPolicy
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ChatRuntime:
@@ -43,6 +44,7 @@ class ChatRuntime:
     history_service: ChatHistoryService
     agent_loop: AgentLoop | None = None
     agent_turn_runner: AgentTurnRunner | None = None
+
 
 ###############################################################################
 def build_chat_runtime(

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from server.domain.agent.context import ConversationDirective
 
+
 ###############################################################################
 class ConversationInstructionService:
     _DURABLE_MARKERS = re.compile(

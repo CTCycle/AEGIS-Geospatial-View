@@ -25,9 +25,12 @@ from server.services.sanitization import LocationSanitizationService
 
 ###############################################################################
 def _database(tmp_path):  # noqa: ANN001
-    database = SQLiteRepository(DatabaseSettings(database_path=str(tmp_path / "evidence.db")))
+    database = SQLiteRepository(
+        DatabaseSettings(database_path=str(tmp_path / "evidence.db"))
+    )
     Base.metadata.create_all(database.engine)
     return database
+
 
 ###############################################################################
 def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  # noqa: ANN001
@@ -69,6 +72,7 @@ def test_evidence_round_trip_checksum_and_parent_provenance(tmp_path) -> None:  
     assert "api_key" not in parent.summary
     assert "authorization" not in parent.provenance
 
+
 ###############################################################################
 def test_evidence_metadata_cascade_deletes_with_conversation(tmp_path) -> None:  # noqa: ANN001
     database = _database(tmp_path)
@@ -93,6 +97,7 @@ def test_evidence_metadata_cascade_deletes_with_conversation(tmp_path) -> None: 
         session.commit()
     assert repository.get_summary(item.evidence_id) is None
 
+
 ###############################################################################
 class _SlowRepository:
     def __init__(self, release: threading.Event) -> None:
@@ -105,6 +110,7 @@ class _SlowRepository:
         self.release.wait(timeout=5)
         self.completed += 1
         return fields
+
 
 ###############################################################################
 async def test_evidence_write_does_not_block_event_loop() -> None:
@@ -126,6 +132,7 @@ async def test_evidence_write_does_not_block_event_loop() -> None:
     await watcher
     assert ticks >= 5
 
+
 ###############################################################################
 async def test_cancelled_evidence_write_returns_no_reference(tmp_path) -> None:  # noqa: ANN001
     database = _database(tmp_path)
@@ -134,7 +141,9 @@ async def test_cancelled_evidence_write_returns_no_reference(tmp_path) -> None: 
     release = threading.Event()
     slow = _SlowRepository(release)
     slow.create = lambda **fields: (  # type: ignore[method-assign]
-        slow.started.set(), release.wait(timeout=5), real.create(**fields)
+        slow.started.set(),
+        release.wait(timeout=5),
+        real.create(**fields),
     )[-1]
 
     write = asyncio.create_task(
@@ -161,6 +170,7 @@ async def test_cancelled_evidence_write_returns_no_reference(tmp_path) -> None: 
         assert loaded is not None
         assert loaded[1] == b'{"records":[1]}'
 
+
 # --- test_credential_crypto.py ---
 
 
@@ -175,6 +185,7 @@ def test_credential_crypto_roundtrip() -> None:
     decrypted = service.decrypt(encrypted.value)
     assert decrypted == "secret-value"
     assert service.mask(encrypted.value) == "••••••••"
+
 
 # --- test_credentials_repository.py ---
 
@@ -193,6 +204,7 @@ def test_credentials_repository_upsert_and_lookup(sqlite_backend) -> None:
     assert loaded is not None
     assert loaded.encrypted_value == "encrypted-token"
 
+
 # --- test_geospatial_api_credentials.py ---
 
 
@@ -201,6 +213,7 @@ def create_started_client() -> TestClient:
     client = TestClient(create_app())
     client.__enter__()
     return client
+
 
 ###############################################################################
 def test_credential_status_uses_saved_storage_and_does_not_return_secret_values(
@@ -216,6 +229,7 @@ def test_credential_status_uses_saved_storage_and_does_not_return_secret_values(
     assert "windy-secret" not in response.text
     assert "environmentVariable" not in response.json()
 
+
 # --- test_geospatial_manifest_secret_safety.py ---
 
 
@@ -229,6 +243,7 @@ def test_geospatial_manifests_do_not_contain_secret_values() -> None:
     ]
 
     assert not issues
+
 
 # --- test_sanitization.py ---
 

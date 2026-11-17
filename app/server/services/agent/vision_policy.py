@@ -17,6 +17,7 @@ TERMINAL_CALL_KIND = "terminal"
 
 _TERMINAL_CALL_KINDS = frozenset({TERMINAL_CALL_KIND})
 
+
 ###############################################################################
 class VisionPolicyEngine:
     """Deterministic vision-attachment decisions for the native agent loop.
@@ -52,7 +53,10 @@ class VisionPolicyEngine:
             return True
         if state.prepared_map_session is None:
             return False
-        if state.render_observations and state.render_observations[-1].status == "ready":
+        if (
+            state.render_observations
+            and state.render_observations[-1].status == "ready"
+        ):
             return True
         return False
 
@@ -105,10 +109,15 @@ class VisionPolicyEngine:
             return False
         # The request travels with the render handshake, before any browser
         # observation exists; the browser only captures a ready render.
-        if state.prepared_map_session is None and not self.meaningful_map_rendered(state):
+        if state.prepared_map_session is None and not self.meaningful_map_rendered(
+            state
+        ):
             return False
         vision_state = state.vision_state
-        if vision_state is not None and vision_state.vision_calls >= self.max_vision_calls:
+        if (
+            vision_state is not None
+            and vision_state.vision_calls >= self.max_vision_calls
+        ):
             return False
         if self.policy_enum == VisionPolicy.ON_FAILURE:
             return self.relevant_failures(state) >= 1

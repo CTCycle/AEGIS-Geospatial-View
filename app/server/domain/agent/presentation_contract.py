@@ -10,10 +10,21 @@ from server.domain.agent.capability_route import ObligationKind
 
 # A fine-grained place (landmark, address, station...) must be framed at its
 # own scale; a neighbourhood or district may fill a wider view.
-FINE_LOCATION_TYPES = frozenset({
-    "landmark", "poi", "address", "feature", "airport", "station", "street", "road",
-    "attraction", "monument", "building",
-})
+FINE_LOCATION_TYPES = frozenset(
+    {
+        "landmark",
+        "poi",
+        "address",
+        "feature",
+        "airport",
+        "station",
+        "street",
+        "road",
+        "attraction",
+        "monument",
+        "building",
+    }
+)
 LOCAL_LOCATION_TYPES = frozenset({"neighborhood", "district"})
 # Wide enough for a street-level fit on a landscape map (the long side of the
 # view), narrow enough that a city-scale view of a landmark never passes.
@@ -25,10 +36,21 @@ FINE_PLACE_FRAME_DEGREES = 0.01
 FINE_PLACE_EXTENT_DEGREES = 0.02
 MAX_LOCAL_VIEW_SPAN_DEGREES = 0.6
 # Scopes whose centre point says nothing about what must be visible.
-AREA_LOCATION_TYPES = frozenset({
-    "country", "state", "province", "region", "macro_region", "continent",
-    "ocean", "sea", "viewport", "global", "world",
-})
+AREA_LOCATION_TYPES = frozenset(
+    {
+        "country",
+        "state",
+        "province",
+        "region",
+        "macro_region",
+        "continent",
+        "ocean",
+        "sea",
+        "viewport",
+        "global",
+        "world",
+    }
+)
 MIN_RESULTS_IN_VIEW = 0.5
 # A target spanning at least this much longitude is the whole globe: no
 # viewport can contain it, so it never counts as out of view.
@@ -38,9 +60,11 @@ MapState = Literal["rendered", "failed", "none"]
 # "unsupported": the only evidence is imagery, which carries no records to analyse.
 ObligationStatus = Literal["met", "unmet", "failed", "unsupported"]
 
+
 ###############################################################################
 def substitution_sentence(rejected: str, coverage: str, alternative: str) -> str:
     return f"{rejected} only covers {coverage or 'a limited area'}, so {alternative} is shown instead."
+
 
 ###############################################################################
 def is_fine_place(location_type: str | None, bbox: list[float] | None) -> bool:
@@ -53,6 +77,7 @@ def is_fine_place(location_type: str | None, bbox: list[float] | None) -> bool:
         and location_type not in AREA_LOCATION_TYPES
         and max(bbox[2] - bbox[0], bbox[3] - bbox[1]) <= FINE_PLACE_EXTENT_DEGREES
     )
+
 
 ###############################################################################
 class ContractTarget(BaseModel):
@@ -75,7 +100,11 @@ class ContractTarget(BaseModel):
     # -------------------------------------------------------------------------
     @property
     def is_global(self) -> bool:
-        return self.bbox is not None and self.bbox[2] - self.bbox[0] >= GLOBAL_EXTENT_SPAN_DEGREES
+        return (
+            self.bbox is not None
+            and self.bbox[2] - self.bbox[0] >= GLOBAL_EXTENT_SPAN_DEGREES
+        )
+
 
 ###############################################################################
 class PresentationContract(BaseModel):
@@ -89,7 +118,9 @@ class PresentationContract(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    targets: list[ContractTarget] = Field(default_factory=lambda: list[ContractTarget](), max_length=16)
+    targets: list[ContractTarget] = Field(
+        default_factory=lambda: list[ContractTarget](), max_length=16
+    )
     findings: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
 
     # -------------------------------------------------------------------------
@@ -112,9 +143,15 @@ class PresentationContract(BaseModel):
             for target in self.targets
             if not target.is_global
             and (
-                (results_in_viewport is not None and results_in_viewport < MIN_RESULTS_IN_VIEW)
+                (
+                    results_in_viewport is not None
+                    and results_in_viewport < MIN_RESULTS_IN_VIEW
+                )
                 if target.location_type in AREA_LOCATION_TYPES
-                else not (west <= target.longitude <= east and south <= target.latitude <= north)
+                else not (
+                    west <= target.longitude <= east
+                    and south <= target.latitude <= north
+                )
             )
         ]
         coarse = [
@@ -122,12 +159,17 @@ class PresentationContract(BaseModel):
             for target in self.targets
             if (
                 (target.is_fine and span > MAX_FINE_VIEW_SPAN_DEGREES)
-                or (target.location_type in LOCAL_LOCATION_TYPES and span > MAX_LOCAL_VIEW_SPAN_DEGREES)
+                or (
+                    target.location_type in LOCAL_LOCATION_TYPES
+                    and span > MAX_LOCAL_VIEW_SPAN_DEGREES
+                )
             )
         ]
         findings: list[str] = []
         if out_of_view:
-            findings.append("requested places outside the map view: " + ", ".join(out_of_view))
+            findings.append(
+                "requested places outside the map view: " + ", ".join(out_of_view)
+            )
         if coarse:
             findings.append(
                 "map view too wide for "
@@ -142,6 +184,7 @@ class PresentationContract(BaseModel):
     ) -> list[str]:
         return [*self.findings, *self.view_findings(viewport, results_in_viewport)]
 
+
 ###############################################################################
 class ObligationOutcome(BaseModel):
     """Verified status of one request obligation."""
@@ -155,10 +198,13 @@ class ObligationOutcome(BaseModel):
     evidence_ref: str | None = None
     values: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
     # Spellings the answer must use to name what this obligation asked for.
-    answer_must_name: list[str] = Field(default_factory=lambda: list[str](), max_length=4)
+    answer_must_name: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=4
+    )
     # Figures an analysis answer must cite: one group per compared target (a
     # figure of each group, or their difference) or a single group.
     cite_groups: list[list[float]] = Field(default_factory=lambda: list[list[float]]())
+
 
 ###############################################################################
 class CompletionSummary(BaseModel):
@@ -170,14 +216,18 @@ class CompletionSummary(BaseModel):
         default_factory=lambda: list[ObligationOutcome](), max_length=32
     )
     map_state: MapState = "none"
-    presentation_findings: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
+    presentation_findings: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=8
+    )
     # A rejected source replaced by a covering one that then ran.
     # (rejected source, its coverage, covering source shown instead).
     substitutions: list[tuple[str, str, str]] = Field(
         default_factory=lambda: list[tuple[str, str, str]](), max_length=4
     )
     # (shown, total) per layer whose records were cut by a limit.
-    truncations: list[tuple[int, int]] = Field(default_factory=lambda: list[tuple[int, int]](), max_length=8)
+    truncations: list[tuple[int, int]] = Field(
+        default_factory=lambda: list[tuple[int, int]](), max_length=8
+    )
 
     # -------------------------------------------------------------------------
     def undelivered(self) -> list[ObligationOutcome]:
@@ -187,13 +237,21 @@ class CompletionSummary(BaseModel):
     def disclosure(self) -> str:
         """Plain sentences for everything the user did not get."""
 
-        sentences: list[str] = [substitution_sentence(*item) for item in self.substitutions]
+        sentences: list[str] = [
+            substitution_sentence(*item) for item in self.substitutions
+        ]
         if self.map_state == "failed":
-            sentences.append("The map could not be confirmed in the browser, so it is not shown as requested.")
+            sentences.append(
+                "The map could not be confirmed in the browser, so it is not shown as requested."
+            )
         sentences.extend(
             f"Map check: {finding}." for finding in self.presentation_findings
         )
-        unsupported = [item.label or item.obligation_id for item in self.obligations if item.status == "unsupported"]
+        unsupported = [
+            item.label or item.obligation_id
+            for item in self.obligations
+            if item.status == "unsupported"
+        ]
         if unsupported:
             sentences.append(
                 "Only map imagery was available, which has no point or numeric records, so "
@@ -201,7 +259,9 @@ class CompletionSummary(BaseModel):
                 + " could not be computed from records; the imagery is shown instead."
             )
         undelivered = [
-            item.label or item.obligation_id for item in self.undelivered() if item.status != "unsupported"
+            item.label or item.obligation_id
+            for item in self.undelivered()
+            if item.status != "unsupported"
         ]
         if undelivered:
             sentences.append("Not delivered: " + "; ".join(undelivered) + ".")
@@ -239,6 +299,10 @@ class CompletionSummary(BaseModel):
                 for item in self.obligations
             ],
             "presentation_findings": self.presentation_findings,
-            "substitutions": [substitution_sentence(*item) for item in self.substitutions],
-            "truncated_layers": [f"{shown} of {total}" for shown, total in self.truncations],
+            "substitutions": [
+                substitution_sentence(*item) for item in self.substitutions
+            ],
+            "truncated_layers": [
+                f"{shown} of {total}" for shown, total in self.truncations
+            ],
         }

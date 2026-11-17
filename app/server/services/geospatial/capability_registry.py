@@ -14,13 +14,14 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
+
 ###############################################################################
 class CapabilityArgumentSchemaError(ValueError):
     """Raised when an executable manifest lacks a safe argument schema."""
 
+
 ###############################################################################
 class RuntimeEligibility(Protocol):
-
     # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool: ...
 
@@ -95,6 +96,7 @@ _MODIFIER_SYNONYMS: dict[str, str] = {
     "mean": "average",
     "colour": "color",
 }
+
 
 def _canonical_modifier(token: str) -> str:
     return _MODIFIER_SYNONYMS.get(token) or token
@@ -252,13 +254,12 @@ _ROUTING_CONTEXT_TOKENS = _GENERIC_QUERY_TOKENS | {
 }
 
 _ROUTING_CANONICAL_TERMS = {
-    term
-    for aliases in _ROUTING_QUERY_ALIASES.values()
-    for term in aliases
+    term for aliases in _ROUTING_QUERY_ALIASES.values() for term in aliases
 }
 _ROUTING_CANONICAL_TERMS.update(
     term for _, aliases in _ROUTING_QUERY_PHRASES for term in aliases
 )
+
 
 ###############################################################################
 def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
@@ -289,11 +290,7 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
         "fallback_ids",
     )
     contract: dict[str, Any] = {
-        field: [
-            str(item).strip()
-            for item in raw.get(field, [])
-            if str(item).strip()
-        ]
+        field: [str(item).strip() for item in raw.get(field, []) if str(item).strip()]
         if isinstance(raw.get(field), list)
         else []
         for field in list_fields
@@ -323,6 +320,7 @@ def normalized_execution_contract(capability: dict[str, Any]) -> dict[str, Any]:
     )
     return contract
 
+
 ###############################################################################
 def _result_semantics(
     raw: dict[str, Any], render_support: str, metadata: dict[str, Any]
@@ -336,24 +334,31 @@ def _result_semantics(
 
     declared_kind = str(raw.get("result_kind") or "").strip().casefold()
     declared_numeric = str(raw.get("numeric_query") or "").strip().casefold()
-    default_kind = {"vector": "vector", "raster": "raster"}.get(render_support, "metadata")
+    default_kind = {"vector": "vector", "raster": "raster"}.get(
+        render_support, "metadata"
+    )
     if render_support == "raster":
-        default_numeric = "legend_sampled" if is_json_object(metadata.get("legend")) else "render_only"
+        default_numeric = (
+            "legend_sampled"
+            if is_json_object(metadata.get("legend"))
+            else "render_only"
+        )
     else:
         default_numeric = "numeric"
     return (
         declared_kind if declared_kind in RESULT_KINDS else default_kind,
-        declared_numeric if declared_numeric in NUMERIC_QUERY_KINDS else default_numeric,
+        declared_numeric
+        if declared_numeric in NUMERIC_QUERY_KINDS
+        else default_numeric,
     )
+
 
 ###############################################################################
 def capability_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
     """Return the canonical bounded argument schema for one manifest entry."""
 
     metadata = json_object(capability.get("metadata"))
-    schema = metadata.get("parameters_json_schema") or metadata.get(
-        "argument_schema"
-    )
+    schema = metadata.get("parameters_json_schema") or metadata.get("argument_schema")
     if is_json_object(schema):
         return dict(schema)
     if capability.get("source_path") or capability.get("source_filename"):
@@ -420,9 +425,9 @@ def capability_argument_schema(capability: dict[str, Any]) -> dict[str, Any]:
         f"Capability '{capability_id}' does not declare an executable argument schema."
     )
 
+
 ###############################################################################
 class CapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(
         self, *, manifest_loader: GeospatialManifestLoader | None = None
@@ -700,12 +705,20 @@ class CapabilityRegistry:
         snapshot = self._ensure_snapshot()
         searchable = [
             _searchable_text(item)
-            for collection in (snapshot.overlays, snapshot.cameras, snapshot.transit, snapshot.tools)
+            for collection in (
+                snapshot.overlays,
+                snapshot.cameras,
+                snapshot.transit,
+                snapshot.tools,
+            )
             for item in collection
         ]
         return [
-            query for query in queries
-            if (tokens := _raw_query_tokens([query]).difference(_ROUTING_CONTEXT_TOKENS))
+            query
+            for query in queries
+            if (
+                tokens := _raw_query_tokens([query]).difference(_ROUTING_CONTEXT_TOKENS)
+            )
             and any(tokens.intersection(terms) for terms in searchable)
         ]
 
@@ -835,7 +848,11 @@ class CapabilityRegistry:
                 if capability_id in normalized_explicit
                 else None
             )
-            if normalized_explicit and explicit_index is None and not normalized_queries:
+            if (
+                normalized_explicit
+                and explicit_index is None
+                and not normalized_queries
+            ):
                 continue
             if (
                 raw_query_terms
@@ -863,23 +880,21 @@ class CapabilityRegistry:
             ):
                 continue
             if has_routing_alias and routing_query_terms:
-                if (
-                    _routing_variant_matches(
-                        item, queries, include_hints=False
-                    )
-                ):
+                if _routing_variant_matches(item, queries, include_hints=False):
                     strong_semantic_candidate_ids.add(capability_id)
             identity_matches = meaningful_queries.intersection(
                 _identity_searchable_text(item)
             )
-            if not has_routing_alias and _names_subject(meaningful_queries, _subject_terms(item)):
+            if not has_routing_alias and _names_subject(
+                meaningful_queries, _subject_terms(item)
+            ):
                 subject_candidate_ids.add(capability_id)
             score = (
-                1000.0 - float(explicit_index)
-                if explicit_index is not None
-                else 0.0
+                1000.0 - float(explicit_index) if explicit_index is not None else 0.0
             )
-            score += float(len(declared_domains.intersection(requested_domains))) * 100.0
+            score += (
+                float(len(declared_domains.intersection(requested_domains))) * 100.0
+            )
             score += float(len(matched_queries) * 10)
             # Direct capability identity is stronger evidence than a broad
             # planner hint.  Keep hinted capabilities eligible, but do not let
@@ -892,7 +907,9 @@ class CapabilityRegistry:
                 len(meaningful_queries.intersection(_variable_terms(item))) * 90
             )
             score += float(len(semantic_matches) * 60)
-            if capability_id.casefold() in {item.casefold() for item in normalized_queries}:
+            if capability_id.casefold() in {
+                item.casefold() for item in normalized_queries
+            }:
                 score += 50.0
             score += _preferred_area_bonus(contract, location)
             if requires_numeric and contract["numeric_query"] == "render_only":
@@ -902,7 +919,9 @@ class CapabilityRegistry:
             candidate["routing_query_matches"] = sorted(matched_queries)
             candidate["routing_identity_matches"] = sorted(identity_matches)
             candidate["routing_semantic_matches"] = sorted(semantic_matches)
-            candidate["routing_domains"] = sorted(domain.value for domain in declared_domains)
+            candidate["routing_domains"] = sorted(
+                domain.value for domain in declared_domains
+            )
             candidate["routing_contract"] = contract
             candidate["runtime_eligible"] = True
             candidate["runtime_render_ready"] = (
@@ -945,6 +964,7 @@ class CapabilityRegistry:
         )
         return candidates[:bounded_limit]
 
+
 ###############################################################################
 def _preferred_area_bonus(
     contract: dict[str, Any], location: ResolvedLocation | None
@@ -961,6 +981,7 @@ def _preferred_area_bonus(
         and south <= location.latitude <= north
     )
     return PREFERRED_AREA_BONUS if inside else -PREFERRED_AREA_BONUS
+
 
 ###############################################################################
 def _contract_supports(
@@ -1034,6 +1055,7 @@ def _contract_supports(
         return False
     return True
 
+
 ###############################################################################
 def _operation_candidates(operation: str) -> set[str]:
     """Map compound user-semantic operations to manifest primitives."""
@@ -1094,6 +1116,7 @@ def _operation_candidates(operation: str) -> set[str]:
         candidates.add("show")
     return candidates
 
+
 ###############################################################################
 class _UngatedRuntime:
     """Runtime view that treats every entry as enabled and accessible."""
@@ -1117,6 +1140,7 @@ class _UngatedRuntime:
         supports_mode = getattr(self.runtime_registry, "supports_mode", None)
         return not callable(supports_mode) or bool(supports_mode(capability_id, mode))
 
+
 ###############################################################################
 def _runtime_supports_render(
     runtime_registry: RuntimeEligibility, capability_id: str
@@ -1130,6 +1154,7 @@ def _runtime_supports_render(
         return True
     return bool(supports_mode(capability_id, "map"))
 
+
 ###############################################################################
 def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
     if is_json_object(capability.get("executionContract")):
@@ -1138,6 +1163,7 @@ def _has_explicit_execution_contract(capability: dict[str, Any]) -> bool:
         return True
     metadata = json_object(capability.get("metadata"))
     return is_json_object(metadata.get("execution_contract"))
+
 
 ###############################################################################
 def coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
@@ -1158,11 +1184,10 @@ def coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     ):
         return True
     country = re.sub(
-        r"[^a-z0-9]+", " ",
+        r"[^a-z0-9]+",
+        " ",
         " ".join(
-            value
-            for value in (location.country, location.location_class)
-            if value
+            value for value in (location.country, location.location_class) if value
         ).casefold(),
     ).strip()
     if not country:
@@ -1170,14 +1195,20 @@ def coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
     coverage_tokens = set(normalized.split())
     country_tokens = set(country.split())
     if (
-        "united" in coverage_tokens and "states" in coverage_tokens
-    ) or "usa" in coverage_tokens or "us" in coverage_tokens:
+        ("united" in coverage_tokens and "states" in coverage_tokens)
+        or "usa" in coverage_tokens
+        or "us" in coverage_tokens
+    ):
         return (
             {"united", "states"}.issubset(country_tokens)
             or "usa" in country_tokens
             or "us" in country_tokens
         )
-    if "europe" in coverage_tokens or "eu" in coverage_tokens or "eea" in coverage_tokens:
+    if (
+        "europe" in coverage_tokens
+        or "eu" in coverage_tokens
+        or "eea" in coverage_tokens
+    ):
         return any(
             token in country
             for token in (
@@ -1202,6 +1233,7 @@ def coverage_matches(coverage: str, location: ResolvedLocation) -> bool:
             )
         )
     return True
+
 
 ###############################################################################
 def _avoid_when_conflicts(
@@ -1241,9 +1273,7 @@ def _avoid_when_conflicts(
     for raw_phrase in raw_avoid:
         phrase = str(raw_phrase or "").casefold()
         phrase_tokens = {
-            token
-            for token in re.findall(r"[a-z0-9]+", phrase)
-            if token not in ignored
+            token for token in re.findall(r"[a-z0-9]+", phrase) if token not in ignored
         }
         if not phrase_tokens:
             continue
@@ -1259,6 +1289,7 @@ def _avoid_when_conflicts(
             return True
     return False
 
+
 ###############################################################################
 def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
     agentic_use = json_object(capability.get("agenticUse"))
@@ -1273,6 +1304,7 @@ def _declared_domains(capability: dict[str, Any]) -> set[CapabilityDomain]:
             except ValueError:
                 continue
     return declared
+
 
 ###############################################################################
 def _searchable_text(capability: dict[str, Any]) -> set[str]:
@@ -1304,6 +1336,7 @@ def _searchable_text(capability: dict[str, Any]) -> set[str]:
         for token in _query_tokens(value if is_json_array(value) else [value])
     }
 
+
 ###############################################################################
 def _subject_terms(capability: dict[str, Any]) -> set[str]:
     """Return the terms of the curated fields that name what a capability provides."""
@@ -1322,8 +1355,13 @@ def _subject_terms(capability: dict[str, Any]) -> set[str]:
         metadata.get("label"),
     ]
     return _raw_query_tokens(
-        [item for value in values for item in (value if is_json_array(value) else [value])]
+        [
+            item
+            for value in values
+            for item in (value if is_json_array(value) else [value])
+        ]
     )
+
 
 ###############################################################################
 def _names_subject(query_terms: set[str], subject_terms: set[str]) -> bool:
@@ -1336,6 +1374,7 @@ def _names_subject(query_terms: set[str], subject_terms: set[str]) -> bool:
         for subject in subject_terms
     )
 
+
 ###############################################################################
 def _variable_terms(capability: dict[str, Any]) -> set[str]:
     """Return the terms of the variables a capability declares it provides."""
@@ -1343,6 +1382,7 @@ def _variable_terms(capability: dict[str, Any]) -> set[str]:
     metadata = json_object(capability.get("metadata"))
     variables = metadata.get("variables")
     return _raw_query_tokens(variables if is_json_array(variables) else [variables])
+
 
 ###############################################################################
 def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
@@ -1359,6 +1399,7 @@ def _identity_searchable_text(capability: dict[str, Any]) -> set[str]:
         for value in values
         for token in _raw_query_tokens(value if is_json_array(value) else [value])
     }
+
 
 ###############################################################################
 def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
@@ -1387,6 +1428,7 @@ def _routing_query_terms(values: Sequence[object]) -> tuple[set[str], bool]:
                 terms.add(token)
     return terms, recognized
 
+
 ###############################################################################
 def _routing_variant_matches(
     capability: dict[str, Any],
@@ -1412,6 +1454,7 @@ def _routing_variant_matches(
         ):
             return True
     return False
+
 
 ###############################################################################
 def _routing_searchable_text(
@@ -1466,11 +1509,10 @@ def _routing_searchable_text(
         terms.add("ev_charging")
     if "electric" in terms and terms.intersection({"charging", "charger"}):
         terms.add("ev_charging")
-    if "usgs" in terms and terms.intersection(
-        {"earthquake", "seismic", "hazard"}
-    ):
+    if "usgs" in terms and terms.intersection({"earthquake", "seismic", "hazard"}):
         terms.add("usgs_hazard")
     return terms
+
 
 ###############################################################################
 def _query_tokens(values: Sequence[object]) -> set[str]:
@@ -1487,6 +1529,7 @@ def _query_tokens(values: Sequence[object]) -> set[str]:
                 tokens.add(token[:-1])
             tokens.update(_QUERY_ALIASES.get(token, set()))
     return tokens
+
 
 ###############################################################################
 def _raw_query_tokens(values: Sequence[object]) -> set[str]:

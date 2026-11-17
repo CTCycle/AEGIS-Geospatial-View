@@ -17,6 +17,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class EurostatProvider(GeospatialProvider):
     provider_id = "eurostat"
@@ -130,10 +131,12 @@ class EurostatProvider(GeospatialProvider):
         )
         return _response(request, metadata, {**payload, "jsonStatMetadata": normalized})
 
+
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
     return dict(value) if is_json_object(value) else {}
+
 
 ###############################################################################
 def _response(
@@ -153,6 +156,7 @@ def _response(
         stale=stale,
     )
 
+
 ###############################################################################
 def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
     if not is_json_object(value):
@@ -169,6 +173,7 @@ def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
         "label": value.get("label"),
         "updated": value.get("updated"),
     }
+
 
 ###############################################################################
 def _build_choropleth_payload(
@@ -212,6 +217,7 @@ def _build_choropleth_payload(
             "features": enriched_features,
         },
     }
+
 
 ###############################################################################
 def _legend_bins(values: list[float]) -> list[dict[str, float]]:

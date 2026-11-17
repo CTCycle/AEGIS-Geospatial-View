@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # from run state (failed render observations + failed map tool results) rather
 # than stored counters, so the policy survives checkpoints for free.
 
+
 ###############################################################################
 class VisionPolicy(str, Enum):
     DISABLED = "disabled"

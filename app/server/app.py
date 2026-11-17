@@ -61,13 +61,16 @@ from server.services.database_runtime import (
     DatabaseRuntimeManager,
 )
 
+
 ###############################################################################
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
+
 
 ###############################################################################
 def _dispose_sqlite_engine(database: object) -> None:
@@ -75,6 +78,7 @@ def _dispose_sqlite_engine(database: object) -> None:
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -279,9 +283,11 @@ def _database_busy_reasons(bundle: _RuntimeBundle) -> list[str]:
         reasons.append("agent runs")
     return reasons
 
+
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -293,9 +299,11 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
+
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
+
 
 ###############################################################################
 @asynccontextmanager
@@ -328,6 +336,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     finally:
         active_bundle = getattr(application.state, "runtime_bundle", bundle)
         await _shutdown_runtime_bundle(active_bundle)
+
 
 ###############################################################################
 def create_app() -> FastAPI:

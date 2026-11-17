@@ -18,10 +18,19 @@ from server.services.geospatial.providers.base import (
 JRC_TILE_ROOT = "https://storage.googleapis.com/water-world/tiles2024"
 JRC_ATTRIBUTION = "Source: EC JRC/Google (Pekel et al., Nature 2016)"
 JRC_MAX_ZOOM = 13
-JRC_PERIOD = (datetime(1984, 1, 1, tzinfo=UTC), datetime(2024, 12, 31, 23, 59, 59, tzinfo=UTC))
+JRC_PERIOD = (
+    datetime(1984, 1, 1, tzinfo=UTC),
+    datetime(2024, 12, 31, 23, 59, 59, tzinfo=UTC),
+)
 JRC_LAYERS: dict[str, tuple[str, str]] = {
-    "jrc_surface_water_occurrence": ("occurrence", "Share of 1984-2024 observations with water"),
-    "jrc_surface_water_change": ("change", "Change in water occurrence intensity, 1984-1999 vs 2000-2024"),
+    "jrc_surface_water_occurrence": (
+        "occurrence",
+        "Share of 1984-2024 observations with water",
+    ),
+    "jrc_surface_water_change": (
+        "change",
+        "Change in water occurrence intensity, 1984-1999 vs 2000-2024",
+    ),
 }
 
 
@@ -33,13 +42,18 @@ class JRCSurfaceWaterProvider:
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         layer = JRC_LAYERS.get(request.capability_id)
         if layer is None:
-            raise ProviderInvalidQueryError(f"Unknown JRC surface water layer '{request.capability_id}'.")
+            raise ProviderInvalidQueryError(
+                f"Unknown JRC surface water layer '{request.capability_id}'."
+            )
         name, label = layer
         start, end = _window(request)
-        covered = start is None or (start <= JRC_PERIOD[1] and (end is None or end >= JRC_PERIOD[0]))
+        covered = start is None or (
+            start <= JRC_PERIOD[1] and (end is None or end >= JRC_PERIOD[0])
+        )
         warnings = (
             ["The surface-water record starts in 1984; earlier years are not covered."]
-            if covered and start is not None and start < JRC_PERIOD[0] else []
+            if covered and start is not None and start < JRC_PERIOD[0]
+            else []
         )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -54,8 +68,13 @@ class JRCSurfaceWaterProvider:
             attribution=[JRC_ATTRIBUTION],
             warnings=warnings,
             result_type="raster",
-            coverage={"type": "global", "temporal_coverage": "1984-2024", "numeric_values": False,
-                      "period_composite": True, "temporal_scope_satisfied": covered},
+            coverage={
+                "type": "global",
+                "temporal_coverage": "1984-2024",
+                "numeric_values": False,
+                "period_composite": True,
+                "temporal_scope_satisfied": covered,
+            },
         )
 
 
@@ -65,10 +84,18 @@ def _window(request: ProviderRequest) -> tuple[datetime | None, datetime | None]
 
     end_value = request.params.get("end_time_iso")
     try:
-        end = datetime.fromisoformat(str(end_value).replace("Z", "+00:00")) if end_value else None
+        end = (
+            datetime.fromisoformat(str(end_value).replace("Z", "+00:00"))
+            if end_value
+            else None
+        )
     except ValueError as exc:
         raise ProviderInvalidQueryError("The end time must be ISO-8601.") from exc
     start = request.time
-    start = start.replace(tzinfo=UTC) if start is not None and start.tzinfo is None else start
+    start = (
+        start.replace(tzinfo=UTC)
+        if start is not None and start.tzinfo is None
+        else start
+    )
     end = end.replace(tzinfo=UTC) if end is not None and end.tzinfo is None else end
     return start, end

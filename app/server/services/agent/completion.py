@@ -36,9 +36,14 @@ from server.domain.agent.presentation_contract import (
     PresentationContract,
 )
 from server.domain.agent.task_ledger import map_fingerprint
-from server.domain.agent.tool_result import EvidenceAssessment, ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import (
+    EvidenceAssessment,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.services.agent.policy_engine import is_text_location_lookup
 from server.services.agent.route_references import place_targets
+
 
 ###############################################################################
 def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
@@ -48,16 +53,32 @@ def _parse_scope_time(value: str, *, inclusive_end: bool = False) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     if inclusive_end and len(value.strip()) == 10:
-        parsed = datetime.combine(parsed.date(), time.min, tzinfo=UTC) + timedelta(days=1)
+        parsed = datetime.combine(parsed.date(), time.min, tzinfo=UTC) + timedelta(
+            days=1
+        )
     return parsed
 
+
 CURRENT_TOLERANCE = timedelta(hours=2)
-_NUMERIC_AGGREGATIONS = frozenset({
-    "maximum", "max", "minimum", "min", "mean", "average", "avg", "sum", "total", "median", "count",
-})
+_NUMERIC_AGGREGATIONS = frozenset(
+    {
+        "maximum",
+        "max",
+        "minimum",
+        "min",
+        "mean",
+        "average",
+        "avg",
+        "sum",
+        "total",
+        "median",
+        "count",
+    }
+)
 
 # Error code of a transform on evidence that is raster imagery without records.
 RASTER_ONLY_CODE = "unsupported_evidence_records"
+
 
 ###############################################################################
 def needs_numeric_values(state: AgentRunState) -> bool:
@@ -75,6 +96,7 @@ def needs_numeric_values(state: AgentRunState) -> bool:
         route.temporal_scope.aggregation.strip().casefold() in _NUMERIC_AGGREGATIONS
     )
 
+
 ###############################################################################
 def analysis_unsupported(state: AgentRunState) -> bool:
     """Whether the route's analysis needs records that no available source returned.
@@ -88,38 +110,66 @@ def analysis_unsupported(state: AgentRunState) -> bool:
     """
 
     route = state.route
-    if route is None or route.presentation not in {"map", "both"} or not needs_numeric_values(state):
+    if (
+        route is None
+        or route.presentation not in {"map", "both"}
+        or not needs_numeric_values(state)
+    ):
         return False
     executed = _imagery_only_executions(state)
-    settled = {result.metadata.capability_id for result in executed} | set(state.excluded_capability_ids)
-    return bool(executed and state.capability_ids) and set(state.capability_ids) <= settled
+    settled = {result.metadata.capability_id for result in executed} | set(
+        state.excluded_capability_ids
+    )
+    return (
+        bool(executed and state.capability_ids) and set(state.capability_ids) <= settled
+    )
+
 
 ###############################################################################
 def _imagery_only_executions(state: AgentRunState) -> list[ToolResult]:
     """The run's capability executions when every one returned raster imagery, else none."""
 
     executed = [
-        result for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability" and result.status != "failed"
+        result
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status != "failed"
     ]
-    return [] if any(result.metadata.result_type != "raster" for result in executed) else executed
+    return (
+        []
+        if any(result.metadata.result_type != "raster" for result in executed)
+        else executed
+    )
+
 
 ###############################################################################
 def imagery_only_note(state: AgentRunState) -> str:
     """Name the gap when only raster imagery answered a request for values."""
 
-    if not needs_numeric_values(state) or state.route is None or not _imagery_only_executions(state):
+    if (
+        not needs_numeric_values(state)
+        or state.route is None
+        or not _imagery_only_executions(state)
+    ):
         return ""
     query = state.route.capability_queries[0] if state.route.capability_queries else ""
     aggregation = state.route.temporal_scope.aggregation
-    subject = query if aggregation == "none" or aggregation in query else f"{aggregation} {query}".strip()
+    subject = (
+        query
+        if aggregation == "none" or aggregation in query
+        else f"{aggregation} {query}".strip()
+    )
     return (
         "Only map imagery layers were available for this request. They carry no numeric values, "
         f"so the requested {subject or 'values'} could not be computed or compared."
     )
 
-_DATA_TOOLS = frozenset({"execute_geospatial_capability", "inspect_evidence", "transform_evidence"})
+
+_DATA_TOOLS = frozenset(
+    {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}
+)
 _FAILED_RESULT_STATUSES = frozenset({"unavailable", "error", "failed", "invalid"})
+
 
 ###############################################################################
 def _result_location_ref(result: ToolResult) -> str:
@@ -128,11 +178,16 @@ def _result_location_ref(result: ToolResult) -> str:
     query_ref = json_object(json_object(result.data).get("query")).get("location_ref")
     if query_ref:
         return str(query_ref)
-    sources = json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+    sources = json_array(
+        json_object(result.metadata.coverage).get("source_location_refs")
+    )
     return str(sources[0]) if sources else ""
 
+
 ###############################################################################
-def requirement_for_location(state: AgentRunState, location_ref: str) -> TargetRequirement | None:
+def requirement_for_location(
+    state: AgentRunState, location_ref: str
+) -> TargetRequirement | None:
     """Return the goal's per-target scope for a location reference, if any."""
 
     goal = state.goal
@@ -147,16 +202,24 @@ def requirement_for_location(state: AgentRunState, location_ref: str) -> TargetR
         (
             requirement
             for requirement in goal.target_requirements
-            if any(location_ref_matches(requirement.target_ref, key, label) for key, label in names)
+            if any(
+                location_ref_matches(requirement.target_ref, key, label)
+                for key, label in names
+            )
         ),
         None,
     )
 
+
 ###############################################################################
-def _is_eligible_evidence(result: ToolResult, assessment: EvidenceAssessment, analysis: bool) -> bool:
+def _is_eligible_evidence(
+    result: ToolResult, assessment: EvidenceAssessment, analysis: bool
+) -> bool:
     return bool(
-        assessment.tool_execution_success and assessment.data_valid is True
-        and assessment.data_relevant is True and (analysis or result.status != "partial")
+        assessment.tool_execution_success
+        and assessment.data_valid is True
+        and assessment.data_relevant is True
+        and (analysis or result.status != "partial")
     )
 
 
@@ -195,24 +258,35 @@ def _reused_layer_results(state: AgentRunState) -> list[ToolResult]:
         status = str(layer.get("result_status") or "").casefold()
         sources = [str(item) for item in json_array(layer.get("location_refs"))]
         ref = str(layer.get("evidence_ref") or "")
-        if ref in fetched_now or status in _FAILED_RESULT_STATUSES or (located_goal and not sources):
+        if (
+            ref in fetched_now
+            or status in _FAILED_RESULT_STATUSES
+            or (located_goal and not sources)
+        ):
             continue
-        results.append(ToolResult(
-            call_id=plan.call_id,
-            tool_name="execute_geospatial_capability",
-            status="partial" if status == "partial" else "success",
-            summary="Evidence retrieved earlier in this conversation.",
-            evidence_refs=[ref],
-            metadata=ToolExecutionMetadata(
-                capability_id=str(layer.get("capability_id") or "") or None,
-                duration_ms=0,
+        results.append(
+            ToolResult(
+                call_id=plan.call_id,
+                tool_name="execute_geospatial_capability",
+                status="partial" if status == "partial" else "success",
+                summary="Evidence retrieved earlier in this conversation.",
                 evidence_refs=[ref],
-                result_type=str(layer.get("result_type") or "") or None,
-                observation_time=str(layer.get("observation_time") or "") or None,
-                coverage={**json_object(layer.get("coverage")), "source_location_refs": sources},
-                covered_queries=[str(item) for item in json_array(layer.get("covered_queries"))],
-            ),
-        ))
+                metadata=ToolExecutionMetadata(
+                    capability_id=str(layer.get("capability_id") or "") or None,
+                    duration_ms=0,
+                    evidence_refs=[ref],
+                    result_type=str(layer.get("result_type") or "") or None,
+                    observation_time=str(layer.get("observation_time") or "") or None,
+                    coverage={
+                        **json_object(layer.get("coverage")),
+                        "source_location_refs": sources,
+                    },
+                    covered_queries=[
+                        str(item) for item in json_array(layer.get("covered_queries"))
+                    ],
+                ),
+            )
+        )
     return results
 
 
@@ -227,9 +301,14 @@ class CompletionEvaluator:
         executed = result.status != "failed" and result.error is None
         data = json_object(result.data)
         coverage = result.metadata.coverage or json_object(data.get("coverage"))
-        valid = executed and bool(result.evidence_refs or (result.data and result.metadata.result_type))
+        valid = executed and bool(
+            result.evidence_refs or (result.data and result.metadata.result_type)
+        )
         if result.status == "valid_empty":
-            valid = executed and (result.semantic_outcome == "resolved" or coverage.get("query_complete") is True)
+            valid = executed and (
+                result.semantic_outcome == "resolved"
+                or coverage.get("query_complete") is True
+            )
         required_ids = state.route.explicit_capability_ids if state.route else []
         relevant = bool(result.metadata.capability_id) and (
             not required_ids or result.metadata.capability_id in required_ids
@@ -247,13 +326,21 @@ class CompletionEvaluator:
             spatial = coverage.get("spatial_scope_satisfied")
             if not isinstance(spatial, bool):
                 spatial = None
-        sources = [str(item) for item in json_array(coverage.get("source_location_refs"))]
-        if sources and state.goal is not None and state.goal.target_ids and not any(
-            location_ref_matches(str(target), source, source)
-            for target in state.goal.target_ids
-            for source in sources
-        ) and not {normalize_target_key(source) for source in sources}.intersection(
-            normalize_target_key(key) for key in follow_up_location_keys(state)
+        sources = [
+            str(item) for item in json_array(coverage.get("source_location_refs"))
+        ]
+        if (
+            sources
+            and state.goal is not None
+            and state.goal.target_ids
+            and not any(
+                location_ref_matches(str(target), source, source)
+                for target in state.goal.target_ids
+                for source in sources
+            )
+            and not {normalize_target_key(source) for source in sources}.intersection(
+                normalize_target_key(key) for key in follow_up_location_keys(state)
+            )
         ):
             # Evidence derived from another place never covers this goal.
             relevant = False
@@ -286,45 +373,80 @@ class CompletionEvaluator:
                     if scope.get("mode") == "current" and not end_value:
                         # A live reading is sampled before or after the instant
                         # the request was routed; only a stale one is wrong.
-                        start, end = start - CURRENT_TOLERANCE, start + CURRENT_TOLERANCE
+                        start, end = (
+                            start - CURRENT_TOLERANCE,
+                            start + CURRENT_TOLERANCE,
+                        )
                     temporal = start <= actual <= end
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     temporal = None
         reasons: list[str] = []
-        for name, value in (("data_valid", valid), ("data_relevant", relevant),
-                            ("spatial_scope_satisfied", spatial), ("temporal_scope_satisfied", temporal)):
+        for name, value in (
+            ("data_valid", valid),
+            ("data_relevant", relevant),
+            ("spatial_scope_satisfied", spatial),
+            ("temporal_scope_satisfied", temporal),
+        ):
             if value is not True:
-                reasons.append(f"{name}: {'unknown' if value is None else 'false'}; inspect evidence or discover an alternate source")
+                reasons.append(
+                    f"{name}: {'unknown' if value is None else 'false'}; inspect evidence or discover an alternate source"
+                )
         return EvidenceAssessment(
-            tool_execution_success=executed, data_valid=valid, data_relevant=relevant,
-            spatial_scope_satisfied=spatial, temporal_scope_satisfied=temporal, reasons=reasons,
+            tool_execution_success=executed,
+            data_valid=valid,
+            data_relevant=relevant,
+            spatial_scope_satisfied=spatial,
+            temporal_scope_satisfied=temporal,
+            reasons=reasons,
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def data_checks(state: AgentRunState) -> dict[str, bool]:
         results = [
-            *(result for result in state.tool_results if result.tool_name in _DATA_TOOLS),
+            *(
+                result
+                for result in state.tool_results
+                if result.tool_name in _DATA_TOOLS
+            ),
             *_reused_layer_results(state),
         ]
         analysis = state.route is not None and state.route.analysis is not None
         if needs_numeric_values(state) and not analysis_unsupported(state):
             # Derived evidence inherits its parents' source; raster parents
             # cannot be transformed, so only located numeric records remain.
-            results = [result for result in results if (
-                result.tool_name == "execute_geospatial_capability"
-                and result.metadata.result_type != "raster"
-            ) or (result.tool_name == "transform_evidence" and result.metadata.capability_id)]
-        assessments = [(result, CompletionEvaluator.assess_evidence(state, result)) for result in results]
-        eligible = [(result, assessment) for result, assessment in assessments
-                    if _is_eligible_evidence(result, assessment, analysis)]
+            results = [
+                result
+                for result in results
+                if (
+                    result.tool_name == "execute_geospatial_capability"
+                    and result.metadata.result_type != "raster"
+                )
+                or (
+                    result.tool_name == "transform_evidence"
+                    and result.metadata.capability_id
+                )
+            ]
+        assessments = [
+            (result, CompletionEvaluator.assess_evidence(state, result))
+            for result in results
+        ]
+        eligible = [
+            (result, assessment)
+            for result, assessment in assessments
+            if _is_eligible_evidence(result, assessment, analysis)
+        ]
         required = set(state.route.explicit_capability_ids if state.route else [])
         route = state.route
         data_targets = _obligation_targets(state, "data")
         per_target = (
-            not required and route is not None and not analysis
-            and route.location_mode == "target" and len(data_targets) >= 2
+            not required
+            and route is not None
+            and not analysis
+            and route.location_mode == "target"
+            and len(data_targets) >= 2
         )
+
         def covered(field: str) -> bool:
             if per_target:
                 # Each requested place needs its own in-scope evidence; one
@@ -333,12 +455,18 @@ class CompletionEvaluator:
                     _target_has_scoped_evidence(state, target, eligible, field)
                     for target in data_targets
                 )
-            matched = {result.metadata.capability_id for result, assessment in eligible
-                       if getattr(assessment, field) is True}
+            matched = {
+                result.metadata.capability_id
+                for result, assessment in eligible
+                if getattr(assessment, field) is True
+            }
             # One numeric source may cover several queried metrics; the
             # registry still permits further distinct sources for analysis.
             return bool(matched) and (not required or required <= matched)
-        all_targets_covered = not uncovered_route_targets(state) and not uncovered_data_obligations(state)
+
+        all_targets_covered = not uncovered_route_targets(
+            state
+        ) and not uncovered_data_obligations(state)
         return {
             "required_data_retrieved": covered("data_valid") and all_targets_covered,
             "spatial_scope_applied": covered("spatial_scope_satisfied"),
@@ -379,7 +507,9 @@ class CompletionEvaluator:
         ):
             if (
                 completion_contract is not None
-                and getattr(completion_contract, f"{_native_flag(name)}_required", False)
+                and getattr(
+                    completion_contract, f"{_native_flag(name)}_required", False
+                )
                 and name not in required_names
             ):
                 required_names.append(name)
@@ -415,10 +545,7 @@ class CompletionEvaluator:
             "measurement_computed": True,
             "capabilities_discovered": True,
             "required_data_retrieved": not data_failure
-            and bool(
-                map_session.overlay_collection.instances
-                or valid_empty
-            ),
+            and bool(map_session.overlay_collection.instances or valid_empty),
             "temporal_scope_applied": _native_temporal_scope_applied(
                 goal,
                 map_session,
@@ -475,7 +602,9 @@ class CompletionEvaluator:
                 item["status"] = (
                     "satisfied"
                     if ready and checks.get("viewport_valid") is True
-                    else "failed" if not ready else "pending"
+                    else "failed"
+                    if not ready
+                    else "pending"
                 )
             elif name == "final_response_ready":
                 item["status"] = "satisfied" if ready else "failed"
@@ -495,9 +624,7 @@ class CompletionEvaluator:
             mode = str(instance.rendering_mode).casefold()
             descriptor = instance.descriptor
             render_status = str(
-                descriptor.get("render_status")
-                or descriptor.get("renderStatus")
-                or ""
+                descriptor.get("render_status") or descriptor.get("renderStatus") or ""
             ).casefold()
             result_type = str(
                 descriptor.get("result_type") or descriptor.get("resultType") or ""
@@ -509,6 +636,7 @@ class CompletionEvaluator:
             ):
                 return True
         return False
+
 
 ###############################################################################
 def _native_flag(name: str) -> str:
@@ -522,6 +650,7 @@ def _native_flag(name: str) -> str:
         "map_candidate_prepared": "map_preparation",
     }.get(name, name)
 
+
 ###############################################################################
 def _native_temporal_scope_applied(
     goal: AgentGoal | None,
@@ -532,7 +661,8 @@ def _native_temporal_scope_applied(
     per_target_modes = {
         requirement.temporal_scope.mode
         for requirement in (goal.target_requirements if goal else [])
-        if requirement.temporal_scope is not None and requirement.temporal_scope.mode != "none"
+        if requirement.temporal_scope is not None
+        and requirement.temporal_scope.mode != "none"
     }
     if goal is None or not (goal.temporal_scope or per_target_modes):
         return True
@@ -571,6 +701,7 @@ def _native_temporal_scope_applied(
         in expected_modes
         for instance in temporal_instances
     )
+
 
 ###############################################################################
 def _native_spatial_scope_applied(
@@ -615,6 +746,7 @@ _REQUIREMENT_DESCRIPTIONS = {
     "render_verified": "the map was not confirmed in the browser",
 }
 
+
 ###############################################################################
 def describe_requirements(names: list[str]) -> str:
     """Name unmet completion obligations in plain language for users."""
@@ -624,6 +756,7 @@ def describe_requirements(names: list[str]) -> str:
         for name in dict.fromkeys(names)
     ]
     return "; ".join(described)
+
 
 ###############################################################################
 def unmarked_route_targets(state: AgentRunState) -> list[str]:
@@ -660,6 +793,7 @@ def unmarked_route_targets(state: AgentRunState) -> list[str]:
         )
     ]
 
+
 ###############################################################################
 def requested_transform_unmet(state: AgentRunState) -> bool:
     """Whether the latest requested filter or transform failed.
@@ -669,10 +803,15 @@ def requested_transform_unmet(state: AgentRunState) -> bool:
     """
 
     latest = next(
-        (result for result in reversed(state.tool_results) if result.tool_name == "transform_evidence"),
+        (
+            result
+            for result in reversed(state.tool_results)
+            if result.tool_name == "transform_evidence"
+        ),
         None,
     )
     return latest is not None and latest.status == "failed"
+
 
 ###############################################################################
 def geometry_result(state: AgentRunState) -> ToolResult | None:
@@ -692,15 +831,21 @@ def geometry_result(state: AgentRunState) -> ToolResult | None:
                 result.status == "valid_empty"
                 or (
                     result.status == "success"
-                    and isinstance(count := json_object(result.data).get("located_record_count"), int)
+                    and isinstance(
+                        count := json_object(result.data).get("located_record_count"),
+                        int,
+                    )
                     and count > 0
                 )
             )
             and result.metadata.geometry_operations
-            and (expected is None or result.metadata.geometry_operations[-1] == expected)
+            and (
+                expected is None or result.metadata.geometry_operations[-1] == expected
+            )
         ),
         None,
     )
+
 
 ###############################################################################
 def uncovered_data_obligations(state: AgentRunState) -> list[str]:
@@ -717,11 +862,16 @@ def uncovered_data_obligations(state: AgentRunState) -> list[str]:
     imagery_counts = not analysis_unsupported(state)
     covered: set[str] = set()
     for result in [*state.tool_results, *_reused_layer_results(state)]:
-        if result.tool_name != "execute_geospatial_capability" or not result.metadata.covered_queries:
+        if (
+            result.tool_name != "execute_geospatial_capability"
+            or not result.metadata.covered_queries
+        ):
             continue
         if analysis and imagery_counts and result.metadata.result_type == "raster":
             continue
-        if _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), analysis):
+        if _is_eligible_evidence(
+            result, CompletionEvaluator.assess_evidence(state, result), analysis
+        ):
             covered.update(result.metadata.covered_queries)
     return [query for query in contract.data_obligations if query not in covered]
 
@@ -735,7 +885,11 @@ def _obligation_targets(state: AgentRunState, kind: ObligationKind) -> list[str]
 
     goal = state.goal
     if goal is None:
-        return place_targets(state.route.target_refs, state) if state.route is not None else []
+        return (
+            place_targets(state.route.target_refs, state)
+            if state.route is not None
+            else []
+        )
     return place_targets(
         dict.fromkeys(
             target
@@ -769,16 +923,33 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
     # are normalized keys, so compare both sides normalized.
     covered_keys: set[str] = set()
     for result in state.tool_results:
-        if result.tool_name not in {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}:
+        if result.tool_name not in {
+            "execute_geospatial_capability",
+            "inspect_evidence",
+            "transform_evidence",
+        }:
             continue
-        if not _is_eligible_evidence(result, CompletionEvaluator.assess_evidence(state, result), False):
+        if not _is_eligible_evidence(
+            result, CompletionEvaluator.assess_evidence(state, result), False
+        ):
             continue
         # Executions name their target in the query; inspected or derived
         # evidence (possibly from an earlier turn) carries its source targets.
-        covered_keys.add(normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")))
+        covered_keys.add(
+            normalize_target_key(
+                str(
+                    json_object(json_object(result.data).get("query")).get(
+                        "location_ref"
+                    )
+                    or ""
+                )
+            )
+        )
         covered_keys.update(
             normalize_target_key(str(ref))
-            for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+            for ref in json_array(
+                json_object(result.metadata.coverage).get("source_location_refs")
+            )
         )
     uncovered: list[str] = []
     for target in targets:
@@ -788,7 +959,9 @@ def uncovered_route_targets(state: AgentRunState) -> list[str]:
             if location_ref_matches(str(target), str(key), location.label)
         ]
         # A target that never resolved cannot have been covered.
-        if not matches or not covered_keys.intersection(normalize_target_key(key) for key in matches):
+        if not matches or not covered_keys.intersection(
+            normalize_target_key(key) for key in matches
+        ):
             uncovered.append(str(target))
     return uncovered
 
@@ -809,10 +982,19 @@ def _target_has_scoped_evidence(
     }
     for result, assessment in eligible:
         named = {
-            normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")),
+            normalize_target_key(
+                str(
+                    json_object(json_object(result.data).get("query")).get(
+                        "location_ref"
+                    )
+                    or ""
+                )
+            ),
             *(
                 normalize_target_key(str(ref))
-                for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+                for ref in json_array(
+                    json_object(result.metadata.coverage).get("source_location_refs")
+                )
             ),
         }
         if keys.intersection(named) and getattr(assessment, field) is True:
@@ -847,10 +1029,21 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
     for result in state.tool_results:
         if not set(result.evidence_refs).intersection(layer_refs):
             continue
-        shown.add(normalize_target_key(str(json_object(json_object(result.data).get("query")).get("location_ref") or "")))
+        shown.add(
+            normalize_target_key(
+                str(
+                    json_object(json_object(result.data).get("query")).get(
+                        "location_ref"
+                    )
+                    or ""
+                )
+            )
+        )
         shown.update(
             normalize_target_key(str(ref))
-            for ref in json_array(json_object(result.metadata.coverage).get("source_location_refs"))
+            for ref in json_array(
+                json_object(result.metadata.coverage).get("source_location_refs")
+            )
         )
     uncovered: list[str] = []
     for target in targets:
@@ -859,7 +1052,9 @@ def uncovered_map_targets(state: AgentRunState, layer_refs: set[str]) -> list[st
             for key, location in state.location_refs.items()
             if location_ref_matches(str(target), str(key), location.label)
         ]
-        if matches and not shown.intersection(normalize_target_key(key) for key in matches):
+        if matches and not shown.intersection(
+            normalize_target_key(key) for key in matches
+        ):
             uncovered.append(str(target))
     return uncovered
 
@@ -870,8 +1065,11 @@ _MAX_EVIDENCE_NUMBERS = 400
 # Record fields that name what a statistic's extreme record is.
 _RECORD_LABEL_KEYS = ("name", "title", "place", "label", "id")
 
+
 ###############################################################################
-def _numeric_leaves(value: object, key: str = "", depth: int = 0) -> list[tuple[str, float]]:
+def _numeric_leaves(
+    value: object, key: str = "", depth: int = 0
+) -> list[tuple[str, float]]:
     """Collect the numeric values of a tool payload, with the key that names them."""
 
     if depth > 6 or isinstance(value, bool):
@@ -886,6 +1084,7 @@ def _numeric_leaves(value: object, key: str = "", depth: int = 0) -> list[tuple[
         for item in json_array(value)[:200]:
             leaves.extend(_numeric_leaves(item, key, depth + 1))
     return leaves
+
 
 ###############################################################################
 def _position_leaves(value: object, key: str = "", depth: int = 0) -> list[float]:
@@ -904,6 +1103,7 @@ def _position_leaves(value: object, key: str = "", depth: int = 0) -> list[float
             leaves.extend(_position_leaves(item, key, depth + 1))
     return leaves
 
+
 ###############################################################################
 def evidence_coordinates(state: AgentRunState) -> list[float]:
     """Latitudes and longitudes of the records the run's and earlier turns' evidence carries.
@@ -914,12 +1114,16 @@ def evidence_coordinates(state: AgentRunState) -> list[float]:
 
     values: list[float] = []
     for result in state.tool_results:
-        if result.status != "failed" and result.tool_name != "resolve_geospatial_location":
+        if (
+            result.status != "failed"
+            and result.tool_name != "resolve_geospatial_location"
+        ):
             values.extend(_position_leaves(result.data))
     for item in state.relevant_tool_outcomes:
         if item.get("evidence_id"):
             values.extend(_position_leaves(item.get("summary")))
     return values[:_MAX_EVIDENCE_NUMBERS]
+
 
 ###############################################################################
 def evidence_numbers(state: AgentRunState) -> list[float]:
@@ -927,12 +1131,16 @@ def evidence_numbers(state: AgentRunState) -> list[float]:
 
     numbers: list[float] = []
     for result in state.tool_results:
-        if result.status == "failed" or result.tool_name == "resolve_geospatial_location":
+        if (
+            result.status == "failed"
+            or result.tool_name == "resolve_geospatial_location"
+        ):
             continue
         numbers.extend(value for _, value in _numeric_leaves(result.data))
         if len(numbers) >= _MAX_EVIDENCE_NUMBERS:
             break
     return numbers[:_MAX_EVIDENCE_NUMBERS]
+
 
 ###############################################################################
 def _time_zone_names(value: object) -> set[str]:
@@ -959,7 +1167,7 @@ def evidence_utc_offsets(state: AgentRunState) -> set[float]:
         for name in _time_zone_names(result.data):
             try:
                 offset = now.astimezone(ZoneInfo(name)).utcoffset()
-            except (ValueError, ZoneInfoNotFoundError):
+            except ValueError, ZoneInfoNotFoundError:
                 continue
             if offset is not None:
                 offsets.add(offset.total_seconds())
@@ -978,6 +1186,7 @@ def prior_evidence_numbers(state: AgentRunState) -> list[float]:
     ]
     return numbers[:_MAX_EVIDENCE_NUMBERS]
 
+
 ###############################################################################
 def key_names_variable(key: str, variable: str | None) -> bool:
     """Whether a payload key names the variable.
@@ -991,18 +1200,27 @@ def key_names_variable(key: str, variable: str | None) -> bool:
     wanted = re.sub(r"[^a-z0-9]", "", asked)
     if len(name) >= 3 and wanted and (name in wanted or wanted in name):
         return True
-    return bool(set(re.findall(r"[a-z]{3,}", leaf)) & set(re.findall(r"[a-z]{3,}", asked)))
+    return bool(
+        set(re.findall(r"[a-z]{3,}", leaf)) & set(re.findall(r"[a-z]{3,}", asked))
+    )
+
 
 ###############################################################################
-def _statistic_values(statistics: dict[str, Any], variable: str | None, limit: int) -> list[str]:
+def _statistic_values(
+    statistics: dict[str, Any], variable: str | None, limit: int
+) -> list[str]:
     """Extremes of the summarised fields, with the record holding the maximum."""
 
-    keys = [key for key in statistics if key_names_variable(key, variable)] or list(statistics)
+    keys = [key for key in statistics if key_names_variable(key, variable)] or list(
+        statistics
+    )
     values: list[str] = []
     for key in keys[:limit]:
         stat = json_object(statistics[key])
         holder = json_object(stat.get("argmax"))
-        label = next((str(holder[name]) for name in _RECORD_LABEL_KEYS if holder.get(name)), "")
+        label = next(
+            (str(holder[name]) for name in _RECORD_LABEL_KEYS if holder.get(name)), ""
+        )
         values.append(
             f"{key.replace('_', ' ')} max {stat.get('max')}"
             + (f" ({label})" if label else "")
@@ -1010,8 +1228,11 @@ def _statistic_values(statistics: dict[str, Any], variable: str | None, limit: i
         )
     return values
 
+
 ###############################################################################
-def _leading_values(result: ToolResult, limit: int = 3, variable: str | None = None) -> list[str]:
+def _leading_values(
+    result: ToolResult, limit: int = 3, variable: str | None = None
+) -> list[str]:
     """Name the first numeric facts of a result, with units where known.
 
     Facts naming the requested ``variable`` come first.
@@ -1021,7 +1242,9 @@ def _leading_values(result: ToolResult, limit: int = 3, variable: str | None = N
     if result.tool_name == "inspect_evidence":
         inspected = json_object(data.get("result"))
         if "statistics" in inspected:
-            return _statistic_values(json_object(inspected["statistics"]), variable, limit)
+            return _statistic_values(
+                json_object(inspected["statistics"]), variable, limit
+            )
         records = json_array(inspected.get("records"))
         source = json_object(records[0]) if records else {}
     else:
@@ -1039,19 +1262,24 @@ def _leading_values(result: ToolResult, limit: int = 3, variable: str | None = N
         for name, value in named[:limit]
     ]
 
+
 ###############################################################################
 def _value_numbers(result: ToolResult, variable: str | None) -> list[float]:
     """Numbers of a result that an answer about ``variable`` may cite."""
 
     leaves = [
-        (key, value) for key, value in _numeric_leaves(result.data)
+        (key, value)
+        for key, value in _numeric_leaves(result.data)
         if key != "count" and not key.endswith("_count")
     ]
     named = [value for key, value in leaves if key_names_variable(key, variable)]
     return (named or [value for _, value in leaves])[:_MAX_EVIDENCE_NUMBERS]
 
+
 ###############################################################################
-def _source_figures(result: ToolResult, variable: str | None) -> tuple[list[str], list[list[float]]]:
+def _source_figures(
+    result: ToolResult, variable: str | None
+) -> tuple[list[str], list[list[float]]]:
     """Each source's figure in a record set combined from several evidence refs.
 
     Returns the labelled values and the figures per source. A comparison over
@@ -1068,9 +1296,11 @@ def _source_figures(result: ToolResult, variable: str | None) -> tuple[list[str]
         fields = json_object(record.get("properties")) or record
         source = str(fields.get("source_ref") or "")
         named = [
-            (key, float(value)) for key, value in fields.items()
+            (key, float(value))
+            for key, value in fields.items()
             if key_names_variable(key, variable)
-            and isinstance(value, (int, float)) and not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
         ]
         if not source or not named:
             continue
@@ -1079,7 +1309,11 @@ def _source_figures(result: ToolResult, variable: str | None) -> tuple[list[str]
         numbers.append(number)
         unit = f" {result.metadata.units[key]}" if key in result.metadata.units else ""
         label = next(
-            (str(fields[name]) for name in ("place_label", "source_place", *_RECORD_LABEL_KEYS) if fields.get(name)),
+            (
+                str(fields[name])
+                for name in ("place_label", "source_place", *_RECORD_LABEL_KEYS)
+                if fields.get(name)
+            ),
             source,
         )
         values.append(f"{label}: {key.replace('_', ' ')} {number:g}{unit}")
@@ -1089,17 +1323,23 @@ def _source_figures(result: ToolResult, variable: str | None) -> tuple[list[str]
         values.append(f"difference {abs(numbers[0] - numbers[1]):g}{unit}")
     return values, list(groups.values())
 
+
 ###############################################################################
 def _scoped_data_result(state: AgentRunState, target: str) -> ToolResult | None:
     """The latest data result retrieved for ``target`` itself, if any."""
 
-    return next((
-        result for result in reversed(state.tool_results)
-        if result.tool_name == "execute_geospatial_capability"
-        and result.status in {"success", "partial"}
-        and (named := _result_location_ref(result))
-        and location_ref_matches(target, named, named)
-    ), None)
+    return next(
+        (
+            result
+            for result in reversed(state.tool_results)
+            if result.tool_name == "execute_geospatial_capability"
+            and result.status in {"success", "partial"}
+            and (named := _result_location_ref(result))
+            and location_ref_matches(target, named, named)
+        ),
+        None,
+    )
+
 
 ###############################################################################
 def _map_layer_refs(session: MapSession) -> set[str]:
@@ -1109,6 +1349,7 @@ def _map_layer_refs(session: MapSession) -> set[str]:
         if instance.descriptor.get("evidence_ref")
     }
 
+
 ###############################################################################
 def _annotated_refs(session: MapSession) -> set[str]:
     """Places whose marker carries a value label, which is data on the map."""
@@ -1117,22 +1358,36 @@ def _annotated_refs(session: MapSession) -> set[str]:
         str(properties.get("location_ref"))
         for instance in session.overlay_collection.instances
         if instance.instance_id == PLACE_MARKERS_INSTANCE_ID and instance.visible
-        for feature in json_array(json_object(instance.descriptor.get("data")).get("features"))
-        if (properties := json_object(json_object(feature).get("properties"))).get("annotation")
+        for feature in json_array(
+            json_object(instance.descriptor.get("data")).get("features")
+        )
+        if (properties := json_object(json_object(feature).get("properties"))).get(
+            "annotation"
+        )
     }
+
 
 ###############################################################################
 def _bare_value_markers(session: MapSession) -> bool:
     """Whether the map's only visible data is place markers that carry no value."""
 
-    visible = [instance for instance in session.overlay_collection.instances if instance.visible]
-    if not visible or any(instance.instance_id != PLACE_MARKERS_INSTANCE_ID for instance in visible):
+    visible = [
+        instance
+        for instance in session.overlay_collection.instances
+        if instance.visible
+    ]
+    if not visible or any(
+        instance.instance_id != PLACE_MARKERS_INSTANCE_ID for instance in visible
+    ):
         return False
-    features = json_array(json_object(visible[0].descriptor.get("data")).get("features"))
+    features = json_array(
+        json_object(visible[0].descriptor.get("data")).get("features")
+    )
     return not features or any(
         not json_object(json_object(feature).get("properties")).get("annotation")
         for feature in features
     )
+
 
 ###############################################################################
 def data_verified_empty(state: AgentRunState) -> bool:
@@ -1143,8 +1398,10 @@ def data_verified_empty(state: AgentRunState) -> bool:
     """
 
     executed = [
-        result for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability" and result.status != "failed"
+        result
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status != "failed"
     ]
     return (
         bool(executed)
@@ -1152,8 +1409,11 @@ def data_verified_empty(state: AgentRunState) -> bool:
         and CompletionEvaluator.data_checks(state)["required_data_retrieved"]
     )
 
+
 ###############################################################################
-def presentation_contract(state: AgentRunState, session: MapSession) -> PresentationContract | None:
+def presentation_contract(
+    state: AgentRunState, session: MapSession
+) -> PresentationContract | None:
     """Build the presentation contract of a map candidate from the goal.
 
     Returns ``None`` when the goal has no presentation obligation. Findings
@@ -1163,13 +1423,19 @@ def presentation_contract(state: AgentRunState, session: MapSession) -> Presenta
 
     goal = state.goal
     obligation = next(
-        (item for item in (goal.obligations if goal else []) if item.kind == "presentation" and item.required),
+        (
+            item
+            for item in (goal.obligations if goal else [])
+            if item.kind == "presentation" and item.required
+        ),
         None,
     )
     if goal is None or obligation is None:
         return None
     route = state.route
-    edits_current_map = route is not None and route.primary_domain is CapabilityDomain.MAP_STATE
+    edits_current_map = (
+        route is not None and route.primary_domain is CapabilityDomain.MAP_STATE
+    )
     targets: list[ContractTarget] = []
     for ref in [] if edits_current_map else obligation.target_ids:
         match = next(
@@ -1181,35 +1447,51 @@ def presentation_contract(state: AgentRunState, session: MapSession) -> Presenta
             None,
         )
         if match is not None:
-            targets.append(ContractTarget(
-                ref=match[0], label=match[1].label, latitude=match[1].latitude,
-                longitude=match[1].longitude, location_type=match[1].location_type,
-                bbox=match[1].bbox,
-            ))
+            targets.append(
+                ContractTarget(
+                    ref=match[0],
+                    label=match[1].label,
+                    latitude=match[1].latitude,
+                    longitude=match[1].longitude,
+                    location_type=match[1].location_type,
+                    bbox=match[1].bbox,
+                )
+            )
     findings: list[str] = []
     layer_refs = _map_layer_refs(session)
     labelled = _annotated_refs(session)
     missing = [
-        target for target in uncovered_map_targets(state, layer_refs)
+        target
+        for target in uncovered_map_targets(state, layer_refs)
         if not any(location_ref_matches(target, ref, ref) for ref in labelled)
     ]
     if missing:
         findings.append("no map layer carries the data for " + ", ".join(missing))
     contract = state.completion_contract
-    if contract is not None and contract.temporal_scope_required and any(
-        set(result.evidence_refs).intersection(layer_refs)
-        and CompletionEvaluator.assess_evidence(state, result).temporal_scope_satisfied is False
-        for result in state.tool_results
+    if (
+        contract is not None
+        and contract.temporal_scope_required
+        and any(
+            set(result.evidence_refs).intersection(layer_refs)
+            and CompletionEvaluator.assess_evidence(
+                state, result
+            ).temporal_scope_satisfied
+            is False
+            for result in state.tool_results
+        )
     ):
         findings.append("a map layer is not from the requested time window")
     if requested_transform_unmet(state):
-        findings.append("the requested filter or transform is not applied to the map data")
+        findings.append(
+            "the requested filter or transform is not applied to the map data"
+        )
     if obligation.variable and _bare_value_markers(session):
         findings.append(
             f"the map shows places without the {obligation.variable} values; "
             "label the markers with the values or map the data layer"
         )
     return PresentationContract(targets=targets, findings=findings)
+
 
 ###############################################################################
 def layer_edit_count(state: AgentRunState) -> int:
@@ -1224,8 +1506,10 @@ def layer_edit_count(state: AgentRunState) -> int:
             (
                 item.data
                 for item in reversed(state.tool_results)
-                if item.tool_name == "apply_map_plan" and item.status == "success"
-                and isinstance(item.data, dict) and "layer_edits" in item.data
+                if item.tool_name == "apply_map_plan"
+                and item.status == "success"
+                and isinstance(item.data, dict)
+                and "layer_edits" in item.data
             ),
             None,
         )
@@ -1241,6 +1525,7 @@ def layer_edit_count(state: AgentRunState) -> int:
         or (current.visible, current.opacity) != (item.visible, item.opacity)
     )
 
+
 ###############################################################################
 def _map_state(state: AgentRunState) -> MapState:
     if state.render_verified:
@@ -1251,8 +1536,11 @@ def _map_state(state: AgentRunState) -> MapState:
         return "failed"
     return "none"
 
+
 ###############################################################################
-def map_layer_counts(state: AgentRunState, session: MapSession) -> dict[str, tuple[int, int]]:
+def map_layer_counts(
+    state: AgentRunState, session: MapSession
+) -> dict[str, tuple[int, int]]:
     """(shown, total) per visible evidence layer instance: drawn features vs source records."""
 
     counts: dict[str, tuple[int, int]] = {}
@@ -1269,7 +1557,8 @@ def map_layer_counts(state: AgentRunState, session: MapSession) -> dict[str, tup
                 for item in reversed(state.tool_results)
                 if ref in item.evidence_refs
                 for key in ("truncated_from", "feature_count", "record_count")
-                if isinstance(value := json_object(item.data).get(key), int) and value > 0
+                if isinstance(value := json_object(item.data).get(key), int)
+                and value > 0
             ),
             0,
         )
@@ -1277,15 +1566,23 @@ def map_layer_counts(state: AgentRunState, session: MapSession) -> dict[str, tup
             counts[instance.instance_id] = (len(json_array(features)), total)
     return counts
 
+
 ###############################################################################
 def _truncations(state: AgentRunState) -> list[tuple[int, int]]:
     session = state.prepared_map_session or state.active_map_session
     if session is None:
         return []
-    return [(shown, total) for shown, total in map_layer_counts(state, session).values() if shown < total][-8:]
+    return [
+        (shown, total)
+        for shown, total in map_layer_counts(state, session).values()
+        if shown < total
+    ][-8:]
+
 
 ###############################################################################
-def _obligation_result(state: AgentRunState, obligation: RequestObligation) -> ToolResult | None:
+def _obligation_result(
+    state: AgentRunState, obligation: RequestObligation
+) -> ToolResult | None:
     if obligation.id.startswith("analysis:geometry:"):
         return geometry_result(state)
     kind = obligation.kind
@@ -1296,16 +1593,21 @@ def _obligation_result(state: AgentRunState, obligation: RequestObligation) -> T
         else {"transform_evidence", "measure_geospatial", "inspect_evidence"}
     )
     candidates = [
-        result for result in state.tool_results
-        if result.tool_name in tools and result.status in {"success", "partial", "valid_empty"}
+        result
+        for result in state.tool_results
+        if result.tool_name in tools
+        and result.status in {"success", "partial", "valid_empty"}
     ]
     if kind == "data" and target:
         scoped = [
-            result for result in candidates
-            if (named := _result_location_ref(result)) and location_ref_matches(target, named, named)
+            result
+            for result in candidates
+            if (named := _result_location_ref(result))
+            and location_ref_matches(target, named, named)
         ]
         candidates = scoped or candidates
     return candidates[-1] if candidates else None
+
 
 ###############################################################################
 def _identified_place(state: AgentRunState, target: str) -> tuple[str, str] | None:
@@ -1324,6 +1626,7 @@ def _identified_place(state: AgentRunState, target: str) -> tuple[str, str] | No
         return location.label, location.label.split(",")[0].strip()
     return None
 
+
 ###############################################################################
 def _identification_places(
     state: AgentRunState, targets: list[str]
@@ -1339,9 +1642,11 @@ def _identification_places(
     names = [
         name
         for location in state.location_refs.values()
-        if location.location_type == "coordinates" and (name := location.reverse_geocoded_name())
+        if location.location_type == "coordinates"
+        and (name := location.reverse_geocoded_name())
     ]
     return [(names[-1], names[-1].split(",")[0].strip())] if names else []
+
 
 ###############################################################################
 def _obligation_label(obligation: RequestObligation) -> str:
@@ -1351,36 +1656,56 @@ def _obligation_label(obligation: RequestObligation) -> str:
     if obligation.kind == "location":
         return f"the place {places}" if places else "the requested place"
     if obligation.kind == "identification":
-        return f"the name of the place at {places}" if places else "the name of the requested place"
+        return (
+            f"the name of the place at {places}"
+            if places
+            else "the name of the requested place"
+        )
     if obligation.kind == "data":
-        subject = f"{obligation.variable} data" if obligation.variable else "the requested data"
+        subject = (
+            f"{obligation.variable} data"
+            if obligation.variable
+            else "the requested data"
+        )
         return f"{subject} for {places}" if places else subject
     if obligation.id == "analysis:geometry:derived":
         return "the requested geometry operation"
     return f"the requested {obligation.id.split(':')[-1].replace('_', ' ')}"
+
 
 ###############################################################################
 def _substitutions(state: AgentRunState) -> list[tuple[str, str, str]]:
     """Covering sources that replaced a rejected one and then ran."""
 
     executed = {
-        result.metadata.capability_id for result in state.tool_results
-        if result.tool_name == "execute_geospatial_capability" and result.status == "success"
+        result.metadata.capability_id
+        for result in state.tool_results
+        if result.tool_name == "execute_geospatial_capability"
+        and result.status == "success"
     }
     substitutions: list[tuple[str, str, str]] = []
     for result in state.tool_results:
-        record = json_object(json_object(result.data).get("substitution")) if result.status == "failed" else {}
+        record = (
+            json_object(json_object(result.data).get("substitution"))
+            if result.status == "failed"
+            else {}
+        )
         if not record.get("alternative_id") or record["alternative_id"] not in executed:
             continue
         item = (
-            str(record.get("rejected_name")), str(record.get("coverage") or ""), str(record.get("alternative_name"))
+            str(record.get("rejected_name")),
+            str(record.get("coverage") or ""),
+            str(record.get("alternative_name")),
         )
         if item not in substitutions:
             substitutions.append(item)
     return substitutions[:4]
 
+
 ###############################################################################
-def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> CompletionSummary:
+def build_completion_summary(
+    state: AgentRunState, checks: dict[str, bool]
+) -> CompletionSummary:
     """Turn the run's verified facts into per-obligation outcomes.
 
     ``checks`` are the loop's requirement verdicts. A render observation only
@@ -1394,14 +1719,23 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
     map_state = _map_state(state)
     findings: list[str] = []
     if map_state == "failed":
-        failure = next((item for item in state.render_observations if item.status == "failed"), None)
-        if failure is not None and failure.failure_stage == "presentation_contract" and failure.failure_summary:
+        failure = next(
+            (item for item in state.render_observations if item.status == "failed"),
+            None,
+        )
+        if (
+            failure is not None
+            and failure.failure_stage == "presentation_contract"
+            and failure.failure_summary
+        ):
             findings = [failure.failure_summary]
     uncovered = uncovered_route_targets(state)
     outcomes: list[ObligationOutcome] = []
     # An answer-mode route has no tools to satisfy an obligation with and skips
     # the pre-tool obligation check, so what its model declared decides nothing.
-    for obligation in (goal.obligations if goal is not None and goal.task_mode != "answer" else []):
+    for obligation in (
+        goal.obligations if goal is not None and goal.task_mode != "answer" else []
+    ):
         if not obligation.required:
             continue
         evidence_ref: str | None = None
@@ -1411,16 +1745,25 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
         label = _obligation_label(obligation)
         status: ObligationStatus
         if obligation.kind == "presentation":
-            status = "met" if map_state == "rendered" else "failed" if map_state == "failed" else "unmet"
+            status = (
+                "met"
+                if map_state == "rendered"
+                else "failed"
+                if map_state == "failed"
+                else "unmet"
+            )
         elif obligation.kind == "identification":
             # Met only by resolution evidence that names every target place;
             # the answer must then name it too.
-            place_ids = obligation.target_ids or (goal.target_ids if goal is not None else [])
+            place_ids = obligation.target_ids or (
+                goal.target_ids if goal is not None else []
+            )
             places = _identification_places(state, place_ids)
             named = [item for item in places if item is not None]
             status = "met" if named and len(named) == len(places) else "unmet"
             if not place_ids and any(
-                result.status == "success" and result.evidence_refs for result in state.tool_results
+                result.status == "success" and result.evidence_refs
+                for result in state.tool_results
             ):
                 # "Which one was strongest?" identifies a record, not a place:
                 # the evidence holding that record delivers it.
@@ -1436,7 +1779,10 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 # Always routed, even on a contract that resolves nothing (a
                 # recenter on a known place): the place is delivered once known.
                 known = bool(obligation.target_ids) and all(
-                    any(location_ref_matches(target, str(key), item.label) for key, item in state.location_refs.items())
+                    any(
+                        location_ref_matches(target, str(key), item.label)
+                        for key, item in state.location_refs.items()
+                    )
                     for target in obligation.target_ids
                 )
                 status = "met" if known else "unmet"
@@ -1448,33 +1794,65 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 and analysis_unsupported(state)
             ):
                 status = "unsupported"
-            elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(state):
+            elif obligation.kind in {"data", "analysis"} and requested_transform_unmet(
+                state
+            ):
                 status = "failed"
-            elif obligation.kind == "data" and target is not None and any(
-                location_ref_matches(target, name, name) for name in state.failed_data_targets
+            elif (
+                obligation.kind == "data"
+                and target is not None
+                and any(
+                    location_ref_matches(target, name, name)
+                    for name in state.failed_data_targets
+                )
             ):
                 status = "failed"
             else:
-                target_uncovered = obligation.kind == "data" and target is not None and any(
-                    location_ref_matches(target, name, name) for name in uncovered
+                target_uncovered = (
+                    obligation.kind == "data"
+                    and target is not None
+                    and any(
+                        location_ref_matches(target, name, name) for name in uncovered
+                    )
                 )
-                status = "met" if checks.get(requirement, False) and not target_uncovered else "unmet"
-            result = None if obligation.kind == "location" else _obligation_result(state, obligation)
+                status = (
+                    "met"
+                    if checks.get(requirement, False) and not target_uncovered
+                    else "unmet"
+                )
+            result = (
+                None
+                if obligation.kind == "location"
+                else _obligation_result(state, obligation)
+            )
             # Retrieved figures stay deliverable when only a later analysis
             # step failed.
-            if result is not None and (status == "met" or (obligation.kind == "data" and status == "failed")):
+            if result is not None and (
+                status == "met" or (obligation.kind == "data" and status == "failed")
+            ):
                 evidence_ref = result.evidence_refs[0] if result.evidence_refs else None
                 values = _leading_values(result, variable=obligation.variable)
-            if obligation.kind == "location" and status == "met" and is_text_location_lookup(state.route):
-                located = next((
-                    item for key, item in state.location_refs.items()
-                    if target is not None and location_ref_matches(target, str(key), item.label)
-                ), None)
+            if (
+                obligation.kind == "location"
+                and status == "met"
+                and is_text_location_lookup(state.route)
+            ):
+                located = next(
+                    (
+                        item
+                        for key, item in state.location_refs.items()
+                        if target is not None
+                        and location_ref_matches(target, str(key), item.label)
+                    ),
+                    None,
+                )
                 if located is not None:
                     # The coordinates are the requested result, so the answer
                     # must cite them; either sign, for "9.14 W".
                     label = (located.label or label)[:200]
-                    values = [f"latitude {located.latitude:.5f}, longitude {located.longitude:.5f}"]
+                    values = [
+                        f"latitude {located.latitude:.5f}, longitude {located.longitude:.5f}"
+                    ]
                     cite_groups = [
                         [located.latitude, -located.latitude],
                         [located.longitude, -located.longitude],
@@ -1483,29 +1861,47 @@ def build_completion_summary(state: AgentRunState, checks: dict[str, bool]) -> C
                 # A comparison cites each target's own figure (or their
                 # difference); any other analysis cites its result.
                 figures, cite_groups = (
-                    _source_figures(result, obligation.variable) if result is not None else ([], [])
+                    _source_figures(result, obligation.variable)
+                    if result is not None
+                    else ([], [])
                 )
                 if figures:
                     values = figures
                 else:
-                    scoped = [_scoped_data_result(state, item) for item in obligation.target_ids]
+                    scoped = [
+                        _scoped_data_result(state, item)
+                        for item in obligation.target_ids
+                    ]
                     sources = (
                         [item for item in scoped if item is not None]
                         if len(scoped) > 1
-                        else [result] if result is not None else []
+                        else [result]
+                        if result is not None
+                        else []
                     )
-                    cite_groups = [_value_numbers(item, obligation.variable) for item in sources]
-        outcomes.append(ObligationOutcome(
-            obligation_id=obligation.id, kind=obligation.kind, status=status,
-            label=label,
-            evidence_ref=evidence_ref, values=values, answer_must_name=must_name,
-            cite_groups=cite_groups,
-        ))
+                    cite_groups = [
+                        _value_numbers(item, obligation.variable) for item in sources
+                    ]
+        outcomes.append(
+            ObligationOutcome(
+                obligation_id=obligation.id,
+                kind=obligation.kind,
+                status=status,
+                label=label,
+                evidence_ref=evidence_ref,
+                values=values,
+                answer_must_name=must_name,
+                cite_groups=cite_groups,
+            )
+        )
     return CompletionSummary(
-        obligations=outcomes, map_state=map_state,
-        presentation_findings=findings, substitutions=_substitutions(state),
+        obligations=outcomes,
+        map_state=map_state,
+        presentation_findings=findings,
+        substitutions=_substitutions(state),
         truncations=_truncations(state),
     )
+
 
 ###############################################################################
 def ledger_outcomes(
@@ -1527,7 +1923,11 @@ def ledger_outcomes(
     verdicts = {item.obligation_id: item for item in summary.obligations}
     required = [item for item in goal.obligations if item.required]
     data_ids = [item.id for item in required if item.kind in {"data", "analysis"}]
-    shown = state.active_map_session if state.render_verified else state.prepared_map_session
+    shown = (
+        state.active_map_session
+        if state.render_verified
+        else state.prepared_map_session
+    )
     tasks: list[ConversationTask] = []
     for obligation in required:
         verdict = verdicts.get(obligation.id)
@@ -1541,10 +1941,13 @@ def ledger_outcomes(
             status = "failed"
             reason = (
                 "requested_transform_unmet"
-                if obligation.kind in {"data", "analysis"} and requested_transform_unmet(state)
+                if obligation.kind in {"data", "analysis"}
+                and requested_transform_unmet(state)
                 else "provider_failed"
             )
-        elif obligation.kind == "presentation" and state.prepared_map_session is not None:
+        elif (
+            obligation.kind == "presentation" and state.prepared_map_session is not None
+        ):
             status = "in_progress"
         elif verdict.status == "unsupported":
             status, reason = "blocked", "evidence_unsupported"
@@ -1564,7 +1967,11 @@ def ledger_outcomes(
                 item.id
                 for item in required
                 if item.kind == "location"
-                and any(location_ref_matches(ref, other, other) for ref in item.target_ids for other in obligation.target_ids)
+                and any(
+                    location_ref_matches(ref, other, other)
+                    for ref in item.target_ids
+                    for other in obligation.target_ids
+                )
             ]
         elif obligation.kind == "analysis":
             dependencies = [item for item in data_ids if item != obligation.id]
@@ -1574,26 +1981,35 @@ def ledger_outcomes(
         if status == "completed":
             fetched = result.metadata.fetched_at if result is not None else None
             completed_at = _parse_scope_time(fetched) if fetched else now
-        tasks.append(ConversationTask(
-            task_id=obligation.id,
-            description=_obligation_label(obligation)[:300],
-            kind=obligation.kind,
-            status=status,
-            reason=reason,
-            dependencies=dependencies[:16],
-            target_ids=list(obligation.target_ids),
-            capability_id=result.metadata.capability_id if result is not None else None,
-            variable=obligation.variable,
-            temporal_scope=obligation.temporal_scope,
-            filters=dict(goal.filters),
-            evidence_refs=list(result.evidence_refs[:8]) if result is not None and status == "completed" else [],
-            map_revision=(
-                map_fingerprint(shown) if obligation.kind == "presentation" and shown is not None else None
-            ),
-            source_request_id=state.request_id,
-            completed_at=completed_at,
-        ))
+        tasks.append(
+            ConversationTask(
+                task_id=obligation.id,
+                description=_obligation_label(obligation)[:300],
+                kind=obligation.kind,
+                status=status,
+                reason=reason,
+                dependencies=dependencies[:16],
+                target_ids=list(obligation.target_ids),
+                capability_id=result.metadata.capability_id
+                if result is not None
+                else None,
+                variable=obligation.variable,
+                temporal_scope=obligation.temporal_scope,
+                filters=dict(goal.filters),
+                evidence_refs=list(result.evidence_refs[:8])
+                if result is not None and status == "completed"
+                else [],
+                map_revision=(
+                    map_fingerprint(shown)
+                    if obligation.kind == "presentation" and shown is not None
+                    else None
+                ),
+                source_request_id=state.request_id,
+                completed_at=completed_at,
+            )
+        )
     return tasks
+
 
 ###############################################################################
 def follow_up_location_keys(state: AgentRunState) -> set[str]:
@@ -1610,23 +2026,31 @@ def follow_up_location_keys(state: AgentRunState) -> set[str]:
         return set()
 
     def is_goal_target(key: str, label: str) -> bool:
-        return any(location_ref_matches(str(target), key, label) for target in goal.target_ids)
+        return any(
+            location_ref_matches(str(target), key, label) for target in goal.target_ids
+        )
 
     areas = [
         location.bbox
         for key, location in state.location_refs.items()
-        if location.bbox and len(location.bbox) == 4 and is_goal_target(str(key), location.label)
+        if location.bbox
+        and len(location.bbox) == 4
+        and is_goal_target(str(key), location.label)
     ]
     keys: set[str] = set()
     for result in state.tool_results:
-        if result.tool_name != "resolve_geospatial_location" or result.status != "success":
+        if (
+            result.tool_name != "resolve_geospatial_location"
+            or result.status != "success"
+        ):
             continue
         key = str(json_object(result.data).get("target_id") or "")
         location = state.location_refs.get(key)
         if location is None or is_goal_target(key, location.label):
             continue
         if any(
-            area[0] <= location.longitude <= area[2] and area[1] <= location.latitude <= area[3]
+            area[0] <= location.longitude <= area[2]
+            and area[1] <= location.latitude <= area[3]
             for area in areas
         ):
             keys.add(key)

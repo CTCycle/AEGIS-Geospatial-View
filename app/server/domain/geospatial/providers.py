@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderRequest:
@@ -15,6 +16,7 @@ class ProviderRequest:
     zoom: int | None = None
     time: datetime | None = None
     params: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -35,6 +37,7 @@ class ProviderResponse:
     source_url: str | None = None
     partial: bool = False
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderExecutionPolicy:
@@ -49,11 +52,15 @@ class ProviderExecutionPolicy:
     circuit_recovery_seconds: float = 60.0
 
 
-_RUN_PROVIDER_POLICY: ContextVar[ProviderExecutionPolicy | None] = ContextVar("run_provider_policy", default=None)
+_RUN_PROVIDER_POLICY: ContextVar[ProviderExecutionPolicy | None] = ContextVar(
+    "run_provider_policy", default=None
+)
 
 
 ###############################################################################
-def current_provider_policy(default: ProviderExecutionPolicy) -> ProviderExecutionPolicy:
+def current_provider_policy(
+    default: ProviderExecutionPolicy,
+) -> ProviderExecutionPolicy:
     return _RUN_PROVIDER_POLICY.get() or default
 
 

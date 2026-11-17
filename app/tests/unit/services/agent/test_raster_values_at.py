@@ -16,9 +16,9 @@ LEGEND = {
     "entries": [{"color": "#00ff00", "label": "Forest"}],
 }
 
+
 ###############################################################################
 class _Evidence:
-
     # -------------------------------------------------------------------------
     def __init__(self, kind: str, payload: dict[str, Any]) -> None:
         self.item = (
@@ -36,6 +36,7 @@ class _Evidence:
     def get_payload(self, evidence_id: str, *, conversation_id: str | None = None):  # noqa: ANN201, ARG002
         return self.item
 
+
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -45,6 +46,7 @@ def _state() -> AgentRunState:
         user_message="what land cover is at these points",
         evidence_refs=["raster-1"],
     )
+
 
 ###############################################################################
 def _request(*points: tuple[float, float]) -> InspectEvidenceInput:
@@ -56,18 +58,41 @@ def _request(*points: tuple[float, float]) -> InspectEvidenceInput:
         }
     )
 
+
 ###############################################################################
 async def test_values_at_samples_each_point_with_descriptor_legend_and_time() -> None:
     calls: list[tuple[Any, ...]] = []
 
-    async def sampler(capability_id: str, lon: float, lat: float, z: int, time: str | None, *, legend: Any) -> dict[str, Any]:
+    async def sampler(
+        capability_id: str,
+        lon: float,
+        lat: float,
+        z: int,
+        time: str | None,
+        *,
+        legend: Any,
+    ) -> dict[str, Any]:
         calls.append((capability_id, z, time, legend))
-        sample = {"value": None, "label": "Forest", "units": None, "kind": "categorical", "matched_color": "#00ff00"}
-        return {"z": z, "time": time, "legend_title": "Land cover", "units": None, "kind": "categorical",
-                "sample": sample if lon > 0 else None}
+        sample = {
+            "value": None,
+            "label": "Forest",
+            "units": None,
+            "kind": "categorical",
+            "matched_color": "#00ff00",
+        }
+        return {
+            "z": z,
+            "time": time,
+            "legend_title": "Land cover",
+            "units": None,
+            "kind": "categorical",
+            "sample": sample if lon > 0 else None,
+        }
 
     handler = EvidenceToolHandler(
-        repository=_Evidence("raster_descriptor", {"render": {"time": "2021-01-01"}, "legend": LEGEND}),  # type: ignore[arg-type]
+        repository=_Evidence(
+            "raster_descriptor", {"render": {"time": "2021-01-01"}, "legend": LEGEND}
+        ),  # type: ignore[arg-type]
         raster_sampler=sampler,
     )
 
@@ -80,10 +105,13 @@ async def test_values_at_samples_each_point_with_descriptor_legend_and_time() ->
         {"lon": -10.0, "lat": 45.0, "value": None, "label": None, "no_data": True},
     ]
 
+
 ###############################################################################
 async def test_values_at_reports_layer_without_legend_and_non_raster_evidence() -> None:
     async def sampler(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        raise GeospatialSampleUnavailableError("Capability 'fixture_land_cover' has no colour legend to read values from.")
+        raise GeospatialSampleUnavailableError(
+            "Capability 'fixture_land_cover' has no colour legend to read values from."
+        )
 
     no_legend = await EvidenceToolHandler(
         repository=_Evidence("raster_descriptor", {"render": {}}),  # type: ignore[arg-type]

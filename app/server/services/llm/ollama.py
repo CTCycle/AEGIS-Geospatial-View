@@ -43,9 +43,9 @@ from server.services.llm.types import (
 
 _LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
@@ -88,6 +88,7 @@ class _OllamaLibraryParser(HTMLParser):
         )
         self._active_model = None
         self._chunks = []
+
 
 ###############################################################################
 class OllamaProvider(LLMProvider):

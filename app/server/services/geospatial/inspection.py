@@ -12,6 +12,7 @@ from server.contracts.geospatial import (
     MapInspection,
 )
 
+
 ###############################################################################
 class MapInspectionService:
     MAX_FIELDS = 14

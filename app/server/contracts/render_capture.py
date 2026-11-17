@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # render handshake already carries.  The agent loop reads the capture back on
 # the next vision-enabled model step.
 
+
 ###############################################################################
 class RenderCaptureCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")

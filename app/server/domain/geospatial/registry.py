@@ -7,6 +7,7 @@ from typing import Any, Literal, Mapping, cast
 from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialManifestSnapshot:
@@ -44,6 +45,7 @@ class GeospatialManifestSnapshot:
             runtime_profiles=collection("runtime_profiles"),
         )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class CapabilityRegistrySnapshot:
@@ -54,11 +56,13 @@ class CapabilityRegistrySnapshot:
     transit: list[dict[str, Any]]
     tools: list[dict[str, Any]]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RuntimeRegistrySnapshot:
     profiles: dict[str, dict[str, Any]]
     manifests: dict[str, dict[str, Any]]
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -68,6 +72,7 @@ class AttributionEntry:
     label: str
     url: str
     required: bool
+
 
 ###############################################################################
 class LiveValidationCheckResult(BaseModel):
@@ -80,6 +85,7 @@ class LiveValidationCheckResult(BaseModel):
     message: str | None = None
     feature_count: int | None = None
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
 
 ###############################################################################
 class LiveValidationReport(BaseModel):
@@ -96,6 +102,7 @@ class LiveValidationReport(BaseModel):
     @property
     def ok(self) -> bool:
         return self.error_count == 0
+
 
 ###############################################################################
 @dataclass(frozen=True)

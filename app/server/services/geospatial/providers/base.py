@@ -20,6 +20,7 @@ ProviderFailureClass = Literal[
     "transient", "capacity", "unsupported", "credential_missing", "malformed"
 ]
 
+
 ###############################################################################
 class ProviderError(Exception):
     """Base error for geospatial provider execution failures.
@@ -31,15 +32,18 @@ class ProviderError(Exception):
     failure_class: ProviderFailureClass = "transient"
     attempts: int = 1
 
+
 ###############################################################################
 class ProviderAuthError(ProviderError):
     """Raised when a provider needs credentials that are unavailable or invalid."""
 
     failure_class: ProviderFailureClass = "credential_missing"
 
+
 ###############################################################################
 class ProviderCircuitOpenError(ProviderError):
     """Raised when a provider circuit is open after repeated failures."""
+
 
 ###############################################################################
 class ProviderRateLimitError(ProviderError):
@@ -54,13 +58,16 @@ class ProviderRateLimitError(ProviderError):
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
 
+
 ###############################################################################
 class ProviderTimeoutError(ProviderError):
     """Raised when a provider request exceeds its timeout."""
 
+
 ###############################################################################
 class ProviderUnavailableError(ProviderError):
     """Raised when a provider cannot be reached or is temporarily unhealthy."""
+
 
 ###############################################################################
 class ProviderMalformedPayloadError(ProviderError):
@@ -68,17 +75,20 @@ class ProviderMalformedPayloadError(ProviderError):
 
     failure_class: ProviderFailureClass = "malformed"
 
+
 ###############################################################################
 class ProviderInvalidQueryError(ProviderError):
     """Raised when a provider rejects a deterministic or invalid query."""
 
     failure_class: ProviderFailureClass = "unsupported"
 
+
 ###############################################################################
 class ProviderUnsupportedError(ProviderError):
     """Raised when a provider cannot serve the capability at query time at all."""
 
     failure_class: ProviderFailureClass = "unsupported"
+
 
 ###############################################################################
 def provider_error_for_http_status(
@@ -98,6 +108,7 @@ def provider_error_for_http_status(
         return ProviderInvalidQueryError(message)
     return ProviderUnavailableError(message)
 
+
 ###############################################################################
 def classify_provider_error(error: BaseException) -> ProviderFailureClass | None:
     """Return the failure class of a provider error, or None for foreign errors."""
@@ -106,6 +117,7 @@ def classify_provider_error(error: BaseException) -> ProviderFailureClass | None
 
 
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")
+
 
 ###############################################################################
 def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
@@ -117,6 +129,7 @@ def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
         else:
             safe[key_text] = value
     return safe
+
 
 ###############################################################################
 def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
@@ -131,6 +144,7 @@ def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     return f"{payload['provider']}:{request.capability_id}:{digest}"
+
 
 ###############################################################################
 def response_without_credentials(response: ProviderResponse) -> ProviderResponse:
@@ -154,6 +168,7 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
         partial=response.partial,
     )
 
+
 ###############################################################################
 def _redact_secrets(value: Any) -> Any:
     if is_json_object(value):
@@ -170,6 +185,7 @@ def _redact_secrets(value: Any) -> Any:
     if isinstance(value, str) and "://" in value:
         return _redact_url_query(value)
     return value
+
 
 ###############################################################################
 def _redact_url_query(value: str) -> str:
@@ -195,6 +211,7 @@ def _redact_url_query(value: str) -> str:
         )
     )
 
+
 ###############################################################################
 class GeospatialProvider(Protocol):
     provider_id: str
@@ -216,6 +233,7 @@ class GeospatialProvider(Protocol):
     ) -> ProviderCredentialValidationResult:
         """Validate provider credentials without persisting them."""
         return await unsupported_credential_validation(self.provider_id)
+
 
 ###############################################################################
 async def unsupported_credential_validation(

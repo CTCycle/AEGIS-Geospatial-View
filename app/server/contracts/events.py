@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
 
+
 ###############################################################################
 class RunEventType(StrEnum):
     PROGRESS = "progress"
@@ -26,10 +27,12 @@ class RunEventType(StrEnum):
     TRACE = "trace"
     CHECKPOINT = "checkpoint"
 
+
 ###############################################################################
 class RunEventVisibility(StrEnum):
     USER = "user"
     INTERNAL = "internal"
+
 
 ###############################################################################
 class RunProgressStage(StrEnum):
@@ -62,9 +65,11 @@ RUN_PROGRESS_LABELS: dict[RunProgressStage, str] = {
     RunProgressStage.CANCELLED: "Cancelled",
 }
 
+
 ###############################################################################
 class RunEventPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class RunEvent(BaseModel):
@@ -79,6 +84,7 @@ class RunEvent(BaseModel):
     timestamp: datetime
     visibility: RunEventVisibility
     payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 class RunEventCreate(BaseModel):

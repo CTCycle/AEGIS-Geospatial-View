@@ -65,6 +65,7 @@ OUTBOUND_QUEUE_SIZE = 256
 OUTBOUND_ENQUEUE_TIMEOUT_SECONDS = 5.0
 MAX_COMMANDS_PER_MINUTE = 60
 
+
 ###############################################################################
 class RealtimeConnectionRegistry:
     """Tracks live sockets so shutdown can close them deterministically."""
@@ -101,9 +102,9 @@ class RealtimeConnectionRegistry:
         async with self._lock:
             return len(self._connections)
 
+
 ###############################################################################
 class RealtimeConnection:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -496,7 +497,9 @@ class RealtimeConnection:
             result = await acknowledge(self.conversation_id, payload)
         else:
             if self.render_completion_service is None:
-                raise RenderAcknowledgementError("Render acknowledgment is unavailable.")
+                raise RenderAcknowledgementError(
+                    "Render acknowledgment is unavailable."
+                )
             result = await self.render_completion_service.acknowledge(
                 conversation_id=self.conversation_id,
                 payload=payload,
@@ -657,6 +660,7 @@ class RealtimeConnection:
         if isinstance(exc, RunAttachmentError):
             return "attachment_unavailable"
         return "run_service_failure"
+
 
 ###############################################################################
 def is_realtime_origin_allowed(websocket: WebSocket) -> bool:

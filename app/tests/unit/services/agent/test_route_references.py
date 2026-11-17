@@ -4,7 +4,11 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityRoute
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.completion import uncovered_route_targets
 from server.services.agent.route_references import route_reference_kind
@@ -16,7 +20,10 @@ RADAR = "RainViewer Recent Precipitation Radar"
 ###############################################################################
 def _state(targets: list[str]) -> AgentRunState:
     state = AgentRunState(
-        phase=AgentPhase.ROUTE_REQUEST, request_id="r", conversation_id="c", user_message="Remove it."
+        phase=AgentPhase.ROUTE_REQUEST,
+        request_id="r",
+        conversation_id="c",
+        user_message="Remove it.",
     )
     state.route = CapabilityRoute(
         primary_domain=CapabilityDomain.DATA_RETRIEVAL,
@@ -25,7 +32,9 @@ def _state(targets: list[str]) -> AgentRunState:
         location_mode="target",
         target_refs=targets,
     )
-    layer = SimpleNamespace(instance_id="layer-1", capability_id="rainviewer_radar", label=RADAR)
+    layer = SimpleNamespace(
+        instance_id="layer-1", capability_id="rainviewer_radar", label=RADAR
+    )
     state.__dict__["active_map_session"] = cast(
         Any, SimpleNamespace(overlay_collection=SimpleNamespace(instances=[layer]))
     )
@@ -55,7 +64,9 @@ def test_a_place_whose_name_merely_contains_a_layer_word_stays_a_place() -> None
 ###############################################################################
 def test_a_resolved_place_wins_over_a_layer_spelling_the_same_name() -> None:
     state = _state([RADAR])
-    state.location_refs[RADAR.casefold()] = ResolvedLocation(label=RADAR, latitude=1.0, longitude=2.0)
+    state.location_refs[RADAR.casefold()] = ResolvedLocation(
+        label=RADAR, latitude=1.0, longitude=2.0
+    )
 
     assert route_reference_kind(RADAR, state) == "location"
 

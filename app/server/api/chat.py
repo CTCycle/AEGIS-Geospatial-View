@@ -54,9 +54,11 @@ from server.services.llm.errors import (
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
+
 
 ###############################################################################
 def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
@@ -77,6 +79,7 @@ def _build_run_request(payload: ChatTurnRequest) -> AgentRunCreateRequest:
                 include_url=False, include_context=False, include_input=False
             ),
         ) from exc
+
 
 ###############################################################################
 @router.post(
@@ -187,6 +190,7 @@ async def chat_turn(
             detail=str(exc),
         ) from exc
 
+
 ###############################################################################
 @router.post(
     CHAT_ATTACHMENTS_ROUTE,
@@ -199,7 +203,10 @@ async def create_chat_attachment(
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatAttachmentResponse:
     """Hold one user image for the next run start that references it."""
-    if runtime.conversation_repository.get_conversation(payload.conversation_id) is None:
+    if (
+        runtime.conversation_repository.get_conversation(payload.conversation_id)
+        is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found.",
@@ -222,6 +229,7 @@ async def create_chat_attachment(
         attachment_id=attachment_id,
         expires_in_seconds=int(store.ttl_seconds),
     )
+
 
 ###############################################################################
 @router.get(
@@ -269,6 +277,7 @@ def get_models(
             ),
         ) from exc
 
+
 ###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
@@ -285,6 +294,7 @@ def get_settings(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+
 
 ###############################################################################
 @router.patch(
@@ -306,6 +316,7 @@ def update_settings(
             detail=str(exc),
         ) from exc
 
+
 ###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
@@ -322,6 +333,7 @@ def refresh_ollama_models(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
 
 ###############################################################################
 @router.post(
@@ -353,6 +365,7 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Ollama pull failed.",
         ) from exc
+
 
 ###############################################################################
 @router.get(

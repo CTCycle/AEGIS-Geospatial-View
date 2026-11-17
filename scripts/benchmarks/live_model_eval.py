@@ -56,7 +56,10 @@ from tests.agent_benchmark.live_grading import (  # noqa: E402
 from tests.agent_benchmark.scenario_matrix import load_scenario_matrix  # noqa: E402
 
 BENCHMARK_DIR = ROOT / "app" / "tests" / "agent_benchmark"
-MATRICES = {"main": "scenario_matrix.v1.json", "holdout": "scenario_matrix.holdout.v1.json"}
+MATRICES = {
+    "main": "scenario_matrix.v1.json",
+    "holdout": "scenario_matrix.holdout.v1.json",
+}
 BASELINE_PATH = BENCHMARK_DIR / "live_eval_baseline.v1.json"
 SUBPROTOCOL = "aegis.realtime.v1"
 TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
@@ -72,9 +75,13 @@ class MissingCredentialsError(RuntimeError):
 def _commit() -> str:
     try:
         return subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         return "unknown"
 
 
@@ -84,11 +91,15 @@ def _slug(value: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-def select_scenarios(matrix_names: list[str], ids: set[str], limit: int | None) -> list[dict[str, Any]]:
+def select_scenarios(
+    matrix_names: list[str], ids: set[str], limit: int | None
+) -> list[dict[str, Any]]:
     scenarios: list[dict[str, Any]] = []
     for name in matrix_names:
         document = load_scenario_matrix(BENCHMARK_DIR / MATRICES[name])
-        scenarios.extend(s for s in document["scenarios"] if s["lane"] == "model_in_loop")
+        scenarios.extend(
+            s for s in document["scenarios"] if s["lane"] == "model_in_loop"
+        )
     if ids:
         unknown = ids - {s["id"] for s in scenarios}
         if unknown:
@@ -106,7 +117,9 @@ class AppClient:
         self.http = httpx.Client(base_url=f"{self.base_url}/api", timeout=30.0)
 
     # -------------------------------------------------------------------------
-    def configure_model(self, provider: str, model: str, api_key_env: str) -> dict[str, Any]:
+    def configure_model(
+        self, provider: str, model: str, api_key_env: str
+    ) -> dict[str, Any]:
         """Select the evaluated model; return the previous settings for restoring."""
 
         previous = self.http.get("/chat/settings")
@@ -122,19 +135,27 @@ class AppClient:
             patch["credentials"] = {provider: {"api_key": key}}
         response = self.http.patch("/chat/settings", json=patch)
         if response.status_code != 200:
-            raise RuntimeError(f"Model selection rejected ({response.status_code}): {response.text[:300]}")
+            raise RuntimeError(
+                f"Model selection rejected ({response.status_code}): {response.text[:300]}"
+            )
         current: dict[str, Any] = response.json()
         stored = current.get("credentials", {}).get(provider, {}).get("api_key")
         if provider != "ollama" and not stored:
             self.restore(before)
-            raise MissingCredentialsError(f"No API key for provider '{provider}' (set ${api_key_env}).")
+            raise MissingCredentialsError(
+                f"No API key for provider '{provider}' (set ${api_key_env})."
+            )
         return before
 
     # -------------------------------------------------------------------------
     def restore(self, before: dict[str, Any]) -> None:
         patch = {
             key: before.get(key)
-            for key in ("active_provider_mode", "agent_model_provider", "agent_model_name")
+            for key in (
+                "active_provider_mode",
+                "agent_model_provider",
+                "agent_model_name",
+            )
             if before.get(key)
         }
         if patch:
@@ -159,7 +180,9 @@ class AppClient:
             params: dict[str, Any] = {"limit": 200, "include_internal": "true"}
             if cursor:
                 params["cursor"] = cursor
-            page = self.http.get(f"/conversations/{conversation_id}/runs/{run_id}/trace", params=params)
+            page = self.http.get(
+                f"/conversations/{conversation_id}/runs/{run_id}/trace", params=params
+            )
             page.raise_for_status()
             body: dict[str, Any] = page.json()
             events.extend(body["events"])
@@ -185,24 +208,44 @@ class AppClient:
 ###############################################################################
 def _message(kind: str, payload: dict[str, Any]) -> str:
     return json.dumps(
-        {"protocol_version": 1, "type": kind, "message_id": uuid.uuid4().hex, "payload": payload}
+        {
+            "protocol_version": 1,
+            "type": kind,
+            "message_id": uuid.uuid4().hex,
+            "payload": payload,
+        }
     )
 
 
 # -----------------------------------------------------------------------------
-def run_turn_realtime(ws: Any, prompt: str, deadline: float, *, cancel_on_map: bool) -> dict[str, Any]:
+def run_turn_realtime(
+    ws: Any, prompt: str, deadline: float, *, cancel_on_map: bool
+) -> dict[str, Any]:
     """Send one prompt over the realtime socket and wait for the run to settle."""
 
-    ws.send(_message("run.start", {"message": prompt, "client_request_id": uuid.uuid4().hex}))
+    ws.send(
+        _message(
+            "run.start", {"message": prompt, "client_request_id": uuid.uuid4().hex}
+        )
+    )
     started = time.monotonic()
-    outcome: dict[str, Any] = {"run_id": None, "timed_out": False, "render_pending": False}
+    outcome: dict[str, Any] = {
+        "run_id": None,
+        "timed_out": False,
+        "render_pending": False,
+    }
     cancelled = False
     while True:
         remaining = started + deadline - time.monotonic()
         if remaining <= 0:
             outcome["timed_out"] = True
             if outcome["run_id"] and not cancelled:
-                ws.send(_message("run.cancel", {"run_id": outcome["run_id"], "reason": "eval deadline"}))
+                ws.send(
+                    _message(
+                        "run.cancel",
+                        {"run_id": outcome["run_id"], "reason": "eval deadline"},
+                    )
+                )
             break
         try:
             raw = ws.recv(timeout=min(remaining, 5.0))
@@ -223,7 +266,12 @@ def run_turn_realtime(ws: Any, prompt: str, deadline: float, *, cancel_on_map: b
             if event_type == "map_prepared" and cancel_on_map and not cancelled:
                 outcome["render_pending"] = True
                 cancelled = True
-                ws.send(_message("run.cancel", {"run_id": payload["run_id"], "reason": "render unverifiable"}))
+                ws.send(
+                    _message(
+                        "run.cancel",
+                        {"run_id": payload["run_id"], "reason": "render unverifiable"},
+                    )
+                )
             elif event_type in TERMINAL_EVENTS:
                 break
     outcome["duration_seconds"] = time.monotonic() - started
@@ -231,14 +279,22 @@ def run_turn_realtime(ws: Any, prompt: str, deadline: float, *, cancel_on_map: b
 
 
 # -----------------------------------------------------------------------------
-def drive_scenario_realtime(client: AppClient, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+def drive_scenario_realtime(
+    client: AppClient, scenario: dict[str, Any]
+) -> list[dict[str, Any]]:
     prompts = [scenario["prompt"]] if "prompt" in scenario else list(scenario["turns"])
     deadline = float(scenario.get("max_turn_seconds") or DEFAULT_MAX_TURN_SECONDS)
     conversation_id = client.create_conversation()
-    websocket_url = client.base_url.replace("http", "ws", 1) + f"/api/conversations/{conversation_id}/realtime"
+    websocket_url = (
+        client.base_url.replace("http", "ws", 1)
+        + f"/api/conversations/{conversation_id}/realtime"
+    )
     runs: list[dict[str, Any]] = []
     with connect(
-        websocket_url, subprotocols=[SUBPROTOCOL], origin=client.base_url, max_size=None  # type: ignore[list-item]
+        websocket_url,
+        subprotocols=[SUBPROTOCOL],
+        origin=client.base_url,
+        max_size=None,  # type: ignore[list-item]
     ) as ws:
         for prompt in prompts:
             outcome = run_turn_realtime(ws, prompt, deadline, cancel_on_map=True)
@@ -273,7 +329,9 @@ def drive_scenarios_browser(
             for scenario in scenarios:
                 page = browser.new_page()
                 try:
-                    collected[scenario["id"]] = _drive_scenario_browser(client, scenario, page, ui_url)
+                    collected[scenario["id"]] = _drive_scenario_browser(
+                        client, scenario, page, ui_url
+                    )
                     write_snapshot(page, shots, scenario["id"])
                 finally:
                     page.close()
@@ -283,7 +341,9 @@ def drive_scenarios_browser(
 
 
 # -----------------------------------------------------------------------------
-def _drive_scenario_browser(client: AppClient, scenario: dict[str, Any], page: Any, ui_url: str) -> list[dict[str, Any]]:
+def _drive_scenario_browser(
+    client: AppClient, scenario: dict[str, Any], page: Any, ui_url: str
+) -> list[dict[str, Any]]:
     prompts = [scenario["prompt"]] if "prompt" in scenario else list(scenario["turns"])
     deadline = float(scenario.get("max_turn_seconds") or DEFAULT_MAX_TURN_SECONDS)
     page.goto(ui_url)
@@ -308,7 +368,9 @@ def _drive_scenario_browser(client: AppClient, scenario: dict[str, Any], page: A
             latest = client.latest_run_ids(conversation_id, len(runs) + 1)
             fresh = [rid for rid in latest if rid not in known]
             if fresh:
-                snapshot = client.http.get(f"/conversations/{conversation_id}/runs/{fresh[-1]}").json()
+                snapshot = client.http.get(
+                    f"/conversations/{conversation_id}/runs/{fresh[-1]}"
+                ).json()
                 if snapshot.get("state") in TERMINAL_STATES:
                     runs.append({"run_id": fresh[-1]})
                     settled = True
@@ -321,13 +383,17 @@ def _drive_scenario_browser(client: AppClient, scenario: dict[str, Any], page: A
     assert conversation_id is not None
     records = [client.run_record(conversation_id, item["run_id"]) for item in runs]
     for record, duration in zip(records, durations, strict=False):
-        record.update(duration_seconds=duration, timed_out=duration > deadline + 90 or timed_out)
+        record.update(
+            duration_seconds=duration, timed_out=duration > deadline + 90 or timed_out
+        )
     return records
 
 
 # -----------------------------------------------------------------------------
 def _conversation_id(page: Any) -> str | None:
-    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')")
+    raw = page.evaluate(
+        "() => window.sessionStorage.getItem('aegis:webapp-ui-state:v1')"
+    )
     try:
         state = json.loads(raw) if raw else {}
     except ValueError:
@@ -338,23 +404,40 @@ def _conversation_id(page: Any) -> str | None:
 
 ###############################################################################
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--provider", required=True)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--base-url", default=os.environ.get("AEGIS_EVAL_BASE_URL", "http://127.0.0.1:5013"))
-    parser.add_argument("--ui-url", help="UI origin for browser mode (defaults to --base-url).")
+    parser.add_argument(
+        "--base-url",
+        default=os.environ.get("AEGIS_EVAL_BASE_URL", "http://127.0.0.1:5013"),
+    )
+    parser.add_argument(
+        "--ui-url", help="UI origin for browser mode (defaults to --base-url)."
+    )
     parser.add_argument("--matrix", choices=["main", "holdout", "both"], default="both")
     parser.add_argument("--scenario", default="", help="Comma-separated scenario ids.")
     parser.add_argument("--limit", type=int)
-    parser.add_argument("--no-render", action="store_true", help="Skip the browser; render is UNVERIFIED.")
+    parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="Skip the browser; render is UNVERIFIED.",
+    )
     parser.add_argument("--api-key-env", default="AEGIS_EVAL_API_KEY")
     parser.add_argument("--baseline", type=Path, default=BASELINE_PATH)
-    parser.add_argument("--write-baseline", action="store_true", help="Record this run as the model baseline.")
+    parser.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="Record this run as the model baseline.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
     names = ["main", "holdout"] if args.matrix == "both" else [args.matrix]
-    scenarios = select_scenarios(names, {s for s in args.scenario.split(",") if s}, args.limit)
+    scenarios = select_scenarios(
+        names, {s for s in args.scenario.split(",") if s}, args.limit
+    )
     model_key = f"{args.provider}/{args.model}"
     out = args.output_dir / _slug(model_key)
     out.mkdir(parents=True, exist_ok=True)
@@ -364,7 +447,9 @@ def main() -> int:
     try:
         previous = client.configure_model(args.provider, args.model, args.api_key_env)
     except MissingCredentialsError as exc:
-        (out / "skipped.json").write_text(json.dumps({"model": model_key, "skipped": str(exc)}), encoding="utf-8")
+        (out / "skipped.json").write_text(
+            json.dumps({"model": model_key, "skipped": str(exc)}), encoding="utf-8"
+        )
         print(f"SKIPPED {model_key}: {exc}")
         return SKIPPED_EXIT
     except (httpx.HTTPError, RuntimeError) as exc:
@@ -378,18 +463,29 @@ def main() -> int:
                 print(f"[{scenario['id']}] ...", flush=True)
                 by_scenario[scenario["id"]] = drive_scenario_realtime(client, scenario)
         else:
-            by_scenario = drive_scenarios_browser(client, scenarios, args.ui_url or args.base_url, out / "screenshots")
+            by_scenario = drive_scenarios_browser(
+                client, scenarios, args.ui_url or args.base_url, out / "screenshots"
+            )
     finally:
         client.restore(previous)
 
-    results = [grade_scenario(s, by_scenario.get(s["id"], []), render_mode=render_mode) for s in scenarios]
-    baseline: dict[str, Any] = json.loads(args.baseline.read_text(encoding="utf-8")) if args.baseline.exists() else {}
+    results = [
+        grade_scenario(s, by_scenario.get(s["id"], []), render_mode=render_mode)
+        for s in scenarios
+    ]
+    baseline: dict[str, Any] = (
+        json.loads(args.baseline.read_text(encoding="utf-8"))
+        if args.baseline.exists()
+        else {}
+    )
     comparison = compare_to_baseline(model_key, results, baseline)
 
     traces = out / "traces"
     traces.mkdir(exist_ok=True)
     for scenario_id, runs in by_scenario.items():
-        (traces / f"{scenario_id}.json").write_text(json.dumps(runs, indent=1, default=str), encoding="utf-8")
+        (traces / f"{scenario_id}.json").write_text(
+            json.dumps(runs, indent=1, default=str), encoding="utf-8"
+        )
     report = {
         "model": model_key,
         "commit": _commit(),
@@ -398,19 +494,30 @@ def main() -> int:
         "comparison": comparison,
         "results": results,
     }
-    (out / "results.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out / "summary.md").write_text(render_markdown(model_key, results, comparison), encoding="utf-8")
+    (out / "results.json").write_text(
+        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (out / "summary.md").write_text(
+        render_markdown(model_key, results, comparison), encoding="utf-8"
+    )
 
     if args.write_baseline:
         baseline.setdefault("models", {})[model_key] = {
             "recorded_commit": report["commit"],
             "scenarios": {
-                r["scenario_id"]: {"verdict": r["verdict"], **({"explanation": ""} if r["verdict"] == "fail" else {})}
+                r["scenario_id"]: {
+                    "verdict": r["verdict"],
+                    **({"explanation": ""} if r["verdict"] == "fail" else {}),
+                }
                 for r in results
             },
         }
-        args.baseline.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
-        print(f"Baseline updated for {model_key}; document every failing scenario's explanation.")
+        args.baseline.write_text(
+            json.dumps(baseline, indent=2) + "\n", encoding="utf-8"
+        )
+        print(
+            f"Baseline updated for {model_key}; document every failing scenario's explanation."
+        )
     print((out / "summary.md").read_text(encoding="utf-8"))
     return 0 if comparison["gate_passed"] else 1
 

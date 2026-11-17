@@ -6,7 +6,11 @@ from typing import Any, cast
 import pytest
 from pydantic import BaseModel
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityRoute
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
 from server.domain.agent.tool_result import ToolExecutionMetadata, ToolResult
@@ -15,7 +19,11 @@ from server.domain.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.native_orchestrator import NativeAgentOrchestrator
-from server.services.agent.turn_runner import AgentTurnRequest, AgentTurnRunner, _operation
+from server.services.agent.turn_runner import (
+    AgentTurnRequest,
+    AgentTurnRunner,
+    _operation,
+)
 from server.services.agent.tool_definitions import RouteRequestInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
@@ -25,11 +33,8 @@ from server.services.agent.agent_state_factory import AgentStateFactory
 # --- test_turn.py ---
 
 
-
-
 ###############################################################################
 class _Provider:
-
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
@@ -40,9 +45,9 @@ class _Provider:
         self.calls += 1
         return self.results.popleft()
 
+
 ###############################################################################
 class _Factory:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
@@ -51,9 +56,9 @@ class _Factory:
     def get_provider(self, _provider: str) -> _Provider:
         return self.provider
 
+
 ###############################################################################
 class _CapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def servable_queries(self, queries: Any) -> list[str]:
         return list(queries)
@@ -66,9 +71,9 @@ class _CapabilityRegistry:
     def shortlist(self, **_kwargs: Any) -> list[dict[str, Any]]:
         return [{"id": "places:hospitals"}]
 
+
 ###############################################################################
 class _RuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def is_enabled(self, _capability_id: str) -> bool:
         return True
@@ -77,9 +82,11 @@ class _RuntimeRegistry:
     def access_available(self, _capability_id: str) -> bool:
         return True
 
+
 ###############################################################################
 class _Input(BaseModel):
     pass
+
 
 ###############################################################################
 async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
@@ -90,6 +97,7 @@ async def _handler(_arguments: BaseModel, _state: Any) -> ToolResult:
         summary="ok",
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
+
 
 ###############################################################################
 def _runner(provider: _Provider) -> AgentTurnRunner:
@@ -146,6 +154,7 @@ def _runner(provider: _Provider) -> AgentTurnRunner:
     )
     return AgentTurnRunner(agent_loop=loop)
 
+
 ###############################################################################
 def _route_call() -> LLMResult:
     return LLMResult(
@@ -165,6 +174,7 @@ def _route_call() -> LLMResult:
         ],
     )
 
+
 ###############################################################################
 async def _run(provider: _Provider):
     return await _runner(provider).run(
@@ -178,6 +188,7 @@ async def _run(provider: _Provider):
         )
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_returns_bounded_response_contract() -> None:
@@ -189,6 +200,7 @@ async def test_native_runner_returns_bounded_response_contract() -> None:
     assert response.presentation_status == "not_requested"
     assert response.execution_trace is not None
     assert response.execution_trace["transition_trace"]
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -208,6 +220,7 @@ async def test_native_runner_marks_map_text_without_candidate_failed() -> None:
 
     assert response.operation.status == "failed"
     assert response.presentation_status == "failed"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -238,6 +251,7 @@ async def test_native_runner_preserves_location_refs_in_response() -> None:
 
     assert response.location_refs["rome"] == location
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_exposes_control_stops_as_failed_operations() -> None:
@@ -256,6 +270,7 @@ async def test_native_runner_exposes_control_stops_as_failed_operations() -> Non
     assert response.operation.kind == "error"
     assert response.operation.status == "failed"
     assert response.operation.failure_category == "cancelled"
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -283,6 +298,7 @@ def test_disclosed_evidence_gap_is_a_partial_answer_not_a_failure(
     operation = _operation(outcome, None, message)
 
     assert (operation.kind, operation.status) == (kind, status)
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -323,6 +339,7 @@ async def test_native_runner_resumes_a_valid_checkpoint_without_rerouting() -> N
     assert response.execution_trace["checkpoint"]["request_id"] == "request-resume"
     assert provider.calls == 1
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
@@ -349,26 +366,59 @@ async def test_native_runner_persists_safe_checkpoint_boundaries() -> None:
     assert checkpoints[0].route is not None
     assert checkpoints[-1].budget_snapshot["model_calls"] == 2
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_run_policy_snapshot_survives_settings_change_and_checkpoint(monkeypatch) -> None:
+async def test_run_policy_snapshot_survives_settings_change_and_checkpoint(
+    monkeypatch,
+) -> None:
     from dataclasses import asdict
     from server.configurations.settings import AgentExecutionSettings
-    from server.domain.geospatial.providers import current_provider_policy, ProviderExecutionPolicy
+    from server.domain.geospatial.providers import (
+        current_provider_policy,
+        ProviderExecutionPolicy,
+    )
     from server.services.agent.agent_loop import AgentLoopOutcome
+
     captured = []
+
     async def capture(loop, request):
-        captured.append((request, loop.tool_executor.timeout_seconds,
-            current_provider_policy(ProviderExecutionPolicy()).timeout_seconds))
-        return AgentLoopOutcome(state=request.state, final_text='Done', stopped_reason='goal_satisfied', model_calls=0)
-    monkeypatch.setattr(AgentLoop, 'run', capture)
+        captured.append(
+            (
+                request,
+                loop.tool_executor.timeout_seconds,
+                current_provider_policy(ProviderExecutionPolicy()).timeout_seconds,
+            )
+        )
+        return AgentLoopOutcome(
+            state=request.state,
+            final_text="Done",
+            stopped_reason="goal_satisfied",
+            model_calls=0,
+        )
+
+    monkeypatch.setattr(AgentLoop, "run", capture)
     runner = _runner(_Provider([]))
     original_timeout = runner.agent_loop.tool_executor.timeout_seconds
-    old = AgentExecutionSettings(max_iterations=4, tool_execution_seconds=8, provider_request_seconds=3)
-    new = AgentExecutionSettings(max_iterations=9, tool_execution_seconds=18, provider_request_seconds=6)
+    old = AgentExecutionSettings(
+        max_iterations=4, tool_execution_seconds=8, provider_request_seconds=3
+    )
+    new = AgentExecutionSettings(
+        max_iterations=9, tool_execution_seconds=18, provider_request_seconds=6
+    )
+
     def request(policy, checkpoint=None):
-        return AgentTurnRequest(request_id='r', conversation_id='c', user_message='test', provider='fake',
-            model='fake-model', budget=AgentExecutionBudget(), execution_settings=policy, checkpoint=checkpoint)
+        return AgentTurnRequest(
+            request_id="r",
+            conversation_id="c",
+            user_message="test",
+            provider="fake",
+            model="fake-model",
+            budget=AgentExecutionBudget(),
+            execution_settings=policy,
+            checkpoint=checkpoint,
+        )
+
     await runner.run(request(old))
     checkpoint = captured[0][0].state.checkpoint()
     await runner.run(request(new))
@@ -379,8 +429,8 @@ async def test_run_policy_snapshot_survives_settings_change_and_checkpoint(monke
     assert runner.agent_loop.tool_executor.timeout_seconds == original_timeout
     assert current_provider_policy(ProviderExecutionPolicy()).timeout_seconds == 10
 
-# --- test_agent_state_factory.py ---
 
+# --- test_agent_state_factory.py ---
 
 
 ###############################################################################
@@ -395,6 +445,7 @@ def test_factory_creates_bounded_receive_state() -> None:
     assert state.user_message == "show traffic"
     assert state.phase.value == "receive_request"
     assert state.evidence_refs == ["evidence:1"]
+
 
 ###############################################################################
 def test_factory_hydrates_the_complete_native_context_package() -> None:
@@ -438,6 +489,7 @@ def test_factory_hydrates_the_complete_native_context_package() -> None:
     assert state.omitted_message_ids == [2]
     assert state.summarized_through_turn_index == 2
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "kwargs",
@@ -450,9 +502,12 @@ def test_factory_rejects_invalid_lifecycle_inputs(kwargs: dict[str, str]) -> Non
     with pytest.raises(ValueError):
         AgentStateFactory.create(**kwargs)
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_orchestrator_serializes_turns_and_drops_idle_conversation_locks() -> None:
+async def test_orchestrator_serializes_turns_and_drops_idle_conversation_locks() -> (
+    None
+):
     orchestrator = NativeAgentOrchestrator(
         agent_turn_runner=cast(Any, None),
         settings_repo=cast(Any, None),

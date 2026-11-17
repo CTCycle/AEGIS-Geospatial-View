@@ -39,7 +39,11 @@ from server.domain.agent.tool_result import (
 from server.repositories.agent_evidence import AgentEvidenceRepository
 from server.services.agent.basemap_intent import match_requested_basemap, names_centre
 from server.services.agent.capability_execution import ToolExecutionContext
-from server.services.agent.completion import evidence_numbers, geometry_result, layer_edit_count
+from server.services.agent.completion import (
+    evidence_numbers,
+    geometry_result,
+    layer_edit_count,
+)
 from server.services.agent.final_answer_check import value_is_supported
 from server.services.agent.tool_registry import (
     is_active_map_update,
@@ -57,6 +61,7 @@ from server.services.geospatial.map_session_builder import (
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 def _ungrounded_annotation(plan: MapPlan, state: AgentRunState) -> str | None:
     """Return the first marker label whose number the run's evidence lacks."""
@@ -73,7 +78,9 @@ def _ungrounded_annotation(plan: MapPlan, state: AgentRunState) -> str | None:
 
 
 ###############################################################################
-def _addressed_to_replacements(actions: list[MapAction], replaced: dict[str, str]) -> list[MapAction]:
+def _addressed_to_replacements(
+    actions: list[MapAction], replaced: dict[str, str]
+) -> list[MapAction]:
     """Point actions that address a superseded layer at the layer replacing it."""
 
     return [
@@ -84,6 +91,7 @@ def _addressed_to_replacements(actions: list[MapAction], replaced: dict[str, str
         for action in actions
     ]
 
+
 ###############################################################################
 def _query_subject(summary: dict[str, Any]) -> tuple[str, ...] | None:
     """What a data query was about, independent of its time window and filters."""
@@ -93,7 +101,13 @@ def _query_subject(summary: dict[str, Any]) -> tuple[str, ...] | None:
         return None
     return tuple(
         json.dumps(query.get(key), sort_keys=True)
-        for key in ("operation", "location_ref", "resolved_location", "bbox", "radius_m")
+        for key in (
+            "operation",
+            "location_ref",
+            "resolved_location",
+            "bbox",
+            "radius_m",
+        )
     )
 
 
@@ -111,6 +125,7 @@ def _is_location_only_map(state: AgentRunState) -> bool:
         or is_active_map_update(route, state)
     )
 
+
 ###############################################################################
 def _already_shown(state: AgentRunState, candidate: MapSession) -> bool:
     """Whether the candidate is the committed map and the user still sees it.
@@ -125,12 +140,20 @@ def _already_shown(state: AgentRunState, candidate: MapSession) -> bool:
     bounds = json_object(state.map_memory.get("current_view")).get("bounds")
     if not isinstance(bounds, list):
         return True
-    edges = [float(value) for value in cast(list[object], bounds) if isinstance(value, (int, float))]
+    edges = [
+        float(value)
+        for value in cast(list[object], bounds)
+        if isinstance(value, (int, float))
+    ]
     if len(edges) != 4:
         return True
     west, south, east, north = edges
     viewport = candidate.viewport
-    return west <= viewport.center_longitude <= east and south <= viewport.center_latitude <= north
+    return (
+        west <= viewport.center_longitude <= east
+        and south <= viewport.center_latitude <= north
+    )
+
 
 ###############################################################################
 def targets_outside_view(state: AgentRunState, view: list[float]) -> list[str]:
@@ -151,6 +174,7 @@ def targets_outside_view(state: AgentRunState, view: list[float]) -> list[str]:
         )
     ]
 
+
 ###############################################################################
 def _resolved_target_locations(state: AgentRunState) -> list[tuple[str, list[Any]]]:
     if not _is_location_only_map(state) or state.route is None:
@@ -166,9 +190,9 @@ def _resolved_target_locations(state: AgentRunState) -> list[tuple[str, list[Any
             resolved.append((str(target), matches))
     return resolved
 
+
 ###############################################################################
 class EvidenceReader(Protocol):
-
     # -------------------------------------------------------------------------
     def get_summary(
         self, evidence_id: str, *, conversation_id: str | None = None
@@ -178,6 +202,7 @@ class EvidenceReader(Protocol):
     def get_payload(
         self, evidence_id: str, *, conversation_id: str | None = None
     ) -> tuple[Any, bytes] | None: ...
+
 
 ###############################################################################
 class MapPlanService:
@@ -219,7 +244,9 @@ class MapPlanService:
                 recovery="replan",
             )
 
-        unresolved = unresolved_route_targets(state) if _is_location_only_map(state) else []
+        unresolved = (
+            unresolved_route_targets(state) if _is_location_only_map(state) else []
+        )
         if unresolved:
             # A location from an earlier turn must not stand in for a requested
             # place whose own resolution is missing, failed or ambiguous.
@@ -336,7 +363,8 @@ class MapPlanService:
             # anchor the model chose.
             effective_actions = [
                 action.model_copy(update={"anchor": "location"})
-                if isinstance(action, SetViewportAction) and action.strategy == "zoom_in"
+                if isinstance(action, SetViewportAction)
+                and action.strategy == "zoom_in"
                 else action
                 for action in effective_actions
             ]
@@ -355,9 +383,14 @@ class MapPlanService:
         effective_plan = plan.model_copy(update={"actions": effective_actions})
         try:
             evidence = self._evidence_for_plan(effective_plan, state, context)
-            replaced = self._superseded_layer_removals(effective_actions, evidence, active_session, context)
+            replaced = self._superseded_layer_removals(
+                effective_actions, evidence, active_session, context
+            )
             effective_actions = [
-                *(RemoveLayerAction(action="remove_layer", instance_id=old) for old in replaced),
+                *(
+                    RemoveLayerAction(action="remove_layer", instance_id=old)
+                    for old in replaced
+                ),
                 *_addressed_to_replacements(effective_actions, replaced),
             ]
             candidate = await self.session_builder.build(
@@ -381,7 +414,9 @@ class MapPlanService:
                 derived_geometry is not None
                 and derived_geometry.status == "success"
                 and not any(
-                    item.visible and item.descriptor.get("evidence_ref") in derived_geometry.evidence_refs
+                    item.visible
+                    and item.descriptor.get("evidence_ref")
+                    in derived_geometry.evidence_refs
                     for item in candidate.overlay_collection.instances
                 )
             ):
@@ -393,7 +428,11 @@ class MapPlanService:
                     message="Show the requested geometry using the evidence_ref from its transform_evidence result.",
                     recovery="correct_arguments",
                 )
-            if state.route is not None and len(state.route.target_refs) > 1 and evidence:
+            if (
+                state.route is not None
+                and len(state.route.target_refs) > 1
+                and evidence
+            ):
                 candidate = viewport_covering_evidence(candidate, evidence)
             if self._valid_empty_data_only(state):
                 payload = dict(candidate.payload)
@@ -469,8 +508,11 @@ class MapPlanService:
             )
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="map_candidate_build",
-                run_id=context.run_id or state.run_id, call_id=context.call_id,
+                LOGGER,
+                exc,
+                stage="map_candidate_build",
+                run_id=context.run_id or state.run_id,
+                call_id=context.call_id,
             )
             return self._failure(
                 context=context,
@@ -497,7 +539,10 @@ class MapPlanService:
                 tool_name=self.TOOL_NAME,
                 status="success",
                 summary="The map already shows exactly this plan; nothing was re-rendered.",
-                data={"render_status": "already_shown", "basemap_id": candidate.basemap_id},
+                data={
+                    "render_status": "already_shown",
+                    "basemap_id": candidate.basemap_id,
+                },
                 evidence_refs=list(dict.fromkeys(evidence_refs)),
                 metadata=ToolExecutionMetadata(
                     duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
@@ -550,21 +595,30 @@ class MapPlanService:
             if item.evidence_ref not in layer_refs or not capability_id:
                 continue
             query = item.summary.get("query")
-            place: dict[str, Any] = cast("dict[str, Any]", query) if isinstance(query, dict) else {}
-            layers.append({
-                "evidence_ref": item.evidence_ref,
-                "capability_id": capability_id,
-                "result_type": item.summary.get("result_type"),
-                "result_status": item.summary.get("result_status"),
-                "location_refs": [
-                    str(value)
-                    for value in (place.get("location_ref"), place.get("resolved_location"))
-                    if value
-                ],
-                "coverage": item.summary.get("coverage"),
-                "observation_time": item.provenance.get("observation_time"),
-                "covered_queries": self.capability_registry.covered_queries(capability_id, queries),
-            })
+            place: dict[str, Any] = (
+                cast("dict[str, Any]", query) if isinstance(query, dict) else {}
+            )
+            layers.append(
+                {
+                    "evidence_ref": item.evidence_ref,
+                    "capability_id": capability_id,
+                    "result_type": item.summary.get("result_type"),
+                    "result_status": item.summary.get("result_status"),
+                    "location_refs": [
+                        str(value)
+                        for value in (
+                            place.get("location_ref"),
+                            place.get("resolved_location"),
+                        )
+                        if value
+                    ],
+                    "coverage": item.summary.get("coverage"),
+                    "observation_time": item.provenance.get("observation_time"),
+                    "covered_queries": self.capability_registry.covered_queries(
+                        capability_id, queries
+                    ),
+                }
+            )
         return layers
 
     # -------------------------------------------------------------------------
@@ -588,9 +642,14 @@ class MapPlanService:
         repository = self.evidence_repository
         if active_session is None or repository is None:
             return {}
-        if any(isinstance(action, (RemoveLayerAction, KeepOnlyLayersAction)) for action in actions):
+        if any(
+            isinstance(action, (RemoveLayerAction, KeepOnlyLayersAction))
+            for action in actions
+        ):
             return {}
-        added = [action for action in actions if isinstance(action, AddEvidenceLayerAction)]
+        added = [
+            action for action in actions if isinstance(action, AddEvidenceLayerAction)
+        ]
         capabilities = [action.capability_id for action in added]
         if len(set(capabilities)) != len(capabilities):
             return {}
@@ -615,10 +674,16 @@ class MapPlanService:
             )
             if replacement is None:
                 continue
-            old = repository.get_summary(old_ref, conversation_id=context.conversation_id)
+            old = repository.get_summary(
+                old_ref, conversation_id=context.conversation_id
+            )
             old_subject = _query_subject(dict(old.summary)) if old is not None else None
-            if old_subject is not None and old_subject == subjects.get(replacement.evidence_ref):
-                removals[instance.instance_id] = f"evidence:{replacement.evidence_ref}:{replacement.capability_id}"
+            if old_subject is not None and old_subject == subjects.get(
+                replacement.evidence_ref
+            ):
+                removals[instance.instance_id] = (
+                    f"evidence:{replacement.evidence_ref}:{replacement.capability_id}"
+                )
         return removals
 
     # -------------------------------------------------------------------------
@@ -630,7 +695,11 @@ class MapPlanService:
             result = geometry_result(state)
             return result is not None and result.status == "valid_empty"
         if state.route is not None and state.route.analysis is not None:
-            transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
+            transforms = [
+                result
+                for result in state.tool_results
+                if result.tool_name == "transform_evidence"
+            ]
             return bool(transforms) and transforms[-1].status == "valid_empty"
         data_results = [
             result
@@ -665,9 +734,7 @@ class MapPlanService:
         temporal = dict(goal.temporal_scope or {})
         spatial = list(goal.spatial_scope or [])
         temporal_mode = str(temporal.get("mode") or "").strip()
-        spatial_kind = (
-            str(spatial[0].get("kind") or "").strip() if spatial else ""
-        )
+        spatial_kind = str(spatial[0].get("kind") or "").strip() if spatial else ""
         if temporal_mode in {"", "none"} and not spatial_kind:
             return candidate
         instances: list[OverlayInstance] = []
@@ -695,7 +762,9 @@ class MapPlanService:
         collection = candidate.overlay_collection.model_copy(
             update={"instances": instances}, deep=True
         )
-        return candidate.model_copy(update={"overlay_collection": collection}, deep=True)
+        return candidate.model_copy(
+            update={"overlay_collection": collection}, deep=True
+        )
 
     # -------------------------------------------------------------------------
     def _mark_empty_tiles_expected(self, candidate: MapSession) -> MapSession:
@@ -706,12 +775,17 @@ class MapPlanService:
                 update={"descriptor": {**item.descriptor, "empty_tiles_expected": True}}
             )
             if json_object(
-                (self.capability_registry.get_capability(item.capability_id) or {}).get("metadata")
-            ).get("empty_tiles_expected") is True
+                (self.capability_registry.get_capability(item.capability_id) or {}).get(
+                    "metadata"
+                )
+            ).get("empty_tiles_expected")
+            is True
             else item
             for item in candidate.overlay_collection.instances
         ]
-        collection = candidate.overlay_collection.model_copy(update={"instances": instances})
+        collection = candidate.overlay_collection.model_copy(
+            update={"instances": instances}
+        )
         return candidate.model_copy(update={"overlay_collection": collection})
 
     # -------------------------------------------------------------------------
@@ -872,7 +946,7 @@ class MapPlanService:
             if raw_payload is not None:
                 try:
                     payload = _bounded_render_payload(json.loads(raw_payload[1]))
-                except (TypeError, ValueError, json.JSONDecodeError):
+                except TypeError, ValueError, json.JSONDecodeError:
                     payload = None
             if payload is None:
                 raise MapPlanBuildError(
@@ -926,7 +1000,9 @@ class MapPlanService:
             if route is not None
             and route.spatial_scope is not None
             and route.spatial_scope.target_refs
-            else list(route.target_refs) if route is not None else []
+            else list(route.target_refs)
+            if route is not None
+            else []
         )
         if route_target_refs:
             for target_ref in route_target_refs:
@@ -1004,6 +1080,7 @@ class MapPlanService:
 
 __all__ = ["MapPlanService"]
 
+
 ###############################################################################
 def _bounded_render_payload(value: Any) -> Any:
     """Keep only the normalized feature payload required by the map client."""
@@ -1017,11 +1094,9 @@ def _bounded_render_payload(value: Any) -> Any:
     features = payload.get("features")
     if isinstance(features, list):
         features = cast(list[Any], features)
-        return {
-            key: child
-            for key, child in payload.items()
-            if key != "features"
-        } | {"features": features[:5000]}
+        return {key: child for key, child in payload.items() if key != "features"} | {
+            "features": features[:5000]
+        }
     descriptor_keys = {
         "renderingMode",
         "rendering_mode",
@@ -1052,9 +1127,5 @@ def _bounded_render_payload(value: Any) -> Any:
         "bounds",
         "legend",
     }
-    descriptor = {
-        key: payload[key]
-        for key in descriptor_keys
-        if key in payload
-    }
+    descriptor = {key: payload[key] for key in descriptor_keys if key in payload}
     return descriptor or None

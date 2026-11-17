@@ -24,6 +24,7 @@ DEFAULT_STAGE_LIMITS: dict[str, float] = {
     "persistence": 5.0,
 }
 
+
 ###############################################################################
 class ExecutionBudgetExceeded(RuntimeError):
     """Raised when a bounded run cannot start another counted operation."""
@@ -34,9 +35,11 @@ class ExecutionBudgetExceeded(RuntimeError):
         self.stage = stage
         super().__init__(f"The {stage} budget was exhausted.")
 
+
 ###############################################################################
 def _new_stage_metadata() -> dict[str, Any]:
     return {}
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -63,9 +66,11 @@ class StageObservation:
             "metadata": dict(self.metadata),
         }
 
+
 ###############################################################################
 def _new_stage_observations() -> list[StageObservation]:
     return []
+
 
 ###############################################################################
 @dataclass
@@ -99,9 +104,7 @@ class AgentExecutionBudget:
     iteration_traces: list[dict[str, Any]] = field(
         default_factory=lambda: list[dict[str, Any]]()
     )
-    completion_requirements: list[str] = field(
-        default_factory=lambda: list[str]()
-    )
+    completion_requirements: list[str] = field(default_factory=lambda: list[str]())
     stopping_reason: str | None = None
 
     # -------------------------------------------------------------------------
@@ -160,7 +163,9 @@ class AgentExecutionBudget:
     ) -> float:
         limit = self.stage_limits.get(stage)
         if requested_seconds is not None:
-            limit = requested_seconds if limit is None else min(limit, requested_seconds)
+            limit = (
+                requested_seconds if limit is None else min(limit, requested_seconds)
+            )
         remaining = self.remaining_seconds()
         if limit is None:
             return time.monotonic() + remaining
@@ -367,7 +372,8 @@ class AgentExecutionBudget:
         limits = snapshot.get("stage_limits")
         if is_json_object(limits):
             self.stage_limits = {
-                key: float(value) for key, value in limits.items()
+                key: float(value)
+                for key, value in limits.items()
                 if isinstance(value, (int, float)) and value > 0
             }
         profile = snapshot.get("run_profile")
@@ -378,7 +384,9 @@ class AgentExecutionBudget:
             terminal_reason if isinstance(terminal_reason, str) else None
         )
         terminal_stage = snapshot.get("terminal_stage")
-        self.terminal_stage = terminal_stage if isinstance(terminal_stage, str) else None
+        self.terminal_stage = (
+            terminal_stage if isinstance(terminal_stage, str) else None
+        )
         stopping_reason = snapshot.get("stopping_reason")
         self.stopping_reason = (
             stopping_reason if isinstance(stopping_reason, str) else None

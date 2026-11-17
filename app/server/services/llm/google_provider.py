@@ -48,6 +48,7 @@ from server.services.llm.types import (
 
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
+
 ###############################################################################
 class GoogleProvider(LLMProvider):
     provider_name = "google"
@@ -90,9 +91,7 @@ class GoogleProvider(LLMProvider):
         )
 
     # -------------------------------------------------------------------------
-    def _client_for_request(
-        self, request: LLMRequest, *, stage: str = "chat"
-    ) -> Any:
+    def _client_for_request(self, request: LLMRequest, *, stage: str = "chat") -> Any:
         remaining = remaining_request_seconds(request)
         if remaining is None:
             return self._client(stage=stage)
@@ -151,7 +150,9 @@ class GoogleProvider(LLMProvider):
                     descriptor, "input_token_limit", "inputTokenLimit"
                 ).values()
             ):
-                metadata["context_window_tokens" if index == 0 else "context_length"] = value
+                metadata[
+                    "context_window_tokens" if index == 0 else "context_length"
+                ] = value
             for index, value in enumerate(
                 self._model_fields(
                     descriptor, "output_token_limit", "outputTokenLimit"
@@ -173,9 +174,7 @@ class GoogleProvider(LLMProvider):
         if isinstance(value, dict):
             mapping = cast(dict[str, object], value)
             return {
-                key: mapping[key]
-                for key in (snake_key, camel_key)
-                if key in mapping
+                key: mapping[key] for key in (snake_key, camel_key) if key in mapping
             }
         result: dict[str, object] = {}
         snake_value = getattr(value, snake_key, None)
@@ -558,15 +557,23 @@ class GoogleProvider(LLMProvider):
             if role == "tool":
                 part = {
                     "function_response": {
-                        **({"id": message["tool_call_id"]} if message.get("tool_call_id") else {}),
+                        **(
+                            {"id": message["tool_call_id"]}
+                            if message.get("tool_call_id")
+                            else {}
+                        ),
                         "name": message.get("name"),
                         "response": {"content": message.get("content")},
                     }
                 }
                 # Parallel function responses belong to one user content in
                 # the same order as the preceding model's call parts.
-                if contents and contents[-1]["role"] == "user" and all(
-                    "function_response" in item for item in contents[-1]["parts"]
+                if (
+                    contents
+                    and contents[-1]["role"] == "user"
+                    and all(
+                        "function_response" in item for item in contents[-1]["parts"]
+                    )
                 ):
                     contents[-1]["parts"].append(part)
                 else:

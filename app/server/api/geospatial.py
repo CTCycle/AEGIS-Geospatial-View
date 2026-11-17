@@ -45,6 +45,7 @@ GEOSPATIAL_ERROR_STATUS = {
     GeospatialTileRequestError: status.HTTP_502_BAD_GATEWAY,
 }
 
+
 ###############################################################################
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     runtime = getattr(request.app.state, "geospatial_runtime", None)
@@ -55,6 +56,7 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
         )
     return runtime.api_service
 
+
 ###############################################################################
 def get_render_capture_store(request: Request) -> RenderCaptureStore:
     store = getattr(request.app.state, "render_capture_store", None)
@@ -64,6 +66,7 @@ def get_render_capture_store(request: Request) -> RenderCaptureStore:
             detail="Render capture store is not initialized.",
         )
     return store
+
 
 ###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
@@ -93,6 +96,7 @@ def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
         detail="Geospatial service request failed.",
     ) from error
 
+
 ###############################################################################
 @router.get(
     "/capabilities",
@@ -104,6 +108,7 @@ async def get_geospatial_capabilities(
 ) -> GeospatialCatalogResponse:
     return GeospatialCatalogResponse.model_validate(service.list_capabilities())
 
+
 ###############################################################################
 @router.get(
     "/layers",
@@ -114,6 +119,7 @@ async def get_geospatial_layers(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayersResponse:
     return GeospatialLayersResponse.model_validate(service.list_layers())
+
 
 ###############################################################################
 @router.get(
@@ -144,6 +150,7 @@ async def get_layer_features(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
+
 ###############################################################################
 @router.get(
     "/layers/{layer_id}/geojson",
@@ -169,6 +176,7 @@ async def get_layer_geojson(
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
+
 
 ###############################################################################
 @router.get(
@@ -199,6 +207,7 @@ async def proxy_capability_tile(
         headers={"Cache-Control": "private, max-age=60"},
     )
 
+
 ###############################################################################
 @router.get(
     "/sample/{capability_id}",
@@ -218,6 +227,7 @@ async def sample_capability_value(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
     return GeospatialRasterSampleResponse.model_validate(payload)
+
 
 ###############################################################################
 @router.get(
@@ -240,6 +250,7 @@ async def proxy_tomtom_tile(
         media_type="image/png",
         headers={"Cache-Control": "private, max-age=60"},
     )
+
 
 ###############################################################################
 @router.post(
@@ -274,6 +285,7 @@ async def store_render_capture(
         stored=True,
     )
 
+
 ###############################################################################
 @router.get(
     "/cameras",
@@ -297,6 +309,7 @@ async def get_geospatial_cameras(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
+
 ###############################################################################
 @router.get(
     "/cameras.geojson",
@@ -317,6 +330,7 @@ async def get_geospatial_cameras_geojson(
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
+
 ###############################################################################
 @router.get(
     "/sources/{provider_id}/credential-status",
@@ -330,6 +344,7 @@ async def get_credential_status(
     return GeospatialCredentialStatusResponse.model_validate(
         service.get_credential_status(provider_id)
     )
+
 
 ###############################################################################
 @router.get(

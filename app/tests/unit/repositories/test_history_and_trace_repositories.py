@@ -11,6 +11,7 @@ from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
 from server.repositories.schemas.models import Base
 
+
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -25,11 +26,13 @@ class _InMemoryBackend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
+
 ###############################################################################
 def _backend() -> _InMemoryBackend:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
     return backend
+
 
 ###############################################################################
 def test_history_search_is_scoped_bounded_and_deterministic() -> None:
@@ -85,6 +88,7 @@ def test_history_search_is_scoped_bounded_and_deterministic() -> None:
     )
     assert [item["turn_index"] for item in before_current["messages"]] == [1, 2]
 
+
 ###############################################################################
 def test_context_history_is_a_newest_text_window_in_chronological_order() -> None:
     backend = _backend()
@@ -105,9 +109,14 @@ def test_context_history_is_a_newest_text_window_in_chronological_order() -> Non
     window = history.list_context_messages(conversation.id, limit=3)
 
     assert history.count_messages(conversation.id) == 5
-    assert [item["content"] for item in window] == ["message 2", "message 3", "message 4"]
+    assert [item["content"] for item in window] == [
+        "message 2",
+        "message 3",
+        "message 4",
+    ]
     assert window[0]["request_id"] == "req-2"
     assert set(window[0]) == {"id", "turn_index", "request_id", "role", "content"}
+
 
 ###############################################################################
 def test_message_headers_exclude_heavy_payload_columns_and_keep_order() -> None:
@@ -115,7 +124,9 @@ def test_message_headers_exclude_heavy_payload_columns_and_keep_order() -> None:
     conversations = ConversationRepository(backend)
     history = ChatHistoryRepository(backend)
     conversation = conversations.create_conversation("Headers")
-    history.append_message(conversation_id=conversation.id, role="user", content="Show Rome")
+    history.append_message(
+        conversation_id=conversation.id, role="user", content="Show Rome"
+    )
     history.append_message(
         conversation_id=conversation.id,
         role="assistant",
@@ -132,6 +143,7 @@ def test_message_headers_exclude_heavy_payload_columns_and_keep_order() -> None:
         ("assistant", "Done"),
     ]
     assert all(set(item) == {"role", "content", "created_at"} for item in headers)
+
 
 ###############################################################################
 def test_latest_user_event_walks_back_through_matching_user_events_only() -> None:
@@ -164,7 +176,11 @@ def test_latest_user_event_walks_back_through_matching_user_events_only() -> Non
     assert newest is not None and newest.sequence == last
     older = events.get_latest_user_event(run.run_id, types=wanted, before_sequence=last)
     assert older is not None and older.sequence == first
-    assert events.get_latest_user_event(run.run_id, types=wanted, before_sequence=first) is None
+    assert (
+        events.get_latest_user_event(run.run_id, types=wanted, before_sequence=first)
+        is None
+    )
+
 
 ###############################################################################
 def test_run_control_is_one_fresh_query_that_never_scans_events() -> None:
@@ -203,6 +219,7 @@ def test_run_control_is_one_fresh_query_that_never_scans_events() -> None:
     assert cancelled is not None and cancelled.cancel_requested_at is not None
     assert runs.get_run_control("run_missing") is None
 
+
 ###############################################################################
 def test_conversation_page_searches_original_messages_and_uses_keyset_cursor() -> None:
     backend = _backend()
@@ -232,6 +249,7 @@ def test_conversation_page_searches_original_messages_and_uses_keyset_cursor() -
     assert [item["conversation_id"] for item in searched["conversations"]] == [
         second.id
     ]
+
 
 ###############################################################################
 def test_run_trace_is_paged_and_redacts_secrets_and_reasoning() -> None:
@@ -282,6 +300,7 @@ def test_run_trace_is_paged_and_redacts_secrets_and_reasoning() -> None:
         limit=10,
     )
     assert [event["sequence"] for event in remaining["events"]] == [2]
+
 
 ###############################################################################
 def test_run_summary_page_supports_request_search() -> None:

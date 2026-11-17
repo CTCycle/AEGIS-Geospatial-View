@@ -26,7 +26,10 @@ sys.path.insert(0, str(ROOT / "app"))
 
 from tests.agent_benchmark.trajectories import run_all  # noqa: E402
 
-BASELINE_PATH = ROOT / "app" / "tests" / "agent_benchmark" / "trajectory_baseline.v1.json"
+BASELINE_PATH = (
+    ROOT / "app" / "tests" / "agent_benchmark" / "trajectory_baseline.v1.json"
+)
+
 
 ###############################################################################
 def _commit() -> str:
@@ -38,8 +41,9 @@ def _commit() -> str:
             text=True,
             check=True,
         ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         return "unknown"
+
 
 ###############################################################################
 def main() -> None:
@@ -66,12 +70,16 @@ def main() -> None:
                 item["scenario_id"]: {
                     "termination_reason": item["termination_reason"],
                     "model_calls": item["model_calls"],
-                    "total_estimated_input_tokens": item["total_estimated_input_tokens"],
+                    "total_estimated_input_tokens": item[
+                        "total_estimated_input_tokens"
+                    ],
                 }
                 for item in results
             },
         }
-        BASELINE_PATH.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
+        BASELINE_PATH.write_text(
+            json.dumps(baseline, indent=2) + "\n", encoding="utf-8"
+        )
 
 
 if __name__ == "__main__":

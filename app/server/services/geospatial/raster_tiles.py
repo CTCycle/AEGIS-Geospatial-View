@@ -16,6 +16,7 @@ _BACKEND_RASTER_RENDERING_MODES = frozenset(
     {"raster-tile", "tile", "xyz", "wms", "wmts"}
 )
 
+
 ###############################################################################
 def build_backend_raster_proxy_template(
     capability_id: str,
@@ -36,17 +37,18 @@ def build_backend_raster_proxy_template(
     if not normalized_id or any(char in normalized_id for char in "/?#{}"):
         return None
     template = (
-        f"/api/geospatial/tiles/{quote(normalized_id, safe=':')}/"
-        "{z}/{x}/{y}.png"
+        f"/api/geospatial/tiles/{quote(normalized_id, safe=':')}/{{z}}/{{x}}/{{y}}.png"
     )
     time = render.get("time") or render.get("default_time")
     if isinstance(time, str) and time.strip():
         template += "?time={time}"
     return template
 
+
 ###############################################################################
 class RasterTileTemplateError(ValueError):
     """Raised when a raster tile template cannot be safely materialized."""
+
 
 ###############################################################################
 def validate_tile_coordinates(z: int, x: int, y: int) -> None:
@@ -63,10 +65,9 @@ def validate_tile_coordinates(z: int, x: int, y: int) -> None:
     if not 0 <= x < tile_count or not 0 <= y < tile_count:
         raise RasterTileTemplateError("Tile coordinates are outside the zoom range.")
 
+
 ###############################################################################
-def web_mercator_tile_bbox(
-    z: int, x: int, y: int
-) -> tuple[float, float, float, float]:
+def web_mercator_tile_bbox(z: int, x: int, y: int) -> tuple[float, float, float, float]:
     """Return the exact EPSG:3857 envelope for one XYZ tile."""
 
     validate_tile_coordinates(z, x, y)
@@ -77,13 +78,13 @@ def web_mercator_tile_bbox(
     min_y = max_y - tile_span
     return min_x, min_y, max_x, max_y
 
+
 ###############################################################################
-def format_web_mercator_bbox(
-    z: int, x: int, y: int
-) -> str:
+def format_web_mercator_bbox(z: int, x: int, y: int) -> str:
     """Format one XYZ tile envelope for a provider query parameter."""
 
     return ",".join(str(value) for value in web_mercator_tile_bbox(z, x, y))
+
 
 ###############################################################################
 def ensure_no_unresolved_placeholders(url: str) -> str:
@@ -95,6 +96,7 @@ def ensure_no_unresolved_placeholders(url: str) -> str:
             f"Raster tile URL contains unresolved placeholders: {', '.join(unresolved)}."
         )
     return url
+
 
 ###############################################################################
 def materialize_tile_template(
@@ -134,6 +136,7 @@ def materialize_tile_template(
         resolved = resolved.replace(placeholder, replacement)
     return ensure_no_unresolved_placeholders(resolved)
 
+
 ###############################################################################
 def build_wms_tile_template(
     *,
@@ -167,6 +170,7 @@ def build_wms_tile_template(
         query.append(("time", time))
     return _append_query(url, query)
 
+
 ###############################################################################
 def build_wmts_tile_template(
     *,
@@ -194,6 +198,7 @@ def build_wmts_tile_template(
     if time:
         query.append(("time", time))
     return _append_query(url, query)
+
 
 ###############################################################################
 def build_wms_get_map_url(
@@ -228,6 +233,7 @@ def build_wms_get_map_url(
         y,
     )
 
+
 ###############################################################################
 def build_wmts_get_tile_url(
     *,
@@ -257,6 +263,7 @@ def build_wmts_get_tile_url(
         y,
     )
 
+
 ###############################################################################
 def _append_query(url: str, query: list[tuple[str, str]]) -> str:
     parts = urlsplit(url)
@@ -265,7 +272,10 @@ def _append_query(url: str, query: list[tuple[str, str]]) -> str:
         f"{_query_component(key)}={_query_component(value)}" for key, value in query
     )
     combined = "&".join(item for item in (existing, rendered) if item)
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, combined, parts.fragment))
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, combined, parts.fragment)
+    )
+
 
 ###############################################################################
 def _query_component(value: str) -> str:

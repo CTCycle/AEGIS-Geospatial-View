@@ -19,9 +19,9 @@ from server.domain.agent.conversation import ConversationState
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 
+
 ###############################################################################
 class RunSteeringService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -138,9 +138,7 @@ class RunSteeringService:
         )
 
     # -------------------------------------------------------------------------
-    def _apply_state_delta(
-        self, conversation_id: str, delta: SteeringDelta
-    ) -> bool:
+    def _apply_state_delta(self, conversation_id: str, delta: SteeringDelta) -> bool:
         """Persist only mutations that can be applied without model interpretation."""
 
         if self.conversation_repository is None or delta.kind not in {
@@ -192,5 +190,5 @@ class RunSteeringService:
                 conversation_state=state.model_dump(mode="json"),
             )
             return True
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return False

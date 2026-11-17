@@ -16,6 +16,7 @@ from server.services.llm.transport import LLMTransportPolicy
 
 OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvider]
 
+
 ###############################################################################
 def create_ollama_provider(
     base_url: str,
@@ -29,9 +30,9 @@ def create_ollama_provider(
         transport_policy=transport_policy,
     )
 
+
 ###############################################################################
 class ChatMaintenanceService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,

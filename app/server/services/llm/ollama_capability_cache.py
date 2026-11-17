@@ -4,9 +4,9 @@ from time import time
 
 from server.domain.llm.cache import OllamaToolCapabilityCacheRecord
 
+
 ###############################################################################
 class OllamaToolCapabilityCache:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, ttl_seconds: float = 300.0) -> None:
         self.ttl_seconds = ttl_seconds

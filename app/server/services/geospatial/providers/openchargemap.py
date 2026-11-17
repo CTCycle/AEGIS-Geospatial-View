@@ -27,6 +27,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class OpenChargeMapProvider(GeospatialProvider):
     provider_id = "openchargemap"
@@ -196,6 +197,7 @@ class OpenChargeMapProvider(GeospatialProvider):
             )
         return features
 
+
 ###############################################################################
 def _filter_features(
     features: list[dict[str, object]],
@@ -214,6 +216,7 @@ def _filter_features(
         if west <= float(str(item["longitude"])) <= east
         and south <= float(str(item["latitude"])) <= north
     ][: int(request.params.get("maxresults") or 100)]
+
 
 ###############################################################################
 def _geojson_features(payload: dict[str, object]) -> list[dict[str, object]]:

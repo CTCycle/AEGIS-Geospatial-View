@@ -6,20 +6,47 @@ import shutil
 from pathlib import Path
 from server.services.catalog.loader import get_catalog_root, load_reference_catalog
 from server.services.geospatial.ecosystem_audit import build_inventory
-from server.services.geospatial.layer_auditor import audit_all_manifests, profile_claims_unrenderable_map_support
+from server.services.geospatial.layer_auditor import (
+    audit_all_manifests,
+    profile_claims_unrenderable_map_support,
+)
 from dataclasses import replace
 from datetime import UTC, datetime
 from google.transit import gtfs_realtime_pb2
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.live_validator import CREDENTIAL_LIVE_CHECKS, PROVIDER_SMOKE_CHECKS, _run_check, validate_live_geospatial_sources
-from server.services.geospatial.provider_registry import PROVIDER_FACTORIES, ProviderRegistry
+from server.services.geospatial.live_validator import (
+    CREDENTIAL_LIVE_CHECKS,
+    PROVIDER_SMOKE_CHECKS,
+    _run_check,
+    validate_live_geospatial_sources,
+)
+from server.services.geospatial.provider_registry import (
+    PROVIDER_FACTORIES,
+    ProviderRegistry,
+)
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
-from server.services.geospatial.manifest_loader import GeospatialManifestLoader, ManifestValidationError
-from server.contracts.geospatial import CapabilityKind, CapabilityManifestV2, LayerHealthStatus
+from server.services.geospatial.manifest_loader import (
+    GeospatialManifestLoader,
+    ManifestValidationError,
+)
+from server.contracts.geospatial import (
+    CapabilityKind,
+    CapabilityManifestV2,
+    LayerHealthStatus,
+)
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.schemas import ReferenceCountryAliasRecord, ReferenceCountryRecord, ReferenceGeospatialLayerAliasRecord, ReferenceGeospatialLayerKeywordRecord, ReferenceGeospatialLayerRecord, ReferenceGibsLayerDefaultRecord, ReferenceGibsTileMatrixSetRecord, Base
+from server.repositories.schemas import (
+    ReferenceCountryAliasRecord,
+    ReferenceCountryRecord,
+    ReferenceGeospatialLayerAliasRecord,
+    ReferenceGeospatialLayerKeywordRecord,
+    ReferenceGeospatialLayerRecord,
+    ReferenceGibsLayerDefaultRecord,
+    ReferenceGibsTileMatrixSetRecord,
+    Base,
+)
 from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
 from server.services.geospatial.attribution import AttributionService
 from server.services.geospatial.source_health import SourceHealthMonitor
@@ -30,11 +57,10 @@ from server.services.catalog.startup import seed_reference_catalog
 # --- test_catalog_reference_loader.py ---
 
 
-
-
 ###############################################################################
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
 
 ###############################################################################
 def _build_reference_root(tmp_path: Path) -> Path:
@@ -89,6 +115,7 @@ def _build_reference_root(tmp_path: Path) -> Path:
     )
     return tmp_path / "catalog"
 
+
 ###############################################################################
 def test_loads_all_reference_files_from_catalog_root() -> None:
     catalog = load_reference_catalog(get_catalog_root())
@@ -98,6 +125,7 @@ def test_loads_all_reference_files_from_catalog_root() -> None:
     assert catalog.geospatial_layers
     assert catalog.gibs_tile_matrix_sets
     assert catalog.gibs_layer_defaults
+
 
 ###############################################################################
 def test_country_aliases_must_resolve_to_existing_iso2(tmp_path: Path) -> None:
@@ -113,6 +141,7 @@ def test_country_aliases_must_resolve_to_existing_iso2(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unknown ISO2"):
         load_reference_catalog(root)
+
 
 ###############################################################################
 def test_duplicate_country_alias_keys_fail(tmp_path: Path) -> None:
@@ -131,6 +160,7 @@ def test_duplicate_country_alias_keys_fail(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Duplicate country alias key"):
         load_reference_catalog(root)
+
 
 ###############################################################################
 def test_duplicate_layer_ids_fail(tmp_path: Path) -> None:
@@ -163,6 +193,7 @@ def test_duplicate_layer_ids_fail(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Duplicate geospatial layer ID"):
         load_reference_catalog(root)
 
+
 ###############################################################################
 def test_gibs_layer_defaults_require_a_populated_value(tmp_path: Path) -> None:
     root = _build_reference_root(tmp_path)
@@ -183,12 +214,14 @@ def test_gibs_layer_defaults_require_a_populated_value(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="must define at least one value"):
         load_reference_catalog(root)
 
+
 ###############################################################################
 def test_macau_alias_resolves_to_mo() -> None:
     catalog = load_reference_catalog(get_catalog_root())
     aliases = {entry.alias: entry.iso2 for entry in catalog.country_aliases}
 
     assert aliases["Macau"] == "MO"
+
 
 # --- test_geospatial_ecosystem_audit.py ---
 
@@ -222,6 +255,7 @@ def test_ecosystem_inventory_covers_catalog_runtime_and_native_tools() -> None:
     assert "execute_geospatial_capability" in tool_ids
     assert report["replacements"][0]["new"] == ["mobility_database_feeds"]
 
+
 # --- test_geospatial_layer_auditor.py ---
 
 
@@ -240,6 +274,7 @@ def test_profile_map_support_must_match_contract_render_support() -> None:
     )
     assert not profile_claims_unrenderable_map_support(None, {})
 
+
 ###############################################################################
 def test_layer_auditor_blocks_broken_manual_toggles() -> None:
     report = audit_all_manifests(strict=True)
@@ -250,6 +285,7 @@ def test_layer_auditor_blocks_broken_manual_toggles() -> None:
     ]
 
     assert not issues
+
 
 ###############################################################################
 def test_layer_auditor_production_gate_has_no_placeholder_or_visual_gaps() -> None:
@@ -269,10 +305,8 @@ def test_layer_auditor_production_gate_has_no_placeholder_or_visual_gaps() -> No
         if status.capability_id != status.provider_id
     )
 
+
 # --- test_geospatial_live_validator.py ---
-
-
-
 
 
 ###############################################################################
@@ -319,9 +353,7 @@ class _LiveValidationRegistry:
         else:
             payload = {"latitude": 41.9, "longitude": 12.5, "current": {}}
             if provider_id == "openmeteo":
-                payload["features"] = [
-                    {"latitude": 41.9, "longitude": 12.5}
-                ]
+                payload["features"] = [{"latitude": 41.9, "longitude": 12.5}]
         for key in check.numeric_payload_keys:
             payload[key] = 1 if key == "frameCount" else 1.0
         for key in check.required_payload_keys:
@@ -337,6 +369,7 @@ class _LiveValidationRegistry:
             payload=payload,
         )
 
+
 ###############################################################################
 def test_live_validator_covers_the_factory_matrix_with_injected_registry() -> None:
     report = run_async_in_thread(
@@ -348,12 +381,14 @@ def test_live_validator_covers_the_factory_matrix_with_injected_registry() -> No
     assert {result.provider_id for result in report.results} == set(PROVIDER_FACTORIES)
     assert all(result.status in {"passed", "skipped"} for result in report.results)
 
+
 ###############################################################################
 def test_live_validator_matrix_has_one_case_per_factory_entry() -> None:
     provider_ids = [check.provider_id for check in PROVIDER_SMOKE_CHECKS]
 
     assert len(provider_ids) == len(set(provider_ids))
     assert set(provider_ids) == set(PROVIDER_FACTORIES)
+
 
 ###############################################################################
 def test_live_validator_skips_missing_saved_credentials() -> None:
@@ -365,12 +400,12 @@ def test_live_validator_skips_missing_saved_credentials() -> None:
     assert result.status == "skipped"
     assert "saved credential" in (result.message or "")
 
+
 ###############################################################################
 def test_live_validator_rejects_error_payloads() -> None:
 
     ###############################################################################
     class _ErrorRegistry(_LiveValidationRegistry):
-
         # -------------------------------------------------------------------------
         async def fetch(
             self, provider_id: str, request: ProviderRequest
@@ -394,12 +429,12 @@ def test_live_validator_rejects_error_payloads() -> None:
     assert result.status == "failed"
     assert "upstream unavailable" in (result.message or "")
 
+
 ###############################################################################
 def test_live_validator_rejects_malformed_feature_geometry() -> None:
 
     ###############################################################################
     class _MalformedRegistry(_LiveValidationRegistry):
-
         # -------------------------------------------------------------------------
         async def fetch(
             self, provider_id: str, request: ProviderRequest
@@ -425,8 +460,11 @@ def test_live_validator_rejects_malformed_feature_geometry() -> None:
     assert result.status == "failed"
     assert "geometry" in (result.message or "")
 
+
 ###############################################################################
-def test_live_validator_runs_configured_openchargemap_snapshot(monkeypatch, tmp_path) -> None:
+def test_live_validator_runs_configured_openchargemap_snapshot(
+    monkeypatch, tmp_path
+) -> None:
     snapshot = tmp_path / "ocm.json"
     snapshot.write_text("[]", encoding="utf-8")
     monkeypatch.setenv("AEGIS_OCM_SNAPSHOT_PATH", str(snapshot))
@@ -438,9 +476,14 @@ def test_live_validator_runs_configured_openchargemap_snapshot(monkeypatch, tmp_
 
     assert result.status == "passed"
 
+
 ###############################################################################
-def test_live_validator_accepts_production_gtfs_realtime_normalization(monkeypatch) -> None:
-    monkeypatch.setenv("AEGIS_GTFS_REALTIME_FEED_URL", "https://example.test/vehicles.pb")
+def test_live_validator_accepts_production_gtfs_realtime_normalization(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "AEGIS_GTFS_REALTIME_FEED_URL", "https://example.test/vehicles.pb"
+    )
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.header.gtfs_realtime_version = "2.0"
     feed.header.timestamp = int(datetime.now(UTC).timestamp())
@@ -448,19 +491,28 @@ def test_live_validator_accepts_production_gtfs_realtime_normalization(monkeypat
     entity.id = "vehicle-1"
     entity.vehicle.position.latitude = 42.36
     entity.vehicle.position.longitude = -71.06
-    check = next(item for item in PROVIDER_SMOKE_CHECKS if item.provider_id == "gtfs_realtime")
-    check = replace(check, request=ProviderRequest(
-        capability_id="gtfs_realtime", params={"feed_bytes": feed.SerializeToString()},
-    ))
-    result = run_async_in_thread(_run_check(
-        ProviderRegistry(providers=[GTFSRealtimeProvider()]), check,
-    ))
+    check = next(
+        item for item in PROVIDER_SMOKE_CHECKS if item.provider_id == "gtfs_realtime"
+    )
+    check = replace(
+        check,
+        request=ProviderRequest(
+            capability_id="gtfs_realtime",
+            params={"feed_bytes": feed.SerializeToString()},
+        ),
+    )
+    result = run_async_in_thread(
+        _run_check(
+            ProviderRegistry(providers=[GTFSRealtimeProvider()]),
+            check,
+        )
+    )
 
     assert result.status == "passed", result.message
     assert result.feature_count == 1
 
-# --- test_manifest_loader.py ---
 
+# --- test_manifest_loader.py ---
 
 
 ###############################################################################
@@ -476,6 +528,7 @@ def test_manifest_loader_reads_core_collections() -> None:
     assert basemap.get("source_filename")
     assert basemap.get("source_path")
 
+
 ###############################################################################
 def test_priority_provider_manifests_include_temporal_metadata() -> None:
     payload = GeospatialManifestLoader().load_all()
@@ -486,6 +539,7 @@ def test_priority_provider_manifests_include_temporal_metadata() -> None:
         assert metadata["source_freshness"]
         assert metadata["query_mode"]
 
+
 ###############################################################################
 def test_raster_overlay_legends_follow_the_shared_schema() -> None:
     overlays = GeospatialManifestLoader().load_all()["overlays"]
@@ -494,20 +548,29 @@ def test_raster_overlay_legends_follow_the_shared_schema() -> None:
         for item in overlays
         if "legend" in item["metadata"]
     }
-    assert {"SRTM_Color_Index", "MODIS_Terra_NDVI_8Day", "esa_worldcover"} <= set(legends)
+    assert {"SRTM_Color_Index", "MODIS_Terra_NDVI_8Day", "esa_worldcover"} <= set(
+        legends
+    )
     hex_color = re.compile(r"^#[0-9a-f]{6}$")
     for layer_id, legend in legends.items():
-        assert set(legend) == {"kind", "title", "units", "entries", "nodata_colors"}, layer_id
+        assert set(legend) == {"kind", "title", "units", "entries", "nodata_colors"}, (
+            layer_id
+        )
         assert legend["kind"] in {"continuous", "categorical"}, layer_id
         assert legend["entries"], layer_id
         colors = [entry["color"] for entry in legend["entries"]]
-        assert all(hex_color.match(color) for color in colors + legend["nodata_colors"]), layer_id
+        assert all(
+            hex_color.match(color) for color in colors + legend["nodata_colors"]
+        ), layer_id
         # Pixels are reverse-mapped by colour, so each colour must be unambiguous
         # and never both a value and a transparent/no-data colour.
         assert len(colors) == len(set(colors)), layer_id
         assert not set(colors) & set(legend["nodata_colors"]), layer_id
         if legend["kind"] == "continuous":
-            assert all(isinstance(entry["value"], (int, float)) for entry in legend["entries"]), layer_id
+            assert all(
+                isinstance(entry["value"], (int, float)) for entry in legend["entries"]
+            ), layer_id
+
 
 ###############################################################################
 def test_manifest_loader_accepts_path_root_argument() -> None:
@@ -517,9 +580,8 @@ def test_manifest_loader_accepts_path_root_argument() -> None:
 
     assert any(item["id"] == "osm_default" for item in payload["basemaps"])
 
+
 # --- test_manifest_schema_v2.py ---
-
-
 
 
 ###############################################################################
@@ -534,6 +596,7 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
         for issue in report.issues
         if issue.message == "Metadata-only manifest cannot claim map geometry."
     ]
+
 
 ###############################################################################
 def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
@@ -602,6 +665,7 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
     finally:
         shutil.rmtree(manifests, ignore_errors=True)
 
+
 ###############################################################################
 def test_manifest_loader_rejects_empty_agentic_domains() -> None:
     loader = GeospatialManifestLoader()
@@ -620,6 +684,7 @@ def test_manifest_loader_rejects_empty_agentic_domains() -> None:
             require_agentic_domains=True,
         )
 
+
 ###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     loader = GeospatialManifestLoader()
@@ -636,7 +701,9 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
         }
 
     assert all(
-        CapabilityManifestV2.model_validate(without_loader_metadata(item)).capability_kind
+        CapabilityManifestV2.model_validate(
+            without_loader_metadata(item)
+        ).capability_kind
         == CapabilityKind.BASEMAP
         for item in basemaps
     )
@@ -646,8 +713,8 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
         {"gtfs_static", "gtfs_realtime", "mobility_database_feeds"}
     )
 
-# --- test_reference_catalog_seeder.py ---
 
+# --- test_reference_catalog_seeder.py ---
 
 
 ###############################################################################
@@ -660,6 +727,7 @@ def _build_database(tmp_path: Path) -> SQLiteRepository:
     Base.metadata.create_all(repository.engine)
     return repository
 
+
 ###############################################################################
 def test_fresh_sqlite_database_creates_reference_tables(tmp_path: Path) -> None:
     repository = _build_database(tmp_path)
@@ -668,6 +736,7 @@ def test_fresh_sqlite_database_creates_reference_tables(tmp_path: Path) -> None:
     assert repository.count_records(ReferenceGeospatialLayerRecord) == 0
     assert repository.count_records(ReferenceGibsTileMatrixSetRecord) == 0
     assert repository.count_records(ReferenceGibsLayerDefaultRecord) == 0
+
 
 ###############################################################################
 def test_first_seed_inserts_all_reference_rows(tmp_path: Path) -> None:
@@ -686,6 +755,7 @@ def test_first_seed_inserts_all_reference_rows(tmp_path: Path) -> None:
     assert repository.count_records(ReferenceGeospatialLayerKeywordRecord) > 0
     assert repository.count_records(ReferenceGibsTileMatrixSetRecord) > 0
     assert repository.count_records(ReferenceGibsLayerDefaultRecord) > 0
+
 
 ###############################################################################
 def test_second_seed_does_not_insert_duplicates(tmp_path: Path) -> None:
@@ -723,6 +793,7 @@ def test_second_seed_does_not_insert_duplicates(tmp_path: Path) -> None:
         "layer_defaults": repository.count_records(ReferenceGibsLayerDefaultRecord),
     }
 
+
 ###############################################################################
 def test_country_seeding_is_skipped_when_reference_countries_populated(
     tmp_path: Path,
@@ -735,6 +806,7 @@ def test_country_seeding_is_skipped_when_reference_countries_populated(
     result = ReferenceCatalogSeeder(repository).seed_if_needed(load_reference_catalog())
 
     assert result.countries_seeded is False
+
 
 ###############################################################################
 def test_layer_seeding_is_skipped_when_reference_layers_populated(
@@ -756,6 +828,7 @@ def test_layer_seeding_is_skipped_when_reference_layers_populated(
 
     assert result.geospatial_layers_seeded is False
 
+
 ###############################################################################
 def test_tile_matrix_seeding_is_skipped_when_table_populated(tmp_path: Path) -> None:
     repository = _build_database(tmp_path)
@@ -771,6 +844,7 @@ def test_tile_matrix_seeding_is_skipped_when_table_populated(tmp_path: Path) -> 
     result = ReferenceCatalogSeeder(repository).seed_if_needed(load_reference_catalog())
 
     assert result.gibs_tile_matrix_sets_seeded is False
+
 
 ###############################################################################
 def test_layer_default_seeding_is_skipped_when_table_populated(tmp_path: Path) -> None:
@@ -789,6 +863,7 @@ def test_layer_default_seeding_is_skipped_when_table_populated(tmp_path: Path) -
 
     assert result.gibs_layer_defaults_seeded is False
 
+
 # --- test_source_health_and_attribution.py ---
 
 
@@ -804,6 +879,7 @@ def test_source_health_prefers_recorded_provider_status() -> None:
 
     assert monitor.status_for_manifest(manifest) == LayerHealthStatus.FUNCTIONAL
 
+
 ###############################################################################
 def test_source_health_uses_manifest_status_without_probe_record() -> None:
     monitor = SourceHealthMonitor()
@@ -813,6 +889,7 @@ def test_source_health_uses_manifest_status_without_probe_record() -> None:
     )
 
     assert status == LayerHealthStatus.PARTIAL
+
 
 ###############################################################################
 def test_attribution_service_deduplicates_manifest_labels() -> None:
@@ -829,8 +906,8 @@ def test_attribution_service_deduplicates_manifest_labels() -> None:
     assert labels
     assert len(labels) == len(set(labels))
 
-# --- test_gibs_reference_defaults.py ---
 
+# --- test_gibs_reference_defaults.py ---
 
 
 ###############################################################################
@@ -845,6 +922,7 @@ def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
         on_ready=lambda: seed_reference_catalog(repository),
     )
     return repository
+
 
 ###############################################################################
 def test_gibs_reference_maps_load_from_reference_tables(tmp_path: Path) -> None:

@@ -30,11 +30,13 @@ from server.services.agent.tool_definitions import ExecuteCapabilityInput
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
+
 ###############################################################################
 class _Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     value: int
+
 
 ###############################################################################
 class _ManifestInput(BaseModel):
@@ -43,9 +45,9 @@ class _ManifestInput(BaseModel):
     value: int
     arguments: dict[str, Any] = {}
 
+
 ###############################################################################
 class _Policy:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -60,7 +62,9 @@ class _Policy:
         self.alternative_id = alternative_id
 
     # -------------------------------------------------------------------------
-    def authorize(self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState):
+    def authorize(
+        self, _tool: RegisteredTool, _arguments: BaseModel, _state: AgentRunState
+    ):
         return cast(
             Any,
             type(
@@ -69,10 +73,14 @@ class _Policy:
                 {
                     "allowed": self.allowed,
                     "reason": self.reason,
-                    "metadata": {"code": self.code, "alternative_id": self.alternative_id},
+                    "metadata": {
+                        "code": self.code,
+                        "alternative_id": self.alternative_id,
+                    },
                 },
             )(),
         )
+
 
 ###############################################################################
 def _state() -> AgentRunState:
@@ -83,9 +91,11 @@ def _state() -> AgentRunState:
         user_message="Use the tool.",
     )
 
+
 ###############################################################################
 def _budget() -> AgentExecutionBudget:
     return AgentExecutionBudget(total_seconds=5.0)
+
 
 ###############################################################################
 def _tool(
@@ -125,6 +135,7 @@ def _tool(
         argument_schema_provider=argument_schema_provider,
     )
 
+
 ###############################################################################
 def test_executor_validates_once_and_normalizes_success() -> None:
     calls: list[int] = []
@@ -148,6 +159,7 @@ def test_executor_validates_once_and_normalizes_success() -> None:
     assert calls == [3]
     assert state.tool_results == [result]
     assert state.tool_trace[0]["boundary"] == "tool_executor"
+
 
 ###############################################################################
 def test_tool_executor_normalizes_observed_discovery_alias() -> None:
@@ -182,6 +194,7 @@ def test_tool_executor_normalizes_observed_discovery_alias() -> None:
     assert result.tool_name == "discover_geospatial_capabilities"
     assert calls == [7]
 
+
 ###############################################################################
 def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
     async def handler(arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
@@ -213,6 +226,7 @@ def test_mixed_domain_tool_is_authorized_for_a_mixed_map_data_route() -> None:
 
     assert result.status == "success"
 
+
 ###############################################################################
 def test_malformed_call_never_reaches_the_handler() -> None:
     calls: list[int] = []
@@ -239,6 +253,7 @@ def test_malformed_call_never_reaches_the_handler() -> None:
     assert result.error is not None
     assert result.error.error_type == "malformed_call"
     assert calls == []
+
 
 ###############################################################################
 def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
@@ -270,8 +285,13 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
 
     state = _state()
     state.tool_results.append(
-        ToolResult(call_id="earlier", tool_name="test_tool", status="success",
-                   summary="ok", metadata=ToolExecutionMetadata(duration_ms=0))
+        ToolResult(
+            call_id="earlier",
+            tool_name="test_tool",
+            status="success",
+            summary="ok",
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
     )
     repeated = asyncio.run(
         ToolExecutor(tool_registry=registry).execute_tool(
@@ -285,25 +305,36 @@ def test_registered_tool_call_outside_exact_exposure_set_is_rejected() -> None:
     assert repeated.error is not None
     assert "It already succeeded in this run" in repeated.error.message
 
+
 ###############################################################################
 def test_every_rejection_type_returns_the_uniform_feedback_block() -> None:
     async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
         return {}
 
     def reject(_arguments: BaseModel, _state: AgentRunState) -> list[str]:
-        return ["arguments.minmagnitude: number 15 is outside the valid range (maximum 10)."]
+        return [
+            "arguments.minmagnitude: number 15 is outside the valid range (maximum 10)."
+        ]
 
     registry = ToolRegistry(runtime_registry=cast(Any, None))
     registry.register(_tool(handler, semantic_validator=reject))
     registry.register(_tool(handler, name="policy_tool"))
     exposed = {"test_tool", "policy_tool"}
     calls = {
-        "tool_not_exposed": LLMToolCall(id="a", name="test_tool", arguments={"value": 1}),
+        "tool_not_exposed": LLMToolCall(
+            id="a", name="test_tool", arguments={"value": 1}
+        ),
         "unknown_tool": LLMToolCall(id="b", name="invented_tool", arguments={}),
-        "malformed_call": LLMToolCall(id="c", name="test_tool", arguments=None, parse_error="bad_json"),
+        "malformed_call": LLMToolCall(
+            id="c", name="test_tool", arguments=None, parse_error="bad_json"
+        ),
         "schema_validation": LLMToolCall(id="d", name="test_tool", arguments={"x": 1}),
-        "semantic_validation": LLMToolCall(id="e", name="test_tool", arguments={"value": 1}),
-        "policy_rejection": LLMToolCall(id="f", name="policy_tool", arguments={"value": 1}),
+        "semantic_validation": LLMToolCall(
+            id="e", name="test_tool", arguments={"value": 1}
+        ),
+        "policy_rejection": LLMToolCall(
+            id="f", name="policy_tool", arguments={"value": 1}
+        ),
     }
     for error_code, call in calls.items():
         visible = {"other_tool"} if error_code == "tool_not_exposed" else exposed
@@ -320,11 +351,18 @@ def test_every_rejection_type_returns_the_uniform_feedback_block() -> None:
         assert feedback["valid_tools"] == sorted(visible)
         assert feedback["allowed_next_actions"], error_code
         assert set(feedback) <= {
-            "error_code", "issues", "valid_tools", "allowed_next_actions", "correction",
+            "error_code",
+            "issues",
+            "valid_tools",
+            "allowed_next_actions",
+            "correction",
         }
     semantic_result = asyncio.run(
         ToolExecutor(tool_registry=registry).execute_tool(
-            calls["semantic_validation"], _state(), _budget(), exposed_tool_names=exposed
+            calls["semantic_validation"],
+            _state(),
+            _budget(),
+            exposed_tool_names=exposed,
         )
     )
     assert semantic_result.data is not None
@@ -336,6 +374,7 @@ def test_every_rejection_type_returns_the_uniform_feedback_block() -> None:
         "finish with an answer" in action
         for action in semantic_result.data["allowed_next_actions"]
     )
+
 
 ###############################################################################
 def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
@@ -368,6 +407,7 @@ def test_tool_budget_is_enforced_by_the_execution_boundary() -> None:
     assert error.value.reason == "tool_budget_exhausted"
     assert budget.tool_calls == 1
 
+
 ###############################################################################
 def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     async def handler(_arguments: _Input, _state: AgentRunState) -> dict[str, Any]:
@@ -391,7 +431,9 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     policy_registry = ToolRegistry(runtime_registry=cast(Any, None))
     policy_registry.register(_tool(handler))
     policy_result = asyncio.run(
-        ToolExecutor(tool_registry=policy_registry, policy_engine=_Policy(False)).execute_tool(
+        ToolExecutor(
+            tool_registry=policy_registry, policy_engine=_Policy(False)
+        ).execute_tool(
             LLMToolCall(id="policy", name="test_tool", arguments={"value": 1}),
             _state(),
             _budget(),
@@ -430,7 +472,9 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     alternative_result = asyncio.run(
         ToolExecutor(
             tool_registry=policy_registry,
-            policy_engine=_Policy(False, code="unavailable_coverage", alternative_id="global_radar"),
+            policy_engine=_Policy(
+                False, code="unavailable_coverage", alternative_id="global_radar"
+            ),
         ).execute_tool(
             LLMToolCall(id="alternative", name="test_tool", arguments={"value": 1}),
             alternative_state,
@@ -461,7 +505,9 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     map_budget.stage_limits["map_assembly"] = 0.01
     map_result = asyncio.run(
         ToolExecutor(tool_registry=map_registry, timeout_seconds=0.05).execute_tool(
-            LLMToolCall(id="map-timeout", name="apply_map_plan", arguments={"value": 1}),
+            LLMToolCall(
+                id="map-timeout", name="apply_map_plan", arguments={"value": 1}
+            ),
             _state(),
             map_budget,
         )
@@ -469,6 +515,7 @@ def test_schema_semantic_policy_and_timeout_failures_are_typed() -> None:
     assert map_result.error is not None
     assert map_result.error.error_type == "timeout"
     assert [item.stage for item in map_budget.observations] == ["map_assembly"]
+
 
 ###############################################################################
 def test_unexpected_handler_failure_is_logged_with_context_but_not_exposed(
@@ -491,10 +538,18 @@ def test_unexpected_handler_failure_is_logged_with_context_but_not_exposed(
     assert result.error is not None and result.error.code == "tool_execution_error"
     assert "sk-secret" not in result.error.message
     log = caplog.text
-    for expected in ("stage=tool_execution", "run_id=request-1", "tool=test_tool",
-                     "call_id=call-9", "exception_type=RuntimeError", "Traceback", "in handler"):
+    for expected in (
+        "stage=tool_execution",
+        "run_id=request-1",
+        "tool=test_tool",
+        "call_id=call-9",
+        "exception_type=RuntimeError",
+        "Traceback",
+        "in handler",
+    ):
         assert expected in log
     assert "sk-secret" not in log and "api_key=<redacted>" in log
+
 
 ###############################################################################
 def test_manifest_validation_correction_contains_bounded_applicable_schema() -> None:
@@ -546,6 +601,7 @@ def test_manifest_validation_correction_contains_bounded_applicable_schema() -> 
     assert correction["canonical_arguments"]["arguments"] == {}
     assert len(correction["validation_errors"]) == 1
 
+
 ###############################################################################
 def test_execute_capability_accepts_route_temporal_hint() -> None:
     calls: list[ExecuteCapabilityInput] = []
@@ -584,6 +640,7 @@ def test_execute_capability_accepts_route_temporal_hint() -> None:
     assert result.status == "success"
     assert [item.temporal_mode for item in calls] == ["current"]
 
+
 ###############################################################################
 def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
     calls: list[int] = []
@@ -603,14 +660,11 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
 
     ###############################################################################
     class _CapabilityRegistry:
-
         # -------------------------------------------------------------------------
         def argument_schema(self, _capability_id: str) -> dict[str, Any]:
             return manifest_schema
 
-    def provide_schema(
-        _arguments: BaseModel, _state: AgentRunState
-    ) -> dict[str, Any]:
+    def provide_schema(_arguments: BaseModel, _state: AgentRunState) -> dict[str, Any]:
         return manifest_schema
 
     def validate(arguments: BaseModel, _state: AgentRunState) -> list[str]:
@@ -635,7 +689,10 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
             LLMToolCall(
                 id="exclusive-radius",
                 name="execute_geospatial_capability",
-                arguments={"capability_id": "radius-test", "arguments": {"radius_m": 0}},
+                arguments={
+                    "capability_id": "radius-test",
+                    "arguments": {"radius_m": 0},
+                },
             ),
             _state(),
             _budget(),
@@ -647,6 +704,7 @@ def test_exclusive_radius_constraint_rejects_before_handler_execution() -> None:
     assert result.error.validation_errors[0].path == "arguments.radius_m"
     assert "valid range (greater than 0)" in result.error.validation_errors[0].message
     assert calls == []
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -675,6 +733,7 @@ async def test_semantic_failure_is_reported_before_policy_or_handler() -> None:
     assert result.error is not None
     assert result.error.error_type == "semantic_validation"
     assert called is False
+
 
 ###############################################################################
 def test_handler_side_provider_rejection_receives_the_same_feedback_block() -> None:
@@ -707,4 +766,6 @@ def test_handler_side_provider_rejection_receives_the_same_feedback_block() -> N
     assert result.data["valid_tools"] == ["other_tool", "test_tool"]
     assert result.data["issues"][0]["code"] == "unsupported_by_provider"
     assert "limited to 366 days" in result.data["issues"][0]["message"]
-    assert any("states the limit" in action for action in result.data["allowed_next_actions"])
+    assert any(
+        "states the limit" in action for action in result.data["allowed_next_actions"]
+    )

@@ -99,7 +99,9 @@ class RuntimeSettingsRepository:
                 raise ValueError(f"Runtime settings block '{block}' must be an object.")
             typed_block_payload = cast(dict[str, Any], block_payload)
             nested: dict[str, Any] = dict(cast(Mapping[str, Any], value))
-            unknown_fields = sorted(set(nested.keys()) - set(typed_block_payload.keys()))
+            unknown_fields = sorted(
+                set(nested.keys()) - set(typed_block_payload.keys())
+            )
             if unknown_fields:
                 raise ValueError(
                     f"Unsupported runtime settings in {block}: "
@@ -124,9 +126,7 @@ class RuntimeSettingsRepository:
         missing = sorted(set(RUNTIME_SETTING_BLOCKS) - set(payload.keys()))
         unknown = sorted(set(payload.keys()) - set(RUNTIME_SETTING_BLOCKS))
         if missing:
-            raise ValueError(
-                "Missing runtime settings blocks: " + ", ".join(missing)
-            )
+            raise ValueError("Missing runtime settings blocks: " + ", ".join(missing))
         if unknown:
             raise ValueError(
                 "Unsupported runtime settings blocks: " + ", ".join(unknown)

@@ -7,12 +7,13 @@ from server.domain.geospatial.providers import ProviderRequest
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.base import ProviderUnavailableError
 from typing import Any
-from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 
 # --- test_nasa_gibs_provider.py ---
-
-
 
 
 WMTS_XML = """<?xml version="1.0"?>
@@ -52,9 +53,7 @@ WMS_XML = """<?xml version="1.0"?>
 </WMS_Capabilities>
 """
 
-INCOMPATIBLE_WMTS_XML = WMTS_XML.replace(
-    "GoogleMapsCompatible_Level9", "EPSG:4326"
-)
+INCOMPATIBLE_WMTS_XML = WMTS_XML.replace("GoogleMapsCompatible_Level9", "EPSG:4326")
 VECTOR_ONLY_WMTS_XML = WMTS_XML.replace(
     "<Format>image/png</Format>",
     "<Format>application/vnd.mapbox-vector-tile</Format>",
@@ -86,6 +85,7 @@ def _large_wms_xml() -> str:
     </WMS_Capabilities>
     """
 
+
 ###############################################################################
 async def _assert_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -108,6 +108,7 @@ async def _assert_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     assert "{time}" in layer.render.tile_url_template
     assert "/{z}/{y}/{x}.png" in layer.render.tile_url_template
 
+
 ###############################################################################
 async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -121,9 +122,11 @@ async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     assert layer.title == "MODIS Terra NDVI 8-Day"
     assert "EPSG:3857" in layer.crs
 
+
 ###############################################################################
 def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_parses_xml_and_prefers_wmts())
+
 
 ###############################################################################
 def test_nasa_gibs_provider_uses_the_advertised_wmts_zoom_ceiling() -> None:
@@ -136,9 +139,7 @@ def test_nasa_gibs_provider_uses_the_advertised_wmts_zoom_ceiling() -> None:
         return level_six_xml if "wmts" in url else WMS_XML
 
     layer = run_async_in_thread(
-        NASAGIBSProvider(fetcher=fetcher).describe_layer(
-            "MODIS_Terra_NDVI_8Day"
-        )
+        NASAGIBSProvider(fetcher=fetcher).describe_layer("MODIS_Terra_NDVI_8Day")
     )
 
     assert layer.render is not None
@@ -146,9 +147,11 @@ def test_nasa_gibs_provider_uses_the_advertised_wmts_zoom_ceiling() -> None:
     assert layer.render.min_zoom == 0
     assert layer.render.max_zoom == 6
 
+
 ###############################################################################
 def test_nasa_gibs_provider_describes_one_layer() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_describes_one_layer())
+
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_renderable_raster_result() -> None:
@@ -168,6 +171,7 @@ def test_nasa_gibs_provider_returns_renderable_raster_result() -> None:
     assert response.result_type == "raster"
     assert response.payload["render"] is not None
 
+
 ###############################################################################
 def test_nasa_gibs_provider_maps_stable_capability_to_manifest_layer() -> None:
     native_wmts = VECTOR_ONLY_WMTS_XML.replace(
@@ -186,9 +190,7 @@ def test_nasa_gibs_provider_maps_stable_capability_to_manifest_layer() -> None:
             ProviderRequest(
                 capability_id="MODIS_Combined_Thermal_Anomalies_Fire",
                 params={
-                    "metadata": {
-                        "layer_id": "MODIS_Combined_Thermal_Anomalies_All"
-                    }
+                    "metadata": {"layer_id": "MODIS_Combined_Thermal_Anomalies_All"}
                 },
             )
         )
@@ -200,6 +202,7 @@ def test_nasa_gibs_provider_maps_stable_capability_to_manifest_layer() -> None:
     )
     assert response.payload["render"] is not None
     assert response.payload["render"]["rendering_mode"] == "wms"
+
 
 ###############################################################################
 def test_nasa_gibs_provider_falls_back_to_wms_without_web_mercator_wmts() -> None:
@@ -216,6 +219,7 @@ def test_nasa_gibs_provider_falls_back_to_wms_without_web_mercator_wmts() -> Non
     assert layer.render.source_protocol == "wms"
     assert layer.default_time == "2026-06-18"
 
+
 ###############################################################################
 def test_nasa_gibs_provider_prefers_wms_when_wmts_is_vector_only() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -223,9 +227,7 @@ def test_nasa_gibs_provider_prefers_wms_when_wmts_is_vector_only() -> None:
         return VECTOR_ONLY_WMTS_XML if "wmts" in url else WMS_XML
 
     layer = run_async_in_thread(
-        NASAGIBSProvider(fetcher=fetcher).describe_layer(
-            "MODIS_Terra_NDVI_8Day"
-        )
+        NASAGIBSProvider(fetcher=fetcher).describe_layer("MODIS_Terra_NDVI_8Day")
     )
 
     assert layer.render is not None
@@ -235,8 +237,11 @@ def test_nasa_gibs_provider_prefers_wms_when_wmts_is_vector_only() -> None:
         "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
     )
 
+
 ###############################################################################
-def test_nasa_gibs_provider_falls_back_to_wms_when_wmts_discovery_is_unavailable() -> None:
+def test_nasa_gibs_provider_falls_back_to_wms_when_wmts_discovery_is_unavailable() -> (
+    None
+):
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
         if "wmts" in url:
@@ -244,15 +249,14 @@ def test_nasa_gibs_provider_falls_back_to_wms_when_wmts_discovery_is_unavailable
         return WMS_XML
 
     layer = run_async_in_thread(
-        NASAGIBSProvider(fetcher=fetcher).describe_layer(
-            "MODIS_Terra_NDVI_8Day"
-        )
+        NASAGIBSProvider(fetcher=fetcher).describe_layer("MODIS_Terra_NDVI_8Day")
     )
 
     assert layer.render is not None
     assert layer.render.rendering_mode == "wms"
     assert layer.render.source_protocol == "wms"
     assert layer.layer_id == "MODIS_Terra_NDVI_8Day"
+
 
 ###############################################################################
 def test_nasa_gibs_provider_describes_named_layer_beyond_catalog_page_ceiling() -> None:
@@ -261,7 +265,7 @@ def test_nasa_gibs_provider_describes_named_layer_beyond_catalog_page_ceiling() 
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
         return (
-            "<Capabilities xmlns=\"http://www.opengis.net/wmts/1.0\"><Contents />"
+            '<Capabilities xmlns="http://www.opengis.net/wmts/1.0"><Contents />'
             "</Capabilities>"
             if "wmts" in url
             else large_wms_xml
@@ -274,6 +278,7 @@ def test_nasa_gibs_provider_describes_named_layer_beyond_catalog_page_ceiling() 
     assert layer.layer_id == "SRTM_Color_Index"
     assert layer.render is not None
     assert layer.render.rendering_mode == "wms"
+
 
 ###############################################################################
 def test_nasa_gibs_provider_preserves_default_and_explicit_requested_time() -> None:
@@ -296,6 +301,7 @@ def test_nasa_gibs_provider_preserves_default_and_explicit_requested_time() -> N
     assert response.payload["render"]["time"] == "2026-06-20"
     assert "{time}" in response.payload["render"]["tile_url_template"]
 
+
 ###############################################################################
 def test_nasa_gibs_provider_rejects_missing_layer_and_malformed_capabilities() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None) -> str:
@@ -303,9 +309,7 @@ def test_nasa_gibs_provider_rejects_missing_layer_and_malformed_capabilities() -
         return "<not-valid-xml"
 
     with pytest.raises(ProviderUnavailableError, match="malformed XML"):
-        run_async_in_thread(
-            NASAGIBSProvider(fetcher=malformed_fetcher).list_layers()
-        )
+        run_async_in_thread(NASAGIBSProvider(fetcher=malformed_fetcher).list_layers())
 
     async def valid_fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
@@ -316,9 +320,8 @@ def test_nasa_gibs_provider_rejects_missing_layer_and_malformed_capabilities() -
             NASAGIBSProvider(fetcher=valid_fetcher).describe_layer("missing-layer")
         )
 
+
 # --- test_rainviewer_recent_history.py ---
-
-
 
 
 ###############################################################################
@@ -357,6 +360,7 @@ def test_rainviewer_ignores_discontinued_nowcast_frames() -> None:
     assert "/v2/radar/200/256/" in result["tile_url_template"]
     assert "/v2/radar/999/" not in result["tile_url_template"]
 
+
 ###############################################################################
 def test_rainviewer_filters_malformed_past_timestamps() -> None:
     async def fetcher(_url: str, _headers: dict[str, str]) -> dict[str, Any]:
@@ -368,7 +372,7 @@ def test_rainviewer_filters_malformed_past_timestamps() -> None:
                     {"time": None, "path": "/v2/radar/missing"},
                     {"time": 300, "path": "/v2/radar/300"},
                 ]
-            }
+            },
         }
 
     service = RainViewerService(fetcher=fetcher)
@@ -378,6 +382,7 @@ def test_rainviewer_filters_malformed_past_timestamps() -> None:
     assert result["latest_time"] == 300
     assert result["frame_count"] == 1
     assert result["history_start_time"] == 300
+
 
 ###############################################################################
 def test_rainviewer_rejects_when_no_past_frame_has_a_valid_timestamp() -> None:
@@ -399,6 +404,7 @@ def test_rainviewer_rejects_when_no_past_frame_has_a_valid_timestamp() -> None:
         assert "recent radar history frames" in str(exc)
     else:
         raise AssertionError("RainViewerRequestError was not raised.")
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -451,7 +457,9 @@ def test_rainviewer_forces_universal_blue_color_scheme() -> None:
         }
 
     result = asyncio.run(
-        RainViewerService(fetcher=fetcher, tile_color_scheme=6).get_latest_radar_metadata()
+        RainViewerService(
+            fetcher=fetcher, tile_color_scheme=6
+        ).get_latest_radar_metadata()
     )
 
     assert "/2/1_1.png" in result["tile_url_template"]
@@ -462,7 +470,6 @@ def test_rainviewer_provider_reports_server_bound_scope_evidence() -> None:
 
     ###############################################################################
     class _Service:
-
         # -------------------------------------------------------------------------
         async def get_latest_radar_metadata(self) -> dict[str, Any]:
             return {
@@ -497,12 +504,19 @@ def test_rainviewer_provider_reports_server_bound_scope_evidence() -> None:
 
 
 ###############################################################################
-def _wikidata_quantity(amount: str, unit: str, *, rank: str = "normal", year: str | None = None) -> dict[str, Any]:
+def _wikidata_quantity(
+    amount: str, unit: str, *, rank: str = "normal", year: str | None = None
+) -> dict[str, Any]:
     statement: dict[str, Any] = {
         "rank": rank,
         "mainsnak": {
             "snaktype": "value",
-            "datavalue": {"value": {"amount": amount, "unit": f"http://www.wikidata.org/entity/{unit}"}},
+            "datavalue": {
+                "value": {
+                    "amount": amount,
+                    "unit": f"http://www.wikidata.org/entity/{unit}",
+                }
+            },
         },
     }
     if year is not None:
@@ -521,25 +535,37 @@ def test_wikidata_provider_reports_current_place_facts_with_their_dates() -> Non
     async def fetcher(url: str, headers: dict[str, str] | None) -> dict[str, Any]:
         requested.append(url)
         assert headers is not None and "User-Agent" in headers
-        return {"entities": {"Q64": {
-            "labels": {"en": {"value": "Berlin"}},
-            "descriptions": {"en": {"value": "capital of Germany"}},
-            "claims": {
-                "P1082": [
-                    _wikidata_quantity("+3644826", "Q199", year="2018"),
-                    _wikidata_quantity("+3878100", "Q199", rank="preferred", year="2023"),
-                    _wikidata_quantity("+3000000", "Q199", rank="deprecated", year="2024"),
-                ],
-                "P2046": [_wikidata_quantity("+891.3", "Q712226")],
-                "P2044": [_wikidata_quantity("+34", "Q11573")],
-            },
-        }}}
+        return {
+            "entities": {
+                "Q64": {
+                    "labels": {"en": {"value": "Berlin"}},
+                    "descriptions": {"en": {"value": "capital of Germany"}},
+                    "claims": {
+                        "P1082": [
+                            _wikidata_quantity("+3644826", "Q199", year="2018"),
+                            _wikidata_quantity(
+                                "+3878100", "Q199", rank="preferred", year="2023"
+                            ),
+                            _wikidata_quantity(
+                                "+3000000", "Q199", rank="deprecated", year="2024"
+                            ),
+                        ],
+                        "P2046": [_wikidata_quantity("+891.3", "Q712226")],
+                        "P2044": [_wikidata_quantity("+34", "Q11573")],
+                    },
+                }
+            }
+        }
 
     provider = WikidataProvider(fetcher=fetcher)
-    response = run_async_in_thread(provider.fetch(ProviderRequest(
-        capability_id="wikidata_place_facts",
-        params={"wikidata_id": "Q64", "latitude": 52.52, "longitude": 13.405},
-    )))
+    response = run_async_in_thread(
+        provider.fetch(
+            ProviderRequest(
+                capability_id="wikidata_place_facts",
+                params={"wikidata_id": "Q64", "latitude": 52.52, "longitude": 13.405},
+            )
+        )
+    )
 
     assert requested == ["https://www.wikidata.org/wiki/Special:EntityData/Q64.json"]
     facts = response.payload["facts"]
@@ -549,10 +575,18 @@ def test_wikidata_provider_reports_current_place_facts_with_their_dates() -> Non
     assert facts["elevation_m"] == 34
     assert facts["label"] == "Berlin"
     assert response.result_status == "ok"
-    assert response.coverage is not None and response.coverage["spatial_scope_satisfied"] is True
+    assert (
+        response.coverage is not None
+        and response.coverage["spatial_scope_satisfied"] is True
+    )
 
-    unlinked = run_async_in_thread(provider.fetch(ProviderRequest(
-        capability_id="wikidata_place_facts", params={"latitude": 1.0, "longitude": 2.0},
-    )))
+    unlinked = run_async_in_thread(
+        provider.fetch(
+            ProviderRequest(
+                capability_id="wikidata_place_facts",
+                params={"latitude": 1.0, "longitude": 2.0},
+            )
+        )
+    )
     assert unlinked.result_status == "valid_empty"
     assert len(requested) == 1

@@ -18,6 +18,7 @@ EvidenceKind = Literal[
     "diagnostic",
 ]
 
+
 ###############################################################################
 class AgentEvidenceSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -32,6 +33,7 @@ class AgentEvidenceSummary(BaseModel):
     byte_size: int = Field(default=0, ge=0)
     sha256: str | None = None
     map_eligibility: Literal["renderable", "not_renderable", "unknown"] = "unknown"
+
 
 ###############################################################################
 class AgentEvidenceEnvelope(BaseModel):

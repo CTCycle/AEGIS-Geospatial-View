@@ -13,9 +13,9 @@ from server.domain.agent.conversation import ConversationState
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
+
 ###############################################################################
 class ConversationRepository:
-
     MAX_PAGE_LIMIT = 50
     MAX_QUERY_CHARS = 300
 
@@ -197,7 +197,9 @@ class ConversationRepository:
         has_more = len(rows) > bounded_limit
         page_rows = rows[:bounded_limit]
         next_cursor = (
-            _encode_conversation_cursor(page_rows[-1]) if has_more and page_rows else None
+            _encode_conversation_cursor(page_rows[-1])
+            if has_more and page_rows
+            else None
         )
         conversations = [
             self._to_summary(
@@ -301,9 +303,7 @@ class ConversationRepository:
             )
             filters.append(
                 or_(
-                    func.lower(ConversationRecord.title).like(
-                        pattern, escape="\\"
-                    ),
+                    func.lower(ConversationRecord.title).like(pattern, escape="\\"),
                     message_match,
                 )
             )
@@ -327,16 +327,19 @@ class ConversationRepository:
             raise ValueError("Conversation not found.")
         return record
 
+
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
+
 ###############################################################################
 def _preview(value: object, *, limit: int = 240) -> str:
     text_value = " ".join(str(value or "").split())
     return text_value if len(text_value) <= limit else f"{text_value[: limit - 1]}…"
+
 
 ###############################################################################
 def _encode_conversation_cursor(row: ConversationRecord) -> str:
@@ -347,6 +350,7 @@ def _encode_conversation_cursor(row: ConversationRecord) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
 
 ###############################################################################
 def _decode_conversation_cursor(

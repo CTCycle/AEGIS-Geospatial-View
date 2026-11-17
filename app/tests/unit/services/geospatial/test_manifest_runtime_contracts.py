@@ -3,7 +3,11 @@ from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
-from server.services.geospatial.capability_registry import CapabilityRegistry, _operation_candidates, normalized_execution_contract
+from server.services.geospatial.capability_registry import (
+    CapabilityRegistry,
+    _operation_candidates,
+    normalized_execution_contract,
+)
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.endpoint_validation import EndpointValidationService
@@ -11,19 +15,29 @@ from types import SimpleNamespace
 from typing import Any
 from server.repositories.credential_material import seed_credential_encryption_material
 from server.services.geospatial.api_service import GeospatialApiService
-from server.services.geospatial.composition import GeospatialRuntime, build_provider_execution_policy, build_geospatial_runtime
+from server.services.geospatial.composition import (
+    GeospatialRuntime,
+    build_provider_execution_policy,
+    build_geospatial_runtime,
+)
 from server.services.chat.composition import build_chat_runtime
 from server.services.geospatial.coverage import CoverageService
 
 # --- test_agentic_manifest_contract.py ---
 
+
 def test_population_discovery_includes_keyless_place_facts() -> None:
     registry = CapabilityRegistry()
     for query in ("population", "population statistics"):
         candidates = registry.shortlist(
-            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=[query],
-            explicit_ids=[], runtime_registry=RuntimeRegistry(), operation="inspect",
-            location=ResolvedLocation(label="Paris, France", country="France", latitude=48.85, longitude=2.35),
+            domains={CapabilityDomain.DATA_RETRIEVAL},
+            queries=[query],
+            explicit_ids=[],
+            runtime_registry=RuntimeRegistry(),
+            operation="inspect",
+            location=ResolvedLocation(
+                label="Paris, France", country="France", latitude=48.85, longitude=2.35
+            ),
         )
         assert "wikidata_place_facts" in {item["id"] for item in candidates}, query
 
@@ -33,8 +47,10 @@ def test_prose_only_match_does_not_offer_an_unrelated_phenomenon() -> None:
     # "wildfire" compounds the subject term "fire", so it still names the subject.
     for queries in (["fire", "hotspots"], ["wildfire hotspots"]):
         candidates = CapabilityRegistry().shortlist(
-            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=queries,
-            explicit_ids=[], runtime_registry=RuntimeRegistry(),
+            domains={CapabilityDomain.DATA_RETRIEVAL},
+            queries=queries,
+            explicit_ids=[],
+            runtime_registry=RuntimeRegistry(),
         )
         ids = {item["id"] for item in candidates}
         assert "MODIS_Combined_Thermal_Anomalies_Fire" in ids, queries
@@ -43,7 +59,6 @@ def test_prose_only_match_does_not_offer_an_unrelated_phenomenon() -> None:
 
 ###############################################################################
 class _RuntimeEligibility:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, disabled: set[str] | None = None) -> None:
         self.disabled = disabled or set()
@@ -55,6 +70,7 @@ class _RuntimeEligibility:
     # -------------------------------------------------------------------------
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
+
 
 ###############################################################################
 def _registry() -> CapabilityRegistry:
@@ -105,6 +121,7 @@ def _registry() -> CapabilityRegistry:
     )
     return CapabilityRegistry.from_catalog_snapshot(snapshot)
 
+
 ###############################################################################
 def test_shortlist_is_domain_aware_and_bounded() -> None:
     candidates = _registry().shortlist(
@@ -119,6 +136,7 @@ def test_shortlist_is_domain_aware_and_bounded() -> None:
     assert len(candidates) <= 12
     assert candidates[0]["routing_domains"] == ["data_retrieval"]
 
+
 ###############################################################################
 def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> None:
     candidates = _registry().shortlist(
@@ -130,6 +148,7 @@ def test_explicit_shortlist_ids_are_ranked_and_disabled_ids_are_filtered() -> No
     )
 
     assert [item["id"] for item in candidates] == ["weather"]
+
 
 ###############################################################################
 def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> None:
@@ -148,9 +167,11 @@ def test_compound_retrieval_and_undated_recent_intent_match_current_feed() -> No
 
     assert candidates[0]["id"] == "traffic"
 
+
 ###############################################################################
 def test_basemap_switch_operations_include_the_manifest_render_primitive() -> None:
     assert "show" in _operation_candidates("switch_basemap_to_satellite")
+
 
 ###############################################################################
 def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() -> None:
@@ -187,9 +208,11 @@ def test_metadata_only_solar_estimate_is_direct_text_and_operation_compatible() 
     assert runtime.supports_mode("pvgis_solar", "map") is False
     assert runtime.supports_mode("pvgis_solar", "text") is True
 
+
 ###############################################################################
 def test_add_layer_operations_include_the_manifest_render_primitives() -> None:
     assert {"show", "overlay"}.issubset(_operation_candidates("add_layer"))
+
 
 ###############################################################################
 def test_comparing_places_matches_the_same_capabilities_as_retrieving_them() -> None:
@@ -213,10 +236,13 @@ def test_comparing_places_matches_the_same_capabilities_as_retrieving_them() -> 
     )
 
     compared = [item["id"] for item in registry.shortlist(operation="compare", **route)]
-    retrieved = [item["id"] for item in registry.shortlist(operation="retrieve", **route)]
+    retrieved = [
+        item["id"] for item in registry.shortlist(operation="retrieve", **route)
+    ]
 
     assert "openmeteo_weather_forecast" in compared
     assert compared == retrieved
+
 
 ###############################################################################
 def test_avoid_condition_needs_the_whole_phrase_not_one_shared_word() -> None:
@@ -231,7 +257,10 @@ def test_avoid_condition_needs_the_whole_phrase_not_one_shared_word() -> None:
         requires_render=True,
         # A European map: the CONUS-only NOAA radar is out of coverage.
         location=ResolvedLocation(
-            label="Lisbon, Portugal", latitude=38.7078, longitude=-9.1366, country="Portugal"
+            label="Lisbon, Portugal",
+            latitude=38.7078,
+            longitude=-9.1366,
+            country="Portugal",
         ),
     )
 
@@ -246,6 +275,7 @@ def test_avoid_condition_needs_the_whole_phrase_not_one_shared_word() -> None:
     assert "rainviewer_precipitation_radar" not in shortlisted(
         ["satellite infrared imagery"]
     )
+
 
 ###############################################################################
 def test_plain_subject_query_still_counts_beside_an_alias_variant() -> None:
@@ -273,6 +303,7 @@ def test_plain_subject_query_still_counts_beside_an_alias_variant() -> None:
 
     assert "overpass_poi_amenities" in [item["id"] for item in candidates]
 
+
 ###############################################################################
 def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
     candidates = _registry().shortlist(
@@ -289,6 +320,7 @@ def test_dated_historical_intent_does_not_match_current_only_feed() -> None:
 
     assert candidates == []
 
+
 ###############################################################################
 def test_route_contract_remains_independent_of_provider_arguments() -> None:
     route = CapabilityRoute(
@@ -300,6 +332,7 @@ def test_route_contract_remains_independent_of_provider_arguments() -> None:
     )
 
     assert "radius_m" not in route.model_dump()
+
 
 ###############################################################################
 def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None:
@@ -336,6 +369,7 @@ def test_missing_agentic_domains_are_not_inferred_from_capability_kind() -> None
     )
 
     assert candidates == []
+
 
 ###############################################################################
 def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
@@ -375,22 +409,28 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
         longitude=8.5417,
         country="Switzerland",
     )
-    assert registry.shortlist(
-        domains={CapabilityDomain.SPATIAL_ANALYSIS},
-        queries=["parcel analysis"],
-        explicit_ids=[],
-        runtime_registry=_RuntimeEligibility(),
-        location=zurich,
-    ) == []
+    assert (
+        registry.shortlist(
+            domains={CapabilityDomain.SPATIAL_ANALYSIS},
+            queries=["parcel analysis"],
+            explicit_ids=[],
+            runtime_registry=_RuntimeEligibility(),
+            location=zurich,
+        )
+        == []
+    )
 
     rome = zurich.model_copy(update={"label": "Rome", "country": "Italy"})
-    assert registry.shortlist(
-        domains={CapabilityDomain.SPATIAL_ANALYSIS},
-        queries=["parcel analysis"],
-        explicit_ids=[],
-        runtime_registry=_RuntimeEligibility(),
-        location=rome,
-    ) == []
+    assert (
+        registry.shortlist(
+            domains={CapabilityDomain.SPATIAL_ANALYSIS},
+            queries=["parcel analysis"],
+            explicit_ids=[],
+            runtime_registry=_RuntimeEligibility(),
+            location=rome,
+        )
+        == []
+    )
 
     us_location = zurich.model_copy(
         update={"label": "New York", "country": "United States"}
@@ -403,6 +443,7 @@ def test_shortlist_applies_manifest_avoid_conditions_and_coverage() -> None:
         location=us_location,
     )
     assert [item["id"] for item in candidate] == ["us-parcels"]
+
 
 ###############################################################################
 def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() -> None:
@@ -469,6 +510,7 @@ def test_semantic_routing_uses_manifest_hints_and_rejects_domain_only_matches() 
         runtime_registry=_RuntimeEligibility(),
     )
     assert context_only == []
+
 
 ###############################################################################
 def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> None:
@@ -552,7 +594,10 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
 
     # Inside the Euro-Mediterranean preferred area EMSC outranks the global
     # USGS catalog unless USGS is named.
-    for query, expected in (("USGS", "usgs_earthquakes"), ("hazard", "emsc_earthquakes")):
+    for query, expected in (
+        ("USGS", "usgs_earthquakes"),
+        ("hazard", "emsc_earthquakes"),
+    ):
         usgs = registry.shortlist(
             domains={CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.MAP_RENDERING},
             queries=[query],
@@ -614,6 +659,7 @@ def test_real_catalog_aliases_select_environmental_and_hazard_capabilities() -> 
     )
     assert water_gauges[0]["id"] == "usgs_water_gauges"
 
+
 ###############################################################################
 def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> None:
     registry = CapabilityRegistry()
@@ -660,9 +706,7 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
     }
     assert "openmeteo_air_quality_forecast" not in forecast
 
-    air_quality = shortlist(
-        "air quality forecast", "retrieve_weather", zurich
-    )
+    air_quality = shortlist("air quality forecast", "retrieve_weather", zurich)
     assert air_quality[0] == "openmeteo_air_quality_forecast"
 
     poi = shortlist("points of interest", "find_poi", zurich)
@@ -682,9 +726,7 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
     }
 
     modis_land_cover = shortlist("MODIS land cover", "retrieve_land_cover", zurich)
-    assert modis_land_cover == [
-        "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual"
-    ]
+    assert modis_land_cover == ["MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual"]
 
     world_cover = shortlist("world cover", "retrieve_land_cover", zurich)
     assert world_cover == ["esa_worldcover"]
@@ -697,6 +739,7 @@ def test_real_catalog_subject_aliases_do_not_substitute_unrelated_layers() -> No
 
     charging = shortlist("EV charging stations", "retrieve_infrastructure", rome)
     assert charging == []
+
 
 ###############################################################################
 def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() -> None:
@@ -743,6 +786,7 @@ def test_rainviewer_recent_radar_routes_for_naples_and_venice_but_not_nowcast() 
         location=locations[0],
     )
     assert nowcast == []
+
 
 ###############################################################################
 def test_real_catalog_keyless_vector_point_capabilities_route_for_tier3() -> None:
@@ -872,6 +916,7 @@ def test_real_catalog_keyless_vector_point_capabilities_route_for_tier3() -> Non
     assert "opentripmap_tourism_pois" not in amenities
     assert "openmeteo_elevation" not in atmospheric
 
+
 ###############################################################################
 def test_openaq_stations_are_discoverable_for_a_map_request() -> None:
     registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
@@ -893,6 +938,7 @@ def test_openaq_stations_are_discoverable_for_a_map_request() -> None:
 
     assert "openaq_air_quality" in [item["id"] for item in shortlisted]
 
+
 # --- test_capability_registry.py ---
 
 
@@ -903,37 +949,58 @@ def test_capability_registry_loads_tools() -> None:
     assert snapshot.tools
     assert registry.get_capability("get_weather_forecast") is not None
 
+
 ###############################################################################
 def test_execution_contract_is_read_from_the_manifest() -> None:
-    contract = CapabilityRegistry().execution_contract(
-        "openmeteo_weather_forecast"
-    )
+    contract = CapabilityRegistry().execution_contract("openmeteo_weather_forecast")
 
     assert contract["supported_operations"] == ["show", "inspect", "forecast"]
     assert contract["supported_scope_kinds"] == ["point", "bbox", "grid_sample"]
     assert contract["render_support"] == "vector"
     assert contract["output_geometry_type"] == "Point"
 
+
 ###############################################################################
 def test_numeric_eligibility_defaults_and_ranks_imagery_below_values() -> None:
     registry = CapabilityRegistry()
-    assert registry.execution_contract("MODIS_Combined_Thermal_Anomalies_Fire")["numeric_query"] == "render_only"
-    assert registry.execution_contract("MODIS_Terra_NDVI_8Day")["numeric_query"] == "legend_sampled"
+    assert (
+        registry.execution_contract("MODIS_Combined_Thermal_Anomalies_Fire")[
+            "numeric_query"
+        ]
+        == "render_only"
+    )
+    assert (
+        registry.execution_contract("MODIS_Terra_NDVI_8Day")["numeric_query"]
+        == "legend_sampled"
+    )
     assert registry.execution_contract("usgs_earthquakes")["numeric_query"] == "numeric"
     declared = normalized_execution_contract(
-        {"executionContract": {"render_support": "raster", "result_kind": "raster", "numeric_query": "numeric"}}
+        {
+            "executionContract": {
+                "render_support": "raster",
+                "result_kind": "raster",
+                "numeric_query": "numeric",
+            }
+        }
     )
     assert declared["numeric_query"] == "numeric"
 
     def score(requires_numeric: bool) -> float:
         candidates = registry.shortlist(
-            domains={CapabilityDomain.DATA_RETRIEVAL}, queries=["fire", "hotspots"],
-            explicit_ids=[], runtime_registry=RuntimeRegistry(), requires_numeric=requires_numeric,
+            domains={CapabilityDomain.DATA_RETRIEVAL},
+            queries=["fire", "hotspots"],
+            explicit_ids=[],
+            runtime_registry=RuntimeRegistry(),
+            requires_numeric=requires_numeric,
         )
-        return next(item["routing_score"] for item in candidates
-                    if item["id"] == "MODIS_Combined_Thermal_Anomalies_Fire")
+        return next(
+            item["routing_score"]
+            for item in candidates
+            if item["id"] == "MODIS_Combined_Thermal_Anomalies_Fire"
+        )
 
     assert score(True) < score(False)
+
 
 ###############################################################################
 def test_execution_contract_is_not_inferred_for_an_incomplete_manifest() -> None:
@@ -951,12 +1018,12 @@ def test_execution_contract_is_not_inferred_for_an_incomplete_manifest() -> None
     assert contract["supported_scope_kinds"] == []
     assert contract["render_support"] == "none"
 
+
 # --- test_manifest_metadata_contract.py ---
 
 
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
@@ -972,6 +1039,7 @@ REQUIRED_TRAIT_FIELDS = {
     "rate_limit_notes",
 }
 
+
 ###############################################################################
 def test_all_manifest_entries_expose_source_traits() -> None:
     payload = GeospatialManifestLoader().load_all()
@@ -983,6 +1051,7 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                 if not metadata.get(field):
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
+
 
 ###############################################################################
 def test_enabled_executable_manifests_declare_execution_contracts() -> None:
@@ -1003,6 +1072,7 @@ def test_enabled_executable_manifests_declare_execution_contracts() -> None:
 
     assert not missing
 
+
 ###############################################################################
 def test_credentialed_capabilities_are_not_healthy_without_credentials(
     monkeypatch,
@@ -1015,6 +1085,7 @@ def test_credentialed_capabilities_are_not_healthy_without_credentials(
     runtime.build_snapshot()
 
     assert runtime.provider_health("openaq_air_quality") == "missing_credentials"
+
 
 ###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:
@@ -1038,12 +1109,12 @@ def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None
     assert osm_url is not None
     assert osm_url.endswith("/6/33/23.png")
 
+
 # --- test_runtime_registry.py ---
 
 
 ###############################################################################
 class _CredentialRepo:
-
     # -------------------------------------------------------------------------
     def __init__(self, present: bool) -> None:
         self.present = present
@@ -1058,6 +1129,7 @@ class _CredentialRepo:
             return object()
         return None
 
+
 ###############################################################################
 def test_runtime_registry_reads_profiles() -> None:
     registry = RuntimeRegistry(
@@ -1067,6 +1139,7 @@ def test_runtime_registry_reads_profiles() -> None:
     snapshot = registry.build_snapshot()
     assert "osm_default" in snapshot.profiles
     assert registry.is_enabled("osm_default")
+
 
 ###############################################################################
 def test_runtime_profiles_cover_all_capabilities() -> None:
@@ -1092,6 +1165,7 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
     )
     assert not missing
 
+
 ###############################################################################
 def test_key_required_providers_are_unavailable_without_saved_credentials(
     monkeypatch,
@@ -1106,6 +1180,7 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(
     assert not registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "missing_credentials"
 
+
 ###############################################################################
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
@@ -1118,8 +1193,11 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
 
+
 ###############################################################################
-def test_openchargemap_requires_saved_key_or_local_snapshot(monkeypatch, tmp_path) -> None:
+def test_openchargemap_requires_saved_key_or_local_snapshot(
+    monkeypatch, tmp_path
+) -> None:
     monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
     unavailable = RuntimeRegistry(
         manifest_loader=GeospatialManifestLoader(),
@@ -1143,6 +1221,7 @@ def test_openchargemap_requires_saved_key_or_local_snapshot(monkeypatch, tmp_pat
     assert local.access_available("openchargemap_ev_charging")
     assert local.provider_health("openchargemap_ev_charging") == "healthy"
 
+
 ###############################################################################
 def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
@@ -1153,6 +1232,7 @@ def test_openchargemap_is_available_with_saved_access_credential(monkeypatch) ->
 
     assert registry.access_available("openchargemap_ev_charging")
     assert registry.provider_health("openchargemap_ev_charging") == "healthy"
+
 
 ###############################################################################
 def test_configured_gtfs_feeds_require_a_feed_source(monkeypatch) -> None:
@@ -1179,6 +1259,7 @@ def test_configured_gtfs_feeds_require_a_feed_source(monkeypatch) -> None:
         assert configured.access_available(capability_id)
         assert configured.provider_health(capability_id) == "healthy"
 
+
 ###############################################################################
 def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_ALLOW_RESTRICTED_SOURCES", raising=False)
@@ -1189,6 +1270,7 @@ def test_restricted_capability_is_disabled_without_explicit_opt_in(monkeypatch) 
 
     assert not registry.is_enabled("openmeteo_elevation")
     assert registry.provider_health("openmeteo_elevation") == "disabled"
+
 
 ###############################################################################
 def test_restricted_capability_requires_explicit_opt_in(monkeypatch) -> None:
@@ -1201,10 +1283,12 @@ def test_restricted_capability_requires_explicit_opt_in(monkeypatch) -> None:
     assert registry.is_enabled("openmeteo_elevation")
     assert registry.provider_health("openmeteo_elevation") == "healthy"
 
+
 # --- test_tool_runtime_profiles.py ---
 
 
 ###############################################################################
+
 
 ###############################################################################
 def test_tool_runtime_profiles_complete() -> None:
@@ -1218,8 +1302,8 @@ def test_tool_runtime_profiles_complete() -> None:
     for tool in tools:
         assert tool["id"] in profiles
 
-# --- test_geospatial_runtime_composition.py ---
 
+# --- test_geospatial_runtime_composition.py ---
 
 
 ###############################################################################
@@ -1251,6 +1335,7 @@ def test_provider_policy_uses_source_timeout_floors() -> None:
         "gibs": 30.0,
     }
 
+
 ###############################################################################
 def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None:
     seed_credential_encryption_material(sqlite_backend)
@@ -1272,6 +1357,7 @@ def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None
         runtime.api_service.provider_registry.catalog_snapshot
         is runtime.catalog_snapshot
     )
+
 
 ###############################################################################
 def test_chat_consumes_shared_geospatial_runtime(sqlite_backend) -> None:
@@ -1318,10 +1404,12 @@ def test_chat_consumes_shared_geospatial_runtime(sqlite_backend) -> None:
         "search_conversation_history",
     }
 
+
 # --- test_coverage.py ---
 
 
 ###############################################################################
+
 
 ###############################################################################
 def test_coverage_global_policy_supported() -> None:
@@ -1334,8 +1422,11 @@ def test_coverage_global_policy_supported() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     assert service.is_location_supported("osm_default", location)
 
+
 ###############################################################################
-def test_airport_and_attraction_requests_reach_a_live_source_not_an_ingestion_dataset() -> None:
+def test_airport_and_attraction_requests_reach_a_live_source_not_an_ingestion_dataset() -> (
+    None
+):
     registry = CapabilityRegistry()
     runtime = RuntimeRegistry()
     ottawa = ResolvedLocation(
@@ -1352,9 +1443,13 @@ def test_airport_and_attraction_requests_reach_a_live_source_not_an_ingestion_da
         "location": ottawa,
     }
 
-    airports = [str(item["id"]) for item in registry.shortlist(queries=["airports"], **constraints)]
+    airports = [
+        str(item["id"])
+        for item in registry.shortlist(queries=["airports"], **constraints)
+    ]
     attractions = [
-        str(item["id"]) for item in registry.shortlist(queries=["tourist attractions"], **constraints)
+        str(item["id"])
+        for item in registry.shortlist(queries=["tourist attractions"], **constraints)
     ]
 
     assert "overpass_poi_amenities" in airports

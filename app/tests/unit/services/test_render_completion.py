@@ -14,7 +14,12 @@ from server.contracts.geospatial import (
 )
 from server.contracts.events import RunEventType
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.agent.capability_route import AgentGoal, AgentRunState, CapabilityRoute, CompletionContract
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentRunState,
+    CapabilityRoute,
+    CompletionContract,
+)
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.realtime import RealtimeRenderAckPayload
 from server.repositories.agent_run_events import AgentRunEventRepository
@@ -27,48 +32,111 @@ from server.services.agent_runs.render_completion import (
     RenderCompletionService,
 )
 
-###############################################################################
-def test_map_preparation_cannot_override_missing_checkpoint_evidence(render_context) -> None:
-    repository, publisher, _, run_id = render_context
-    state = AgentRunState(request_id="request", conversation_id="conversation", user_message="Show data", phase="update_state")
-    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL,
-        task_mode="execute", presentation="map", location_mode="none", explicit_capability_ids=["missing"])
-    state.completion_contract = CompletionContract(operation="show", evidence_required=True,
-        requirements=["required_data_retrieved"])
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
-    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
-        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
-    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
-        "map_session": candidate.model_dump(mode="json"),
-        "completion_contract": state.completion_contract.model_dump(mode="json"),
-"execution_trace": {"checkpoint": state.checkpoint()}})
-    requirement = next(item for item in presentation["completion_requirements"] if item["name"] == "required_data_retrieved")
-    assert requirement["status"] == "pending"
 
 ###############################################################################
-def test_presentation_carries_vision_capture_requested_from_execution_trace(render_context) -> None:
+def test_map_preparation_cannot_override_missing_checkpoint_evidence(
+    render_context,
+) -> None:
     repository, publisher, _, run_id = render_context
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
-    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
-        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    state = AgentRunState(
+        request_id="request",
+        conversation_id="conversation",
+        user_message="Show data",
+        phase="update_state",
+    )
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="map",
+        location_mode="none",
+        explicit_capability_ids=["missing"],
+    )
+    state.completion_contract = CompletionContract(
+        operation="show",
+        evidence_required=True,
+        requirements=["required_data_retrieved"],
+    )
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="raster",
+            capability_id="missing",
+            label="Raster",
+            provider="test",
+            overlay_type="tile",
+            rendering_mode="raster-tile",
+            descriptor={"result_type": "raster"},
+        )
+    )
+    presentation, _ = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "completion_contract": state.completion_contract.model_dump(mode="json"),
+            "execution_trace": {"checkpoint": state.checkpoint()},
+        },
+    )
+    requirement = next(
+        item
+        for item in presentation["completion_requirements"]
+        if item["name"] == "required_data_retrieved"
+    )
+    assert requirement["status"] == "pending"
+
+
+###############################################################################
+def test_presentation_carries_vision_capture_requested_from_execution_trace(
+    render_context,
+) -> None:
+    repository, publisher, _, run_id = render_context
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="raster",
+            capability_id="missing",
+            label="Raster",
+            provider="test",
+            overlay_type="tile",
+            rendering_mode="raster-tile",
+            descriptor={"result_type": "raster"},
+        )
+    )
     base_payload = {
         "map_session": candidate.model_dump(mode="json"),
-        "execution_trace": {"checkpoint": AgentRunState(
-            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
-        ).checkpoint()},
+        "execution_trace": {
+            "checkpoint": AgentRunState(
+                request_id="request",
+                conversation_id="conversation",
+                user_message="Show map",
+                phase="update_state",
+            ).checkpoint()
+        },
     }
-    disabled, _ = service.prepare(run_id=run_id, run_version=1, response_payload=base_payload)
+    disabled, _ = service.prepare(
+        run_id=run_id, run_version=1, response_payload=base_payload
+    )
     assert disabled["vision_capture_requested"] is False
 
     enabled_payload = dict(base_payload)
     enabled_payload["execution_trace"] = {
         "vision_capture_requested": True,
         "checkpoint": AgentRunState(
-            request_id="request", conversation_id="conversation", user_message="Show map", phase="update_state",
+            request_id="request",
+            conversation_id="conversation",
+            user_message="Show map",
+            phase="update_state",
         ).checkpoint(),
     }
-    enabled, _ = service.prepare(run_id=run_id, run_version=2, response_payload=enabled_payload)
+    enabled, _ = service.prepare(
+        run_id=run_id, run_version=2, response_payload=enabled_payload
+    )
     assert enabled["vision_capture_requested"] is True
+
 
 ###############################################################################
 def test_unacknowledged_candidate_fails_at_the_render_deadline(
@@ -81,17 +149,34 @@ def test_unacknowledged_candidate_fails_at_the_render_deadline(
     repository, publisher, _, run_id = render_context
     real_sleep = asyncio.sleep
     # The watchdog waits the deadline plus a grace second; shorten it.
-    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.2))
-    service = RenderCompletionService(
-        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.1
+    monkeypatch.setattr(
+        render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.2)
     )
-    candidate = _session(OverlayInstance(instance_id="raster", capability_id="missing", label="Raster",
-        provider="test", overlay_type="tile", rendering_mode="raster-tile", descriptor={"result_type": "raster"}))
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,
+        render_ack_timeout_seconds=0.1,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="raster",
+            capability_id="missing",
+            label="Raster",
+            provider="test",
+            overlay_type="tile",
+            rendering_mode="raster-tile",
+            descriptor={"result_type": "raster"},
+        )
+    )
 
     async def prepare_and_wait() -> None:
-        service.prepare(run_id=run_id, run_version=1, response_payload={
-            "map_session": candidate.model_dump(mode="json"),
-        })
+        service.prepare(
+            run_id=run_id,
+            run_version=1,
+            response_payload={
+                "map_session": candidate.model_dump(mode="json"),
+            },
+        )
         await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
 
     run_async_in_thread(prepare_and_wait())
@@ -101,6 +186,7 @@ def test_unacknowledged_candidate_fails_at_the_render_deadline(
     assert snapshot.error_code == "render_timeout"
     assert "error" in _event_types(publisher, run_id)
 
+
 ###############################################################################
 def _away(service: RenderCompletionService, conversation_id: str, cause: str) -> None:
     service.client_connected(conversation_id, "tab-1")
@@ -109,6 +195,7 @@ def _away(service: RenderCompletionService, conversation_id: str, cause: str) ->
     else:
         service.client_disconnected(conversation_id, "tab-1")
 
+
 ###############################################################################
 def _back(service: RenderCompletionService, conversation_id: str, cause: str) -> None:
     if cause == "render_client_hidden":
@@ -116,8 +203,11 @@ def _back(service: RenderCompletionService, conversation_id: str, cause: str) ->
     else:
         service.client_connected(conversation_id, "tab-1")
 
+
 ###############################################################################
-@pytest.mark.parametrize("cause", ["render_client_disconnected", "render_client_hidden"])
+@pytest.mark.parametrize(
+    "cause", ["render_client_disconnected", "render_client_hidden"]
+)
 def test_transient_client_gap_extends_once_then_redelivers_and_completes(
     render_context, monkeypatch: pytest.MonkeyPatch, cause: str
 ) -> None:
@@ -127,17 +217,25 @@ def test_transient_client_gap_extends_once_then_redelivers_and_completes(
 
     repository, publisher, conversation_id, run_id = render_context
     real_sleep = asyncio.sleep
-    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35))
+    monkeypatch.setattr(
+        render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35)
+    )
     service = RenderCompletionService(
-        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.3
+        run_repository=repository,
+        event_publisher=publisher,
+        render_ack_timeout_seconds=0.3,
     )
     candidate = _session()
     _away(service, conversation_id, cause)
 
     async def scenario() -> None:
-        service.prepare(run_id=run_id, run_version=1, response_payload={
-            "map_session": candidate.model_dump(mode="json"),
-        })
+        service.prepare(
+            run_id=run_id,
+            run_version=1,
+            response_payload={
+                "map_session": candidate.model_dump(mode="json"),
+            },
+        )
         await real_sleep(0.45)
         # The overdue candidate was neither failed nor left unbounded.
         snapshot = repository.get_run(run_id)
@@ -146,19 +244,22 @@ def test_transient_client_gap_extends_once_then_redelivers_and_completes(
         _back(service, conversation_id, cause)
         await service.redeliver_pending_map(conversation_id)
         await service.redeliver_pending_map(conversation_id)
-        await service.acknowledge(conversation_id, RealtimeRenderAckPayload(
-            run_id=run_id,
-            run_version=1,
-            map_session_id=candidate.session_id,
-            collection_revision=candidate.overlay_collection.revision,
-            status="ready",
-            viewport_bounds=candidate.bounds,
-            checks={
-                "required_sources_loaded": True,
-                "required_layers_present": True,
-                "viewport_valid": True,
-            },
-        ))
+        await service.acknowledge(
+            conversation_id,
+            RealtimeRenderAckPayload(
+                run_id=run_id,
+                run_version=1,
+                map_session_id=candidate.session_id,
+                collection_revision=candidate.overlay_collection.revision,
+                status="ready",
+                viewport_bounds=candidate.bounds,
+                checks={
+                    "required_sources_loaded": True,
+                    "required_layers_present": True,
+                    "viewport_valid": True,
+                },
+            ),
+        )
         await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
 
     run_async_in_thread(scenario())
@@ -168,8 +269,11 @@ def test_transient_client_gap_extends_once_then_redelivers_and_completes(
     assert snapshot.presentation_status == "ready"
     assert _event_types(publisher, run_id).count("map_prepared") == 1
 
+
 ###############################################################################
-@pytest.mark.parametrize("cause", ["render_client_disconnected", "render_client_hidden"])
+@pytest.mark.parametrize(
+    "cause", ["render_client_disconnected", "render_client_hidden"]
+)
 def test_transient_client_gap_is_bounded_and_fails_with_the_observed_cause(
     render_context, monkeypatch: pytest.MonkeyPatch, cause: str
 ) -> None:
@@ -179,16 +283,24 @@ def test_transient_client_gap_is_bounded_and_fails_with_the_observed_cause(
 
     repository, publisher, conversation_id, run_id = render_context
     real_sleep = asyncio.sleep
-    monkeypatch.setattr(render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35))
+    monkeypatch.setattr(
+        render_completion.asyncio, "sleep", lambda _seconds: real_sleep(0.35)
+    )
     service = RenderCompletionService(
-        run_repository=repository, event_publisher=publisher, render_ack_timeout_seconds=0.3
+        run_repository=repository,
+        event_publisher=publisher,
+        render_ack_timeout_seconds=0.3,
     )
     _away(service, conversation_id, cause)
 
     async def scenario() -> None:
-        service.prepare(run_id=run_id, run_version=1, response_payload={
-            "map_session": _session().model_dump(mode="json"),
-        })
+        service.prepare(
+            run_id=run_id,
+            run_version=1,
+            response_payload={
+                "map_session": _session().model_dump(mode="json"),
+            },
+        )
         await asyncio.gather(*service._deadline_tasks)  # pyright: ignore[reportPrivateUsage]
 
     run_async_in_thread(scenario())
@@ -199,28 +311,38 @@ def test_transient_client_gap_is_bounded_and_fails_with_the_observed_cause(
     assert snapshot.presentation_status == "render_timeout"
     assert snapshot.presentation["deadline_extensions"] == 1
 
+
 ###############################################################################
 def test_explicit_failure_ack_fails_fast_even_while_the_client_is_away(
     render_context,
 ) -> None:
     repository, publisher, conversation_id, run_id = render_context
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher
+    )
     candidate = _session()
     _away(service, conversation_id, "render_client_hidden")
 
     async def scenario() -> None:
-        service.prepare(run_id=run_id, run_version=1, response_payload={
-            "map_session": candidate.model_dump(mode="json"),
-        })
-        await service.acknowledge(conversation_id, RealtimeRenderAckPayload(
+        service.prepare(
             run_id=run_id,
             run_version=1,
-            map_session_id=candidate.session_id,
-            collection_revision=candidate.overlay_collection.revision,
-            status="failed",
-            failure_code="render_failed",
-            failure_summary="style rejected",
-        ))
+            response_payload={
+                "map_session": candidate.model_dump(mode="json"),
+            },
+        )
+        await service.acknowledge(
+            conversation_id,
+            RealtimeRenderAckPayload(
+                run_id=run_id,
+                run_version=1,
+                map_session_id=candidate.session_id,
+                collection_revision=candidate.overlay_collection.revision,
+                status="failed",
+                failure_code="render_failed",
+                failure_summary="style rejected",
+            ),
+        )
         await service.shutdown()
 
     run_async_in_thread(scenario())
@@ -230,15 +352,22 @@ def test_explicit_failure_ack_fails_fast_even_while_the_client_is_away(
     assert snapshot.error_code == "render_failed"
     assert "deadline_extensions" not in (snapshot.presentation or {})
 
+
 ###############################################################################
 def test_shutdown_cancels_pending_render_deadline(render_context) -> None:
     repository, publisher, _, run_id = render_context
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher
+    )
 
     async def prepare_and_shutdown() -> None:
-        service.prepare(run_id=run_id, run_version=1, response_payload={
-            "map_session": _session().model_dump(mode="json"),
-        })
+        service.prepare(
+            run_id=run_id,
+            run_version=1,
+            response_payload={
+                "map_session": _session().model_dump(mode="json"),
+            },
+        )
         tasks = set(service._deadline_tasks)
         assert tasks
         await service.shutdown()
@@ -248,15 +377,17 @@ def test_shutdown_cancels_pending_render_deadline(render_context) -> None:
     run_async_in_thread(prepare_and_shutdown())
     assert repository.get_run(run_id).state == "awaiting_render"
 
+
 ###############################################################################
 def _event_types(publisher: RunEventPublisher, run_id: str) -> list[str]:
     return [
-        str(event.type.value) for event in publisher.event_repository.list_events(run_id)
+        str(event.type.value)
+        for event in publisher.event_repository.list_events(run_id)
     ]
+
 
 ###############################################################################
 class _InMemoryBackend:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.engine = sqlalchemy.create_engine(
@@ -266,6 +397,7 @@ class _InMemoryBackend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -286,6 +418,7 @@ def render_context() -> tuple[AgentRunRepository, RunEventPublisher, str, str]:
     )
     publisher = RunEventPublisher(event_repository)
     return repository, publisher, conversation_id, run.run_id
+
 
 ###############################################################################
 def _session(
@@ -319,6 +452,7 @@ def _session(
         ),
     )
 
+
 ###############################################################################
 def _contract(*requirements: str) -> CompletionContract:
     return CompletionContract(
@@ -326,6 +460,7 @@ def _contract(*requirements: str) -> CompletionContract:
         requirements=list(requirements),
         map_preparation_required=True,
     )
+
 
 ###############################################################################
 def _goal(
@@ -344,6 +479,7 @@ def _goal(
         spatial_scope=spatial_scope or [],
     )
 
+
 ###############################################################################
 def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
     metadata = OverlayInstance(
@@ -361,18 +497,23 @@ def test_metadata_only_overlay_cannot_satisfy_renderable_geometry() -> None:
         map_session=_session(metadata),
     )
 
-    map_candidate = next(item for item in requirements if item.name == "map_candidate_prepared")
+    map_candidate = next(
+        item for item in requirements if item.name == "map_candidate_prepared"
+    )
     assert map_candidate.status == "satisfied"
     assert RenderCompletionService.requires_browser_ack(_session(metadata)) is False
+
 
 ###############################################################################
 def test_location_only_map_still_requires_browser_ack() -> None:
     assert RenderCompletionService.requires_browser_ack(_session()) is True
 
+
 ###############################################################################
 @pytest.mark.parametrize("evidence_required", [False, True])
 def test_spatial_render_requirement_uses_viewport_only_for_location_requests(
-    render_context, evidence_required: bool,
+    render_context,
+    evidence_required: bool,
 ) -> None:
     repository, publisher, _, run_id = render_context
     goal = _goal(spatial_scope=[{"kind": "point"}])
@@ -383,13 +524,19 @@ def test_spatial_render_requirement_uses_viewport_only_for_location_requests(
         requirements=["spatial_scope_applied"],
     )
     state = AgentRunState(
-        request_id="request", conversation_id="conversation",
-        user_message="Show Rome", phase="update_state",
-        goal=goal, completion_contract=contract,
+        request_id="request",
+        conversation_id="conversation",
+        user_message="Show Rome",
+        phase="update_state",
+        goal=goal,
+        completion_contract=contract,
     )
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher)
+    service = RenderCompletionService(
+        run_repository=repository, event_publisher=publisher
+    )
     presentation, _ = service.prepare(
-        run_id=run_id, run_version=1,
+        run_id=run_id,
+        run_version=1,
         response_payload={
             "map_session": _session().model_dump(mode="json"),
             "goal": goal.model_dump(mode="json"),
@@ -398,10 +545,12 @@ def test_spatial_render_requirement_uses_viewport_only_for_location_requests(
         },
     )
     spatial = next(
-        item for item in presentation["completion_requirements"]
+        item
+        for item in presentation["completion_requirements"]
         if item["name"] == "spatial_scope_applied"
     )
     assert spatial["status"] == ("pending" if evidence_required else "satisfied")
+
 
 ###############################################################################
 def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
@@ -431,9 +580,13 @@ def test_unavailable_provider_is_not_treated_as_metadata_only() -> None:
         goal=_goal(),
         map_session=render_unavailable,
     )
-    assert next(
-        item for item in requirements if item.name == "required_data_retrieved"
-    ).status == "failed"
+    assert (
+        next(
+            item for item in requirements if item.name == "required_data_retrieved"
+        ).status
+        == "failed"
+    )
+
 
 ###############################################################################
 def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
@@ -443,13 +596,19 @@ def test_valid_empty_result_with_bounds_can_render_analysis_area() -> None:
         map_session=_session(payload={"result_status": "valid_empty"}),
     )
 
-    renderable = next(item for item in requirements if item.name == "map_candidate_prepared")
+    renderable = next(
+        item for item in requirements if item.name == "map_candidate_prepared"
+    )
     assert renderable.status == "satisfied"
+
 
 ###############################################################################
 def test_valid_empty_result_satisfies_explicit_data_and_time_checks() -> None:
     goal = _goal(
-        temporal_scope={"mode": "current", "reference_time_iso": "2026-09-20T07:00:00Z"},
+        temporal_scope={
+            "mode": "current",
+            "reference_time_iso": "2026-09-20T07:00:00Z",
+        },
         spatial_scope=[{"kind": "bbox", "relationship": "within"}],
     )
     requirements = CompletionEvaluator.native_candidate_requirements(
@@ -466,6 +625,7 @@ def test_valid_empty_result_satisfies_explicit_data_and_time_checks() -> None:
     assert statuses["required_data_retrieved"] == "satisfied"
     assert statuses["temporal_scope_applied"] == "satisfied"
     assert statuses["spatial_scope_applied"] == "satisfied"
+
 
 ###############################################################################
 def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
@@ -511,11 +671,18 @@ def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
     )
 
     requirements = CompletionEvaluator.native_candidate_requirements(
-        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"),
+        completion_contract=_contract(
+            "required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"
+        ),
         goal=goal,
         map_session=candidate,
     )
-    assert next(item for item in requirements if item.name == "spatial_scope_applied").status == "pending"
+    assert (
+        next(
+            item for item in requirements if item.name == "spatial_scope_applied"
+        ).status
+        == "pending"
+    )
 
     candidate.overlay_collection.instances[0].descriptor.update(
         {
@@ -524,11 +691,19 @@ def test_explicit_scope_and_time_require_descriptor_evidence() -> None:
         }
     )
     requirements = CompletionEvaluator.native_candidate_requirements(
-        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"),
+        completion_contract=_contract(
+            "required_data_retrieved", "temporal_scope_applied", "spatial_scope_applied"
+        ),
         goal=goal,
         map_session=candidate,
     )
-    assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
+    assert (
+        next(
+            item for item in requirements if item.name == "temporal_scope_applied"
+        ).status
+        == "satisfied"
+    )
+
 
 ###############################################################################
 def test_temporal_scope_ignores_static_overlay_retained_during_current_update() -> None:
@@ -553,12 +728,20 @@ def test_temporal_scope_ignores_static_overlay_retained_during_current_update() 
     )
 
     requirements = CompletionEvaluator.native_candidate_requirements(
-        completion_contract=_contract("required_data_retrieved", "temporal_scope_applied"),
+        completion_contract=_contract(
+            "required_data_retrieved", "temporal_scope_applied"
+        ),
         goal=goal,
         map_session=_session(static_overlay, current_overlay),
     )
 
-    assert next(item for item in requirements if item.name == "temporal_scope_applied").status == "satisfied"
+    assert (
+        next(
+            item for item in requirements if item.name == "temporal_scope_applied"
+        ).status
+        == "satisfied"
+    )
+
 
 ###############################################################################
 def test_temporal_scope_is_vacuous_for_basemap_only_view_without_evidence() -> None:
@@ -578,8 +761,15 @@ def test_temporal_scope_is_vacuous_for_basemap_only_view_without_evidence() -> N
         completion_contract=needs_evidence, goal=goal, map_session=_session()
     )
 
-    assert next(i for i in vacuous if i.name == "temporal_scope_applied").status == "satisfied"
-    assert next(i for i in strict if i.name == "temporal_scope_applied").status == "pending"
+    assert (
+        next(i for i in vacuous if i.name == "temporal_scope_applied").status
+        == "satisfied"
+    )
+    assert (
+        next(i for i in strict if i.name == "temporal_scope_applied").status
+        == "pending"
+    )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -605,6 +795,7 @@ def test_acknowledgment_normalizes_world_and_wrapped_viewport(
         viewport_bounds=raw,
     )
     assert payload.viewport_bounds == expected
+
 
 ###############################################################################
 def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None:
@@ -670,6 +861,7 @@ def test_acknowledgment_payload_is_bounded_and_requires_valid_viewport() -> None
                 "viewport_valid": True,
             },
         )
+
 
 ###############################################################################
 def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
@@ -761,6 +953,7 @@ def test_matching_render_ack_promotes_once_and_replay_is_idempotent(
             )
         )
 
+
 ###############################################################################
 def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
     render_context,
@@ -776,7 +969,10 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
             rendering_mode="geojson",
             descriptor={
                 "result_type": "feature_collection",
-                "data": {"type": "FeatureCollection", "features": [{"type": "Feature"}]},
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": [{"type": "Feature"}],
+                },
             },
         )
     )
@@ -819,7 +1015,11 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
             service.acknowledge(
                 conversation_id,
                 RealtimeRenderAckPayload(
-                    **{**base_ack, "collection_revision": candidate.overlay_collection.revision + 1}
+                    **{
+                        **base_ack,
+                        "collection_revision": candidate.overlay_collection.revision
+                        + 1,
+                    }
                 ),
             )
         )
@@ -840,6 +1040,7 @@ def test_render_ack_rejects_wrong_revision_and_vector_without_visible_features(
                 RealtimeRenderAckPayload(**base_ack),
             )
         )
+
 
 ###############################################################################
 def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
@@ -864,9 +1065,9 @@ def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
                 location_mode="target",
                 target_ids=["target-rome"],
             ).model_dump(mode="json"),
-            "completion_contract": _contract(
-                "required_data_retrieved"
-            ).model_dump(mode="json"),
+            "completion_contract": _contract("required_data_retrieved").model_dump(
+                mode="json"
+            ),
         },
     )
     assert prepared is True
@@ -889,6 +1090,7 @@ def test_render_ack_rejects_missing_required_data_even_with_analysis_bounds(
                 ),
             )
         )
+
 
 ###############################################################################
 def test_production_render_ack_persists_terminal_events_atomically() -> None:
@@ -957,6 +1159,7 @@ def test_production_render_ack_persists_terminal_events_atomically() -> None:
     assert presentation["status"] == "ready"
     assert "pending_response" not in presentation
     assert len(presentation.get("durable_event_ids", [])) == 3
+
 
 ###############################################################################
 def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
@@ -1058,6 +1261,7 @@ def test_resumable_render_ack_reenters_same_run_and_preserves_attempts(
     assert duplicate.duplicate is True
     assert duplicate.resume_required is False
 
+
 ###############################################################################
 def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     render_context,
@@ -1127,9 +1331,7 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
         ],
     )
 
-    result = run_async_in_thread(
-        service.acknowledge(conversation_id, rejected_ready)
-    )
+    result = run_async_in_thread(service.acknowledge(conversation_id, rejected_ready))
 
     assert result.resume_required is True
     assert result.presentation_status == "pending"
@@ -1140,31 +1342,78 @@ def test_resumable_ready_check_rejection_becomes_render_failure_observation(
     assert result.observation.recovery == "revise_map"
     assert "render_observed" in _event_types(publisher, run_id)
 
+
 ###############################################################################
-@pytest.mark.parametrize('rendering_mode', ['raster-tile', 'tile', 'xyz', 'wms', 'wmts'])
-@pytest.mark.parametrize('visible', [None, False])
+@pytest.mark.parametrize(
+    "rendering_mode", ["raster-tile", "tile", "xyz", "wms", "wmts"]
+)
+@pytest.mark.parametrize("visible", [None, False])
 def test_loaded_raster_without_visibility_proof_resumes_with_original_policy(
     render_context, rendering_mode, visible
 ) -> None:
     repository, publisher, conversation_id, run_id = render_context
-    service = RenderCompletionService(run_repository=repository, event_publisher=publisher,
-        resume_mode=True, max_render_attempts=3)
-    candidate = _session(OverlayInstance(instance_id='raster', capability_id='raster', label='Raster',
-        provider='test', overlay_type='tile', rendering_mode=rendering_mode, descriptor={'result_type': 'raster'}))
-    presentation, _ = service.prepare(run_id=run_id, run_version=1, response_payload={
-        'map_session': candidate.model_dump(mode='json'),
-        'execution_trace': {'checkpoint': {'render_attempts': 0, 'budget_snapshot': {},
-            'execution_policy': {'max_render_attempts': 1, 'render_ack_seconds': 7}}}})
-    assert presentation['max_render_attempts'] == 1
-    assert presentation['render_ack_timeout_seconds'] == 7
-    ack = RealtimeRenderAckPayload(run_id=run_id, run_version=1, map_session_id=candidate.session_id,
-        collection_revision=4, status='ready', viewport_bounds=candidate.bounds,
-        checks={'required_sources_loaded': True, 'required_layers_present': True, 'viewport_valid': True},
-        overlay_results=[{'overlay_id': 'raster', 'source_present': True, 'layer_present': True,
-            'loaded': True, 'visibility_matches': True, 'result_visible': visible}])
+    service = RenderCompletionService(
+        run_repository=repository,
+        event_publisher=publisher,
+        resume_mode=True,
+        max_render_attempts=3,
+    )
+    candidate = _session(
+        OverlayInstance(
+            instance_id="raster",
+            capability_id="raster",
+            label="Raster",
+            provider="test",
+            overlay_type="tile",
+            rendering_mode=rendering_mode,
+            descriptor={"result_type": "raster"},
+        )
+    )
+    presentation, _ = service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "execution_trace": {
+                "checkpoint": {
+                    "render_attempts": 0,
+                    "budget_snapshot": {},
+                    "execution_policy": {
+                        "max_render_attempts": 1,
+                        "render_ack_seconds": 7,
+                    },
+                }
+            },
+        },
+    )
+    assert presentation["max_render_attempts"] == 1
+    assert presentation["render_ack_timeout_seconds"] == 7
+    ack = RealtimeRenderAckPayload(
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=4,
+        status="ready",
+        viewport_bounds=candidate.bounds,
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "raster",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "result_visible": visible,
+            }
+        ],
+    )
     result = run_async_in_thread(service.acknowledge(conversation_id, ack))
-    assert result.observation.status == 'failed'
-    assert result.observation.recovery == 'terminal'
+    assert result.observation.status == "failed"
+    assert result.observation.recovery == "terminal"
     duplicate = run_async_in_thread(service.acknowledge(conversation_id, ack))
     assert duplicate.duplicate is True
 
@@ -1231,15 +1480,29 @@ def test_valid_empty_raster_does_not_require_visible_pixels(render_context) -> N
 ###############################################################################
 def _blank_raster_ack(candidate, run_id: str) -> RealtimeRenderAckPayload:
     return RealtimeRenderAckPayload(
-        run_id=run_id, run_version=1, map_session_id=candidate.session_id,
-        collection_revision=candidate.overlay_collection.revision, status="ready",
+        run_id=run_id,
+        run_version=1,
+        map_session_id=candidate.session_id,
+        collection_revision=candidate.overlay_collection.revision,
+        status="ready",
         viewport_bounds=candidate.bounds,
-        checks={"required_sources_loaded": True, "required_layers_present": True, "viewport_valid": True},
-        overlay_results=[{
-            "overlay_id": "raster", "source_present": True, "layer_present": True, "loaded": True,
-            "visibility_matches": True, "result_visible": False,
-            "raster_tile_intersects_viewport": True, "raster_nontransparent_pixel_count": 0,
-        }],
+        checks={
+            "required_sources_loaded": True,
+            "required_layers_present": True,
+            "viewport_valid": True,
+        },
+        overlay_results=[
+            {
+                "overlay_id": "raster",
+                "source_present": True,
+                "layer_present": True,
+                "loaded": True,
+                "visibility_matches": True,
+                "result_visible": False,
+                "raster_tile_intersects_viewport": True,
+                "raster_nontransparent_pixel_count": 0,
+            }
+        ],
     )
 
 
@@ -1256,19 +1519,43 @@ def test_blank_raster_passes_when_expected_and_is_not_retried_otherwise(
 ) -> None:
     repository, publisher, conversation_id, run_id = render_context
     service = RenderCompletionService(
-        run_repository=repository, event_publisher=publisher, resume_mode=True, max_render_attempts=5
+        run_repository=repository,
+        event_publisher=publisher,
+        resume_mode=True,
+        max_render_attempts=5,
     )
-    candidate = _session(OverlayInstance(
-        instance_id="raster", capability_id="raster", label="Raster", provider="test",
-        overlay_type="tile", rendering_mode="wms", descriptor=descriptor,
-    ))
-    service.prepare(run_id=run_id, run_version=1, response_payload={
-        "map_session": candidate.model_dump(mode="json"),
-        "execution_trace": {"checkpoint": {"render_attempts": 0, "budget_snapshot": {},
-            "execution_policy": {"max_render_attempts": 5, "render_ack_seconds": 7}}},
-    })
+    candidate = _session(
+        OverlayInstance(
+            instance_id="raster",
+            capability_id="raster",
+            label="Raster",
+            provider="test",
+            overlay_type="tile",
+            rendering_mode="wms",
+            descriptor=descriptor,
+        )
+    )
+    service.prepare(
+        run_id=run_id,
+        run_version=1,
+        response_payload={
+            "map_session": candidate.model_dump(mode="json"),
+            "execution_trace": {
+                "checkpoint": {
+                    "render_attempts": 0,
+                    "budget_snapshot": {},
+                    "execution_policy": {
+                        "max_render_attempts": 5,
+                        "render_ack_seconds": 7,
+                    },
+                }
+            },
+        },
+    )
 
-    result = run_async_in_thread(service.acknowledge(conversation_id, _blank_raster_ack(candidate, run_id)))
+    result = run_async_in_thread(
+        service.acknowledge(conversation_id, _blank_raster_ack(candidate, run_id))
+    )
 
     assert result.observation.status == status
     assert result.observation.recovery == recovery

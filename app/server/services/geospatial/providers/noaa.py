@@ -21,6 +21,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
@@ -105,11 +106,7 @@ class NOAAProvider(GeospatialProvider):
                 attribution=["NOAA National Weather Service"],
                 warnings=warnings,
                 result_status=(
-                    "valid_empty"
-                    if not features
-                    else "partial"
-                    if partial
-                    else "ok"
+                    "valid_empty" if not features else "partial" if partial else "ok"
                 ),
                 result_type="features",
                 partial=partial,
@@ -141,11 +138,7 @@ class NOAAProvider(GeospatialProvider):
         boundary without trusting model-supplied geometry or external URLs.
         """
 
-        raw_features = (
-            payload.get("features")
-            if is_json_object(payload)
-            else None
-        )
+        raw_features = payload.get("features") if is_json_object(payload) else None
         if not is_json_array(raw_features):
             return {}, []
 
@@ -327,6 +320,7 @@ class NOAAProvider(GeospatialProvider):
                 )
             raise
 
+
 ###############################################################################
 def _coops_query(request: ProviderRequest) -> dict[str, str]:
     today = datetime.now(UTC).strftime("%Y%m%d")
@@ -340,6 +334,7 @@ def _coops_query(request: ProviderRequest) -> dict[str, str]:
         "format": "json",
         "application": "AEGIS-Geospatial-View",
     }
+
 
 ###############################################################################
 def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
@@ -379,6 +374,7 @@ def _normalize_coops_stations(payload: object) -> list[dict[str, object]]:
         )
     return stations
 
+
 ###############################################################################
 def _filter_stations(
     stations: list[dict[str, object]], request: ProviderRequest
@@ -399,6 +395,7 @@ def _filter_stations(
         ]
     limit = max(1, min(int(request.params.get("station_limit") or 25), 100))
     return filtered[:limit]
+
 
 ###############################################################################
 def _normalize_coops_observation(
@@ -442,14 +439,16 @@ def _normalize_coops_observation(
         }
     return None
 
+
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _station_in_bbox(
@@ -465,6 +464,7 @@ def _station_in_bbox(
     if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
         return False
     return south <= latitude <= north and west <= longitude <= east
+
 
 ###############################################################################
 def _normalize_noaa_alerts(
@@ -518,6 +518,7 @@ def _normalize_noaa_alerts(
         )
     return features
 
+
 ###############################################################################
 def _noaa_alert_zone_urls(properties: dict[str, object]) -> list[str]:
     """Return only canonical NWS forecast-zone URLs from an alert."""
@@ -552,16 +553,19 @@ def _noaa_alert_zone_urls(properties: dict[str, object]) -> list[str]:
         urls.append(f"https://api.weather.gov/zones/forecast/{zone_id}")
     return list(dict.fromkeys(urls))
 
+
 ###############################################################################
 def _normalize_noaa_zone_geometry(payload: object) -> dict[str, object] | None:
     if not is_json_object(payload):
         return None
     return _normalize_noaa_geometry(payload.get("geometry"))
 
+
 ###############################################################################
 def _normalize_noaa_geometry(value: object) -> dict[str, object] | None:
     geometry = json_object(value)
     return geometry if _valid_noaa_geometry(geometry) else None
+
 
 ###############################################################################
 def _combine_noaa_geometries(
@@ -574,14 +578,17 @@ def _combine_noaa_geometries(
         return usable[0]
     return {"type": "GeometryCollection", "geometries": usable}
 
+
 ###############################################################################
 def _valid_noaa_geometry(value: object) -> bool:
     geometry = json_object(value)
     geometry_type = geometry.get("type")
     if geometry_type == "GeometryCollection":
         geometries = geometry.get("geometries")
-        return is_json_array(geometries) and bool(geometries) and all(
-            _valid_noaa_geometry(item) for item in geometries
+        return (
+            is_json_array(geometries)
+            and bool(geometries)
+            and all(_valid_noaa_geometry(item) for item in geometries)
         )
     if geometry_type not in {
         "Point",

@@ -25,6 +25,7 @@ from server.common.constants import (
 from server.common.logger import logger
 from server.configurations.settings import JsonNominatimSettings, NominatimSettings
 
+
 ###############################################################################
 class NominatimService:
     GENERIC_QUERY_FILLERS = frozenset({"the", "central", "main", "centre", "center"})
@@ -157,7 +158,9 @@ class NominatimService:
                     if self._city_candidate_matches_query(candidate, candidate_query)
                 ]
                 if qualified_candidates:
-                    qualified_ids = {id(candidate) for candidate in qualified_candidates}
+                    qualified_ids = {
+                        id(candidate) for candidate in qualified_candidates
+                    }
                     candidate_ranked = qualified_candidates + [
                         candidate
                         for candidate in candidate_ranked
@@ -201,9 +204,7 @@ class NominatimService:
         return selected
 
     # -------------------------------------------------------------------------
-    def _is_mount_name_variant(
-        self, address: str | None, candidate_query: str
-    ) -> bool:
+    def _is_mount_name_variant(self, address: str | None, candidate_query: str) -> bool:
         normalized_address = self.normalize_component(address or "")
         normalized_query = self.normalize_component(candidate_query)
         for prefix in ("mount ", "mt "):
@@ -213,8 +214,7 @@ class NominatimService:
             reduced_tokens = reduced_name.split()
             query_tokens = normalized_query.split()
             return bool(
-                reduced_tokens
-                and query_tokens[: len(reduced_tokens)] == reduced_tokens
+                reduced_tokens and query_tokens[: len(reduced_tokens)] == reduced_tokens
             )
         return False
 
@@ -245,8 +245,7 @@ class NominatimService:
         return not any(
             str(candidate.get("selected_result_class") or "").lower()
             in {"natural", "waterway"}
-            or str(candidate.get("selected_result_type") or "").lower()
-            in natural_types
+            or str(candidate.get("selected_result_type") or "").lower() in natural_types
             for candidate in ranked
         )
 
@@ -276,9 +275,9 @@ class NominatimService:
             if token not in self.GENERIC_QUERY_DESCRIPTORS
         ]
         core_address = " ".join(core_tokens)
-        if core_address and self.normalize_component(core_address) != self.normalize_component(
-            address or ""
-        ):
+        if core_address and self.normalize_component(
+            core_address
+        ) != self.normalize_component(address or ""):
             reduced = self.compose_query(core_address, city, country_name)
             if reduced and self.normalize_component(reduced) not in {
                 self.normalize_component(item) for item in variants
@@ -331,19 +330,18 @@ class NominatimService:
         }
 
         def city_level(candidate: dict[str, Any]) -> bool:
-            candidate_type = str(
-                candidate.get("selected_result_type") or ""
-            ).lower()
+            candidate_type = str(candidate.get("selected_result_type") or "").lower()
             if candidate_type in city_types:
                 candidate_text = self._candidate_text(candidate)
-                return self.compute_token_overlap(
-                    self.tokenize(query), self.tokenize(candidate_text)
-                ) >= 0.6
+                return (
+                    self.compute_token_overlap(
+                        self.tokenize(query), self.tokenize(candidate_text)
+                    )
+                    >= 0.6
+                )
             if candidate_type not in {"administrative", "boundary"}:
                 return False
-            address_type = str(
-                candidate.get("selected_address_type") or ""
-            ).lower()
+            address_type = str(candidate.get("selected_address_type") or "").lower()
             if address_type and address_type not in city_types:
                 return False
             address: dict[str, Any] = json_object(candidate.get("address"))
@@ -355,9 +353,13 @@ class NominatimService:
                 ),
                 "",
             )
-            return bool(locality) and self.compute_token_overlap(
-                self.tokenize(locality), self.tokenize(query)
-            ) >= 0.8
+            return (
+                bool(locality)
+                and self.compute_token_overlap(
+                    self.tokenize(locality), self.tokenize(query)
+                )
+                >= 0.8
+            )
 
         if expected in {"city", "municipality"}:
             same_level_candidates = [
@@ -407,16 +409,13 @@ class NominatimService:
             ]
         elif expected in {"neighborhood", "neighbourhood", "district"}:
             same_level_candidates = [
-                candidate
-                for candidate in ranked
-                if self._district_candidate(candidate)
+                candidate for candidate in ranked if self._district_candidate(candidate)
             ]
         elif expected == "country":
             same_level_candidates = [
                 candidate
                 for candidate in ranked
-                if str(candidate.get("selected_result_type") or "").lower()
-                == "country"
+                if str(candidate.get("selected_result_type") or "").lower() == "country"
             ]
         else:
             first_type = str(ranked[0].get("selected_result_type") or "").lower()
@@ -427,9 +426,7 @@ class NominatimService:
                 and str(candidate.get("selected_result_type") or "").lower()
                 == first_type
             ]
-        same_level_candidates = self._deduplicate_named_entities(
-            same_level_candidates
-        )
+        same_level_candidates = self._deduplicate_named_entities(same_level_candidates)
         if len(same_level_candidates) < 2:
             return []
 
@@ -444,7 +441,11 @@ class NominatimService:
         )
         if second is None:
             return []
-        if expected in {"city", "municipality"} and self._names_query(first, query) and not self._names_query(second, query):
+        if (
+            expected in {"city", "municipality"}
+            and self._names_query(first, query)
+            and not self._names_query(second, query)
+        ):
             # A rival that is not named as asked is not a reading of the request.
             return []
         first_confidence = float(first.get("confidence") or 0.0)
@@ -476,8 +477,16 @@ class NominatimService:
         if not first_label or not second_label or first_label == second_label:
             return []
         return [
-            {"display_name": first_label, "lat": first.get("lat"), "lon": first.get("lon")},
-            {"display_name": second_label, "lat": second.get("lat"), "lon": second.get("lon")},
+            {
+                "display_name": first_label,
+                "lat": first.get("lat"),
+                "lon": first.get("lon"),
+            },
+            {
+                "display_name": second_label,
+                "lat": second.get("lat"),
+                "lon": second.get("lon"),
+            },
         ]
 
     # -------------------------------------------------------------------------
@@ -539,7 +548,8 @@ class NominatimService:
             name = str(candidate.get("display_name") or "").split(",")[0]
         # Language variants of the name count ("Milano"); alternate names do not.
         names = [name] + [
-            value for key, value in json_object(candidate.get("namedetails")).items()
+            value
+            for key, value in json_object(candidate.get("namedetails")).items()
             if key == "name" or str(key).startswith("name:")
         ]
         return bool(head) and any(
@@ -574,13 +584,10 @@ class NominatimService:
             return (
                 abs(float(left.get("lat") or 0.0) - float(right.get("lat") or 0.0))
                 < 0.01
-                and abs(
-                    float(left.get("lon") or 0.0)
-                    - float(right.get("lon") or 0.0)
-                )
+                and abs(float(left.get("lon") or 0.0) - float(right.get("lon") or 0.0))
                 < 0.01
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
 
     # -------------------------------------------------------------------------
@@ -590,17 +597,14 @@ class NominatimService:
         distinct: list[dict[str, Any]] = []
         for candidate in candidates:
             if any(
-                self._same_named_entity(candidate, existing)
-                for existing in distinct
+                self._same_named_entity(candidate, existing) for existing in distinct
             ):
                 continue
             distinct.append(candidate)
         return distinct
 
     # -------------------------------------------------------------------------
-    def _same_named_entity(
-        self, left: dict[str, Any], right: dict[str, Any]
-    ) -> bool:
+    def _same_named_entity(self, left: dict[str, Any], right: dict[str, Any]) -> bool:
         """Recognize alternate geocoder representations of one locality.
 
         A boundary result and a point result can describe the same city while
@@ -666,9 +670,9 @@ class NominatimService:
             self.normalize_component(str(left.get("selected_result_type") or "")),
             self.normalize_component(str(right.get("selected_result_type") or "")),
         }
-        if not result_types.intersection(boundary_types) or not result_types.intersection(
-            city_types
-        ):
+        if not result_types.intersection(
+            boundary_types
+        ) or not result_types.intersection(city_types):
             return False
         address_types = {
             self.normalize_component(str(left.get("selected_address_type") or "")),
@@ -701,7 +705,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return [west, south, east, north]
 
@@ -723,7 +727,15 @@ class NominatimService:
         place = next(
             (
                 str(address[key])
-                for key in ("city", "town", "village", "municipality", "county", "state", "region")
+                for key in (
+                    "city",
+                    "town",
+                    "village",
+                    "municipality",
+                    "county",
+                    "state",
+                    "region",
+                )
                 if address.get(key)
             ),
             None,
@@ -807,7 +819,9 @@ class NominatimService:
                     attempt,
                     exc,
                 )
-                if attempt == self.TRANSIENT_ATTEMPTS or not self._is_transient_failure(exc):
+                if attempt == self.TRANSIENT_ATTEMPTS or not self._is_transient_failure(
+                    exc
+                ):
                     return None
                 time.sleep(self.TRANSIENT_BACKOFF_S * attempt)
         if payload is None:
@@ -918,7 +932,7 @@ class NominatimService:
                 east = float(bounding_box[3])
                 result["bbox"] = [west, south, east, north]
                 result["bbox_source"] = "nominatim"
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
         confidence = self.compute_confidence(
             data=data,
@@ -1009,10 +1023,10 @@ class NominatimService:
         }
         if expected in feature_scores:
             candidates_for_type = feature_scores[expected]
-            if (
-                (class_name, type_name) in candidates_for_type
-                or (class_name, "*") in candidates_for_type
-            ):
+            if (class_name, type_name) in candidates_for_type or (
+                class_name,
+                "*",
+            ) in candidates_for_type:
                 return 3.0
             if class_name in {"administrative", "boundary"}:
                 return 0.0
@@ -1064,9 +1078,7 @@ class NominatimService:
                 # remains the specific city target and must outrank its parent.
                 return 3.0
             if target_tokens and (
-                self.compute_token_overlap(
-                    target_tokens, self.tokenize(candidate_text)
-                )
+                self.compute_token_overlap(target_tokens, self.tokenize(candidate_text))
                 >= 0.8
             ):
                 # Some localized geocoder responses omit a city address field
@@ -1175,7 +1187,11 @@ class NominatimService:
                 address=address,
                 query=query,
             )
-            if expected_location_type in {"city", "municipality"} and location_type_bonus >= 3.0 and self._names_query(candidate, query):
+            if (
+                expected_location_type in {"city", "municipality"}
+                and location_type_bonus >= 3.0
+                and self._names_query(candidate, query)
+            ):
                 # A locality named exactly as asked outranks one that only
                 # contains the name ("Saint-Etienne" vs "Saint-Etienne-la-Cigogne").
                 location_type_bonus += 0.2
@@ -1242,9 +1258,7 @@ class NominatimService:
         if not target_tokens:
             return False
         candidate_tokens = self.tokenize(self._candidate_text(candidate))
-        return (
-            self.compute_token_overlap(target_tokens, candidate_tokens) >= 0.8
-        )
+        return self.compute_token_overlap(target_tokens, candidate_tokens) >= 0.8
 
     # -------------------------------------------------------------------------
     def compute_confidence(
@@ -1298,7 +1312,7 @@ class NominatimService:
     def derive_importance_score(self, importance: Any) -> float:
         try:
             value = float(importance)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.55
         if value <= 0.0:
             return 0.05
@@ -1410,7 +1424,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.5
         lat_span = abs(north - south)
         lon_span = abs(east - west)
@@ -1666,9 +1680,7 @@ class NominatimService:
         # (for example ``E.U.R.``) while the request uses ``EUR``.  Collapse
         # those internal dots before removing the remaining punctuation so
         # raw-span matching remains useful without hardcoding a place name.
-        ascii_text = re.sub(
-            r"(?<=[A-Za-z0-9])\.(?=[A-Za-z0-9])", "", ascii_text
-        )
+        ascii_text = re.sub(r"(?<=[A-Za-z0-9])\.(?=[A-Za-z0-9])", "", ascii_text)
         ascii_text = re.sub(r"[^A-Za-z0-9]+", " ", ascii_text)
         return " ".join(ascii_text.lower().split())
 

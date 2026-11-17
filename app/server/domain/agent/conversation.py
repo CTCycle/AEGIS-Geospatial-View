@@ -16,9 +16,20 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.contracts.geospatial import MapSession
-from server.domain.agent.capability_route import AgentGoal, CapabilityRoute, ConversationTask
-from server.domain.agent.decision import ResolvedLocation, normalize_clarification_options
-from server.domain.agent.task_ledger import LEDGER_LIMIT, complete_presentation, ledger_view
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    CapabilityRoute,
+    ConversationTask,
+)
+from server.domain.agent.decision import (
+    ResolvedLocation,
+    normalize_clarification_options,
+)
+from server.domain.agent.task_ledger import (
+    LEDGER_LIMIT,
+    complete_presentation,
+    ledger_view,
+)
 
 
 _CLARIFICATION_ACTION_MARKERS = re.compile(
@@ -35,13 +46,22 @@ _CLARIFICATION_NON_ANSWER = re.compile(
 )
 
 _INFRASTRUCTURE_OPTION_ALIASES: dict[str, tuple[str, ...]] = {
-    "EV charging stations": ("ev", "charging", "charger", "chargers", "electric vehicle"),
+    "EV charging stations": (
+        "ev",
+        "charging",
+        "charger",
+        "chargers",
+        "electric vehicle",
+    ),
     "Buildings": ("building", "buildings", "residential"),
     "Airports": ("airport", "airports"),
     "Roads": ("road", "roads", "highway", "highways"),
     "Transit": ("transit", "transport", "bus", "rail", "station"),
 }
-INFRASTRUCTURE_CLARIFICATION_OPTIONS: tuple[str, ...] = tuple(_INFRASTRUCTURE_OPTION_ALIASES)
+INFRASTRUCTURE_CLARIFICATION_OPTIONS: tuple[str, ...] = tuple(
+    _INFRASTRUCTURE_OPTION_ALIASES
+)
+
 
 ###############################################################################
 class PendingClarification(BaseModel):
@@ -128,7 +148,9 @@ class PendingClarification(BaseModel):
     # -------------------------------------------------------------------------
     def _exact_option(self, message: str) -> str | None:
         key = " ".join(message.split()).casefold()
-        return next((option for option in self.options if option.casefold() == key), None)
+        return next(
+            (option for option in self.options if option.casefold() == key), None
+        )
 
     # -------------------------------------------------------------------------
     def match_option(self, message: str) -> str | None:
@@ -151,6 +173,7 @@ class PendingClarification(BaseModel):
             ):
                 return option
         return None
+
 
 ###############################################################################
 class ConversationState(BaseModel):
@@ -205,9 +228,7 @@ class ConversationState(BaseModel):
         return state.model_copy(update={"revision": max(state.revision, revision)})
 
     # -------------------------------------------------------------------------
-    def pending_clarification_for(
-        self, message: str
-    ) -> PendingClarification | None:
+    def pending_clarification_for(self, message: str) -> PendingClarification | None:
         """Project only a clarification relevant to the current user turn."""
 
         pending = self.pending_clarification
@@ -253,7 +274,9 @@ class ConversationState(BaseModel):
         return result
 
     # -------------------------------------------------------------------------
-    def with_committed_map(self, session: MapSession, now: datetime) -> "ConversationState":
+    def with_committed_map(
+        self, session: MapSession, now: datetime
+    ) -> "ConversationState":
         """Commit an acknowledged map and complete the tasks that prepared it."""
 
         return self.model_copy(
@@ -269,12 +292,18 @@ class ConversationState(BaseModel):
 
         result: dict[str, Any] = {}
         if self.resolved_locations:
-            key = "active_location" if "active_location" in self.resolved_locations else next(
-                iter(self.resolved_locations)
+            key = (
+                "active_location"
+                if "active_location" in self.resolved_locations
+                else next(iter(self.resolved_locations))
             )
-            result["active_location"] = self.resolved_locations[key].model_dump(mode="json")
+            result["active_location"] = self.resolved_locations[key].model_dump(
+                mode="json"
+            )
         if self.committed_map_session is not None:
-            result["active_visualization"] = self.committed_map_session.model_dump(mode="json")
+            result["active_visualization"] = self.committed_map_session.model_dump(
+                mode="json"
+            )
         return result
 
 

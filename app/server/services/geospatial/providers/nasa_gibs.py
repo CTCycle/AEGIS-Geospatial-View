@@ -36,6 +36,7 @@ GIBS_WMTS_REST_BASE_URL = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
 GIBS_WMS_BASE_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
 GIBS_USER_AGENT = {"User-Agent": "AEGIS/1.0"}
 
+
 ###############################################################################
 @dataclass
 class ParsedGIBSLayer:
@@ -49,6 +50,7 @@ class ParsedGIBSLayer:
     time_extent: str | None = None
     default_time: str | None = None
     tile_matrix_sets: set[str] = field(default_factory=lambda: set[str]())
+
 
 ###############################################################################
 class NASAGIBSProvider(GeospatialProvider):
@@ -100,8 +102,12 @@ class NASAGIBSProvider(GeospatialProvider):
             wms_error = exc
 
         if not wmts and not wms:
-            raise wmts_error or wms_error or ProviderUnavailableError(
-                "NASA GIBS capabilities could not be fetched."
+            raise (
+                wmts_error
+                or wms_error
+                or ProviderUnavailableError(
+                    "NASA GIBS capabilities could not be fetched."
+                )
             )
 
         layers = self._merge_layer_descriptors(wmts, wms)
@@ -162,8 +168,14 @@ class NASAGIBSProvider(GeospatialProvider):
                 # A date the layer does not publish (not yet, or never) has no
                 # tiles: an honest empty result, not a map that renders blank.
                 result_status = "valid_empty"
-                latest = f"; the latest available date is {layer.default_time}" if layer.default_time else ""
-                warnings.append(f"No imagery is published for {coverage['time']}{latest}.")
+                latest = (
+                    f"; the latest available date is {layer.default_time}"
+                    if layer.default_time
+                    else ""
+                )
+                warnings.append(
+                    f"No imagery is published for {coverage['time']}{latest}."
+                )
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
@@ -194,7 +206,7 @@ class NASAGIBSProvider(GeospatialProvider):
             try:
                 first = date.fromisoformat(bounds[0][:10])
                 last = date.fromisoformat(bounds[1][:10]) if len(bounds) > 1 else first
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 continue
             satisfied = bool(satisfied) or first <= day <= last
         if satisfied is None:

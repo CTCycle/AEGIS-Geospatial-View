@@ -5,10 +5,18 @@ import json
 import asyncio
 import time
 from server.services.llm.factory import LLMFactory
-from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError, LLMStructuredOutputError
+from server.services.llm.errors import (
+    LLMConfigurationError,
+    LLMProviderRequestError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
-from server.services.llm.opencode_provider import OpenCodeProvider, OPENCODE_GO_PROVIDER, OPENCODE_PROVIDER
+from server.services.llm.opencode_provider import (
+    OpenCodeProvider,
+    OPENCODE_GO_PROVIDER,
+    OPENCODE_PROVIDER,
+)
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.transport import LLMTransportPolicy
 from server.services.llm.deepseek_provider import DeepSeekProvider
@@ -16,18 +24,27 @@ from pydantic import BaseModel
 from server.services.llm.types import LLMRequest, LLMResult
 from tests.conftest import run_async_in_thread
 from server.domain.geospatial.providers import provider_execution_scope
-from server.services.geospatial.provider_registry import ProviderExecutionPolicy, ProviderNotRegisteredError, ProviderRegistry
+from server.services.geospatial.provider_registry import (
+    ProviderExecutionPolicy,
+    ProviderNotRegisteredError,
+    ProviderRegistry,
+)
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderCircuitOpenError, ProviderRequest, ProviderRateLimitError, ProviderResponse, ProviderTimeoutError, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderCircuitOpenError,
+    ProviderRequest,
+    ProviderRateLimitError,
+    ProviderResponse,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 
 # --- test_llm_factory.py ---
 
 
-
-
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_required(self):  # noqa: ANN201
         return SimpleNamespace(
@@ -37,9 +54,9 @@ class _SettingsRepo:
             deepseek_base_url="https://api.deepseek.test",
         )
 
+
 ###############################################################################
 class _CredentialsRepo:
-
     # -------------------------------------------------------------------------
     def __init__(self, mapping: dict[tuple[str, str], str]) -> None:
         self.mapping = mapping
@@ -56,19 +73,20 @@ class _CredentialsRepo:
     def mark_used(self, *, provider: str, label: str) -> None:
         self.mark_used_calls.append((provider, label))
 
+
 ###############################################################################
 class _Crypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         return f"decrypted:{encrypted_value}"
 
+
 ###############################################################################
 class _FailingCrypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:  # noqa: ARG002
         raise ValueError("bad key")
+
 
 ###############################################################################
 def test_openai_credential_is_read_from_repository(monkeypatch) -> None:
@@ -86,6 +104,7 @@ def test_openai_credential_is_read_from_repository(monkeypatch) -> None:
     provider = factory.get_provider("openai")
     assert provider == ("decrypted:enc-openai", "https://api.openai.test")
     assert repo.mark_used_calls == [("openai", "api_key")]
+
 
 ###############################################################################
 def test_google_credential_is_read_from_repository(monkeypatch) -> None:
@@ -107,6 +126,7 @@ def test_google_credential_is_read_from_repository(monkeypatch) -> None:
     )
     assert repo.mark_used_calls == [("google", "api_key")]
 
+
 ###############################################################################
 def test_environment_variables_are_not_used_as_fallback(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-env-ignored")
@@ -123,6 +143,7 @@ def test_environment_variables_are_not_used_as_fallback(monkeypatch) -> None:
     with pytest.raises(ValueError, match="Google credentials are not configured"):
         factory.get_provider("google")
 
+
 ###############################################################################
 def test_missing_credentials_follow_current_failure_path() -> None:
     factory = LLMFactory(
@@ -133,6 +154,7 @@ def test_missing_credentials_follow_current_failure_path() -> None:
 
     with pytest.raises(ValueError, match="OpenAI credentials are not configured"):
         factory.get_provider("openai")
+
 
 ###############################################################################
 def test_unreadable_credentials_raise_configuration_error() -> None:
@@ -150,6 +172,7 @@ def test_unreadable_credentials_raise_configuration_error() -> None:
         factory.get_provider("openai")
     assert repo.mark_used_calls == []
 
+
 ###############################################################################
 def test_get_provider_returns_ollama_provider_type() -> None:
     factory = LLMFactory(
@@ -160,6 +183,7 @@ def test_get_provider_returns_ollama_provider_type() -> None:
 
     provider = factory.get_provider("ollama")
     assert isinstance(provider, OllamaProvider)
+
 
 ###############################################################################
 def test_get_provider_returns_openai_provider_type() -> None:
@@ -172,6 +196,7 @@ def test_get_provider_returns_openai_provider_type() -> None:
     provider = factory.get_provider("openai")
     assert isinstance(provider, OpenAIProvider)
 
+
 ###############################################################################
 def test_get_provider_returns_google_provider_type() -> None:
     factory = LLMFactory(
@@ -182,6 +207,7 @@ def test_get_provider_returns_google_provider_type() -> None:
 
     provider = factory.get_provider("google")
     assert isinstance(provider, GoogleProvider)
+
 
 ###############################################################################
 def test_get_provider_returns_opencode_provider_types() -> None:
@@ -208,6 +234,7 @@ def test_get_provider_returns_opencode_provider_types() -> None:
         ("opencode", "api_key"),
         ("opencode-go", "api_key"),
     ]
+
 
 ###############################################################################
 def test_all_canonical_providers_receive_one_shared_transport_policy() -> None:
@@ -243,6 +270,7 @@ def test_all_canonical_providers_receive_one_shared_transport_policy() -> None:
     assert all(provider.transport_policy is policy for provider in providers)
     assert isinstance(providers[2], DeepSeekProvider)
 
+
 ###############################################################################
 def test_missing_opencode_credentials_are_provider_specific() -> None:
     factory = LLMFactory(
@@ -256,6 +284,7 @@ def test_missing_opencode_credentials_are_provider_specific() -> None:
     with pytest.raises(LLMConfigurationError, match="OpenCode Go credentials"):
         factory.get_provider("opencode-go")
 
+
 ###############################################################################
 def test_get_provider_keeps_structured_output_available_for_ollama() -> None:
     factory = LLMFactory(
@@ -266,6 +295,7 @@ def test_get_provider_keeps_structured_output_available_for_ollama() -> None:
     provider = factory.get_provider("ollama")
 
     assert isinstance(provider, OllamaProvider)
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -282,18 +312,17 @@ def test_get_provider_rejects_noncanonical_provider_ids(provider: str) -> None:
     with pytest.raises(ValueError, match="Unsupported model provider"):
         factory.get_provider(provider)
 
+
 # --- test_llm_providers.py ---
-
-
 
 
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str = "structured"
 
+
 ###############################################################################
 class _Message:
-
     # -------------------------------------------------------------------------
     def __init__(self, content) -> None:  # noqa: ANN001
         self.content = content
@@ -301,9 +330,9 @@ class _Message:
         self.usage_metadata = {"total_tokens": 3}
         self.additional_kwargs = {}
 
+
 ###############################################################################
 class _StructuredModel:
-
     # -------------------------------------------------------------------------
     def __init__(self, schema: type[object]) -> None:
         self._schema = schema
@@ -314,6 +343,7 @@ class _StructuredModel:
         if callable(validator):
             return validator({"answer": "structured"})
         return {"answer": "structured"}
+
 
 ###############################################################################
 class _FakeChatModel:
@@ -337,9 +367,9 @@ class _FakeChatModel:
     def with_structured_output(self, schema: type[object]) -> _StructuredModel:
         return _StructuredModel(schema)
 
+
 ###############################################################################
 class _FakeEmbeddings:
-
     # -------------------------------------------------------------------------
     def __init__(self, **_kwargs) -> None:
         pass
@@ -348,20 +378,19 @@ class _FakeEmbeddings:
     def embed_query(self, _input_text: str) -> list[float]:
         return [0.1, 0.2, 0.3]
 
+
 ###############################################################################
 class _FakeOpenAIResponse:
     output_text = "chat-ok"
 
     # -------------------------------------------------------------------------
-    def model_dump(
-        self, *, mode: str, warnings: bool = False
-    ) -> dict[str, object]:
+    def model_dump(self, *, mode: str, warnings: bool = False) -> dict[str, object]:
         _ = warnings
         return {"mode": mode, "id": "resp-test"}
 
+
 ###############################################################################
 class _FakeOpenAIResponses:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
@@ -390,9 +419,9 @@ class _FakeOpenAIResponses:
             output_text="",
         )
 
+
 ###############################################################################
 class _FakeOpenAIEmbeddingEndpoint:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
@@ -401,6 +430,7 @@ class _FakeOpenAIEmbeddingEndpoint:
     def create(self, **kwargs):  # noqa: ANN001, ANN202
         self.create_calls.append(kwargs)
         return SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])])
+
 
 ###############################################################################
 class _FakeOpenAIClient:
@@ -413,9 +443,9 @@ class _FakeOpenAIClient:
         self.embeddings = _FakeOpenAIEmbeddingEndpoint()
         self.instances.append(self)
 
+
 ###############################################################################
 class _FakeGoogleModels:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.generate_content_calls: list[dict[str, object]] = []
@@ -453,6 +483,7 @@ class _FakeGoogleModels:
         self.embed_content_calls.append(kwargs)
         return SimpleNamespace(embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])])
 
+
 ###############################################################################
 class _FakeGoogleClient:
     instances: list["_FakeGoogleClient"] = []
@@ -463,12 +494,13 @@ class _FakeGoogleClient:
         self.models = _FakeGoogleModels()
         self.instances.append(self)
 
+
 ###############################################################################
 class _FakeHttpOptions:
-
     # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
+
 
 ###############################################################################
 def _request() -> LLMRequest:
@@ -479,6 +511,7 @@ def _request() -> LLMRequest:
             {"role": "user", "content": "Hello"},
         ],
     )
+
 
 ###############################################################################
 def test_openai_provider_uses_responses_api(monkeypatch) -> None:
@@ -519,6 +552,7 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
         "input": "hello",
     }
 
+
 ###############################################################################
 def test_openai_reasoning_catalog_policy_omits_temperature_and_caps_output(
     monkeypatch,
@@ -544,6 +578,7 @@ def test_openai_reasoning_catalog_policy_omits_temperature_and_caps_output(
     assert "temperature" not in parse_call
     assert parse_call["max_output_tokens"] == 128_000
 
+
 ###############################################################################
 def test_openai_structured_output_rejects_unsupported_model_before_api_call(
     monkeypatch,
@@ -566,6 +601,7 @@ def test_openai_structured_output_rejects_unsupported_model_before_api_call(
         raise AssertionError("structured_output should reject unsupported models")
 
     assert _FakeOpenAIClient.instances == []
+
 
 ###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
@@ -619,6 +655,7 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
         "model": "embed-model",
         "contents": "hello",
     }
+
 
 ###############################################################################
 def test_ollama_provider_http_paths(monkeypatch) -> None:
@@ -677,6 +714,7 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     assert response.context_usage is not None
     assert response.context_usage["provider"] == "ollama"
 
+
 ###############################################################################
 def test_ollama_thinking_control_uses_exact_show_metadata(monkeypatch) -> None:
     payloads: list[dict[str, object]] = []
@@ -704,6 +742,7 @@ def test_ollama_thinking_control_uses_exact_show_metadata(monkeypatch) -> None:
     structured_payloads = [payload for payload in payloads if payload.get("format")]
     assert structured_payloads[0]["think"] == "low"
     assert structured_payloads[1]["think"] is False
+
 
 ###############################################################################
 def test_all_llm_adapters_normalize_transport_setup_timeouts(monkeypatch) -> None:
@@ -741,8 +780,8 @@ def test_all_llm_adapters_normalize_transport_setup_timeouts(monkeypatch) -> Non
         assert error.value.code == "provider_timeout"
         assert error.value.timeout_origin == "provider_transport"
 
-# --- test_provider_registry.py ---
 
+# --- test_provider_registry.py ---
 
 
 ###############################################################################
@@ -773,6 +812,7 @@ class _LayerProvider:
         del query, limit, refresh
         return []
 
+
 ###############################################################################
 class _TimeoutProvider:
     provider_id = "slow"
@@ -790,6 +830,7 @@ class _TimeoutProvider:
             provider_id=self.provider_id,
             payload={"ok": True},
         )
+
 
 ###############################################################################
 class _FlakyProvider:
@@ -810,6 +851,7 @@ class _FlakyProvider:
             payload={"attempts": self.calls},
         )
 
+
 ###############################################################################
 class _AuthProvider:
     provider_id = "auth"
@@ -823,6 +865,7 @@ class _AuthProvider:
         self.calls += 1
         raise ProviderAuthError("missing key")
 
+
 ###############################################################################
 class _RateLimitedProvider:
     provider_id = "rate-limited"
@@ -835,18 +878,16 @@ class _RateLimitedProvider:
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         self.calls += 1
         if self.calls == 1:
-            raise ProviderRateLimitError(
-                "slow down", retry_after_seconds=0.0
-            )
+            raise ProviderRateLimitError("slow down", retry_after_seconds=0.0)
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={"attempts": self.calls},
         )
 
+
 ###############################################################################
 class _SavedCredentialRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.mark_used_calls: list[tuple[str, str]] = []
@@ -861,13 +902,14 @@ class _SavedCredentialRepository:
     def mark_used(self, *, provider: str, label: str) -> None:
         self.mark_used_calls.append((provider, label))
 
+
 ###############################################################################
 class _CredentialDecryptor:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         assert encrypted_value == "encrypted-tomtom-key"
         return "database-only-tomtom-key"
+
 
 ###############################################################################
 def test_provider_registry_registers_and_fetches_provider() -> None:
@@ -880,6 +922,7 @@ def test_provider_registry_registers_and_fetches_provider() -> None:
     assert registry.list_provider_ids() == ["example"]
     assert response.payload == {"ok": True}
 
+
 ###############################################################################
 def test_provider_registry_errors_for_missing_provider() -> None:
     registry = ProviderRegistry()
@@ -890,6 +933,7 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         assert "missing" in str(exc)
     else:
         raise AssertionError("Missing provider unexpectedly resolved.")
+
 
 ###############################################################################
 def test_provider_registry_uses_canonical_gibs_id_only() -> None:
@@ -909,6 +953,7 @@ def test_provider_registry_uses_canonical_gibs_id_only() -> None:
     else:
         raise AssertionError("Retired NASA GIBS provider alias unexpectedly resolved.")
 
+
 ###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:
     registry = ProviderRegistry()
@@ -922,12 +967,14 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     assert "osm" not in registry.list_provider_ids()
     assert "gibs" in registry.list_provider_ids()
 
+
 ###############################################################################
-def test_provider_registry_rejects_provider_entries_without_canonical_provider_id() -> None:
+def test_provider_registry_rejects_provider_entries_without_canonical_provider_id() -> (
+    None
+):
 
     ###############################################################################
     class _Loader:
-
         # -------------------------------------------------------------------------
         def load_all(self) -> dict[str, list[dict[str, object]]]:
             return {
@@ -946,6 +993,7 @@ def test_provider_registry_rejects_provider_entries_without_canonical_provider_i
 
     assert "gibs" not in registry.list_provider_ids()
 
+
 ###############################################################################
 def test_provider_registry_passes_database_only_credentials_to_provider() -> None:
     repository = _SavedCredentialRepository()
@@ -961,6 +1009,7 @@ def test_provider_registry_passes_database_only_credentials_to_provider() -> Non
     assert getattr(provider, "api_key") == "database-only-tomtom-key"
     assert repository.mark_used_calls == [("tomtom", "api_key")]
 
+
 ###############################################################################
 def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
     registry = ProviderRegistry()
@@ -969,12 +1018,12 @@ def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
 
     assert "osm_tiles" not in registry.list_provider_ids()
 
+
 ###############################################################################
 def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
 
     ###############################################################################
     class _Loader:
-
         # -------------------------------------------------------------------------
         def load_all(self) -> dict[str, list[dict[str, object]]]:
             return {
@@ -1002,6 +1051,7 @@ def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
     else:
         raise AssertionError("Unknown fetchable provider unexpectedly registered.")
 
+
 ###############################################################################
 def test_provider_registry_times_out_slow_provider() -> None:
     registry = ProviderRegistry(
@@ -1018,6 +1068,7 @@ def test_provider_registry_times_out_slow_provider() -> None:
     else:
         raise AssertionError("Slow provider unexpectedly succeeded.")
 
+
 ###############################################################################
 def test_provider_registry_retries_transient_provider_failure() -> None:
     provider = _FlakyProvider()
@@ -1031,6 +1082,7 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
     )
 
     assert response.payload == {"attempts": 2}
+
 
 ###############################################################################
 def test_provider_registry_does_not_retry_after_deadline_expires() -> None:
@@ -1055,6 +1107,7 @@ def test_provider_registry_does_not_retry_after_deadline_expires() -> None:
         raise AssertionError("Slow provider unexpectedly succeeded.")
     assert provider.calls == 1
 
+
 ###############################################################################
 def test_provider_registry_preserves_provider_specific_timeout_floor() -> None:
     registry = ProviderRegistry(
@@ -1072,6 +1125,7 @@ def test_provider_registry_preserves_provider_specific_timeout_floor() -> None:
     with provider_execution_scope(ProviderExecutionPolicy(timeout_seconds=0.02)):
         assert registry._timeout_seconds("slow") == 0.05  # pyright: ignore[reportPrivateUsage]
         assert registry._timeout_seconds("other") == 0.02  # pyright: ignore[reportPrivateUsage]
+
 
 ###############################################################################
 def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> None:
@@ -1091,6 +1145,7 @@ def test_provider_registry_retries_bounded_rate_limit_after_retry_after() -> Non
 
     assert response.payload == {"attempts": 2}
 
+
 ###############################################################################
 def test_provider_registry_does_not_retry_auth_errors() -> None:
     provider = _AuthProvider()
@@ -1108,6 +1163,7 @@ def test_provider_registry_does_not_retry_auth_errors() -> None:
     else:
         raise AssertionError("Auth provider unexpectedly succeeded.")
     assert provider.calls == 1
+
 
 ###############################################################################
 def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
@@ -1137,9 +1193,12 @@ def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
     else:
         raise AssertionError("Open circuit did not reject the provider.")
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_provider_registry_concurrent_rate_waits_start_an_interval_apart() -> None:
+async def test_provider_registry_concurrent_rate_waits_start_an_interval_apart() -> (
+    None
+):
     registry = ProviderRegistry(providers=[])
     registry._min_call_interval_s["paced"] = 0.1
     started: list[float] = []
@@ -1151,6 +1210,7 @@ async def test_provider_registry_concurrent_rate_waits_start_an_interval_apart()
     await asyncio.gather(wait(), wait())
 
     assert started[1] - started[0] >= 0.09
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1167,6 +1227,7 @@ async def test_provider_registry_cancelled_rate_wait_releases_its_slot() -> None
         await waiter
 
     assert registry._last_call_at["paced"] == first_slot
+
 
 ###############################################################################
 def test_provider_registry_recovers_circuit_after_recovery_window() -> None:

@@ -24,25 +24,31 @@ __all__ = [
     "OpenAQMalformedPayloadError",
 ]
 
+
 ###############################################################################
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
+
 
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
 
+
 ###############################################################################
 class OpenAQAuthError(OpenAQServiceError):
     """Raised when OpenAQ rejects the configured API key."""
+
 
 ###############################################################################
 class OpenAQRateLimitError(OpenAQServiceError):
     """Raised when OpenAQ applies a rate limit."""
 
+
 ###############################################################################
 class OpenAQInvalidQueryError(OpenAQServiceError):
     """Raised when OpenAQ rejects a deterministic query."""
+
 
 ###############################################################################
 class OpenAQMalformedPayloadError(OpenAQServiceError):
@@ -50,6 +56,7 @@ class OpenAQMalformedPayloadError(OpenAQServiceError):
 
 
 JsonRequester = Callable[[str, dict[str, str]], Any]
+
 
 ###############################################################################
 class OpenAQService:
@@ -278,7 +285,7 @@ class OpenAQService:
             return None
         try:
             return float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------

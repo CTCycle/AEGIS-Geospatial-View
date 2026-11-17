@@ -17,13 +17,14 @@ from server.services.llm.opencode_messages_transport import build_messages_paylo
 from server.services.llm.opencode_models_dev import ModelsDevEntry
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
+
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
+
 ###############################################################################
 class _Response:
-
     # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -36,9 +37,9 @@ class _Response:
     def json(self) -> dict[str, object]:
         return self.payload
 
+
 ###############################################################################
 class _Completions:
-
     # -------------------------------------------------------------------------
     def __init__(self, error: Exception | None = None) -> None:
         self.calls: list[dict[str, object]] = []
@@ -52,11 +53,7 @@ class _Completions:
         if kwargs.get("stream") is True:
             return [
                 SimpleNamespace(
-                    choices=[
-                        SimpleNamespace(
-                            delta=SimpleNamespace(content="streamed")
-                        )
-                    ]
+                    choices=[SimpleNamespace(delta=SimpleNamespace(content="streamed"))]
                 )
             ]
         if kwargs.get("tools"):
@@ -81,9 +78,9 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
+
 ###############################################################################
 class _Client:
-
     # -------------------------------------------------------------------------
     def __init__(self, error: Exception | None = None) -> None:
         self.completions = _Completions(error)
@@ -94,6 +91,7 @@ class _Client:
     def with_options(self, **kwargs):  # noqa: ANN003, ANN201
         self.timeout_options.append(kwargs)
         return self
+
 
 ###############################################################################
 def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown(
@@ -129,17 +127,21 @@ def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
     assert captured["kwargs"]["headers"]["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
 
+
 ###############################################################################
 def test_go_uses_go_endpoint_without_inferred_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
     assert provider.base_url == "https://opencode.ai/zen/go/v1"
-    assert provider.protocol_for_model("deepseek-v4.1-flash") == "openai-chat-completions"
+    assert (
+        provider.protocol_for_model("deepseek-v4.1-flash") == "openai-chat-completions"
+    )
     assert provider.supports_tools("deepseek-v4.1-flash") is None
     assert provider.supports_structured_output("deepseek-v4.1-flash") is True
     assert provider.supports_tools("deepseek-v4-flash") is None
     assert provider.supports_structured_output("deepseek-v4-flash") is True
     assert provider.supports_tools("minimax-m3") is None
+
 
 ###############################################################################
 def test_go_catalog_leaves_tool_support_unknown_when_model_omits_capabilities(
@@ -183,6 +185,7 @@ def test_go_catalog_leaves_tool_support_unknown_when_model_omits_capabilities(
     assert "tools" not in models[1].capabilities
     assert captured["url"] == "https://opencode.ai/zen/go/v1/models"
 
+
 ###############################################################################
 def test_go_catalog_uses_explicit_model_tool_capabilities(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -199,6 +202,7 @@ def test_go_catalog_uses_explicit_model_tool_capabilities(monkeypatch) -> None:
     assert model.metadata["supports_tools"] is True
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" in model.capabilities
+
 
 ###############################################################################
 def test_go_catalog_uses_explicit_support_flag_when_present(monkeypatch) -> None:
@@ -217,6 +221,7 @@ def test_go_catalog_uses_explicit_support_flag_when_present(monkeypatch) -> None
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" in model.capabilities
 
+
 ###############################################################################
 def test_go_catalog_preserves_explicitly_unsupported_tool_support(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -234,6 +239,7 @@ def test_go_catalog_preserves_explicitly_unsupported_tool_support(monkeypatch) -
     assert model.metadata["tool_support_source"] == "opencode_models_api"
     assert "tools" not in model.capabilities
 
+
 ###############################################################################
 def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(
     monkeypatch,
@@ -241,9 +247,7 @@ def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(
     monkeypatch.setattr(
         "server.services.llm.opencode_provider.fetch_models_dev_entries",
         lambda provider, policy: {
-            "gpt-6-luna": ModelsDevEntry(
-                "openai-responses", 1_050_000, 128_000, True
-            ),
+            "gpt-6-luna": ModelsDevEntry("openai-responses", 1_050_000, 128_000, True),
             "qwen3.8-max": ModelsDevEntry(
                 "anthropic-messages", 1_000_000, 131_072, True
             ),
@@ -267,6 +271,7 @@ def test_models_dev_publishes_protocol_limits_and_vision_for_unlisted_models(
     assert qwen.metadata["protocol"] == "anthropic-messages"
     assert provider.protocol_for_model("gpt-6-luna") == "openai-responses"
 
+
 ###############################################################################
 def test_protocol_lookup_consults_models_dev_without_a_catalog_listing(
     monkeypatch,
@@ -280,6 +285,7 @@ def test_protocol_lookup_consults_models_dev_without_a_catalog_listing(
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
     assert provider.protocol_for_model("grok-4.7") == "openai-responses"
+
 
 ###############################################################################
 def test_opencode_normalizes_nested_documented_limits(monkeypatch) -> None:
@@ -304,6 +310,7 @@ def test_opencode_normalizes_nested_documented_limits(monkeypatch) -> None:
     assert model.metadata["context_window_tokens"] == 32_768
     assert model.metadata["maximum_output_tokens"] == 4096
     assert model.metadata["context_metadata_authority"] == "provider"
+
 
 ###############################################################################
 def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
@@ -330,11 +337,15 @@ def test_structured_output_uses_single_function_mode(monkeypatch) -> None:
     call = client.completions.calls[0]
     assert len(call["tools"]) == 1
     assert call["tools"][0]["function"]["name"] == "submit_structured_response"
-    assert call["tools"][0]["function"]["parameters"] == _StructuredPayload.model_json_schema()
+    assert (
+        call["tools"][0]["function"]["parameters"]
+        == _StructuredPayload.model_json_schema()
+    )
     assert "response_format" not in call
     assert "tool_choice" not in call
     assert call["max_tokens"] == 123
     assert result.context_usage["response_schema_tokens"] == 0
+
 
 ###############################################################################
 def test_structured_output_forwards_explicit_thinking_mode(monkeypatch) -> None:
@@ -358,6 +369,7 @@ def test_structured_output_forwards_explicit_thinking_mode(monkeypatch) -> None:
         "thinking": {"type": "disabled"}
     }
 
+
 ###############################################################################
 def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
@@ -377,6 +389,7 @@ def test_chat_forwards_bounded_output_tokens(monkeypatch) -> None:
     provider.chat(request)
 
     assert client.completions.calls[0]["max_tokens"] == 77
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -403,6 +416,7 @@ def test_lone_required_tool_omits_tool_choice_on_opencode(
     assert call.get("tool_choice") == expected
     assert call["extra_body"] == {"thinking": {"type": "disabled"}}
 
+
 ###############################################################################
 def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
     client = _Client()
@@ -421,6 +435,7 @@ def test_stream_forwards_bounded_output_tokens(monkeypatch) -> None:
 
     assert list(provider.stream_chat(request)) == ["streamed"]
     assert client.completions.calls[0]["max_tokens"] == 88
+
 
 ###############################################################################
 def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
@@ -448,6 +463,7 @@ def test_bounded_deadline_is_forwarded_without_the_old_thirty_second_cap(
 
     assert client.timeout_options == [{"timeout": 47.5}]
 
+
 ###############################################################################
 def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     client = _Client(TimeoutError("completion timed out"))
@@ -472,6 +488,7 @@ def test_timeout_failure_keeps_preflight_context_usage(monkeypatch) -> None:
     assert error.value.context_usage is not None
     assert error.value.context_usage["estimated_input_tokens"] > 0
     assert error.value.context_usage["response_schema_tokens"] == 0
+
 
 ###############################################################################
 def test_opencode_session_headers_are_stable_per_conversation_and_not_shared() -> None:
@@ -505,17 +522,17 @@ def test_opencode_session_headers_are_stable_per_conversation_and_not_shared() -
     assert first["User-Agent"] == "AEGIS-Geospatial-View/1.0.0"
     assert "Authorization" not in first
 
+
 ###############################################################################
 def test_opencode_requires_session_context_for_inference() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
     with pytest.raises(LLMProviderRequestError) as error:
-        provider._request_headers(
-            LLMRequest(model="deepseek-v4-flash", messages=[])
-        )
+        provider._request_headers(LLMRequest(model="deepseek-v4-flash", messages=[]))
 
     assert error.value.code == "provider_session_required"
     assert "test-key" not in str(error.value)
+
 
 ###############################################################################
 def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) -> None:
@@ -523,7 +540,6 @@ def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) ->
 
     ###############################################################################
     class _Responses:
-
         # -------------------------------------------------------------------------
         def structured_output(self, request, schema):  # noqa: ANN001
             captured["request"] = request
@@ -547,6 +563,7 @@ def test_opencode_routes_responses_models_to_responses_transport(monkeypatch) ->
     assert routed.metadata["protocol"] == "openai-responses"
     assert routed.metadata["supports_temperature"] is False
 
+
 ###############################################################################
 def test_opencode_rejects_unimplemented_transport_without_guessing() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_PROVIDER)
@@ -560,6 +577,7 @@ def test_opencode_rejects_unimplemented_transport_without_guessing() -> None:
         provider.structured_output(request, schema=_StructuredPayload)
 
     assert error.value.code == "provider_transport_unsupported"
+
 
 ###############################################################################
 def test_opencode_structured_wrapper_rejects_multiple_payloads() -> None:
@@ -593,6 +611,7 @@ def test_opencode_structured_wrapper_rejects_multiple_payloads() -> None:
 
     assert error.value.code == "structured_invalid_payload"
 
+
 ###############################################################################
 def test_messages_payload_maps_tools_images_and_turn_roles() -> None:
     payload = build_messages_payload(
@@ -616,7 +635,10 @@ def test_messages_payload_maps_tools_images_and_turn_roles() -> None:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "See"},
-                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,QUJD"},
+                    },
                 ],
             },
             {
@@ -649,6 +671,7 @@ def test_messages_payload_maps_tools_images_and_turn_roles() -> None:
         {"type": "tool_use", "id": "call-1", "name": "lookup", "input": {"q": 1}}
     ]
     assert payload["messages"][2]["content"][0]["type"] == "tool_result"
+
 
 ###############################################################################
 def test_messages_models_run_structured_output_through_the_messages_endpoint(
@@ -697,6 +720,7 @@ def test_messages_models_run_structured_output_through_the_messages_endpoint(
     assert captured["json"]["tools"][0]["name"] == "submit_structured_response"
     assert result.context_usage["reported_input_tokens"] == 7
 
+
 ###############################################################################
 def test_messages_error_keeps_status_and_provider_detail(monkeypatch) -> None:
     def fake_post(self, url, **kwargs):  # noqa: ANN001, ANN003, ANN202
@@ -720,6 +744,7 @@ def test_messages_error_keeps_status_and_provider_detail(monkeypatch) -> None:
 
     assert error.value.code == "context_limit_exceeded"
 
+
 ###############################################################################
 def test_rejected_thinking_control_is_dropped_and_remembered_for_the_model(
     monkeypatch,
@@ -734,7 +759,9 @@ def test_rejected_thinking_control_is_dropped_and_remembered_for_the_model(
     def create(**kwargs):  # noqa: ANN003, ANN202
         attempts.append(kwargs)
         if len(attempts) == 1:
-            raise RuntimeError("400: this is a thinking-only model; cannot disable thinking")
+            raise RuntimeError(
+                "400: this is a thinking-only model; cannot disable thinking"
+            )
         return original_create(**kwargs)
 
     client.completions.create = create

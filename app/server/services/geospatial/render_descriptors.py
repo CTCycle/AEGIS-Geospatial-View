@@ -39,9 +39,9 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
 )
 
+
 ###############################################################################
 class RenderDescriptorService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -678,8 +678,10 @@ class RenderDescriptorService:
     def _provider_bbox(
         request: LocationSearchRequest,
     ) -> tuple[float, float, float, float] | None:
-        bounds = request.analysis_bbox or request.viewport.bbox or RenderDescriptorService._bounds_from_viewport(
-            request.viewport
+        bounds = (
+            request.analysis_bbox
+            or request.viewport.bbox
+            or RenderDescriptorService._bounds_from_viewport(request.viewport)
         )
         if (
             not bounds
@@ -839,7 +841,10 @@ class RenderDescriptorService:
         rainviewer_url = await self._resolve_rainviewer_tile_url()
         if rainviewer_url is not None:
             return rainviewer_url, None
-        return None, "RainViewer metadata could not be fetched; no tile URL was emitted."
+        return (
+            None,
+            "RainViewer metadata could not be fetched; no tile URL was emitted.",
+        )
 
     # -------------------------------------------------------------------------
     def _resolve_credential_placeholders(

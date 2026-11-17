@@ -14,6 +14,7 @@ from server.domain.agent.tool_result import (
 from server.repositories.chat_history import ChatHistoryRepository
 from server.services.agent.tool_definitions import SearchConversationHistoryInput
 
+
 ###############################################################################
 class HistoryToolHandler:
     """Search original messages in the active conversation only."""
@@ -64,9 +65,7 @@ class HistoryToolHandler:
             )
 
         matches = page.get("messages")
-        match_count = (
-            len(cast(list[Any], matches)) if isinstance(matches, list) else 0
-        )
+        match_count = len(cast(list[Any], matches)) if isinstance(matches, list) else 0
         status = "success" if match_count else "valid_empty"
         return ToolResult(
             call_id="handler-call",

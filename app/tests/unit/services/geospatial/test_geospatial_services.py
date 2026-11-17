@@ -1,6 +1,9 @@
 from __future__ import annotations
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.openmeteo import OpenMeteoService, zoned_observation_time
+from server.services.geospatial.openmeteo import (
+    OpenMeteoService,
+    zoned_observation_time,
+)
 from server.services.geospatial.overpass import OverpassService
 import math
 import time
@@ -9,22 +12,41 @@ from typing import Any
 import pytest
 import httpx
 from unittest.mock import AsyncMock
-from server.services.geospatial.api_service import GeospatialApiService, GeospatialInvalidRequestError, GeospatialProviderResponseError, normalize_geojson_feature_collection
-from server.services.geospatial.spatial_constraints import SpatialConstraintError, feature_matches_constraint, geodesic_distance_m, normalize_bbox, validate_geojson_geometry, validate_point
+from server.services.geospatial.api_service import (
+    GeospatialApiService,
+    GeospatialInvalidRequestError,
+    GeospatialProviderResponseError,
+    normalize_geojson_feature_collection,
+)
+from server.services.geospatial.spatial_constraints import (
+    SpatialConstraintError,
+    feature_matches_constraint,
+    geodesic_distance_m,
+    normalize_bbox,
+    validate_geojson_geometry,
+    validate_point,
+)
 from server.services.geospatial.providers import http as provider_http
 
 # --- test_direct_service_provenance.py ---
-
 
 
 ###############################################################################
 @pytest.mark.parametrize(
     ("stamp", "payload", "expected"),
     [
-        ("2026-11-07T03:45", {"utc_offset_seconds": 46800}, "2026-11-07T03:45:00+13:00"),
+        (
+            "2026-11-07T03:45",
+            {"utc_offset_seconds": 46800},
+            "2026-11-07T03:45:00+13:00",
+        ),
         ("2026-11-07T03:45", {"utc_offset_seconds": 0}, "2026-11-07T03:45:00+00:00"),
         ("2026-11-07T03:45", {}, "2026-11-07T03:45"),
-        ("2026-11-07T03:45+01:00", {"utc_offset_seconds": 46800}, "2026-11-07T03:45+01:00"),
+        (
+            "2026-11-07T03:45+01:00",
+            {"utc_offset_seconds": 46800},
+            "2026-11-07T03:45+01:00",
+        ),
     ],
 )
 def test_openmeteo_local_observation_time_carries_the_point_utc_offset(
@@ -104,18 +126,21 @@ def test_openmeteo_direct_service_results_carry_source_and_measurement_metadata(
     assert result["current"]["relative_humidity_2m"] == 0
     assert result["hourly_forecast"][0]["precipitation_probability"] == 0
 
+
 ###############################################################################
 def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
-    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
-        "current": {"time": "2026-09-01T09:00", "temperature_2m": 22.0},
-        "hourly": {
-            "time": ["2026-09-01T09:00"],
-            "temperature_2m": [22.0],
-            "precipitation": [0.0],
-            "weather_code": [1],
-        },
-    })
+    service._get_json = AsyncMock(
+        return_value={  # type: ignore[method-assign]
+            "current": {"time": "2026-09-01T09:00", "temperature_2m": 22.0},
+            "hourly": {
+                "time": ["2026-09-01T09:00"],
+                "temperature_2m": [22.0],
+                "precipitation": [0.0],
+                "weather_code": [1],
+            },
+        }
+    )
 
     result = run_async_in_thread(
         service.get_weather_forecast(latitude=43.817, longitude=7.777)
@@ -125,13 +150,16 @@ def test_openmeteo_direct_service_marks_missing_measurements_as_partial() -> Non
     assert result["partial"] is True
     assert result["hourly_forecast"][0]["relative_humidity_2m"] is None
 
+
 ###############################################################################
 def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
     service = OpenMeteoService(weather_base_url="https://weather.example/forecast")
-    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
-        "hourly": {},
-        "current": {},
-    })
+    service._get_json = AsyncMock(
+        return_value={  # type: ignore[method-assign]
+            "hourly": {},
+            "current": {},
+        }
+    )
 
     result = run_async_in_thread(
         service.get_weather_forecast(latitude=43.817, longitude=7.777)
@@ -140,20 +168,23 @@ def test_openmeteo_direct_service_distinguishes_valid_empty_response() -> None:
     assert result["result_status"] == "valid_empty"
     assert result["partial"] is False
 
+
 ###############################################################################
 def test_openmeteo_air_quality_service_retains_hourly_forecast_window() -> None:
     service = OpenMeteoService(air_quality_base_url="https://air.example/forecast")
     timeline = [f"2026-09-01T{hour:02d}:00" for hour in range(24)]
-    service._get_json = AsyncMock(return_value={  # type: ignore[method-assign]
-        "timezone": "Europe/Rome",
-        "hourly": {
-            "time": timeline,
-            **{
-                name: [float(index) for index in range(24)]
-                for name in OpenMeteoService.AIR_QUALITY_VARIABLES
+    service._get_json = AsyncMock(
+        return_value={  # type: ignore[method-assign]
+            "timezone": "Europe/Rome",
+            "hourly": {
+                "time": timeline,
+                **{
+                    name: [float(index) for index in range(24)]
+                    for name in OpenMeteoService.AIR_QUALITY_VARIABLES
+                },
             },
-        },
-    })
+        }
+    )
 
     result = run_async_in_thread(
         service.get_air_quality_forecast(latitude=41.9, longitude=12.5)
@@ -215,9 +246,8 @@ def test_overpass_returns_the_nearest_results_and_flags_only_server_cuts() -> No
     assert capped["result_status"] == "partial"
     assert capped["truncated"] is True
 
+
 # --- test_geospatial_api_validation.py ---
-
-
 
 
 ###############################################################################
@@ -248,6 +278,7 @@ def test_geojson_normalization_preserves_valid_geometry_and_coordinates() -> Non
 
     assert len(result["features"]) == 2
     assert result["features"][0]["geometry"]["coordinates"] == [12.5, 41.9]
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -289,6 +320,7 @@ def test_geojson_normalization_rejects_invalid_geometry(payload: dict) -> None:
     with pytest.raises(GeospatialProviderResponseError, match="invalid geometry"):
         normalize_geojson_feature_collection(payload)
 
+
 ###############################################################################
 def test_geojson_normalization_converts_latitude_longitude_records() -> None:
     result = normalize_geojson_feature_collection(
@@ -311,6 +343,7 @@ def test_geojson_normalization_converts_latitude_longitude_records() -> None:
     }
     assert feature["properties"]["value"] == 4.2
 
+
 ###############################################################################
 def test_bbox_parser_enforces_west_south_east_north_and_finite_values() -> None:
     service = object.__new__(GeospatialApiService)
@@ -326,8 +359,8 @@ def test_bbox_parser_enforces_west_south_east_north_and_finite_values() -> None:
     with pytest.raises(GeospatialInvalidRequestError, match="finite"):
         service._parse_bbox("12.0,41.0,nan,42.0")
 
-# --- test_spatial_constraints.py ---
 
+# --- test_spatial_constraints.py ---
 
 
 ###############################################################################
@@ -337,6 +370,7 @@ def test_bbox_uses_west_south_east_north_and_preserves_antimeridian_wrap() -> No
 
     with pytest.raises(SpatialConstraintError, match="equal longitudes"):
         normalize_bbox([8.0, 45.0, 8.0, 46.0])
+
 
 ###############################################################################
 def test_invalid_coordinates_and_geometry_fail_closed() -> None:
@@ -349,42 +383,65 @@ def test_invalid_coordinates_and_geometry_fail_closed() -> None:
     with pytest.raises(SpatialConstraintError):
         validate_geojson_geometry({"type": "Polygon", "coordinates": []})
 
+
 ###############################################################################
 def test_radius_uses_wgs84_geodesic_distance() -> None:
     distance = geodesic_distance_m(0.0, 0.0, 0.0, 1.0)
     assert 110_000 < distance < 112_000
 
+
 ###############################################################################
 def test_containment_and_distance_are_applied_to_feature_geometry() -> None:
     polygon = {
         "type": "Polygon",
-        "coordinates": [[[8.0, 45.0], [9.0, 45.0], [9.0, 46.0], [8.0, 46.0], [8.0, 45.0]]],
+        "coordinates": [
+            [[8.0, 45.0], [9.0, 45.0], [9.0, 46.0], [8.0, 46.0], [8.0, 45.0]]
+        ],
     }
-    inside = {"type": "Feature", "geometry": {"type": "Point", "coordinates": [8.5, 45.5]}}
-    outside = {"type": "Feature", "geometry": {"type": "Point", "coordinates": [10.0, 45.5]}}
+    inside = {
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [8.5, 45.5]},
+    }
+    outside = {
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [10.0, 45.5]},
+    }
 
-    assert feature_matches_constraint(
-        inside,
-        relationship="in",
-        reference_geometry=polygon,
-    ) is True
-    assert feature_matches_constraint(
-        outside,
-        relationship="in",
-        reference_geometry=polygon,
-    ) is False
-    assert feature_matches_constraint(
-        inside,
-        relationship="within_distance",
-        reference_point=(45.5, 8.5),
-        distance_m=10,
-    ) is True
-    assert feature_matches_constraint(
-        outside,
-        relationship="within_distance",
-        reference_point=(45.5, 8.5),
-        distance_m=10,
-    ) is False
+    assert (
+        feature_matches_constraint(
+            inside,
+            relationship="in",
+            reference_geometry=polygon,
+        )
+        is True
+    )
+    assert (
+        feature_matches_constraint(
+            outside,
+            relationship="in",
+            reference_geometry=polygon,
+        )
+        is False
+    )
+    assert (
+        feature_matches_constraint(
+            inside,
+            relationship="within_distance",
+            reference_point=(45.5, 8.5),
+            distance_m=10,
+        )
+        is True
+    )
+    assert (
+        feature_matches_constraint(
+            outside,
+            relationship="within_distance",
+            reference_point=(45.5, 8.5),
+            distance_m=10,
+        )
+        is False
+    )
+
 
 ###############################################################################
 def test_distance_uses_the_nearest_part_of_nonpoint_geometry() -> None:
@@ -396,22 +453,22 @@ def test_distance_uses_the_nearest_part_of_nonpoint_geometry() -> None:
         },
     }
 
-    assert feature_matches_constraint(
-        line,
-        relationship="within_distance",
-        reference_point=(45.5, 8.5),
-        distance_m=20,
-    ) is True
+    assert (
+        feature_matches_constraint(
+            line,
+            relationship="within_distance",
+            reference_point=(45.5, 8.5),
+            distance_m=20,
+        )
+        is True
+    )
+
 
 # --- test_provider_http.py ---
 
 
-
-
-
 ###############################################################################
 class _FakeResponse:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -444,7 +501,6 @@ class _FakeResponse:
 
 ###############################################################################
 class _FakeClient:
-
     # -------------------------------------------------------------------------
     def __init__(self, response: _FakeResponse | Exception) -> None:
         self.response = response
@@ -458,7 +514,9 @@ class _FakeClient:
 
 ###############################################################################
 def _request_error(message: str) -> httpx.RequestError:
-    return httpx.ConnectError(message, request=httpx.Request("GET", "https://example.test/tile"))
+    return httpx.ConnectError(
+        message, request=httpx.Request("GET", "https://example.test/tile")
+    )
 
 
 ###############################################################################
@@ -544,7 +602,9 @@ def test_raster_http_classifies_transport_failure_categories(
 
 
 ###############################################################################
-def test_raster_http_classifies_body_read_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_raster_http_classifies_body_read_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         provider_http,
         "_ASYNC_HTTP_CLIENT",
@@ -619,19 +679,22 @@ def test_raster_http_accepts_png_and_jpeg(
         provider_http,
         "_ASYNC_HTTP_CLIENT",
         _FakeClient(
-            _FakeResponse(
-                headers={"content-type": "image/png"}, chunks=(body,)
-            )
+            _FakeResponse(headers={"content-type": "image/png"}, chunks=(body,))
         ),
     )
 
-    assert run_async_in_thread(
-        provider_http.fetch_raster_image_url("https://example.test/tile.png")
-    ) == body
+    assert (
+        run_async_in_thread(
+            provider_http.fetch_raster_image_url("https://example.test/tile.png")
+        )
+        == body
+    )
 
 
 ###############################################################################
-def test_raster_http_classifies_oversized_response(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_raster_http_classifies_oversized_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         provider_http,
         "_ASYNC_HTTP_CLIENT",
@@ -654,6 +717,8 @@ def test_raster_http_classifies_oversized_response(monkeypatch: pytest.MonkeyPat
     assert error.value.diagnostic.failure_phase == "response_headers"
     assert error.value.diagnostic.status_code == 200
     assert error.value.diagnostic.content_length == 9
+
+
 ###############################################################################
 def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent_one(
     monkeypatch: pytest.MonkeyPatch,
@@ -667,10 +732,14 @@ def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent
     def grid(fail_times: int) -> tuple[list[object], list[str], int]:
         attempts: list[int] = []
 
-        async def batch(batch_points: list[tuple[float, float]], *args: object) -> list[object]:
+        async def batch(
+            batch_points: list[tuple[float, float]], *args: object
+        ) -> list[object]:
             attempts.append(1)
             if len(attempts) <= fail_times:
-                raise module.OpenMeteoRequestError("Open-Meteo request failed: HTTP 503", status_code=503)
+                raise module.OpenMeteoRequestError(
+                    "Open-Meteo request failed: HTTP 503", status_code=503
+                )
             return [{"sample": point} for point in batch_points]
 
         service._weather_grid_batch = batch  # type: ignore[method-assign]
@@ -681,11 +750,16 @@ def test_openmeteo_grid_retries_a_transient_batch_failure_and_names_a_persistent
         return list(samples), reasons, len(attempts)
 
     recovered, reasons, attempts = grid(1)
-    assert recovered == [{"sample": point} for point in points] and not reasons and attempts == 2
+    assert (
+        recovered == [{"sample": point} for point in points]
+        and not reasons
+        and attempts == 2
+    )
 
     # A persistent failure of the only batch still raises (nothing to disclose).
     with pytest.raises(module.OpenMeteoRequestError):
         grid(2)
+
 
 ###############################################################################
 def test_overpass_cache_is_bounded_and_drops_expired_entries(monkeypatch) -> None:
@@ -704,6 +778,7 @@ def test_overpass_cache_is_bounded_and_drops_expired_entries(monkeypatch) -> Non
     service._cache_set("fresh", {"elements": []})  # noqa: SLF001
     assert list(service._cache) == ["fresh"]  # noqa: SLF001
 
+
 ###############################################################################
 def test_overpass_keeps_results_of_non_amenity_categories() -> None:
     service = OverpassService(base_url="https://overpass.example/api/interpreter")
@@ -717,7 +792,10 @@ def test_overpass_keeps_results_of_non_amenity_categories() -> None:
                     "type": "way",
                     "id": 1,
                     "center": {"lat": 45.32, "lon": -75.67},
-                    "tags": {"aeroway": "aerodrome", "name": "Ottawa International Airport"},
+                    "tags": {
+                        "aeroway": "aerodrome",
+                        "name": "Ottawa International Airport",
+                    },
                 }
             ]
         }

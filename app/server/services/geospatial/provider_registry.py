@@ -8,7 +8,10 @@ from time import monotonic
 from typing import Any, cast
 
 from server.contracts.geospatial import GeospatialProviderLayerDescriptor
-from server.domain.geospatial.providers import ProviderExecutionPolicy, current_provider_policy
+from server.domain.geospatial.providers import (
+    ProviderExecutionPolicy,
+    current_provider_policy,
+)
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -107,17 +110,19 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
+
 
 ###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
 
+
 ###############################################################################
 class ProviderRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -238,7 +243,9 @@ class ProviderRegistry:
         # Provider transport is the only retry owner below the tool boundary.
         # Keep the external attempt count bounded even if a stale configuration
         # requests a larger value.
-        attempts = min(10, max(1, int(current_provider_policy(self.execution_policy).max_attempts)))
+        attempts = min(
+            10, max(1, int(current_provider_policy(self.execution_policy).max_attempts))
+        )
         last_error: ProviderError | None = None
         for attempt in range(attempts):
             remaining = deadline - monotonic()
@@ -331,10 +338,13 @@ class ProviderRegistry:
             await asyncio.sleep(delay)
 
     # -------------------------------------------------------------------------
-    def _retry_delay_seconds(
-        self, attempt: int, error: ProviderError
-    ) -> float | None:
-        maximum = max(0.0, float(current_provider_policy(self.execution_policy).retry_backoff_max_seconds))
+    def _retry_delay_seconds(self, attempt: int, error: ProviderError) -> float | None:
+        maximum = max(
+            0.0,
+            float(
+                current_provider_policy(self.execution_policy).retry_backoff_max_seconds
+            ),
+        )
         retry_after = getattr(error, "retry_after_seconds", None)
         if retry_after is not None:
             if not isinstance(retry_after, (int, float)) or not math.isfinite(
@@ -347,7 +357,14 @@ class ProviderRegistry:
                 return None
             else:
                 return float(retry_after)
-        base = max(0.0, float(current_provider_policy(self.execution_policy).retry_backoff_base_seconds))
+        base = max(
+            0.0,
+            float(
+                current_provider_policy(
+                    self.execution_policy
+                ).retry_backoff_base_seconds
+            ),
+        )
         return min(maximum, base * (2**attempt))
 
     # -------------------------------------------------------------------------
@@ -461,11 +478,21 @@ class ProviderRegistry:
 
     # -------------------------------------------------------------------------
     def _ensure_circuit_closed(self, provider_id: str) -> None:
-        limit = max(1, int(current_provider_policy(self.execution_policy).circuit_breaker_failures))
+        limit = max(
+            1,
+            int(
+                current_provider_policy(self.execution_policy).circuit_breaker_failures
+            ),
+        )
         if self._failures.get(provider_id, 0) >= limit:
             opened_at = self._circuit_opened_at.get(provider_id, monotonic())
             recovery_seconds = max(
-                0.0, float(current_provider_policy(self.execution_policy).circuit_recovery_seconds)
+                0.0,
+                float(
+                    current_provider_policy(
+                        self.execution_policy
+                    ).circuit_recovery_seconds
+                ),
             )
             if monotonic() - opened_at >= recovery_seconds:
                 self._failures[provider_id] = 0
@@ -479,7 +506,12 @@ class ProviderRegistry:
     def _record_failure(self, provider_id: str) -> None:
         failures = self._failures.get(provider_id, 0) + 1
         self._failures[provider_id] = failures
-        limit = max(1, int(current_provider_policy(self.execution_policy).circuit_breaker_failures))
+        limit = max(
+            1,
+            int(
+                current_provider_policy(self.execution_policy).circuit_breaker_failures
+            ),
+        )
         if failures >= limit:
             self._circuit_opened_at.setdefault(provider_id, monotonic())
 

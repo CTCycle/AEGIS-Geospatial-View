@@ -19,6 +19,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class NominatimProvider(GeospatialProvider):
     provider_id = "nominatim"
@@ -145,5 +146,5 @@ class NominatimProvider(GeospatialProvider):
     def _float_or_none(self, value: object) -> float | None:
         try:
             return float(str(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None

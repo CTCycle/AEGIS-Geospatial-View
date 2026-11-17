@@ -7,9 +7,9 @@ from server.common.typing import json_array, json_object
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class GeospatialCatalogService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -27,9 +27,7 @@ class GeospatialCatalogService:
         last_audited = reliability.get("lastAudited")
         return {
             "status": str(reliability.get("status") or "unknown"),
-            "last_audited": (
-                last_audited if isinstance(last_audited, str) else None
-            ),
+            "last_audited": (last_audited if isinstance(last_audited, str) else None),
             "known_limitations": [
                 item
                 for item in json_array(reliability.get("knownLimitations"))
@@ -46,9 +44,7 @@ class GeospatialCatalogService:
         return {
             "type": str(auth.get("type") or "none"),
             "required": bool(auth.get("required", False)),
-            "provider_key": (
-                provider_key if isinstance(provider_key, str) else None
-            ),
+            "provider_key": (provider_key if isinstance(provider_key, str) else None),
             "access_page_provider_id": (
                 access_page_provider_id
                 if isinstance(access_page_provider_id, str)

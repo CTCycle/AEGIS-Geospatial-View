@@ -4,9 +4,9 @@ from server.services.agent.instruction_state import ConversationInstructionServi
 from server.services.llm.types import ModelContextProfile
 from server.services.llm.context_budget import estimate_json_tokens
 
+
 ###############################################################################
 class _ExplicitProfileResolver:
-
     # -------------------------------------------------------------------------
     def resolve(self, provider: str, model: str) -> ModelContextProfile:  # noqa: ARG002
         if model == "4k-local":
@@ -27,6 +27,7 @@ class _ExplicitProfileResolver:
             metadata_source="provider_metadata",
         )
 
+
 ###############################################################################
 def _messages(count: int) -> list[dict]:
     return [
@@ -38,6 +39,7 @@ def _messages(count: int) -> list[dict]:
         }
         for i in range(1, count + 1)
     ]
+
 
 ###############################################################################
 def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> None:
@@ -57,6 +59,7 @@ def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> Non
     assert small.summary is not None
     assert small.omitted_message_ids
 
+
 ###############################################################################
 def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     service = ConversationInstructionService()
@@ -70,6 +73,7 @@ def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     assert len(service.active(repeated)) == 1
     assert service.active(repeated)[0].source_turn_index == 1
     assert service.active([]) == []
+
 
 ###############################################################################
 def test_policy_constraints_are_hydrated_into_native_state() -> None:
@@ -98,6 +102,7 @@ def test_policy_constraints_are_hydrated_into_native_state() -> None:
     assert package.policy_constraints == constraints
     assert state.policy_constraints == constraints
 
+
 ###############################################################################
 def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     service = ConversationInstructionService()
@@ -110,6 +115,7 @@ def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     assert len(service.active(directives)) == 1
     assert service.active(directives)[0].source_turn_index == 2
     assert any(item.status == "superseded" for item in directives)
+
 
 ###############################################################################
 def test_oversized_newest_history_is_compacted_without_losing_location_state() -> None:
@@ -127,6 +133,7 @@ def test_oversized_newest_history_is_compacted_without_losing_location_state() -
     assert package.omitted_message_ids == [1]
     assert package.map_memory == location
     assert estimate_json_tokens(package.model_dump(mode="json")) < 3072
+
 
 ###############################################################################
 def test_active_overlay_identity_survives_context_bounding() -> None:
@@ -160,7 +167,11 @@ def test_active_overlay_identity_survives_context_bounding() -> None:
                                     "title": "Rain rate",
                                     "units": "mm/h",
                                     "entries": [
-                                        {"color": f"#0000{value:02x}", "value": value, "label": str(value)}
+                                        {
+                                            "color": f"#0000{value:02x}",
+                                            "value": value,
+                                            "label": str(value),
+                                        }
                                         for value in range(1, 40)
                                     ],
                                 },
@@ -201,6 +212,7 @@ def test_active_overlay_identity_survives_context_bounding() -> None:
         ],
     }
 
+
 ###############################################################################
 def test_oversized_history_item_does_not_hide_smaller_relevant_messages() -> None:
     package = AgentContextAssembler(_ExplicitProfileResolver()).assemble(
@@ -229,6 +241,7 @@ def test_oversized_history_item_does_not_hide_smaller_relevant_messages() -> Non
 
     assert package.included_message_ids == [1, 3]
     assert package.omitted_message_ids == [2]
+
 
 ###############################################################################
 def test_unknown_model_history_is_bounded_and_excludes_renderer_payloads() -> None:

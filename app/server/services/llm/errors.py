@@ -15,6 +15,7 @@ TimeoutOrigin = Literal[
     "unknown",
 ]
 
+
 ###############################################################################
 def _exception_chain(exc: BaseException) -> list[BaseException]:
     chain: list[BaseException] = []
@@ -25,6 +26,7 @@ def _exception_chain(exc: BaseException) -> list[BaseException]:
         chain.append(current)
         current = current.__cause__ or current.__context__
     return chain
+
 
 ###############################################################################
 def transport_diagnostics(
@@ -53,6 +55,7 @@ def transport_diagnostics(
             diagnostics.setdefault("winerror", int(match.group(1)))
     return diagnostics
 
+
 ###############################################################################
 def retry_after_seconds_from_exception(exc: BaseException) -> float | None:
     """Read a provider Retry-After header from an SDK/httpx exception response."""
@@ -63,6 +66,7 @@ def retry_after_seconds_from_exception(exc: BaseException) -> float | None:
         return None
     raw = getter("retry-after") or getter("Retry-After")
     return parse_retry_after(raw) if isinstance(raw, str) else None
+
 
 ###############################################################################
 def safe_failure_detail(exc: BaseException, fallback: str) -> str:
@@ -76,9 +80,11 @@ def safe_failure_detail(exc: BaseException, fallback: str) -> str:
     suffix = f" (WinError {winerror})" if isinstance(winerror, int) else ""
     return f"{fallback} [{exception_type}{suffix}]"
 
+
 ###############################################################################
 class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
+
 
 ###############################################################################
 class LLMStructuredOutputError(RuntimeError):
@@ -108,10 +114,9 @@ class LLMStructuredOutputError(RuntimeError):
         self.retryable = retryable
         self.http_status = http_status
         self.metadata = dict(metadata or {})
-        self.context_usage = (
-            dict(context_usage) if context_usage is not None else None
-        )
+        self.context_usage = dict(context_usage) if context_usage is not None else None
         super().__init__(detail)
+
 
 ###############################################################################
 class LLMContextLimitError(LLMStructuredOutputError):
@@ -137,6 +142,7 @@ class LLMContextLimitError(LLMStructuredOutputError):
             context_usage=context_usage,
         )
 
+
 ###############################################################################
 class LLMRequestSchemaError(LLMStructuredOutputError):
     """Raised for invalid local response schemas or native tool definitions."""
@@ -160,6 +166,7 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
             detail=detail,
             context_usage=context_usage,
         )
+
 
 ###############################################################################
 class LLMResponseParsingError(LLMStructuredOutputError):
@@ -185,6 +192,7 @@ class LLMResponseParsingError(LLMStructuredOutputError):
             detail=detail,
             context_usage=context_usage,
         )
+
 
 ###############################################################################
 class LLMProviderRequestError(RuntimeError):
@@ -218,9 +226,7 @@ class LLMProviderRequestError(RuntimeError):
         self.elapsed_ms = elapsed_ms
         self.retry_after_seconds = retry_after_seconds
         self.diagnostics = dict(diagnostics or {})
-        self.context_usage = (
-            dict(context_usage) if context_usage is not None else None
-        )
+        self.context_usage = dict(context_usage) if context_usage is not None else None
         if stage == "health" and model == "*":
             detail = (
                 f"{provider.capitalize()} could not be reached or refused the "
@@ -229,7 +235,8 @@ class LLMProviderRequestError(RuntimeError):
             if http_status is not None:
                 detail += f" (HTTP {http_status})"
             super().__init__(
-                detail + ". Check that the server is running and the base URL is correct."
+                detail
+                + ". Check that the server is running and the base URL is correct."
             )
             return
         detail = f"{provider} rejected {model} during {stage}"

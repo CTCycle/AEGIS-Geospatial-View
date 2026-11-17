@@ -32,6 +32,7 @@ from server.services.cryptography import CredentialEncryptionService
 
 USGS_CATALOG_DEADLINE_SECONDS = 40.0
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialRuntime:
@@ -48,6 +49,7 @@ class GeospatialRuntime:
     openmeteo_service: OpenMeteoService
     overpass_service: OverpassService
     rainviewer_service: RainViewerService
+
 
 ###############################################################################
 def build_provider_execution_policy(
@@ -98,6 +100,7 @@ def build_provider_execution_policy(
         ),
     )
 
+
 ###############################################################################
 def build_geospatial_runtime(
     database: SQLiteRepository,
@@ -141,9 +144,7 @@ def build_geospatial_runtime(
             "openmeteo": lambda _credential: OpenMeteoProvider(
                 service=openmeteo_service
             ),
-            "overpass": lambda _credential: OverpassProvider(
-                service=overpass_service
-            ),
+            "overpass": lambda _credential: OverpassProvider(service=overpass_service),
             "rainviewer": lambda _credential: RainViewerProvider(
                 service=rainviewer_service
             ),

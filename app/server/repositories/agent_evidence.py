@@ -21,9 +21,7 @@ _WRITE_SLOTS = asyncio.Semaphore(2)
 
 
 ###############################################################################
-async def create_evidence_async(
-    repository: Any, **fields: Any
-) -> AgentEvidenceSummary:
+async def create_evidence_async(repository: Any, **fields: Any) -> AgentEvidenceSummary:
     """Run ``repository.create`` off the event loop with bounded concurrency.
 
     ``create`` opens its own session and commits atomically, so a cancelled
@@ -72,7 +70,9 @@ class AgentEvidenceRepository:
         bounded_provenance = self._sanitize_object(provenance or {})
         if len(self._json_bytes(bounded_summary)) > self.MAX_SUMMARY_BYTES:
             raise ValueError("Evidence summary exceeds the bounded summary limit.")
-        parents = [str(value) for value in (parent_evidence_ids or [])[: self.MAX_PARENTS]]
+        parents = [
+            str(value) for value in (parent_evidence_ids or [])[: self.MAX_PARENTS]
+        ]
         evidence_id = f"evidence_{uuid4().hex}"
         digest = hashlib.sha256(raw).hexdigest()
         record = AgentEvidenceRecord(
@@ -149,7 +149,9 @@ class AgentEvidenceRepository:
             return self._summary(record), raw
 
     # -------------------------------------------------------------------------
-    def list_summaries(self, conversation_id: str, *, limit: int = 100) -> list[AgentEvidenceSummary]:
+    def list_summaries(
+        self, conversation_id: str, *, limit: int = 100
+    ) -> list[AgentEvidenceSummary]:
         bounded_limit = max(1, min(int(limit), 500))
         with self._session_factory() as session:
             records = session.scalars(
@@ -163,7 +165,9 @@ class AgentEvidenceRepository:
     # -------------------------------------------------------------------------
     @staticmethod
     def _json_bytes(value: Any) -> bytes:
-        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        return json.dumps(
+            value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str
+        ).encode("utf-8")
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -202,7 +206,16 @@ class AgentEvidenceRepository:
     def _sanitize_object(cls, value: Any, *, depth: int = 0) -> Any:
         if depth > 8:
             return "[depth-limited]"
-        secret_keys = {"authorization", "cookie", "set-cookie", "api_key", "apikey", "token", "password", "secret"}
+        secret_keys = {
+            "authorization",
+            "cookie",
+            "set-cookie",
+            "api_key",
+            "apikey",
+            "token",
+            "password",
+            "secret",
+        }
         if isinstance(value, dict):
             mapping = cast(dict[Any, Any], value)
             return {
@@ -212,7 +225,9 @@ class AgentEvidenceRepository:
             }
         if isinstance(value, list):
             items = cast(list[Any], value)
-            return [cls._sanitize_object(child, depth=depth + 1) for child in items[:1000]]
+            return [
+                cls._sanitize_object(child, depth=depth + 1) for child in items[:1000]
+            ]
         if isinstance(value, str):
             return value[:4096]
         return value
@@ -221,10 +236,21 @@ class AgentEvidenceRepository:
     @staticmethod
     def _is_secret_key(key: str, secret_keys: set[str]) -> bool:
         normalized = key.casefold().replace("-", "_")
-        return normalized in secret_keys or any(
-            marker in normalized
-            for marker in ("authorization", "access_token", "api_key", "password", "secret", "cookie")
-        ) or normalized.endswith("_token")
+        return (
+            normalized in secret_keys
+            or any(
+                marker in normalized
+                for marker in (
+                    "authorization",
+                    "access_token",
+                    "api_key",
+                    "password",
+                    "secret",
+                    "cookie",
+                )
+            )
+            or normalized.endswith("_token")
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -241,7 +267,9 @@ class AgentEvidenceRepository:
             status=record.status,  # type: ignore[arg-type]
             summary=raw_summary,
             provenance=raw_provenance,
-            parent_evidence_ids=[str(item) for item in (record.parent_evidence_ids or [])],
+            parent_evidence_ids=[
+                str(item) for item in (record.parent_evidence_ids or [])
+            ],
             byte_size=record.uncompressed_byte_size,
             sha256=record.sha256,
             map_eligibility=map_eligibility,  # type: ignore[arg-type]

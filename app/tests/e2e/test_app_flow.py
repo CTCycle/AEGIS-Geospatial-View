@@ -24,9 +24,9 @@ def _fulfill_json(route: Route, payload: dict[str, Any]) -> None:
         body=json.dumps(payload),
     )
 
+
 ###############################################################################
 class TestAppShell:
-
     # -------------------------------------------------------------------------
     def test_homepage_loads_chat_and_map_layout(self, page: Page, base_url: str):
         page.goto(base_url)
@@ -35,14 +35,15 @@ class TestAppShell:
         expect(page.get_by_label("Agent Chat")).to_be_visible()
         expect(page.locator(".map-canvas")).to_be_visible()
 
+
 ###############################################################################
 class TestChatFlow:
-
     # -------------------------------------------------------------------------
     def test_chat_composer_visible_and_send_prompt(self, page: Page, base_url: str):
         response = "The requested point is at latitude 41.9028 and longitude 12.4964."
         register_chat_stub(
-            page, lambda _message, _run_number: chat_completion_text_payload(1, response)
+            page,
+            lambda _message, _run_number: chat_completion_text_payload(1, response),
         )
         page.goto(base_url)
         composer = page.get_by_label("Chat message")
@@ -89,8 +90,12 @@ class TestChatFlow:
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
         expect(page.get_by_role("button", name="Models", exact=True)).to_be_visible()
-        expect(page.get_by_role("button", name="Model Providers", exact=True)).to_be_visible()
-        expect(page.get_by_role("button", name="Geospatial Access", exact=True)).to_be_visible()
+        expect(
+            page.get_by_role("button", name="Model Providers", exact=True)
+        ).to_be_visible()
+        expect(
+            page.get_by_role("button", name="Geospatial Access", exact=True)
+        ).to_be_visible()
         page.get_by_role("button", name="Model Providers", exact=True).click()
         expect(page.get_by_role("heading", name="Ollama", exact=True)).to_be_visible()
 
@@ -132,9 +137,13 @@ class TestChatFlow:
     def test_model_selection_persists(self, page: Page, base_url: str):
         page.goto(base_url)
         page.get_by_role("link", name="Settings", exact=True).click()
-        first_card_button = page.locator("button.model-row__select:not([disabled])").first
+        first_card_button = page.locator(
+            "button.model-row__select:not([disabled])"
+        ).first
         if first_card_button.count() == 0:
             expect(page.locator(".settings-empty-state").first).to_be_visible()
             return
         first_card_button.click()
-        expect(page.get_by_text(re.compile(r"Selected agent model"))).to_be_visible(timeout=15000)
+        expect(page.get_by_text(re.compile(r"Selected agent model"))).to_be_visible(
+            timeout=15000
+        )

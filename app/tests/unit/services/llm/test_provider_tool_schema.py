@@ -5,6 +5,7 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMToolDefinition
 
+
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -15,6 +16,7 @@ def _tool() -> LLMToolDefinition:
             "properties": {"q": {"type": "string"}},
         },
     )
+
 
 ###############################################################################
 def test_provider_tool_schema_conversion() -> None:
@@ -29,8 +31,11 @@ def test_provider_tool_schema_conversion() -> None:
         == "resolve_location"
     )
 
+
 ###############################################################################
-def test_openai_strict_schema_covers_nested_definitions_and_falls_back_for_free_form() -> None:
+def test_openai_strict_schema_covers_nested_definitions_and_falls_back_for_free_form() -> (
+    None
+):
     nested = LLMToolDefinition(
         name="route",
         description="Route",
@@ -40,7 +45,10 @@ def test_openai_strict_schema_covers_nested_definitions_and_falls_back_for_free_
             "$defs": {
                 "Scope": {
                     "type": "object",
-                    "properties": {"kind": {"type": "string"}, "rel": {"type": "string"}},
+                    "properties": {
+                        "kind": {"type": "string"},
+                        "rel": {"type": "string"},
+                    },
                     "required": ["kind"],
                 }
             },
@@ -63,6 +71,7 @@ def test_openai_strict_schema_covers_nested_definitions_and_falls_back_for_free_
     assert strict["parameters"]["$defs"]["Scope"]["additionalProperties"] is False
     assert relaxed["strict"] is False
     assert relaxed["parameters"] == free_form.parameters_json_schema
+
 
 ###############################################################################
 def test_tool_call_parsing() -> None:

@@ -1,5 +1,9 @@
 from __future__ import annotations
-from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache, cache_key_for_request
+from server.services.geospatial.cache import (
+    CacheLookupStatus,
+    GeospatialCache,
+    cache_key_for_request,
+)
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -8,18 +12,33 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.census import CensusProvider
 from server.domain.catalog import GeospatialLayerReferenceEntry
-from server.services.geospatial.layers import LayerProviderService, build_geospatial_layer_catalog
+from server.services.geospatial.layers import (
+    LayerProviderService,
+    build_geospatial_layer_catalog,
+)
 import pytest
-from server.services.geospatial.normalizers import NormalizationError, deduplicate_poi_features, normalize_camera_feature, normalize_poi_category, normalize_poi_feature
-from server.services.geospatial.poi_benchmark import benchmark_poi_parity, load_poi_records
-from server.services.geospatial.search_index import IndexedFeature, build_feature_search_index, query_search_index
+from server.services.geospatial.normalizers import (
+    NormalizationError,
+    deduplicate_poi_features,
+    normalize_camera_feature,
+    normalize_poi_category,
+    normalize_poi_feature,
+)
+from server.services.geospatial.poi_benchmark import (
+    benchmark_poi_parity,
+    load_poi_records,
+)
+from server.services.geospatial.search_index import (
+    IndexedFeature,
+    build_feature_search_index,
+    query_search_index,
+)
 
 # --- test_geospatial_cache.py ---
 
 
 ###############################################################################
 class _Clock:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.value = 0.0
@@ -27,6 +46,7 @@ class _Clock:
     # -------------------------------------------------------------------------
     def __call__(self) -> float:
         return self.value
+
 
 ###############################################################################
 def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
@@ -48,6 +68,7 @@ def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     clock.value = 16.0
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.MISS
 
+
 ###############################################################################
 def test_geospatial_cache_sweeps_expired_entries_and_bounds_size() -> None:
     clock = _Clock()
@@ -64,6 +85,7 @@ def test_geospatial_cache_sweeps_expired_entries_and_bounds_size() -> None:
     assert cache.get("a").status == CacheLookupStatus.MISS
     assert [cache.get(key).value for key in ("b", "c", "d")] == [2, 3, 4]
 
+
 ###############################################################################
 def test_geospatial_cache_can_invalidate_entries() -> None:
     cache = GeospatialCache()
@@ -72,6 +94,7 @@ def test_geospatial_cache_can_invalidate_entries() -> None:
     cache.invalidate("openaq:stations")
 
     assert cache.get("openaq:stations").status == CacheLookupStatus.MISS
+
 
 ###############################################################################
 def test_geospatial_cache_key_for_request_excludes_raw_credentials() -> None:
@@ -88,12 +111,12 @@ def test_geospatial_cache_key_for_request_excludes_raw_credentials() -> None:
     assert "raw-secret" not in key
     assert key.startswith("openaq:openaq_air_quality:")
 
+
 # --- test_geospatial_catalog_service.py ---
 
 
 ###############################################################################
 class _CredentialRepo:
-
     # -------------------------------------------------------------------------
     def __init__(self, present: bool) -> None:
         self.present = present
@@ -103,6 +126,7 @@ class _CredentialRepo:
         if self.present and provider == "tomtom" and label == "api_key":
             return object()
         return None
+
 
 ###############################################################################
 def _service_with_credentials(present: bool) -> GeospatialCatalogService:
@@ -114,6 +138,7 @@ def _service_with_credentials(present: bool) -> GeospatialCatalogService:
             credentials_repo=_CredentialRepo(present),  # type: ignore[arg-type]
         ),
     )
+
 
 ###############################################################################
 def test_catalog_contains_grouped_capability_sections() -> None:
@@ -127,6 +152,7 @@ def test_catalog_contains_grouped_capability_sections() -> None:
     assert any(item["id"] == "openaq_air_quality" for item in catalog["overlays"])
     assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
+
 ###############################################################################
 def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     catalog = _service_with_credentials(False).list_catalog()
@@ -139,6 +165,7 @@ def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     assert "World_Imagery/MapServer/tile" in render["tile_url"]
     assert render["attribution"]
 
+
 ###############################################################################
 def test_satellite_basemap_declares_location_execution_arguments() -> None:
     registry = CapabilityRegistry(manifest_loader=GeospatialManifestLoader())
@@ -150,6 +177,7 @@ def test_satellite_basemap_declares_location_execution_arguments() -> None:
     assert "location" in argument_schema["properties"]
     assert "latitude" in argument_schema["properties"]
     assert "longitude" in argument_schema["properties"]
+
 
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(
@@ -165,6 +193,7 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
+
 ###############################################################################
 def test_catalog_exposes_openchargemap_local_or_access_reason(monkeypatch) -> None:
     monkeypatch.delenv("AEGIS_OCM_SNAPSHOT_PATH", raising=False)
@@ -178,6 +207,7 @@ def test_catalog_exposes_openchargemap_local_or_access_reason(monkeypatch) -> No
     assert "Open Charge Map" in openchargemap["availability_reason"]
     assert "local snapshot" in openchargemap["availability_reason"]
 
+
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(
     monkeypatch,
@@ -190,6 +220,7 @@ def test_catalog_marks_key_required_capabilities_available_with_saved_credential
 
     assert lookup["tomtom_traffic_flow"]["is_available"] is True
     assert providers["tomtom"]["is_available"] is True
+
 
 ###############################################################################
 def test_catalog_exposes_snake_case_nested_api_metadata() -> None:
@@ -212,8 +243,8 @@ def test_catalog_exposes_snake_case_nested_api_metadata() -> None:
     assert "lastAudited" not in overlay["reliability"]
     assert "providerKey" not in overlay["auth"]
 
-# --- test_geospatial_choropleth_normalization.py ---
 
+# --- test_geospatial_choropleth_normalization.py ---
 
 
 ###############################################################################
@@ -230,6 +261,7 @@ def test_census_demographic_payload_uses_choropleth_contract() -> None:
     assert response.payload["renderingMode"] == "choropleth"
     assert response.payload["classificationField"]
     assert response.attribution
+
 
 # --- test_geospatial_layers.py ---
 
@@ -255,11 +287,13 @@ def test_geospatial_layer_catalog_comes_from_reference_entries() -> None:
     assert entry.label == "Active Fires (MODIS, Daily)"
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
 
+
 ###############################################################################
 def test_geospatial_layer_service_without_catalog_has_no_entries() -> None:
     service = LayerProviderService()
 
     assert service.list_options() == {}
+
 
 ###############################################################################
 def test_build_geospatial_layer_catalog_uses_reference_repository(monkeypatch) -> None:
@@ -276,7 +310,6 @@ def test_build_geospatial_layer_catalog_uses_reference_repository(monkeypatch) -
 
     ###############################################################################
     class RepositoryStub:
-
         # -------------------------------------------------------------------------
         def __init__(self, database) -> None:
             self.database = database
@@ -295,8 +328,8 @@ def test_build_geospatial_layer_catalog_uses_reference_repository(monkeypatch) -
     assert isinstance(service, LayerProviderService)
     assert service.resolve("fires").name == "fire"
 
-# --- test_geospatial_normalizers.py ---
 
+# --- test_geospatial_normalizers.py ---
 
 
 ###############################################################################
@@ -319,6 +352,7 @@ def test_normalize_poi_feature_accepts_common_coordinate_aliases() -> None:
     assert poi.longitude == 7.2
     assert poi.metadata == {"raw_tag": "drinking_water"}
 
+
 ###############################################################################
 def test_normalize_camera_feature_requires_official_url() -> None:
     with pytest.raises(NormalizationError):
@@ -327,6 +361,7 @@ def test_normalize_camera_feature_requires_official_url() -> None:
             provider="windy_webcams",
             camera_type="webcam",
         )
+
 
 ###############################################################################
 def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
@@ -347,6 +382,7 @@ def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
     assert camera.embed_url is None
     assert camera.official_url == "https://example.test/cam"
 
+
 ###############################################################################
 def test_normalize_poi_category_maps_optional_provider_sources() -> None:
     assert normalize_poi_category("charging station") == "ev_charging"
@@ -361,6 +397,7 @@ def test_normalize_poi_category_maps_optional_provider_sources() -> None:
     assert normalize_poi_category("hiking trail") == "trails"
     assert normalize_poi_category("marina") == "ports"
     assert normalize_poi_category("railway station") == "rail"
+
 
 ###############################################################################
 def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
@@ -384,6 +421,7 @@ def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
 
     assert [feature.id for feature in deduplicated] == ["osm-1", "other-1"]
 
+
 # --- test_geospatial_poi_benchmark.py ---
 
 
@@ -405,6 +443,7 @@ def test_poi_parity_report_matches_by_id_and_tracks_completeness() -> None:
     assert report.precision == 1.0
     assert report.meets_thresholds is True
 
+
 ###############################################################################
 def test_poi_parity_report_rejects_missing_candidate_coverage_and_duplicates() -> None:
     baseline = [
@@ -421,6 +460,7 @@ def test_poi_parity_report_rejects_missing_candidate_coverage_and_duplicates() -
     assert report.recall == 0.5
     assert report.duplicate_rate == 0.5
     assert report.meets_thresholds is False
+
 
 ###############################################################################
 def test_load_poi_records_accepts_geojson_feature_collections(tmp_path) -> None:
@@ -441,6 +481,7 @@ def test_load_poi_records_accepts_geojson_feature_collections(tmp_path) -> None:
             "longitude": 12.5,
         }
     ]
+
 
 # --- test_geospatial_poi_search_index.py ---
 
@@ -463,6 +504,7 @@ def test_geospatial_poi_search_index_matches_labels_categories_and_sources() -> 
 
     assert [item.id for item in query_search_index(index, "museum tourism")] == ["1"]
     assert [item.id for item in query_search_index(index, "ev charging")] == ["2"]
+
 
 # --- test_geospatial_service_regressions.py ---
 

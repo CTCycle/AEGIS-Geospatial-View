@@ -64,9 +64,9 @@ _UNSAMPLEABLE_ERRORS = (
     GeospatialUnsupportedTileError,
 )
 
+
 ###############################################################################
 class EvidenceToolHandler:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -92,7 +92,10 @@ class EvidenceToolHandler:
                 code="unknown_evidence",
                 message=(
                     "The evidence reference is not part of the current state. Valid references: "
-                    + (", ".join(state.evidence_refs[-8:]) or "none; answer from the working state.")
+                    + (
+                        ", ".join(state.evidence_refs[-8:])
+                        or "none; answer from the working state."
+                    )
                 ),
                 recovery="choose_alternate_tool",
                 started=started,
@@ -130,10 +133,18 @@ class EvidenceToolHandler:
             sort_by=request.sort_by,
             ascending=request.ascending,
         )
-        capability_id, coverage = _inherited_assessment([{
-            **summary.provenance,
-            **{key: summary.summary[key] for key in ("coverage", "query") if key in summary.summary},
-        }])
+        capability_id, coverage = _inherited_assessment(
+            [
+                {
+                    **summary.provenance,
+                    **{
+                        key: summary.summary[key]
+                        for key in ("coverage", "query")
+                        if key in summary.summary
+                    },
+                }
+            ]
+        )
         return ToolResult(
             call_id="handler-call",
             tool_name="inspect_evidence",
@@ -167,27 +178,39 @@ class EvidenceToolHandler:
         capability_id = str(summary.provenance.get("capability_id") or "").strip()
         if summary.kind != "raster_descriptor" or not capability_id:
             return _failure(
-                tool_name="inspect_evidence", code="unsupported_view",
+                tool_name="inspect_evidence",
+                code="unsupported_view",
                 message="values_at reads raster imagery evidence; use page or statistics for records.",
-                recovery="correct_arguments", started=started,
+                recovery="correct_arguments",
+                started=started,
             )
         if self.raster_sampler is None:
             return _failure(
-                tool_name="inspect_evidence", code="sampling_unavailable",
+                tool_name="inspect_evidence",
+                code="sampling_unavailable",
                 message="Raster values cannot be read in this runtime.",
-                recovery="choose_alternate_tool", started=started,
+                recovery="choose_alternate_tool",
+                started=started,
             )
         descriptor = json_object(payload)
         render = json_object(descriptor.get("render"))
         legend = next(
-            (value for value in (descriptor.get("legend"), render.get("legend")) if is_json_object(value)),
+            (
+                value
+                for value in (descriptor.get("legend"), render.get("legend"))
+                if is_json_object(value)
+            ),
             None,
         )
         layer_time = next(
             (
                 value.strip()
-                for value in (render.get("time"), render.get("default_time"),
-                              descriptor.get("time"), descriptor.get("default_time"))
+                for value in (
+                    render.get("time"),
+                    render.get("default_time"),
+                    descriptor.get("time"),
+                    descriptor.get("default_time"),
+                )
                 if isinstance(value, str) and value.strip()
             ),
             None,
@@ -195,16 +218,26 @@ class EvidenceToolHandler:
         points: list[dict[str, Any]] = []
         sampled: dict[str, Any] = {}
         for point in request.points:
-            entry: dict[str, Any] = {"lon": round(point.lon, 5), "lat": round(point.lat, 5)}
+            entry: dict[str, Any] = {
+                "lon": round(point.lon, 5),
+                "lat": round(point.lat, 5),
+            }
             try:
                 sampled = await self.raster_sampler(
-                    capability_id, point.lon, point.lat, VALUES_AT_ZOOM, layer_time, legend=legend
+                    capability_id,
+                    point.lon,
+                    point.lat,
+                    VALUES_AT_ZOOM,
+                    layer_time,
+                    legend=legend,
                 )
             except _UNSAMPLEABLE_ERRORS as exc:
                 return _failure(
-                    tool_name="inspect_evidence", code="no_legend",
+                    tool_name="inspect_evidence",
+                    code="no_legend",
                     message=f"{exc} Its values cannot be read; describe the imagery instead.",
-                    recovery="choose_alternate_tool", started=started,
+                    recovery="choose_alternate_tool",
+                    started=started,
                 )
             except GeospatialApiServiceError as exc:
                 points.append({**entry, "value": None, "error": str(exc)[:160]})
@@ -218,9 +251,12 @@ class EvidenceToolHandler:
         failed = sum("error" in item for item in points)
         if failed == len(points):
             return _failure(
-                tool_name="inspect_evidence", code="sampling_failed",
-                message="No point could be read from the imagery: " + str(points[0]["error"]),
-                recovery="choose_alternate_tool", started=started,
+                tool_name="inspect_evidence",
+                code="sampling_failed",
+                message="No point could be read from the imagery: "
+                + str(points[0]["error"]),
+                recovery="choose_alternate_tool",
+                started=started,
             )
         units = sampled.get("units") if isinstance(sampled.get("units"), str) else None
         return ToolResult(
@@ -286,18 +322,22 @@ class EvidenceToolHandler:
             if summary.kind == "raster_descriptor":
                 if needs_numeric_values(state):
                     return _failure(
-                        tool_name="transform_evidence", code=RASTER_ONLY_CODE,
+                        tool_name="transform_evidence",
+                        code=RASTER_ONLY_CODE,
                         message=(
                             "The matching source is map imagery only: it has no point or "
                             "numeric records, so the requested values could not be computed. "
                             "The imagery layer can be shown on the map instead."
                         ),
-                        recovery="terminal", started=started,
+                        recovery="terminal",
+                        started=started,
                     )
                 return _failure(
-                    tool_name="transform_evidence", code=RASTER_ONLY_CODE,
+                    tool_name="transform_evidence",
+                    code=RASTER_ONLY_CODE,
                     message="This evidence is raster imagery with no records to transform. Show it with apply_map_plan instead.",
-                    recovery="choose_alternate_tool", started=started,
+                    recovery="choose_alternate_tool",
+                    started=started,
                 )
             if summary.status == "failed":
                 return _failure(
@@ -307,20 +347,39 @@ class EvidenceToolHandler:
                     recovery="replan",
                     started=started,
                 )
-            parents.append({"provider": summary.provenance.get("provider_id") or summary.provenance.get("provider"),
-                            **summary.provenance,
-                            **{key: summary.summary[key] for key in ("coverage", "units", "observation_time", "value_kind", "query") if key in summary.summary}})
+            parents.append(
+                {
+                    "provider": summary.provenance.get("provider_id")
+                    or summary.provenance.get("provider"),
+                    **summary.provenance,
+                    **{
+                        key: summary.summary[key]
+                        for key in (
+                            "coverage",
+                            "units",
+                            "observation_time",
+                            "value_kind",
+                            "query",
+                        )
+                        if key in summary.summary
+                    },
+                }
+            )
             parent_records = _records_from_payload(_decode_json(raw))
             if len(refs) > 1:
                 # Keep each record's origin so combined sets stay comparable.
-                place = json_object(summary.summary.get("query")).get("resolved_location")
+                place = json_object(summary.summary.get("query")).get(
+                    "resolved_location"
+                )
                 for record in parent_records:
                     _properties(record)["source_ref"] = ref
                     if place:
                         _properties(record)["source_place"] = place
             records.extend(parent_records)
         records, outside_scope = _within_requested_country(records, state)
-        operations = [operation.model_dump(mode="python") for operation in request.operations]
+        operations = [
+            operation.model_dump(mode="python") for operation in request.operations
+        ]
         ref_error = _pairwise_ref_error(operations, refs)
         if ref_error is not None:
             return _failure(
@@ -363,28 +422,69 @@ class EvidenceToolHandler:
         status = "success" if transformed else "valid_empty"
         truncated_from = _count_cut_by_limit(records, operations)
         labelled = await self._label_places(transformed)
-        shapes = [geometry for item in transformed if (geometry := geometry_ops.record_geometry(item)) is not None]
+        shapes = [
+            geometry
+            for item in transformed
+            if (geometry := geometry_ops.record_geometry(item)) is not None
+        ]
         bounds = [geometry.bounds for geometry in shapes]
-        bbox = [min(b[0] for b in bounds), min(b[1] for b in bounds), max(b[2] for b in bounds), max(b[3] for b in bounds)] if bounds else None
-        value_fields = sorted({key for item in transformed for key, value in _properties(item).items() if _numeric(value) is not None})
+        bbox = (
+            [
+                min(b[0] for b in bounds),
+                min(b[1] for b in bounds),
+                max(b[2] for b in bounds),
+                max(b[3] for b in bounds),
+            ]
+            if bounds
+            else None
+        )
+        value_fields = sorted(
+            {
+                key
+                for item in transformed
+                for key, value in _properties(item).items()
+                if _numeric(value) is not None
+            }
+        )
         unlocated = sum(geometry_ops.record_geometry(item) is None for item in records)
         capability_id, coverage = _inherited_assessment(parents)
-        provenance: dict[str, Any] = {"operation_count": len(request.operations), "parents": parents,
-                      "coverage": coverage, "capability_id": capability_id}
-        geometry_kinds = [str(item["op"]) for item in operations if item.get("op") in _GEOMETRY_OPS]
+        provenance: dict[str, Any] = {
+            "operation_count": len(request.operations),
+            "parents": parents,
+            "coverage": coverage,
+            "capability_id": capability_id,
+        }
+        geometry_kinds = [
+            str(item["op"]) for item in operations if item.get("op") in _GEOMETRY_OPS
+        ]
         geometry_operations = [
             str(item["kind"] if item["op"] == "overlay" else item["op"])
-            for item in operations if item.get("op") in _GEOMETRY_OPS
+            for item in operations
+            if item.get("op") in _GEOMETRY_OPS
         ]
         if geometry_kinds:
             # Derived areas, joins and overlays name the operations and the
             # result's footprint so a point location is never read as an area.
             provenance["geometry_ops"] = geometry_kinds
             provenance["footprint_basis"] = (
-                "polygon" if any(geometry_ops.is_polygonal(item) for item in shapes) else "point"
+                "polygon"
+                if any(geometry_ops.is_polygonal(item) for item in shapes)
+                else "point"
             )
         if len(parents) == 1:
-            provenance.update({key: parents[0][key] for key in ("provider", "provider_id", "units", "observation_time", "value_kind") if key in parents[0]})
+            provenance.update(
+                {
+                    key: parents[0][key]
+                    for key in (
+                        "provider",
+                        "provider_id",
+                        "units",
+                        "observation_time",
+                        "value_kind",
+                    )
+                    if key in parents[0]
+                }
+            )
         evidence = await create_evidence_async(
             self.repository,
             conversation_id=state.conversation_id,
@@ -413,13 +513,17 @@ class EvidenceToolHandler:
             tool_name="transform_evidence",
             status=status,
             summary=f"Created derived evidence with {len(transformed)} records.",
-            data={"record_count": len(transformed), "parent_refs": refs,
-                  "truncated_from": truncated_from,
-                  "preview": [_preview(item) for item in transformed[:5]],
-                  "located_record_count": len(shapes),
-                  "unlocated_record_count": unlocated, "place_labelled_count": labelled,
-                  "excluded_outside_scope_count": outside_scope,
-                  "parent_coverage": [parent.get("coverage") for parent in parents]},
+            data={
+                "record_count": len(transformed),
+                "parent_refs": refs,
+                "truncated_from": truncated_from,
+                "preview": [_preview(item) for item in transformed[:5]],
+                "located_record_count": len(shapes),
+                "unlocated_record_count": unlocated,
+                "place_labelled_count": labelled,
+                "excluded_outside_scope_count": outside_scope,
+                "parent_coverage": [parent.get("coverage") for parent in parents],
+            },
             evidence_refs=[evidence_ref],
             metadata=ToolExecutionMetadata(
                 capability_id=capability_id,
@@ -437,7 +541,11 @@ class EvidenceToolHandler:
         if self.place_labeler is None:
             return 0
         labelled = 0
-        candidates = [item for item in records if _properties(item).get("label_kind") == "coordinates"]
+        candidates = [
+            item
+            for item in records
+            if _properties(item).get("label_kind") == "coordinates"
+        ]
         for item in candidates[:MAX_PLACE_LABELS]:
             point = _record_point(item)
             if point is None:
@@ -449,6 +557,7 @@ class EvidenceToolHandler:
                 properties["label_kind"] = "nearest_reverse_geocoded"
                 labelled += 1
         return labelled
+
 
 ###############################################################################
 def _within_requested_country(
@@ -465,7 +574,10 @@ def _within_requested_country(
     locations = [
         location
         for key, location in state.location_refs.items()
-        if any(location_ref_matches(str(target), str(key), location.label) for target in targets)
+        if any(
+            location_ref_matches(str(target), str(key), location.label)
+            for target in targets
+        )
     ]
     if len(locations) != 1 or locations[0].location_type != "country":
         return records, 0
@@ -475,16 +587,22 @@ def _within_requested_country(
     kept: list[dict[str, Any]] = []
     for record in records:
         point = _record_point(record)
-        if point is None or (found := country_at(point[0], point[1])) is None or found == code:
+        if (
+            point is None
+            or (found := country_at(point[0], point[1])) is None
+            or found == code
+        ):
             kept.append(record)
     return kept, len(records) - len(kept)
+
 
 ###############################################################################
 def _decode_json(raw: bytes) -> Any:
     try:
         return json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except UnicodeDecodeError, json.JSONDecodeError:
         return {"byte_size": len(raw)}
+
 
 ###############################################################################
 def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
@@ -494,7 +612,12 @@ def _records_from_payload(payload: Any) -> list[dict[str, Any]]:
             if is_json_array(value):
                 return [item for item in value if is_json_object(item)]
         return [with_nested_scalars(payload)]
-    return [item for item in payload if is_json_object(item)] if is_json_array(payload) else []
+    return (
+        [item for item in payload if is_json_object(item)]
+        if is_json_array(payload)
+        else []
+    )
+
 
 ###############################################################################
 def _inspect_payload(
@@ -510,9 +633,14 @@ def _inspect_payload(
     records = _records_from_payload(payload)
     if sort_by:
         # Rank before projecting so the sort field need not be returned.
-        present = [item for item in records if _properties(item).get(sort_by) is not None]
+        present = [
+            item for item in records if _properties(item).get(sort_by) is not None
+        ]
         missing = [item for item in records if _properties(item).get(sort_by) is None]
-        present.sort(key=lambda item: _sort_key(_properties(item).get(sort_by)), reverse=not ascending)
+        present.sort(
+            key=lambda item: _sort_key(_properties(item).get(sort_by)),
+            reverse=not ascending,
+        )
         records = present + missing
     if fields:
         records = [
@@ -546,8 +674,26 @@ def _inspect_payload(
                     "max": max(values),
                     "count": len(values),
                     "mean": sum(values) / len(values),
-                    "argmax": _compact_record(max((item for item in records if _numeric(_properties(item).get(key)) is not None), key=lambda item: float(_properties(item)[key]))),
-                    "argmin": _compact_record(min((item for item in records if _numeric(_properties(item).get(key)) is not None), key=lambda item: float(_properties(item)[key]))),
+                    "argmax": _compact_record(
+                        max(
+                            (
+                                item
+                                for item in records
+                                if _numeric(_properties(item).get(key)) is not None
+                            ),
+                            key=lambda item: float(_properties(item)[key]),
+                        )
+                    ),
+                    "argmin": _compact_record(
+                        min(
+                            (
+                                item
+                                for item in records
+                                if _numeric(_properties(item).get(key)) is not None
+                            ),
+                            key=lambda item: float(_properties(item)[key]),
+                        )
+                    ),
                 }
         return {"statistics": statistics, "record_count": len(records)}
     start = int(cursor or 0) if str(cursor or "0").isdigit() else 0
@@ -561,27 +707,39 @@ def _inspect_payload(
         },
     }
 
+
 ###############################################################################
 def _count_cut_by_limit(
     records: list[dict[str, Any]], operations: list[dict[str, Any]]
 ) -> int | None:
     """Records that existed when a ``limit`` operation cut the set, if it cut."""
 
-    index = next((i for i, item in enumerate(operations) if item.get("op") == "limit"), None)
+    index = next(
+        (i for i, item in enumerate(operations) if item.get("op") == "limit"), None
+    )
     if index is None:
         return None
     before, error = _apply_operations(records, operations[:index])
     cap = operations[index].get("value")
-    return len(before) if error is None and isinstance(cap, int) and len(before) > cap else None
+    return (
+        len(before)
+        if error is None and isinstance(cap, int) and len(before) > cap
+        else None
+    )
 
 
 ###############################################################################
 _GEOMETRY_OPS = frozenset({"area", "buffer", "spatial_join", "overlay"})
-_PAIRWISE_REF_FIELDS = {"spatial_join": ("target_ref", "join_ref"), "overlay": ("left_ref", "right_ref")}
+_PAIRWISE_REF_FIELDS = {
+    "spatial_join": ("target_ref", "join_ref"),
+    "overlay": ("left_ref", "right_ref"),
+}
 
 
 ###############################################################################
-def _pairwise_ref_error(operations: list[dict[str, Any]], refs: list[str]) -> str | None:
+def _pairwise_ref_error(
+    operations: list[dict[str, Any]], refs: list[str]
+) -> str | None:
     """Joins and overlays relate two distinct refs that are both being transformed."""
 
     for operation in operations:
@@ -603,8 +761,13 @@ def _geometry_operation(
 ) -> list[dict[str, Any]]:
     op = str(operation.get("op"))
     if op == "area":
-        if records and not any(geometry_ops.is_polygonal(geometry_ops.record_geometry(item)) for item in records):
-            raise geometry_ops.GeometryOperationError("Area requires polygon footprints.")
+        if records and not any(
+            geometry_ops.is_polygonal(geometry_ops.record_geometry(item))
+            for item in records
+        ):
+            raise geometry_ops.GeometryOperationError(
+                "Area requires polygon footprints."
+            )
         return [geometry_ops.with_area(item, _properties) for item in records]
     if op == "buffer":
         distance = float(operation["distance_km"])
@@ -620,16 +783,31 @@ def _geometry_operation(
             buffered.append(geometry_ops.with_area(item, _properties))
         return buffered
     first_field, second_field = _PAIRWISE_REF_FIELDS[op]
-    first = [item for item in records if _properties(item).get("source_ref") == operation[first_field]]
-    second = [item for item in records if _properties(item).get("source_ref") == operation[second_field]]
+    first = [
+        item
+        for item in records
+        if _properties(item).get("source_ref") == operation[first_field]
+    ]
+    second = [
+        item
+        for item in records
+        if _properties(item).get("source_ref") == operation[second_field]
+    ]
     if op == "spatial_join":
         return geometry_ops.spatial_join(
-            first, second, predicate=str(operation.get("predicate") or "within"),
+            first,
+            second,
+            predicate=str(operation.get("predicate") or "within"),
             mode=str(operation.get("mode") or "count"),
-            distance_km=operation.get("distance_km"), properties=_properties,
+            distance_km=operation.get("distance_km"),
+            properties=_properties,
         )
-    return geometry_ops.overlay(first, second, kind=str(operation.get("kind") or "intersection"),
-                                properties=_properties)
+    return geometry_ops.overlay(
+        first,
+        second,
+        kind=str(operation.get("kind") or "intersection"),
+        properties=_properties,
+    )
 
 
 ###############################################################################
@@ -665,8 +843,14 @@ def _apply_operations(
         ):
             # Ranking or filtering on an absent field would succeed silently
             # on the record order; the requested analysis is not applicable.
-            available = sorted({key for item in result for key, value in _properties(item).items()
-                                if not isinstance(value, (dict, list))})[:24]
+            available = sorted(
+                {
+                    key
+                    for item in result
+                    for key, value in _properties(item).items()
+                    if not isinstance(value, (dict, list))
+                }
+            )[:24]
             return result, (
                 f"No '{field}' field, so {op} cannot be applied. "
                 f"Fields: {', '.join(available) or 'none'}. "
@@ -676,8 +860,18 @@ def _apply_operations(
             field = str(operation.get("field") or "")
             operator = str(operation.get("operator") or "eq")
             expected = operation.get("value")
-            if not field or operator not in {"eq", "neq", "in", "contains", "gte", "lte"}:
-                return result, "attribute_filter requires a field and supported operator."
+            if not field or operator not in {
+                "eq",
+                "neq",
+                "in",
+                "contains",
+                "gte",
+                "lte",
+            }:
+                return (
+                    result,
+                    "attribute_filter requires a field and supported operator.",
+                )
             result = [
                 item
                 for item in result
@@ -689,7 +883,10 @@ def _apply_operations(
                 start = _timestamp(operation.get("start"))
                 end = _timestamp(operation.get("end"))
             except ValueError:
-                return result, "temporal_filter bounds must be ISO times or epoch values."
+                return (
+                    result,
+                    "temporal_filter bounds must be ISO times or epoch values.",
+                )
             if start is None and end is None:
                 return result, "temporal_filter requires a start or end bound."
             filtered: list[dict[str, Any]] = []
@@ -698,27 +895,42 @@ def _apply_operations(
                     value = _timestamp(_properties(item).get(field))
                 except ValueError:
                     continue
-                if value is not None and (start is None or value >= start) and (end is None or value <= end):
+                if (
+                    value is not None
+                    and (start is None or value >= start)
+                    and (end is None or value <= end)
+                ):
                     filtered.append(item)
             result = filtered
         elif op == "sort":
             field = str(operation.get("field") or "")
             if not field:
                 return result, "sort requires a field."
-            present = [item for item in result if _properties(item).get(field) is not None]
+            present = [
+                item for item in result if _properties(item).get(field) is not None
+            ]
             missing = [item for item in result if _properties(item).get(field) is None]
-            present.sort(key=lambda item: _sort_key(_properties(item).get(field)), reverse=bool(operation.get("descending")))
+            present.sort(
+                key=lambda item: _sort_key(_properties(item).get(field)),
+                reverse=bool(operation.get("descending")),
+            )
             result = present + missing
         elif op == "limit":
             count = operation.get("value")
-            if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 10000:
+            if (
+                not isinstance(count, int)
+                or isinstance(count, bool)
+                or not 1 <= count <= 10000
+            ):
                 return result, "limit must be an integer between 1 and 10000."
             result = result[:count]
         elif op == "field_projection":
             fields = operation.get("fields")
             if not is_json_array(fields) or not fields:
                 return result, "field_projection requires a non-empty fields list."
-            operation["fields"] = stored = [_stored_field(str(key), result) for key in fields]
+            operation["fields"] = stored = [
+                _stored_field(str(key), result) for key in fields
+            ]
             result = [_project(item, stored) for item in result]
         elif op == "aggregate":
             metric = str(operation.get("metric") or "sum")
@@ -733,7 +945,11 @@ def _apply_operations(
                 if value is not None or metric == "count":
                     groups.setdefault(group, []).append(value or 0.0)
             result = [
-                {group_by: group, field: _aggregate(values, metric), "count": len(values)}
+                {
+                    group_by: group,
+                    field: _aggregate(values, metric),
+                    "count": len(values),
+                }
                 for group, values in groups.items()
             ]
         elif op == "grid_aggregate":
@@ -753,7 +969,9 @@ def _apply_operations(
                 point = _record_point(item)
                 if point is not None:
                     _properties(item)["distance_km"] = round(
-                        geodesic_distance_m(latitude, longitude, point[1], point[0]) / 1000.0, 3
+                        geodesic_distance_m(latitude, longitude, point[1], point[0])
+                        / 1000.0,
+                        3,
                     )
         elif op == "country_tag":
             for item in result:
@@ -761,6 +979,7 @@ def _apply_operations(
                 if point is not None:
                     _properties(item)["country_iso2"] = country_at(point[0], point[1])
     return result, None
+
 
 ###############################################################################
 def _stored_field(field: str, records: list[dict[str, Any]]) -> str:
@@ -775,6 +994,7 @@ def _stored_field(field: str, records: list[dict[str, Any]]) -> str:
         return leaf
     return field
 
+
 ###############################################################################
 def _project(item: dict[str, Any], fields: list[str]) -> dict[str, Any]:
     """Keep the requested attributes and the record's location."""
@@ -782,8 +1002,19 @@ def _project(item: dict[str, Any], fields: list[str]) -> dict[str, Any]:
     properties = _properties(item)
     projected = {key: properties[key] for key in fields if key in properties}
     if properties is not item:
-        return {**{key: item[key] for key in ("type", "geometry") if key in item}, "properties": projected}
-    return {**{key: item[key] for key in ("geometry", "latitude", "longitude") if key in item}, **projected}
+        return {
+            **{key: item[key] for key in ("type", "geometry") if key in item},
+            "properties": projected,
+        }
+    return {
+        **{
+            key: item[key]
+            for key in ("geometry", "latitude", "longitude")
+            if key in item
+        },
+        **projected,
+    }
+
 
 ###############################################################################
 def _matches(actual: Any, operator: str, expected: Any) -> bool:
@@ -798,8 +1029,17 @@ def _matches(actual: Any, operator: str, expected: Any) -> bool:
             return expected in actual
         return is_json_array(actual) and expected in actual
     if operator == "gte":
-        return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual >= expected
-    return isinstance(actual, (int, float)) and isinstance(expected, (int, float)) and actual <= expected
+        return (
+            isinstance(actual, (int, float))
+            and isinstance(expected, (int, float))
+            and actual >= expected
+        )
+    return (
+        isinstance(actual, (int, float))
+        and isinstance(expected, (int, float))
+        and actual <= expected
+    )
+
 
 ###############################################################################
 def _spatial_filter(
@@ -819,7 +1059,7 @@ def _spatial_filter(
     try:
         lon0, lat0 = float(center[0]), float(center[1])
         radius_value = float(radius_km)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return records, "spatial_filter requires numeric center and radius."
     if not -180 <= lon0 <= 180 or not -90 <= lat0 <= 90:
         return records, "spatial_filter center is outside coordinate bounds."
@@ -831,11 +1071,17 @@ def _spatial_filter(
         lon, lat = point
         dlat = math.radians(lat - lat0)
         dlon = math.radians(lon - lon0)
-        a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat0)) * math.cos(math.radians(lat)) * math.sin(dlon / 2) ** 2
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(math.radians(lat0))
+            * math.cos(math.radians(lat))
+            * math.sin(dlon / 2) ** 2
+        )
         distance = 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1 - a)))
         return distance <= radius_value
 
     return [item for item in records if within(item)], None
+
 
 ###############################################################################
 def _failure(
@@ -862,6 +1108,7 @@ def _failure(
         ),
     )
 
+
 ###############################################################################
 def _properties(item: dict[str, Any]) -> dict[str, Any]:
     properties = item.get("properties")
@@ -875,7 +1122,7 @@ def _numeric(value: Any) -> float | None:
     try:
         number = float(value)
         return number if math.isfinite(number) else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -897,9 +1144,17 @@ def _timestamp(value: Any) -> float | None:
 
 
 ###############################################################################
-def _record_point(item: dict[str, Any], *, field: str = "geometry") -> tuple[float, float] | None:
+def _record_point(
+    item: dict[str, Any], *, field: str = "geometry"
+) -> tuple[float, float] | None:
     geometry = item.get(field)
-    coordinates = geometry.get("coordinates") if is_json_object(geometry) and geometry.get("type") == "Point" else geometry if is_json_array(geometry) else None
+    coordinates = (
+        geometry.get("coordinates")
+        if is_json_object(geometry) and geometry.get("type") == "Point"
+        else geometry
+        if is_json_array(geometry)
+        else None
+    )
     props = _properties(item)
     if not is_json_array(coordinates) or len(coordinates) < 2:
         coordinates = [props.get("longitude"), props.get("latitude")]
@@ -921,7 +1176,11 @@ def _preview(item: dict[str, Any]) -> dict[str, Any]:
 
 ###############################################################################
 def _compact_record(item: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in _properties(item).items() if not isinstance(value, (list, dict))}
+    return {
+        key: value
+        for key, value in _properties(item).items()
+        if not isinstance(value, (list, dict))
+    }
 
 
 ###############################################################################
@@ -938,31 +1197,59 @@ def _aggregate(values: list[float], metric: str) -> float:
 
 
 ###############################################################################
-def _grid_aggregate(records: list[dict[str, Any]], operation: dict[str, Any]) -> list[dict[str, Any]]:
+def _grid_aggregate(
+    records: list[dict[str, Any]], operation: dict[str, Any]
+) -> list[dict[str, Any]]:
     size = float(operation["cell_size_deg"])
     field = operation.get("value_field")
     groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for item in records:
         point = _record_point(item)
         if point is not None:
-            key = (math.floor((point[0] + 180) / size), math.floor((point[1] + 90) / size))
+            key = (
+                math.floor((point[0] + 180) / size),
+                math.floor((point[1] + 90) / size),
+            )
             groups.setdefault(key, []).append(item)
     cells: list[dict[str, Any]] = []
     for (x, y), items in groups.items():
         west, south = x * size - 180, y * size - 90
         east, north = min(180.0, west + size), min(90.0, south + size)
-        valued = [(value, item) for item in items if (value := _numeric(_properties(item).get(field))) is not None] if field else []
+        valued = (
+            [
+                (value, item)
+                for item in items
+                if (value := _numeric(_properties(item).get(field))) is not None
+            ]
+            if field
+            else []
+        )
         values = [value for value, _item in valued]
         # The representative is the record with the largest value; negative
         # values (sub-zero temperatures) must not lose to missing ones.
-        representative = max(valued, key=lambda pair: pair[0])[1] if valued else items[0]
-        cells.append({"longitude": (west + east) / 2, "latitude": (south + north) / 2,
-                      "cell_bbox": [west, south, east, north], "count": len(items),
-                      "sum": sum(values), "mean": sum(values) / len(values) if values else None,
-                      "max": max(values) if values else None, "representative": _compact_record(representative)})
+        representative = (
+            max(valued, key=lambda pair: pair[0])[1] if valued else items[0]
+        )
+        cells.append(
+            {
+                "longitude": (west + east) / 2,
+                "latitude": (south + north) / 2,
+                "cell_bbox": [west, south, east, north],
+                "count": len(items),
+                "sum": sum(values),
+                "mean": sum(values) / len(values) if values else None,
+                "max": max(values) if values else None,
+                "representative": _compact_record(representative),
+            }
+        )
     order_by = str(operation.get("order_by") or "count")
     # Cells without the ordering value sort last instead of as zero.
-    return sorted(cells, key=lambda item: (item.get(order_by) is not None, item.get(order_by) or 0), reverse=True)
+    return sorted(
+        cells,
+        key=lambda item: (item.get(order_by) is not None, item.get(order_by) or 0),
+        reverse=True,
+    )
+
 
 ###############################################################################
 def _shared_units(parents: list[dict[str, Any]]) -> dict[str, str]:
@@ -974,6 +1261,7 @@ def _shared_units(parents: list[dict[str, Any]]) -> dict[str, str]:
         for key, unit in tables[0].items()
         if isinstance(unit, str) and all(table.get(key) == unit for table in tables)
     }
+
 
 ###############################################################################
 def _inherited_assessment(

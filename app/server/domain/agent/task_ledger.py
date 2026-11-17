@@ -32,6 +32,7 @@ PROJECTED_TASK_LIMIT = 12
 PROJECTED_OPEN_LIMIT = 4
 UNRESOLVED_STATUSES = frozenset({"in_progress", "blocked", "failed"})
 
+
 ###############################################################################
 def map_fingerprint(session: MapSession) -> str:
     """Hash what the user sees; session ids, timestamps and revisions excluded."""
@@ -45,14 +46,22 @@ def map_fingerprint(session: MapSession) -> str:
             round(viewport.radius_m, 1),
             [round(value, 5) for value in viewport.bbox or []],
         ],
-        "payload": {key: value for key, value in session.payload.items() if key != "map_candidate"},
+        "payload": {
+            key: value
+            for key, value in session.payload.items()
+            if key != "map_candidate"
+        },
         "overlays": sorted(
-            (item.model_dump(mode="json") for item in session.overlay_collection.instances),
+            (
+                item.model_dump(mode="json")
+                for item in session.overlay_collection.instances
+            ),
             key=lambda item: str(item["instance_id"]),
         ),
     }
     encoded = json.dumps(content, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
 
 ###############################################################################
 def merge_ledger(
@@ -78,7 +87,10 @@ def merge_ledger(
                 if item.task_id != outcome.task_id or outcome.status != "completed":
                     kept.append(item)
                     # A worse result of the same run is not recorded at all.
-                    if item.task_id == outcome.task_id and item.source_request_id == outcome.source_request_id:
+                    if (
+                        item.task_id == outcome.task_id
+                        and item.source_request_id == outcome.source_request_id
+                    ):
                         record = False
             elif item.source_request_id == outcome.source_request_id:
                 # The same run redoing an obligation replaces only that entry.
@@ -91,16 +103,25 @@ def merge_ledger(
         merged = [*kept, outcome] if record else kept
     while len(merged) > LEDGER_LIMIT:
         evict = next(
-            (position for position, item in enumerate(merged) if item.status == "superseded"),
+            (
+                position
+                for position, item in enumerate(merged)
+                if item.status == "superseded"
+            ),
             None,
         )
         if evict is None:
             evict = next(
-                (position for position, item in enumerate(merged) if item.status == "completed"),
+                (
+                    position
+                    for position, item in enumerate(merged)
+                    if item.status == "completed"
+                ),
                 0,
             )
         del merged[evict]
     return merged
+
 
 ###############################################################################
 def complete_presentation(
@@ -118,6 +139,7 @@ def complete_presentation(
         for item in tasks
     ]
 
+
 ###############################################################################
 def freshness_seconds(manifest: Mapping[str, object] | None) -> int:
     """Evidence lifetime declared by a manifest cache policy, else the default.
@@ -132,7 +154,12 @@ def freshness_seconds(manifest: Mapping[str, object] | None) -> int:
     if not isinstance(ttl, int) or isinstance(ttl, bool) or ttl <= 0:
         return DEFAULT_FRESHNESS_SECONDS
     stale = policy.get("staleWhileRevalidateSeconds")
-    return ttl + (stale if isinstance(stale, int) and not isinstance(stale, bool) and stale > 0 else 0)
+    return ttl + (
+        stale
+        if isinstance(stale, int) and not isinstance(stale, bool) and stale > 0
+        else 0
+    )
+
 
 ###############################################################################
 def compatible_tasks(
@@ -150,12 +177,16 @@ def compatible_tasks(
     new one.
     """
 
-    data_obligations = [item for item in goal.obligations if item.kind == "data" and item.required]
+    data_obligations = [
+        item for item in goal.obligations if item.kind == "data" and item.required
+    ]
     variables = [item.variable for item in data_obligations if item.variable]
 
     def requested_scope(target: str | None) -> AgentTemporalScope | None:
         for item in data_obligations:
-            if target is None or any(same_target(target, other) for other in item.target_ids):
+            if target is None or any(
+                same_target(target, other) for other in item.target_ids
+            ):
                 return item.temporal_scope
         try:
             scope = AgentTemporalScope.model_validate(goal.temporal_scope)
@@ -168,7 +199,9 @@ def compatible_tasks(
             return False
         if task.kind == "location":
             return any(
-                same_target(target, known) for target in task.target_ids for known in goal.target_ids
+                same_target(target, known)
+                for target in task.target_ids
+                for known in goal.target_ids
             )
         if task.kind != "data" or not task.evidence_refs or task.completed_at is None:
             return False
@@ -177,20 +210,28 @@ def compatible_tasks(
             return False
         if goal.target_ids and not (
             task.target_ids
-            and all(any(same_target(target, known) for known in goal.target_ids) for target in task.target_ids)
+            and all(
+                any(same_target(target, known) for known in goal.target_ids)
+                for target in task.target_ids
+            )
         ):
             return False
-        if variables and not any(_same_variable(task.variable, item) for item in variables):
+        if variables and not any(
+            _same_variable(task.variable, item) for item in variables
+        ):
             return False
         targets: list[str | None] = [*task.target_ids] or [None]
         if not all(
-            same_window(task.temporal_scope, requested_scope(target), tolerance_seconds=ttl)
+            same_window(
+                task.temporal_scope, requested_scope(target), tolerance_seconds=ttl
+            )
             for target in targets
         ):
             return False
         return task.filters == goal.filters
 
     return [item for item in tasks if compatible(item)]
+
 
 ###############################################################################
 def same_window(
@@ -227,6 +268,7 @@ def same_window(
             return False
     return True
 
+
 ###############################################################################
 def ledger_view(tasks: list[ConversationTask]) -> list[dict[str, object]]:
     """Compact pre-route projection of the ledger.
@@ -242,7 +284,8 @@ def ledger_view(tasks: list[ConversationTask]) -> list[dict[str, object]]:
     current = [
         position
         for position, item in enumerate(tasks)
-        if item.source_request_id == latest or (item.kind == "location" and item.status == "completed")
+        if item.source_request_id == latest
+        or (item.kind == "location" and item.status == "completed")
     ][-PROJECTED_TASK_LIMIT:]
     earlier_open = [
         position
@@ -250,9 +293,12 @@ def ledger_view(tasks: list[ConversationTask]) -> list[dict[str, object]]:
         if item.source_request_id != latest and item.status in UNRESOLVED_STATUSES
     ][-PROJECTED_OPEN_LIMIT:]
     return [
-        _open_view(tasks[position]) if position in earlier_open else _task_view(tasks[position])
+        _open_view(tasks[position])
+        if position in earlier_open
+        else _task_view(tasks[position])
         for position in sorted({*current, *earlier_open})
     ]
+
 
 ###############################################################################
 def _open_view(task: ConversationTask) -> dict[str, object]:
@@ -265,13 +311,19 @@ def _open_view(task: ConversationTask) -> dict[str, object]:
     }
     return {key: value for key, value in view.items() if value}
 
+
 ###############################################################################
 def _task_view(task: ConversationTask) -> dict[str, object]:
     scope = task.temporal_scope
     window = (
         " ".join(
             part
-            for part in (scope.mode, scope.start_time_iso, scope.end_time_iso, scope.reference_time_iso)
+            for part in (
+                scope.mode,
+                scope.start_time_iso,
+                scope.end_time_iso,
+                scope.reference_time_iso,
+            )
             if part
         )
         if scope is not None and scope.mode != "none"
@@ -290,6 +342,7 @@ def _task_view(task: ConversationTask) -> dict[str, object]:
     }
     return {key: value for key, value in view.items() if value}
 
+
 ###############################################################################
 def _replaces(outcome: ConversationTask, item: ConversationTask) -> bool:
     """Whether ``outcome`` addresses the same obligation as ``item``."""
@@ -305,8 +358,10 @@ def _replaces(outcome: ConversationTask, item: ConversationTask) -> bool:
     ):
         return False
     return all(
-        any(same_target(left, right) for right in item.target_ids) for left in outcome.target_ids
+        any(same_target(left, right) for right in item.target_ids)
+        for left in outcome.target_ids
     ) and _same_variable(item.variable, outcome.variable)
+
 
 ###############################################################################
 def _same_variable(left: str | None, right: str) -> bool:
@@ -314,7 +369,10 @@ def _same_variable(left: str | None, right: str) -> bool:
         return False
     left_terms = set(re.findall(r"[a-z0-9]+", left.casefold()))
     right_terms = set(re.findall(r"[a-z0-9]+", right.casefold()))
-    return bool(left_terms and right_terms) and (left_terms <= right_terms or right_terms <= left_terms)
+    return bool(left_terms and right_terms) and (
+        left_terms <= right_terms or right_terms <= left_terms
+    )
+
 
 ###############################################################################
 def _instant(value: str) -> datetime:

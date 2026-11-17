@@ -44,9 +44,9 @@ MODEL_TOOL_NAME_ALIASES: dict[str, str] = {
     "discover_capabilities": "discover_geospatial_capabilities",
 }
 
+
 ###############################################################################
 class ToolExecutor:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -54,9 +54,8 @@ class ToolExecutor:
         tool_registry: ToolRegistry,
         policy_engine: Any | None = None,
         timeout_seconds: float = 45.0,
-        trace_callback: Callable[
-            [AgentTraceEvent], Awaitable[None] | None
-        ] | None = None,
+        trace_callback: Callable[[AgentTraceEvent], Awaitable[None] | None]
+        | None = None,
     ) -> None:
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
@@ -70,9 +69,8 @@ class ToolExecutor:
         state: AgentRunState,
         budget: AgentExecutionBudget,
         *,
-        trace_callback: Callable[
-            [AgentTraceEvent], Awaitable[None] | None
-        ] | None = None,
+        trace_callback: Callable[[AgentTraceEvent], Awaitable[None] | None]
+        | None = None,
         iteration: int | None = None,
         task_id: str | None = None,
         exposed_tool_names: Collection[str] | None = None,
@@ -107,7 +105,11 @@ class ToolExecutor:
         result = self._with_rejection_feedback(
             result, execution_tool_call, state, exposed_tool_names
         )
-        if result.tool_name in {"execute_geospatial_capability", "inspect_evidence", "transform_evidence"}:
+        if result.tool_name in {
+            "execute_geospatial_capability",
+            "inspect_evidence",
+            "transform_evidence",
+        }:
             result.assessment = CompletionEvaluator.assess_evidence(state, result)
         if not any(item.call_id == result.call_id for item in state.tool_results):
             # The executor is the only application boundary that may publish a
@@ -241,9 +243,7 @@ class ToolExecutor:
             else None,
             path="$.error",
         )
-        fields = list(
-            dict.fromkeys([*result_fields, *metadata_fields, *error_fields])
-        )
+        fields = list(dict.fromkeys([*result_fields, *metadata_fields, *error_fields]))
         redaction = {
             "policy": "trace-safe-v1",
             "applied": bool(fields),
@@ -260,7 +260,9 @@ class ToolExecutor:
             "status": result.status,
             "summary": result.summary[:1000],
             "semantic_outcome": result.semantic_outcome,
-            "assessment": result.assessment.model_dump(mode="json") if result.assessment else None,
+            "assessment": result.assessment.model_dump(mode="json")
+            if result.assessment
+            else None,
             "result": projected,
             "evidence_refs": list(dict.fromkeys(result.evidence_refs))[:16],
             "map_candidate_id": result.map_candidate_id,
@@ -451,7 +453,10 @@ class ToolExecutor:
                         if is_json_object(raw_properties_value)
                         else {}
                     )
-                    if raw_properties or applicable_schema.get("additionalProperties") is False:
+                    if (
+                        raw_properties
+                        or applicable_schema.get("additionalProperties") is False
+                    ):
                         nested = canonical_arguments.get("arguments")
                         if isinstance(nested, dict):
                             nested_arguments = cast(dict[str, Any], nested)
@@ -512,7 +517,9 @@ class ToolExecutor:
                 feedback["substitution"] = {
                     "rejected_name": str(authorization[2].get("rejected_name") or ""),
                     "alternative_id": alternative_id,
-                    "alternative_name": str(authorization[2].get("alternative_name") or ""),
+                    "alternative_name": str(
+                        authorization[2].get("alternative_name") or ""
+                    ),
                     "coverage": str(authorization[2].get("region") or ""),
                 }
             return self._failure(
@@ -530,9 +537,7 @@ class ToolExecutor:
             )
 
         execution_stage = (
-            "map_assembly"
-            if tool_call.name == "apply_map_plan"
-            else "tool_execution"
+            "map_assembly" if tool_call.name == "apply_map_plan" else "tool_execution"
         )
         budget.ensure_available(execution_stage)
         timeout = budget.operation_timeout(
@@ -567,8 +572,12 @@ class ToolExecutor:
             # Provider-specific failures are normalized by the capability
             # handler.  The outer boundary never exposes exception details.
             log_unexpected_failure(
-                LOGGER, exc, stage="tool_execution", run_id=state.run_id or state.request_id,
-                tool=tool_call.name, call_id=call_id,
+                LOGGER,
+                exc,
+                stage="tool_execution",
+                run_id=state.run_id or state.request_id,
+                tool=tool_call.name,
+                call_id=call_id,
             )
             return self._failure(
                 call_id=call_id,
@@ -587,8 +596,12 @@ class ToolExecutor:
             result = registered.result_normalizer(raw_result, call_id)
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="result_normalization", run_id=state.run_id or state.request_id,
-                tool=tool_call.name, call_id=call_id,
+                LOGGER,
+                exc,
+                stage="result_normalization",
+                run_id=state.run_id or state.request_id,
+                tool=tool_call.name,
+                call_id=call_id,
             )
             return self._failure(
                 call_id=call_id,
@@ -633,8 +646,16 @@ class ToolExecutor:
                 return False, "Tool is outside the validated capability route.", {}
         capability_id = getattr(arguments, "capability_id", None)
         if capability_id and capability_id in state.excluded_capability_ids:
-            return False, "Capability was excluded after a failed attempt in this run.", {}
-        if capability_id and state.capability_ids and capability_id not in state.capability_ids:
+            return (
+                False,
+                "Capability was excluded after a failed attempt in this run.",
+                {},
+            )
+        if (
+            capability_id
+            and state.capability_ids
+            and capability_id not in state.capability_ids
+        ):
             return False, "Capability is outside the validated shortlist.", {}
         return True, None, {}
 
@@ -779,8 +800,7 @@ class ToolExecutor:
             "schema": schema,
             "required": required,
             "validation_errors": [
-                issue.model_dump(mode="json")
-                for issue in (validation_errors or [])[:8]
+                issue.model_dump(mode="json") for issue in (validation_errors or [])[:8]
             ],
         }
         if applicable_schema is not None:
@@ -788,6 +808,7 @@ class ToolExecutor:
                 applicable_schema, depth=0
             )
         return payload
+
 
 ###############################################################################
 def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> Any:
@@ -808,10 +829,10 @@ def _bounded_correction_value(value: Any, *, depth: int, max_depth: int = 4) -> 
     if isinstance(value, list):
         items: list[Any] = cast(list[Any], value)
         return [
-            _bounded_correction_value(child, depth=depth + 1)
-            for child in items[:32]
+            _bounded_correction_value(child, depth=depth + 1) for child in items[:32]
         ]
     return str(value)[:500]
+
 
 ###############################################################################
 def _issue_path(message: str) -> str:
@@ -819,6 +840,7 @@ def _issue_path(message: str) -> str:
 
     head, separator, _ = message.partition(": ")
     return head if separator and " " not in head else "$"
+
 
 ###############################################################################
 def build_rejection_feedback(
@@ -872,6 +894,7 @@ def build_rejection_feedback(
     if correction is not None:
         feedback["correction"] = correction
     return feedback
+
 
 ###############################################################################
 # Semantic validators mark a value outside its declared bounds with this

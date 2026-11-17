@@ -3,6 +3,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Any
 
+
 ###############################################################################
 class RealtimeMetrics:
     """Small dependency-free metrics collector for the local realtime process.

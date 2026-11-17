@@ -26,9 +26,11 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _models_payload() -> dict[str, Any]:
@@ -49,6 +51,7 @@ def _models_payload() -> dict[str, Any]:
         "local": [],
         "sources": {},
     }
+
 
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
@@ -146,6 +149,7 @@ def _turn_payload() -> dict[str, Any]:
         "execution_trace": {"stopped_reason": "goal_satisfied"},
     }
 
+
 ###############################################################################
 def _setup_stubs(page: Page) -> None:
     register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
@@ -203,6 +207,7 @@ def _setup_stubs(page: Page) -> None:
         ),
     )
 
+
 ###############################################################################
 def _assert_visual_baseline(
     actual_bytes: bytes, baseline_name: str, artifact_root: Path
@@ -239,6 +244,7 @@ def _assert_visual_baseline(
             f"Visual regression for {baseline_name}: {diff_pixels} pixels differ. See {diff_path}."
         )
 
+
 def _open_fixture_map(page: Page, base_url: str) -> None:
     page.set_viewport_size({"width": 1280, "height": 720})
     _setup_stubs(page)
@@ -251,6 +257,7 @@ def _open_fixture_map(page: Page, base_url: str) -> None:
     loaded_layer = page.locator('#map-layers-panel label[data-render-status="loaded"]')
     expect(loaded_layer).to_contain_text("Visual fixture points")
 
+
 ###############################################################################
 def test_map_canvas_matches_visual_baseline(
     page: Page, base_url: str, artifact_root: Path
@@ -260,10 +267,13 @@ def test_map_canvas_matches_visual_baseline(
     expect(map_canvas).to_be_visible()
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png", artifact_root)
 
+
 ###############################################################################
 def test_overlay_panel_matches_visual_baseline(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:
     _open_fixture_map(page, base_url)
     page_root = page.locator("body")
-    _assert_visual_baseline(page_root.screenshot(), "geospatial-page.png", artifact_root)
+    _assert_visual_baseline(
+        page_root.screenshot(), "geospatial-page.png", artifact_root
+    )

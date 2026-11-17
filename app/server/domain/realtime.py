@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+    field_serializer,
+)
 from server.contracts.geospatial import ClientMapView
 from server.domain.agent.trace import public_protocol_projection
 
@@ -22,6 +29,7 @@ RealtimeClientMessageType = Literal[
     "client.visibility",
 ]
 
+
 ###############################################################################
 class RealtimeClientMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -31,12 +39,14 @@ class RealtimeClientMessage(BaseModel):
     message_id: str = Field(min_length=1, max_length=MAX_REALTIME_MESSAGE_ID_LENGTH)
     payload: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class RealtimeResumePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str | None = Field(default=None, max_length=160)
     after_sequence: int = Field(default=0, ge=0)
+
 
 ###############################################################################
 class RealtimeStartPayload(BaseModel):
@@ -66,6 +76,7 @@ class RealtimeStartPayload(BaseModel):
             raise ValueError("client_request_id must not be empty")
         return normalized
 
+
 ###############################################################################
 class RealtimeSteerPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -92,12 +103,14 @@ class RealtimeSteerPayload(BaseModel):
             raise ValueError("message must not be empty")
         return normalized
 
+
 ###############################################################################
 class RealtimeCancelPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str = Field(min_length=1, max_length=160)
     reason: str | None = Field(default=None, max_length=400)
+
 
 ###############################################################################
 class RealtimeVisibilityPayload(BaseModel):
@@ -106,6 +119,7 @@ class RealtimeVisibilityPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     visibility: Literal["visible", "hidden"]
+
 
 ###############################################################################
 class RealtimeRenderAckPayload(BaseModel):
@@ -131,7 +145,9 @@ class RealtimeRenderAckPayload(BaseModel):
     @model_validator(mode="after")
     def require_viewport_for_ready(self) -> "RealtimeRenderAckPayload":
         if self.status == "ready" and self.viewport_bounds is None:
-            raise ValueError("A ready render acknowledgment must include viewport bounds")
+            raise ValueError(
+                "A ready render acknowledgment must include viewport bounds"
+            )
         return self
 
     # -------------------------------------------------------------------------
@@ -172,7 +188,9 @@ class RealtimeRenderAckPayload(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator("overlay_results")
     @classmethod
-    def sanitize_overlay_results(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def sanitize_overlay_results(
+        cls, value: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         if len(value) > 256:
             raise ValueError("overlay_results are too large")
         allowed: set[str] = {
@@ -200,8 +218,7 @@ class RealtimeRenderAckPayload(BaseModel):
         for raw in value:
             item: dict[str, Any] = {key: raw[key] for key in allowed if key in raw}
             if "overlay_id" in item and (
-                not isinstance(item["overlay_id"], str)
-                or len(item["overlay_id"]) > 160
+                not isinstance(item["overlay_id"], str) or len(item["overlay_id"]) > 160
             ):
                 raise ValueError("overlay result identity is invalid")
             if "capability_id" in item and (
@@ -219,18 +236,30 @@ class RealtimeRenderAckPayload(BaseModel):
             ):
                 if key in item and not isinstance(item[key], bool):
                     raise ValueError(f"overlay result {key} must be boolean")
-            if item.get("result_visible") is not None and not isinstance(item["result_visible"], bool):
-                raise ValueError("overlay result result_visible must be boolean or null")
+            if item.get("result_visible") is not None and not isinstance(
+                item["result_visible"], bool
+            ):
+                raise ValueError(
+                    "overlay result result_visible must be boolean or null"
+                )
             for key in (
                 "raster_source_loaded",
                 "raster_tile_intersects_viewport",
                 "raster_zoom_supported",
             ):
-                if key in item and item[key] is not None and not isinstance(item[key], bool):
+                if (
+                    key in item
+                    and item[key] is not None
+                    and not isinstance(item[key], bool)
+                ):
                     raise ValueError(f"overlay result {key} must be boolean or null")
-            if "rendered_feature_count" in item and item["rendered_feature_count"] is not None and (
-                not isinstance(item["rendered_feature_count"], int)
-                or item["rendered_feature_count"] < 0
+            if (
+                "rendered_feature_count" in item
+                and item["rendered_feature_count"] is not None
+                and (
+                    not isinstance(item["rendered_feature_count"], int)
+                    or item["rendered_feature_count"] < 0
+                )
             ):
                 raise ValueError("rendered_feature_count must be non-negative")
             for key in (
@@ -239,19 +268,27 @@ class RealtimeRenderAckPayload(BaseModel):
                 "raster_tile_x",
                 "raster_tile_y",
             ):
-                if key in item and item[key] is not None and (
-                    not isinstance(item[key], int) or item[key] < 0
+                if (
+                    key in item
+                    and item[key] is not None
+                    and (not isinstance(item[key], int) or item[key] < 0)
                 ):
-                    raise ValueError(f"overlay result {key} must be a non-negative integer or null")
+                    raise ValueError(
+                        f"overlay result {key} must be a non-negative integer or null"
+                    )
             if item.get("raster_tile_z") is not None and item["raster_tile_z"] > 30:
                 raise ValueError("overlay result raster_tile_z is out of range")
             if "failure_code" in item and (
                 item["failure_code"] is not None
-                and (not isinstance(item["failure_code"], str) or len(item["failure_code"]) > 120)
+                and (
+                    not isinstance(item["failure_code"], str)
+                    or len(item["failure_code"]) > 120
+                )
             ):
                 raise ValueError("overlay failure code is invalid")
             sanitized.append(item)
         return sanitized
+
 
 ###############################################################################
 class RealtimeServerMessage(BaseModel):

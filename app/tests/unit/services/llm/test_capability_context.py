@@ -8,13 +8,16 @@ from server.services.llm.errors import LLMStructuredOutputError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.opencode_provider import OpenCodeProvider
-from server.services.llm.types import LLMRequest, LLMResult, LLMToolDefinition, ModelDescriptor
+from server.services.llm.types import (
+    LLMRequest,
+    LLMResult,
+    LLMToolDefinition,
+    ModelDescriptor,
+)
 from types import SimpleNamespace
 from server.services.llm.context_profile_resolver import ModelContextProfileResolver
 
 # --- test_capabilities.py ---
-
-
 
 
 ###############################################################################
@@ -79,6 +82,7 @@ class _StubProvider(LLMProvider):
     def supports_vision(self, model: str) -> bool | None:
         return self._vision
 
+
 ###############################################################################
 def _request(*, requires_vision: bool) -> LLMRequest:
     return LLMRequest(
@@ -86,6 +90,7 @@ def _request(*, requires_vision: bool) -> LLMRequest:
         messages=[{"role": "user", "content": "hello"}],
         metadata={"requires_vision": True} if requires_vision else {},
     )
+
 
 ###############################################################################
 def test_validate_request_capabilities_fails_closed_without_vision() -> None:
@@ -97,12 +102,14 @@ def test_validate_request_capabilities_fails_closed_without_vision() -> None:
             )
         assert exc_info.value.code == "model_vision_unsupported"
 
+
 ###############################################################################
 def test_validate_request_capabilities_allows_vision_when_supported() -> None:
     provider = _StubProvider(vision=True)
     provider._validate_request_capabilities(  # pyright: ignore[reportPrivateUsage]
         _request(requires_vision=True)
     )
+
 
 ###############################################################################
 def test_validate_request_capabilities_ignores_requires_vision_when_unset() -> None:
@@ -112,12 +119,14 @@ def test_validate_request_capabilities_ignores_requires_vision_when_unset() -> N
         _request(requires_vision=False)
     )
 
+
 ###############################################################################
 def test_openai_provider_vision_follows_catalog() -> None:
     provider = OpenAIProvider(api_key="test")
     assert provider.supports_vision("gpt-4.1") is True
     assert provider.supports_vision("gpt-4.1-mini") is True
     assert provider.supports_vision("unknown-model") is None
+
 
 ###############################################################################
 def test_google_provider_vision_follows_catalog() -> None:
@@ -126,17 +135,20 @@ def test_google_provider_vision_follows_catalog() -> None:
     assert provider.supports_vision("gemini-2.5-pro") is True
     assert provider.supports_vision("unknown-model") is None
 
+
 ###############################################################################
 def test_deepseek_provider_is_text_only() -> None:
     provider = DeepSeekProvider(api_key="test", base_url="https://example.invalid")
     assert provider.supports_vision("deepseek-chat") is False
     assert provider.supports_vision("deepseek-v4-flash") is False
 
+
 ###############################################################################
 def test_opencode_provider_vision_only_for_explicit_vision_models() -> None:
     provider = OpenCodeProvider(api_key="test", provider_name="opencode")
     assert provider.supports_vision("deepseek-v4-flash-vision-exp") is True
     assert provider.supports_vision("deepseek-v4-flash") is False
+
 
 ###############################################################################
 def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
@@ -145,7 +157,6 @@ def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
 
     ###############################################################################
     class _Response:
-
         # -------------------------------------------------------------------------
         def raise_for_status(self) -> None:
             return None
@@ -175,20 +186,19 @@ def test_opencode_go_vision_includes_verified_models_and_catalog_metadata(
     zen = OpenCodeProvider(api_key="test", provider_name="opencode")
     assert zen.supports_vision("deepseek-v4.1-flash") is False
 
-# --- test_context_profile_resolver.py ---
 
+# --- test_context_profile_resolver.py ---
 
 
 ###############################################################################
 class _SettingsRepository:
-
     # -------------------------------------------------------------------------
     def get_required(self):  # noqa: ANN201
         return SimpleNamespace(ollama_url="http://ollama.test")
 
+
 ###############################################################################
 class _ModelLibrary:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -220,6 +230,7 @@ class _ModelLibrary:
             raise self.selected_descriptor
         return self.selected_descriptor
 
+
 ###############################################################################
 def test_resolver_prefers_exact_static_catalog_without_dynamic_lookup() -> None:
     library = _ModelLibrary(None)
@@ -234,6 +245,7 @@ def test_resolver_prefers_exact_static_catalog_without_dynamic_lookup() -> None:
     assert profile.context_window_tokens == 1_047_576
     assert profile.metadata_source == "openai_model_catalog"
     assert library.find_calls == 0
+
 
 ###############################################################################
 def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
@@ -264,6 +276,7 @@ def test_resolver_caches_exact_dynamic_provider_metadata() -> None:
     assert library.find_calls == 1
     assert library.last_find_kwargs["provider"] == "opencode-go"
 
+
 ###############################################################################
 def test_resolver_keeps_missing_dynamic_context_unknown() -> None:
     library = _ModelLibrary({"provider": "opencode-go", "name": "custom-4k"})
@@ -276,6 +289,7 @@ def test_resolver_keeps_missing_dynamic_context_unknown() -> None:
 
     assert profile is None
     assert library.find_calls == 1
+
 
 ###############################################################################
 def test_resolver_selected_lookup_hydrates_once_and_caches_the_profile() -> None:
@@ -303,6 +317,7 @@ def test_resolver_selected_lookup_hydrates_once_and_caches_the_profile() -> None
     assert first.context_window_tokens == 32_768
     assert second == first
     assert library.selected_calls == 1
+
 
 ###############################################################################
 def test_resolver_preserves_previous_profile_when_refresh_fails() -> None:

@@ -22,6 +22,7 @@ _NPM_PROTOCOLS = {
 }
 _DEFAULT_PROTOCOL = "openai-chat-completions"
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelsDevEntry:
@@ -30,14 +31,17 @@ class ModelsDevEntry:
     output_tokens: int | None
     accepts_images: bool
 
+
 _cache: dict[str, tuple[float, dict[str, ModelsDevEntry]]] = {}
 _lock = threading.Lock()
+
 
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value if value > 0 else None
+
 
 ###############################################################################
 def _parse_entries(payload: object, provider: str) -> dict[str, ModelsDevEntry]:
@@ -68,6 +72,7 @@ def _parse_entries(payload: object, provider: str) -> dict[str, ModelsDevEntry]:
         )
     return entries
 
+
 ###############################################################################
 def fetch_models_dev_entries(
     provider: str, transport_policy: LLMTransportPolicy
@@ -84,7 +89,9 @@ def fetch_models_dev_entries(
         if cached is not None and now - cached[0] < MODELS_DEV_TTL_SECONDS:
             return cached[1]
     try:
-        response = httpx.get(MODELS_DEV_URL, **transport_policy.httpx_options("catalog"))
+        response = httpx.get(
+            MODELS_DEV_URL, **transport_policy.httpx_options("catalog")
+        )
         response.raise_for_status()
         entries = _parse_entries(response.json(), provider)
     except Exception:

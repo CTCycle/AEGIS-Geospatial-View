@@ -16,15 +16,16 @@ from server.repositories.agent_run_events import AgentRunEventRepository
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RunEventSubscription:
     run_id: str
     queue: asyncio.Queue[RunEvent | None]
 
+
 ###############################################################################
 class RunEventPublisher:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -85,16 +86,22 @@ class RunEventPublisher:
     @staticmethod
     def _log_lifecycle(event: RunEvent) -> None:
         if event.type in {
-            RunEventType.COMPLETED, RunEventType.CANCELLED, RunEventType.CLARIFICATION_NEEDED
+            RunEventType.COMPLETED,
+            RunEventType.CANCELLED,
+            RunEventType.CLARIFICATION_NEEDED,
         }:
             LOGGER.info(
                 "agent_run event=%s run_id=%s version=%s",
-                event.type.value, event.run_id, event.run_version,
+                event.type.value,
+                event.run_id,
+                event.run_version,
             )
         elif event.type == RunEventType.ERROR:
             LOGGER.error(
                 "agent_run event=error run_id=%s version=%s code=%s",
-                event.run_id, event.run_version, event.payload.get("code", "unknown"),
+                event.run_id,
+                event.run_version,
+                event.payload.get("code", "unknown"),
             )
 
     # -------------------------------------------------------------------------
@@ -116,7 +123,8 @@ class RunEventPublisher:
                 queue.put_nowait(None)
                 LOGGER.warning(
                     "agent_run subscriber evicted run_id=%s sequence=%s",
-                    event.run_id, event.sequence,
+                    event.run_id,
+                    event.sequence,
                 )
         for queue in stale:
             await self.unsubscribe(RunEventSubscription(event.run_id, queue))

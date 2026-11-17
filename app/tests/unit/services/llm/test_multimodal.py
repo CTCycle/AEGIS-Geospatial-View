@@ -14,9 +14,11 @@ from server.services.llm.multimodal import (
     text_from_multimodal_content,
 )
 
+
 ###############################################################################
 def _base64() -> str:
     return "QUJDRA=="
+
 
 ###############################################################################
 def test_attach_image_appends_a_user_message_with_caption_and_image() -> None:
@@ -47,6 +49,7 @@ def test_attach_image_appends_a_user_message_with_caption_and_image() -> None:
     assert messages_contain_image(result) is True
     assert messages_contain_image(messages) is False
 
+
 ###############################################################################
 def test_attach_image_rejects_unsupported_mime_and_empty_data() -> None:
     base = [{"role": "user", "content": "hello"}]
@@ -54,6 +57,7 @@ def test_attach_image_rejects_unsupported_mime_and_empty_data() -> None:
         attach_image(base, data=_base64(), mime_type="image/gif", caption="x")
     unchanged = attach_image(base, data="", mime_type="image/jpeg", caption="x")
     assert unchanged == base
+
 
 ###############################################################################
 def test_openai_responses_projection() -> None:
@@ -71,6 +75,7 @@ def test_openai_responses_projection() -> None:
     ]
     assert normalize_image_content_for_openai_responses("plain text") is None
 
+
 ###############################################################################
 def test_openai_chat_projection() -> None:
     content = [
@@ -86,6 +91,7 @@ def test_openai_chat_projection() -> None:
         },
     ]
 
+
 ###############################################################################
 def test_google_projection() -> None:
     content = [
@@ -98,6 +104,7 @@ def test_google_projection() -> None:
         {"inline_data": {"mime_type": "image/jpeg", "data": _base64()}},
     ]
 
+
 ###############################################################################
 def test_ollama_projection_strips_data_url_prefix() -> None:
     content = [
@@ -109,10 +116,15 @@ def test_ollama_projection_strips_data_url_prefix() -> None:
     assert images == [_base64()]
 
     prefixed = [
-        {"type": "image", "mime_type": "image/jpeg", "data": f"data:image/jpeg;base64,{_base64()}"}
+        {
+            "type": "image",
+            "mime_type": "image/jpeg",
+            "data": f"data:image/jpeg;base64,{_base64()}",
+        }
     ]
     _text, prefixed_images = normalize_image_content_for_ollama(prefixed)
     assert prefixed_images == [_base64()]
+
 
 ###############################################################################
 def test_text_projection_handles_string_and_part_lists() -> None:
@@ -127,6 +139,7 @@ def test_text_projection_handles_string_and_part_lists() -> None:
         )
         == "a b"
     )
+
 
 ###############################################################################
 def test_image_tokens_are_counted_in_message_budget() -> None:

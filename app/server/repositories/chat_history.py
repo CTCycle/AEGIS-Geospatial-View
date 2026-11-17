@@ -11,6 +11,7 @@ from server.domain.agent.conversation import ConversationState
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
+
 ###############################################################################
 class ChatHistoryRepository:
     """Persist and retrieve conversation messages.
@@ -141,9 +142,7 @@ class ChatHistoryRepository:
                 if existing is not None and is_json_object(existing.structured_payload)
                 else {}
             )
-            existing_status = str(
-                existing_payload.get("presentation_status") or ""
-            )
+            existing_status = str(existing_payload.get("presentation_status") or "")
             if (
                 existing is not None
                 and existing_payload.get("native") is True
@@ -414,9 +413,7 @@ class ChatHistoryRepository:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _empty_search_page(
-        cls, *, cursor: str | None, limit: int
-    ) -> dict[str, Any]:
+    def _empty_search_page(cls, *, cursor: str | None, limit: int) -> dict[str, Any]:
         bounded_limit = max(1, min(int(limit), cls.MAX_SEARCH_LIMIT))
         pagination = {
             "cursor": cursor,
@@ -431,6 +428,7 @@ class ChatHistoryRepository:
             "pagination": pagination,
         }
 
+
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     """Build a case-insensitive SQLite LIKE pattern with escaped wildcards."""
@@ -438,6 +436,7 @@ def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
 
 ###############################################################################
 def _parse_offset_cursor(cursor: str | None) -> int:
@@ -447,6 +446,7 @@ def _parse_offset_cursor(cursor: str | None) -> int:
     if not value.isdigit():
         raise ValueError("Invalid history cursor.")
     return max(0, int(value))
+
 
 ###############################################################################
 def _message_excerpt(content: str, query: str, limit: int) -> str:

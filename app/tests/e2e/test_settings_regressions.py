@@ -41,6 +41,7 @@ T1_10_SETTINGS_QA_DIR = (
     / "T1-10"
 )
 
+
 ###############################################################################
 def settings_provider_account_setup_payload() -> dict[str, Any]:
     return {
@@ -89,9 +90,11 @@ def settings_provider_account_setup_payload() -> dict[str, Any]:
         ]
     }
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _request_json(route: Route) -> dict[str, Any]:
@@ -110,6 +113,7 @@ def _request_json(route: Route) -> dict[str, Any]:
     except Exception:  # noqa: BLE001
         return {}
     return payload if isinstance(payload, dict) else {}
+
 
 ###############################################################################
 def _setup_stub_harness(
@@ -242,6 +246,7 @@ def _setup_stub_harness(
     )
     return captured_patch_payloads
 
+
 ###############################################################################
 def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
     page: Page, base_url: str
@@ -285,6 +290,7 @@ def test_settings_layout_has_no_overlap_at_minimum_desktop_width(
         or right["bottom"] <= left["top"] + 1
     )
 
+
 ###############################################################################
 def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_accessible(
     page: Page, base_url: str
@@ -307,11 +313,7 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
 
     expect(page.locator(".model-row").first).to_be_visible(timeout=15000)
     expect(page.get_by_role("button", name="Test selected model")).to_have_count(0)
-    model_card = (
-        page.locator("article.model-row")
-        .filter(has_text="gpt-5-mini")
-        .first
-    )
+    model_card = page.locator("article.model-row").filter(has_text="gpt-5-mini").first
     model_card.get_by_role("button", name="Select as agent model: gpt-5-mini").click()
     expect(page.locator(".settings-page__status")).to_have_text(
         "Selected gpt-5-mini as agent model"
@@ -353,6 +355,7 @@ def test_settings_destinations_render_and_runtime_disclosures_are_keyboard_acces
         assert disclosure.evaluate("element => element.open") is True
         page.keyboard.press("Enter")
         assert disclosure.evaluate("element => element.open") is False
+
 
 ###############################################################################
 def test_settings_provider_surfaces_and_setup_modal_are_responsive(
@@ -457,6 +460,7 @@ def test_settings_provider_surfaces_and_setup_modal_are_responsive(
         page.get_by_role("button", name="Close guided setup").click()
         expect(dialog).to_be_hidden(timeout=5000)
 
+
 ###############################################################################
 def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
     patch_payloads: list[dict[str, Any]] = []
@@ -472,11 +476,7 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
 
     page.goto(f"{base_url.rstrip('/')}/settings")
 
-    model_card = (
-        page.locator("article.model-row")
-        .filter(has_text="gpt-5-mini")
-        .first
-    )
+    model_card = page.locator("article.model-row").filter(has_text="gpt-5-mini").first
     expect(model_card).to_be_visible(timeout=15000)
     selection_button = model_card.get_by_role(
         "button", name="Select as agent model: gpt-5-mini"
@@ -568,6 +568,7 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
         assert response["agent_model_name"] == "gpt-5-mini"
         assert response["selected_model_context"]["model"] == "gpt-5-mini"
 
+
 ###############################################################################
 def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     page: Page, base_url: str
@@ -621,8 +622,10 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
 
     fixture_key = "sk-fixturekey12345"
     with page.expect_response(
-        lambda response: response.request.method == "PATCH"
-        and response.url.endswith("/api/chat/settings")
+        lambda response: (
+            response.request.method == "PATCH"
+            and response.url.endswith("/api/chat/settings")
+        )
     ) as failed_key_save:
         key_input.fill(fixture_key)
         card.get_by_role("button", name="Save key").click()
@@ -646,6 +649,7 @@ def test_model_provider_unreadable_key_and_failed_updates_are_safe(
     page.screenshot(
         path=str(screenshots / "model-provider-update-failure.png"), full_page=True
     )
+
 
 ###############################################################################
 def test_model_provider_credential_safe_save_clear_and_reload(
@@ -710,6 +714,7 @@ def test_model_provider_credential_safe_save_clear_and_reload(
         path=str(screenshots / "model-provider-credential-cleared.png"), full_page=True
     )
 
+
 ###############################################################################
 def test_ollama_url_autosaves_without_confirmation_and_restores_after_reload(
     page: Page, base_url: str
@@ -721,8 +726,10 @@ def test_ollama_url_autosaves_without_confirmation_and_restores_after_reload(
     expect(url_input).to_have_value(selected_agent_settings_payload()["ollama_url"])
 
     with page.expect_response(
-        lambda response: response.request.method == "PATCH"
-        and response.url.endswith("/api/chat/settings")
+        lambda response: (
+            response.request.method == "PATCH"
+            and response.url.endswith("/api/chat/settings")
+        )
     ) as save_response:
         url_input.fill("http://127.0.0.1:11435")
     assert save_response.value.ok, save_response.value.status
@@ -731,7 +738,10 @@ def test_ollama_url_autosaves_without_confirmation_and_restores_after_reload(
 
     page.reload()
     page.get_by_role("button", name="Model Providers").click()
-    expect(page.get_by_label("Ollama server URL")).to_have_value("http://127.0.0.1:11435")
+    expect(page.get_by_label("Ollama server URL")).to_have_value(
+        "http://127.0.0.1:11435"
+    )
+
 
 ###############################################################################
 def test_geospatial_credential_safe_save_clear_and_reload(
@@ -794,6 +804,7 @@ def test_geospatial_credential_safe_save_clear_and_reload(
         path=str(screenshots / "geospatial-credential-cleared.png"), full_page=True
     )
 
+
 ###############################################################################
 def test_geospatial_credential_failed_updates_preserve_saved_state(
     page: Page, base_url: str
@@ -853,6 +864,7 @@ def test_geospatial_credential_failed_updates_preserve_saved_state(
         full_page=True,
     )
 
+
 ###############################################################################
 def test_capabilities_tables_do_not_clip_desktop_columns(
     page: Page, base_url: str
@@ -885,6 +897,7 @@ def test_capabilities_tables_do_not_clip_desktop_columns(
     assert all(
         item["right"] <= item["pageRight"] + 1 for item in metrics["wrappedTables"]
     )
+
 
 ###############################################################################
 def test_chat_composer_does_not_cover_latest_assistant_message(
@@ -922,6 +935,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 
     assert metrics["assistantBottom"] <= metrics["composerTop"] + 1
 
+
 ###############################################################################
 def test_settings_query_params_do_not_leak_back_to_chat(
     page: Page, base_url: str
@@ -938,6 +952,7 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     query = page.evaluate("() => window.location.search")
     assert path == "/"
     assert query == ""
+
 
 ###############################################################################
 def test_settings_sections_preserve_drafts_autosave_and_return(
@@ -1044,7 +1059,9 @@ def test_settings_sections_preserve_drafts_autosave_and_return(
 
     page.go_back()
     expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=agent-runtime")
-    expect(page.get_by_role("heading", name="Agent Runtime", exact=True)).to_be_visible()
+    expect(
+        page.get_by_role("heading", name="Agent Runtime", exact=True)
+    ).to_be_visible()
     page.go_forward()
     expect(page).to_have_url(f"{base_url.rstrip('/')}/settings?tab=database")
     expect(page.get_by_role("heading", name="Database", exact=True)).to_be_visible()
@@ -1077,6 +1094,7 @@ def test_settings_sections_preserve_drafts_autosave_and_return(
     page.screenshot(
         path=str(screenshot_dir / "application-saved-after-return.png"), full_page=True
     )
+
 
 ###############################################################################
 def test_runtime_settings_autosave_each_control_and_restore_after_reload(
@@ -1155,8 +1173,10 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
         count = controls.count()
         patch_start = len(captured_patches)
         with page.expect_response(
-            lambda response: response.request.method == "PATCH"
-            and response.url.endswith("/settings/runtime")
+            lambda response: (
+                response.request.method == "PATCH"
+                and response.url.endswith("/settings/runtime")
+            )
         ) as patch_response:
             for index in range(count):
                 control = controls.nth(index)
@@ -1173,7 +1193,9 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
                         "items => items.filter(item => !item.disabled).map(item => item.value)"
                     )
                     current = control.input_value()
-                    replacement = next((value for value in options if value != current), None)
+                    replacement = next(
+                        (value for value in options if value != current), None
+                    )
                     if replacement is not None:
                         control.select_option(value=replacement)
                         changed.append((index, kind, replacement))
@@ -1182,13 +1204,28 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
                     minimum_attr = control.get_attribute("min")
                     maximum_attr = control.get_attribute("max")
                     step_attr = control.get_attribute("step")
-                    minimum = float(minimum_attr) if minimum_attr is not None else float("-inf")
-                    maximum = float(maximum_attr) if maximum_attr is not None else float("inf")
+                    minimum = (
+                        float(minimum_attr)
+                        if minimum_attr is not None
+                        else float("-inf")
+                    )
+                    maximum = (
+                        float(maximum_attr)
+                        if maximum_attr is not None
+                        else float("inf")
+                    )
                     step = float(step_attr) if step_attr not in (None, "any") else 1.0
-                    step_base = float(minimum_attr or control.get_attribute("value") or "0")
-                    replacement = step_base + (math.floor((current - step_base) / step) + 1) * step
+                    step_base = float(
+                        minimum_attr or control.get_attribute("value") or "0"
+                    )
+                    replacement = (
+                        step_base
+                        + (math.floor((current - step_base) / step) + 1) * step
+                    )
                     if replacement > maximum:
-                        replacement = step_base + math.floor((maximum - step_base) / step) * step
+                        replacement = (
+                            step_base + math.floor((maximum - step_base) / step) * step
+                        )
                     if replacement < minimum or replacement > maximum:
                         continue
                     value = f"{replacement:.8g}"
@@ -1196,7 +1233,9 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
                     changed.append((index, kind, replacement))
                 else:
                     if kind == "url":
-                        value = f"https://settings-autosave.example/{section_id}/{index}"
+                        value = (
+                            f"https://settings-autosave.example/{section_id}/{index}"
+                        )
                     else:
                         value = control.input_value() + "-autosave"
                     control.fill(value)
@@ -1243,6 +1282,7 @@ def test_runtime_settings_autosave_each_control_and_restore_after_reload(
                     f"{section_id} control {index} did not restore {expected!r}."
                 )
 
+
 ###############################################################################
 def test_database_settings_change_only_after_explicit_apply_and_fail_safely(
     page: Page, base_url: str
@@ -1287,14 +1327,19 @@ def test_database_settings_change_only_after_explicit_apply_and_fail_safely(
     assert calls == []
 
     page.get_by_role("button", name="Test connection").click()
-    expect(page.get_by_role("alert")).to_contain_text("Synthetic database connection failure")
+    expect(page.get_by_role("alert")).to_contain_text(
+        "Synthetic database connection failure"
+    )
     assert calls == ["test"]
     expect(page.get_by_text("C:/AEGIS/test/active.db", exact=True)).to_be_visible()
 
     page.get_by_role("button", name="Apply and switch").click()
-    expect(page.get_by_role("alert")).to_contain_text("Synthetic database activation failure")
+    expect(page.get_by_role("alert")).to_contain_text(
+        "Synthetic database activation failure"
+    )
     assert calls == ["test", "switch"]
     expect(page.get_by_text("C:/AEGIS/test/active.db", exact=True)).to_be_visible()
+
 
 ###############################################################################
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(

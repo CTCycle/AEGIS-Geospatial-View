@@ -26,12 +26,18 @@ CENTRE_TERMS = frozenset({"center", "centre", "downtown", "centro", "middle"})
 # Words that make a map-state target a layer rather than a place.
 _LAYER_TERMS = frozenset({"layer", "layers", "overlay", "overlays"})
 # Commercial styles users name that no catalog basemap provides.
-_UNSUPPORTED_STYLE_TERMS = frozenset({"google", "bing", "mapbox", "apple", "yandex", "hybrid"})
+_UNSUPPORTED_STYLE_TERMS = frozenset(
+    {"google", "bing", "mapbox", "apple", "yandex", "hybrid"}
+)
+
 
 ###############################################################################
 def basemap_label(item: Mapping[str, Any]) -> str:
     metadata = json_object(item.get("metadata"))
-    return str(metadata.get("label") or item.get("name") or item.get("id") or "").strip()
+    return str(
+        metadata.get("label") or item.get("name") or item.get("id") or ""
+    ).strip()
+
 
 ###############################################################################
 def basemap_terms(item: Mapping[str, Any]) -> list[str]:
@@ -42,8 +48,13 @@ def basemap_terms(item: Mapping[str, Any]) -> list[str]:
     for key in ("keywords", "map_type_tags"):
         raw = metadata.get(key)
         if isinstance(raw, list):
-            terms.extend(str(term).strip().casefold() for term in cast(list[object], raw) if str(term).strip())
+            terms.extend(
+                str(term).strip().casefold()
+                for term in cast(list[object], raw)
+                if str(term).strip()
+            )
     return list(dict.fromkeys(terms))
+
 
 ###############################################################################
 def basemap_descriptions(basemaps: Iterable[Mapping[str, Any]]) -> dict[str, str]:
@@ -58,6 +69,7 @@ def basemap_descriptions(basemaps: Iterable[Mapping[str, Any]]) -> dict[str, str
         terms = ", ".join(basemap_terms(item))
         descriptions[basemap_id] = f"{label} ({terms})" if terms else label
     return descriptions
+
 
 ###############################################################################
 def match_requested_basemaps(
@@ -76,6 +88,7 @@ def match_requested_basemaps(
             matched.append(basemap_id)
     return matched
 
+
 ###############################################################################
 def match_requested_basemap(
     user_message: str, basemaps: Iterable[Mapping[str, Any]]
@@ -85,17 +98,20 @@ def match_requested_basemap(
     matched = match_requested_basemaps(user_message, basemaps)
     return matched[0] if len(matched) == 1 else None
 
+
 ###############################################################################
 def refers_to_layer(text: str) -> bool:
     """Return whether a target names a map layer ("the earthquake layer"), not a place."""
 
     return bool(set(re.findall(r"\w+", text.casefold())) & _LAYER_TERMS)
 
+
 ###############################################################################
 def names_centre(text: str) -> bool:
     """Return whether the text points at a place's centre ("the city centre")."""
 
     return bool(set(re.findall(r"\w+", text.casefold())) & CENTRE_TERMS)
+
 
 ###############################################################################
 def unsupported_basemap_styles(user_message: str) -> list[str]:
@@ -108,6 +124,7 @@ def unsupported_basemap_styles(user_message: str) -> list[str]:
         if word in _UNSUPPORTED_STYLE_TERMS
     ]
 
+
 ###############################################################################
 def refers_to_basemap(text: str, basemaps: Iterable[Mapping[str, Any]]) -> bool:
     """Return whether a route target names a basemap rather than a place or layer."""
@@ -116,7 +133,10 @@ def refers_to_basemap(text: str, basemaps: Iterable[Mapping[str, Any]]) -> bool:
     if words & {"basemap", "basemaps"}:
         return True
     for item in basemaps:
-        known = {*basemap_terms(item), *re.findall(r"\w+", basemap_label(item).casefold())}
+        known = {
+            *basemap_terms(item),
+            *re.findall(r"\w+", basemap_label(item).casefold()),
+        }
         if known & words:
             return True
     return False

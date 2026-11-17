@@ -59,7 +59,10 @@ from server.services.agent.tool_definitions import (
     SearchConversationHistoryInput,
 )
 from server.services.agent.tool_handlers.catalog import CatalogToolHandler
-from server.services.agent.tool_handlers.evidence import EvidenceToolHandler, PlaceLabeler
+from server.services.agent.tool_handlers.evidence import (
+    EvidenceToolHandler,
+    PlaceLabeler,
+)
 from server.services.agent.tool_handlers.location import (
     CURRENT_VIEW_SOURCE,
     LocationToolHandler,
@@ -85,15 +88,10 @@ _DATA = frozenset({CapabilityDomain.DATA_RETRIEVAL, CapabilityDomain.SPATIAL_ANA
 _MAP = frozenset({CapabilityDomain.MAP_RENDERING, CapabilityDomain.MAP_STATE})
 
 type JsonValue = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | list["JsonValue"]
-    | dict[str, "JsonValue"]
+    None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 )
 type JsonSchema = dict[str, JsonValue]
+
 
 ###############################################################################
 def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]:
@@ -106,6 +104,7 @@ def _validated_basemap_ids(capability_registry: CapabilityRegistry) -> list[str]
             if str(item.get("id") or "").strip()
         }
     )
+
 
 ###############################################################################
 def _map_plan_schema(
@@ -144,6 +143,7 @@ def _map_plan_schema(
     specialize(schema)
     return schema
 
+
 ###############################################################################
 def _inline_schema_refs(schema: JsonSchema) -> JsonSchema:
     """Resolve local ``$defs`` references so weaker models see enums inline.
@@ -179,6 +179,7 @@ def _inline_schema_refs(schema: JsonSchema) -> JsonSchema:
     except ValueError:
         return schema
     return resolved if isinstance(resolved, dict) else schema
+
 
 ###############################################################################
 def register_agent_tools(
@@ -253,9 +254,7 @@ def register_agent_tools(
             domains=frozenset({CapabilityDomain.PLACE_SEARCH}),
             phases=_MODEL_PHASE,
             visibility="model",
-            prerequisites=frozenset(
-                {"route", "location_required", "location_missing"}
-            ),
+            prerequisites=frozenset({"route", "location_required", "location_missing"}),
             idempotent=False,
         ),
         _registration(
@@ -410,7 +409,14 @@ def register_agent_tools(
             visibility="model",
             # A location-only map is a valid candidate: it can contain a
             # validated basemap and viewport without fabricating a data layer.
-            prerequisites=frozenset({"route", "location", "map_presentation", "analysis_complete_if_required"}),
+            prerequisites=frozenset(
+                {
+                    "route",
+                    "location",
+                    "map_presentation",
+                    "analysis_complete_if_required",
+                }
+            ),
             idempotent=False,
             semantic_validator=_map_plan_semantic_validator,
         ),
@@ -435,6 +441,7 @@ def register_agent_tools(
         )
     for tool in registrations:
         registry.register(tool)
+
 
 ###############################################################################
 def _registration(
@@ -472,6 +479,7 @@ def _registration(
         argument_schema_provider=argument_schema_provider,
     )
 
+
 ###############################################################################
 def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
     async def execute(
@@ -499,14 +507,20 @@ def _execute_capability_handler(service: CapabilityExecutionService) -> Any:
             bound_request, context, location=location
         )
         if state.route is not None and result.status != "failed":
-            result.metadata.covered_queries = service.capability_registry.covered_queries(
-                bound_request.capability_id, state.route.capability_queries
+            result.metadata.covered_queries = (
+                service.capability_registry.covered_queries(
+                    bound_request.capability_id, state.route.capability_queries
+                )
             )
         return result
 
     return execute
 
-POINT_PLACE_TYPES = FINE_LOCATION_TYPES | frozenset({"city", "town", "village", "municipality", "hamlet"})
+
+POINT_PLACE_TYPES = FINE_LOCATION_TYPES | frozenset(
+    {"city", "town", "village", "municipality", "hamlet"}
+)
+
 
 ###############################################################################
 def _bind_execute_request(
@@ -539,8 +553,10 @@ def _bind_execute_request(
     follow_up = _is_follow_up_location(
         normalize_target_key(str(request.location_ref or "")), state
     )
-    if goal.location_mode == "search_area" and not follow_up and not _is_point_place(
-        _location_for_request(request, state)
+    if (
+        goal.location_mode == "search_area"
+        and not follow_up
+        and not _is_point_place(_location_for_request(request, state))
     ):
         updates["arguments"]["sampling"] = "area"
     temporal = goal.temporal_scope
@@ -559,7 +575,10 @@ def _bind_execute_request(
         # start makes weather sampling include yesterday instead of midnight.
         if temporal_mode == "current" and temporal.get("granularity") == "day":
             days = None
-        if days and not any(temporal.get(key) for key in ("start_time_iso", "end_time_iso", "reference_time_iso")):
+        if days and not any(
+            temporal.get(key)
+            for key in ("start_time_iso", "end_time_iso", "reference_time_iso")
+        ):
             now = datetime.now(UTC)
             if temporal_mode == "forecast":
                 # A forecast looks ahead; a now-minus-N start silently turned
@@ -581,7 +600,11 @@ def _bind_execute_request(
     bound = request.model_copy(update=updates)
     location = _location_for_request(bound, state)
     spatial = goal.spatial_scope[0] if goal.spatial_scope and not follow_up else {}
-    if requirement is not None and requirement.spatial_scope is not None and not follow_up:
+    if (
+        requirement is not None
+        and requirement.spatial_scope is not None
+        and not follow_up
+    ):
         spatial = requirement.spatial_scope.model_dump(mode="json")
     distance_m = _positive_float(spatial.get("distance_m"))
     if distance_m is not None:
@@ -594,6 +617,7 @@ def _bind_execute_request(
     if extent is not None and extent.bbox is not None:
         bound = bound.model_copy(update={"bbox": list(extent.bbox)})
     return bound
+
 
 ###############################################################################
 def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -624,6 +648,7 @@ def _user_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         if str(key).strip().casefold() not in owned
     }
 
+
 ###############################################################################
 def _optional_string(value: Any) -> str | None:
     if value is None:
@@ -631,13 +656,15 @@ def _optional_string(value: Any) -> str | None:
     text = str(value).strip()
     return text or None
 
+
 ###############################################################################
 def _positive_float(value: Any) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if math.isfinite(number) and number > 0 else None
+
 
 ###############################################################################
 def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]:
@@ -652,6 +679,7 @@ def _bbox_for_radius(location: ResolvedLocation, radius_m: float) -> list[float]
         min(180.0, location.longitude + longitude_delta),
         min(90.0, location.latitude + latitude_delta),
     ]
+
 
 ###############################################################################
 def _lower_execution_extent(
@@ -691,7 +719,8 @@ def _lower_execution_extent(
             target_ref=target_ref,
         )
     if location.bbox and (
-        semantic_kind in {"administrative_geometry", "feature_geometry", "bbox", "viewport"}
+        semantic_kind
+        in {"administrative_geometry", "feature_geometry", "bbox", "viewport"}
         # The visible map is an area by definition, whatever scope was routed.
         or location.source == CURRENT_VIEW_SOURCE
         # A country or region target without a routed scope is still an area;
@@ -718,6 +747,7 @@ def _lower_execution_extent(
         target_ref=target_ref,
     )
 
+
 ###############################################################################
 def _names_goal_target(
     requested: str, state: AgentRunState, goal_targets: set[str]
@@ -732,9 +762,13 @@ def _names_goal_target(
         return True
     return any(
         location_ref_matches(requested, str(key), location.label)
-        and any(location_ref_matches(goal, str(key), location.label) for goal in goal_targets)
+        and any(
+            location_ref_matches(goal, str(key), location.label)
+            for goal in goal_targets
+        )
         for key, location in state.location_refs.items()
     )
+
 
 ###############################################################################
 def _is_point_place(location: ResolvedLocation | None) -> bool:
@@ -747,6 +781,7 @@ def _is_point_place(location: ResolvedLocation | None) -> bool:
 
     return location is not None and location.location_type in POINT_PLACE_TYPES
 
+
 ###############################################################################
 def _is_follow_up_location(requested: str, state: AgentRunState) -> bool:
     """Whether a reference names a point the run derived inside its area."""
@@ -757,6 +792,7 @@ def _is_follow_up_location(requested: str, state: AgentRunState) -> bool:
         location_ref_matches(requested, key, state.location_refs[key].label)
         for key in follow_up_location_keys(state)
     )
+
 
 ###############################################################################
 def _location_for_request(
@@ -782,6 +818,7 @@ def _location_for_request(
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
+
 
 ###############################################################################
 def _apply_map_plan_handler(service: MapPlanService) -> Any:
@@ -809,15 +846,22 @@ def _apply_map_plan_handler(service: MapPlanService) -> Any:
 
     return apply
 
+
 ###############################################################################
 def _plan_layer_refs(request: ApplyMapPlanInput, state: AgentRunState) -> set[str]:
     """Evidence refs visible after the plan: kept layers plus added ones."""
 
     removed = {
-        action.instance_id for action in request.actions if isinstance(action, RemoveLayerAction)
+        action.instance_id
+        for action in request.actions
+        if isinstance(action, RemoveLayerAction)
     }
     kept_only = next(
-        (set(action.instance_ids) for action in request.actions if isinstance(action, KeepOnlyLayersAction)),
+        (
+            set(action.instance_ids)
+            for action in request.actions
+            if isinstance(action, KeepOnlyLayersAction)
+        ),
         None,
     )
     refs = {
@@ -833,6 +877,7 @@ def _plan_layer_refs(request: ApplyMapPlanInput, state: AgentRunState) -> set[st
                 continue
             refs.add(str(instance.descriptor.get("evidence_ref") or ""))
     return refs
+
 
 ###############################################################################
 def _map_plan_semantic_validator(
@@ -858,9 +903,13 @@ def _map_plan_semantic_validator(
             and state.route.analysis is not None
             and not analysis_unsupported(state)
         ):
-            derived_refs = {ref for result in state.tool_results
-                            if result.tool_name == "transform_evidence"
-                            and result.status == "success" for ref in result.evidence_refs}
+            derived_refs = {
+                ref
+                for result in state.tool_results
+                if result.tool_name == "transform_evidence"
+                and result.status == "success"
+                for ref in result.evidence_refs
+            }
             # A second source queried at a resolved result point (e.g. weather
             # at a ranked epicentre) is already located; it need not be ranked
             # by the first source's metric before it can share the map.
@@ -870,18 +919,27 @@ def _map_plan_semantic_validator(
                 if result.tool_name == "execute_geospatial_capability"
                 and result.status in {"success", "partial"}
                 and _is_follow_up_location(
-                    str(json_object(json_object(result.data).get("query")).get("location_ref") or ""),
+                    str(
+                        json_object(json_object(result.data).get("query")).get(
+                            "location_ref"
+                        )
+                        or ""
+                    ),
                     state,
                 )
                 for ref in result.evidence_refs
             }
             if action.evidence_ref not in derived_refs | follow_up_refs:
-                errors.append("Analysis maps must use located derived evidence or data queried at a resolved result point; for valid_empty use fit_location without an evidence layer.")
+                errors.append(
+                    "Analysis maps must use located derived evidence or data queried at a resolved result point; for valid_empty use fit_location without an evidence layer."
+                )
 
     if (
         state.route is not None
         and is_mark_locations_operation(state.route.operation)
-        and not any(isinstance(action, MarkLocationsAction) for action in request.actions)
+        and not any(
+            isinstance(action, MarkLocationsAction) for action in request.actions
+        )
     ):
         errors.append(
             "The user asked to mark places on the map: include a mark_locations action "
@@ -889,7 +947,11 @@ def _map_plan_semantic_validator(
             "set_viewport does not mark them."
         )
     contract = state.completion_contract
-    if contract is not None and contract.evidence_required and uncovered_route_targets(state):
+    if (
+        contract is not None
+        and contract.evidence_required
+        and uncovered_route_targets(state)
+    ):
         errors.append(
             "Retrieve data with execute_geospatial_capability for every requested target "
             "before preparing the map. Targets still missing data: "
@@ -919,6 +981,7 @@ def _map_plan_semantic_validator(
         )
     return errors[:8]
 
+
 ###############################################################################
 def _valid_empty_data_only(state: AgentRunState) -> bool:
     """Allow a location-only map when the provider found no matching data."""
@@ -927,7 +990,11 @@ def _valid_empty_data_only(state: AgentRunState) -> bool:
         result = geometry_result(state)
         return result is not None and result.status == "valid_empty"
     if state.route is not None and state.route.analysis is not None:
-        transforms = [result for result in state.tool_results if result.tool_name == "transform_evidence"]
+        transforms = [
+            result
+            for result in state.tool_results
+            if result.tool_name == "transform_evidence"
+        ]
         return bool(transforms) and transforms[-1].status == "valid_empty"
     data_results = [
         result
@@ -938,8 +1005,11 @@ def _valid_empty_data_only(state: AgentRunState) -> bool:
         result.status == "valid_empty" for result in data_results
     )
 
+
 ###############################################################################
-async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> ToolResult:
+async def _route_handler(
+    _request: RouteRequestInput, _state: AgentRunState
+) -> ToolResult:
     return ToolResult(
         call_id="handler-call",
         tool_name="route_request",
@@ -955,11 +1025,13 @@ async def _route_handler(_request: RouteRequestInput, _state: AgentRunState) -> 
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
 
+
 ###############################################################################
 def _normalize_result(value: Any, call_id: str) -> ToolResult:
     if not isinstance(value, ToolResult):
         raise TypeError("Native handlers must return ToolResult.")
     return value.model_copy(update={"call_id": call_id})
+
 
 ###############################################################################
 def _capability_semantic_validator(
@@ -969,13 +1041,19 @@ def _capability_semantic_validator(
     capability_registry: CapabilityRegistry | None = None,
 ) -> list[str]:
     errors: list[str] = []
-    if state.route is not None and state.route.analysis is not None and any(
-        result.tool_name == "execute_geospatial_capability"
-        and result.metadata.capability_id == request.capability_id
-        and result.status in {"success", "partial", "valid_empty"}
-        for result in state.tool_results
+    if (
+        state.route is not None
+        and state.route.analysis is not None
+        and any(
+            result.tool_name == "execute_geospatial_capability"
+            and result.metadata.capability_id == request.capability_id
+            and result.status in {"success", "partial", "valid_empty"}
+            for result in state.tool_results
+        )
     ):
-        errors.append("This capability already executed successfully; choose a distinct capability or transform its evidence.")
+        errors.append(
+            "This capability already executed successfully; choose a distinct capability or transform its evidence."
+        )
     if state.capability_ids and request.capability_id not in state.capability_ids:
         errors.append(
             "capability_id is outside the validated route shortlist; use one of: "
@@ -987,7 +1065,11 @@ def _capability_semantic_validator(
         for item in (state.goal.target_ids if state.goal is not None else [])
         if normalize_target_key(str(item))
     }
-    known_refs = (f" Use one of: {', '.join(list(state.location_refs)[:12])}." if state.location_refs else "")
+    known_refs = (
+        f" Use one of: {', '.join(list(state.location_refs)[:12])}."
+        if state.location_refs
+        else ""
+    )
     requested_target = normalize_target_key(str(request.location_ref or ""))
     if (
         requested_target
@@ -1023,6 +1105,7 @@ def _capability_semantic_validator(
         errors.extend(contract_errors)
     return errors[:8]
 
+
 ###############################################################################
 def _declared_operations(
     capability_registry: CapabilityRegistry, capability_id: str
@@ -1035,6 +1118,7 @@ def _declared_operations(
     if not isinstance(raw, list):
         return []
     return [str(item) for item in cast(list[Any], raw) if str(item).strip()]
+
 
 ###############################################################################
 def _manifest_contract_errors(
@@ -1049,7 +1133,9 @@ def _manifest_contract_errors(
     try:
         schema = schema_provider(request.capability_id)
     except Exception:
-        return ["The selected capability does not expose a usable argument schema."], None
+        return [
+            "The selected capability does not expose a usable argument schema."
+        ], None
     errors: list[str] = []
     operations = _declared_operations(capability_registry, request.capability_id)
     if (
@@ -1058,16 +1144,21 @@ def _manifest_contract_errors(
         and request.operation.strip().casefold()
         not in {item.casefold() for item in operations}
     ):
-        errors.append(f"operation '{request.operation}' is not declared by this capability.")
+        errors.append(
+            f"operation '{request.operation}' is not declared by this capability."
+        )
     if isinstance(schema, dict):
         typed_schema = cast(dict[str, Any], schema)
         if isinstance(typed_schema.get("properties"), dict):
             # Declared names are the whole contract: unknown keys are never forwarded.
             schema = {**typed_schema, "additionalProperties": False}
     errors.extend(
-        _json_schema_errors(_manifest_arguments(request.arguments), schema, path="arguments")
+        _json_schema_errors(
+            _manifest_arguments(request.arguments), schema, path="arguments"
+        )
     )
     return errors, cast(dict[str, Any], schema) if isinstance(schema, dict) else None
+
 
 ###############################################################################
 def _contract_hint(schema: dict[str, Any], operations: list[str]) -> str:
@@ -1105,6 +1196,7 @@ def _contract_hint(schema: dict[str, Any], operations: list[str]) -> str:
         + "."
     )
 
+
 ###############################################################################
 def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     """Remove route-owned aliases before applying the manifest schema."""
@@ -1134,6 +1226,7 @@ def _manifest_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         if str(key).strip().casefold() not in owned
     }
 
+
 ###############################################################################
 def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
     """Validate the bounded manifest subset used at the execute boundary."""
@@ -1160,12 +1253,12 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
         object_value = cast(dict[str, JsonValue], value)
         raw_properties = schema.get("properties")
         properties = (
-            cast(JsonSchema, raw_properties)
-            if isinstance(raw_properties, dict)
-            else {}
+            cast(JsonSchema, raw_properties) if isinstance(raw_properties, dict) else {}
         )
         raw_required = schema.get("required")
-        required = cast(list[str], raw_required) if isinstance(raw_required, list) else []
+        required = (
+            cast(list[str], raw_required) if isinstance(raw_required, list) else []
+        )
         for name in required[:32]:
             if name not in object_value:
                 errors.append(f"{path}.{name}: required value is missing.")
@@ -1204,24 +1297,33 @@ def _json_schema_errors(value: Any, schema: Any, *, path: str) -> list[str]:
         minimum = schema.get("minimum")
         maximum = schema.get("maximum")
         if isinstance(minimum, (int, float)) and value < minimum:
-            errors.append(f"{path}: number {value} is outside the valid range (minimum {minimum}).")
+            errors.append(
+                f"{path}: number {value} is outside the valid range (minimum {minimum})."
+            )
         if isinstance(maximum, (int, float)) and value > maximum:
-            errors.append(f"{path}: number {value} is outside the valid range (maximum {maximum}).")
+            errors.append(
+                f"{path}: number {value} is outside the valid range (maximum {maximum})."
+            )
         exclusive_minimum = schema.get("exclusiveMinimum")
         if (
             isinstance(exclusive_minimum, (int, float))
             and not isinstance(exclusive_minimum, bool)
             and value <= exclusive_minimum
         ):
-            errors.append(f"{path}: number {value} is outside the valid range (greater than {exclusive_minimum}).")
+            errors.append(
+                f"{path}: number {value} is outside the valid range (greater than {exclusive_minimum})."
+            )
         exclusive_maximum = schema.get("exclusiveMaximum")
         if (
             isinstance(exclusive_maximum, (int, float))
             and not isinstance(exclusive_maximum, bool)
             and value >= exclusive_maximum
         ):
-            errors.append(f"{path}: number {value} is outside the valid range (less than {exclusive_maximum}).")
+            errors.append(
+                f"{path}: number {value} is outside the valid range (less than {exclusive_maximum})."
+            )
     return errors[:8]
+
 
 ###############################################################################
 def _json_type_matches(value: Any, schema_type: Any) -> bool:
@@ -1241,6 +1343,7 @@ def _json_type_matches(value: Any, schema_type: Any) -> bool:
         return value is None
     return True
 
+
 ###############################################################################
 def _execute_argument_schema_provider(
     capability_registry: CapabilityRegistry,
@@ -1255,22 +1358,18 @@ def _execute_argument_schema_provider(
             schema = argument_schema(request.capability_id)
         except Exception:
             return None
-        return (
-            dict(cast(dict[str, Any], schema))
-            if isinstance(schema, dict)
-            else None
-        )
+        return dict(cast(dict[str, Any], schema)) if isinstance(schema, dict) else None
 
     return provide
 
+
 ###############################################################################
-def _evidence_semantic_validator(
-    request: Any, state: AgentRunState
-) -> list[str]:
+def _evidence_semantic_validator(request: Any, state: AgentRunState) -> list[str]:
     refs = list(getattr(request, "evidence_ref", None) and [request.evidence_ref] or [])
     refs.extend(getattr(request, "evidence_refs", []) or [])
     missing = [str(ref) for ref in refs if str(ref) not in state.evidence_refs]
     return [f"Unknown evidence reference: {ref}." for ref in missing[:8]]
+
 
 ###############################################################################
 def _provider_layer_semantic_validator(
@@ -1283,6 +1382,7 @@ def _provider_layer_semantic_validator(
         if normalized not in permitted:
             return ["provider_id is outside the validated provider allowlist."]
     return []
+
 
 ###############################################################################
 def _describe_semantic_validator(

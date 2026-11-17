@@ -22,6 +22,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class LocalOpenDataProvider:
     provider_id = "local_open_data"
@@ -208,6 +209,7 @@ class LocalOpenDataProvider:
     def _is_camera_source(source_id: str) -> bool:
         normalized = source_id.casefold()
         return "camera" in normalized or "webcam" in normalized
+
 
 ###############################################################################
 def _is_private_host(host: str) -> bool:

@@ -47,6 +47,7 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
+
 ###############################################################################
 class OpenAIProvider(LLMProvider):
     provider_name = "openai"
@@ -80,9 +81,7 @@ class OpenAIProvider(LLMProvider):
             "base_url": self.base_url,
             "timeout": self.transport_policy.timeout_for(stage),
             "max_retries": 0,
-            "http_client": httpx.Client(
-                **self.transport_policy.httpx_options(stage)
-            ),
+            "http_client": httpx.Client(**self.transport_policy.httpx_options(stage)),
         }
         headers = self._request_headers(request)
         if headers:
@@ -90,9 +89,7 @@ class OpenAIProvider(LLMProvider):
         return OpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
-    def _client_for_request(
-        self, request: LLMRequest, *, stage: str = "chat"
-    ) -> Any:
+    def _client_for_request(self, request: LLMRequest, *, stage: str = "chat") -> Any:
         client = self._client(request, stage=stage)
         remaining = remaining_request_seconds(request)
         if remaining is None:
@@ -176,9 +173,9 @@ class OpenAIProvider(LLMProvider):
     def _temperature_kwargs(self, request: LLMRequest) -> dict[str, Any]:
         supports_temperature = request.metadata.get("supports_temperature")
         if not isinstance(supports_temperature, bool):
-            supports_temperature = self._catalog_metadata_for_model(
-                request.model
-            ).get("supports_temperature")
+            supports_temperature = self._catalog_metadata_for_model(request.model).get(
+                "supports_temperature"
+            )
         return (
             {"temperature": request.temperature}
             if supports_temperature is not False
@@ -192,7 +189,7 @@ class OpenAIProvider(LLMProvider):
                 return None
             try:
                 parsed = int(value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
             return parsed if parsed > 0 else None
 
@@ -234,7 +231,10 @@ class OpenAIProvider(LLMProvider):
             return all(OpenAIProvider._is_strict_compatible(item) for item in node)
         if not is_json_object(node):
             return True
-        if node.get("type") == "object" and node.get("additionalProperties") is not False:
+        if (
+            node.get("type") == "object"
+            and node.get("additionalProperties") is not False
+        ):
             return False
         return all(
             OpenAIProvider._is_strict_compatible(value) for value in node.values()
@@ -493,7 +493,11 @@ class OpenAIProvider(LLMProvider):
                     **self._temperature_kwargs(request),
                     **(
                         {"max_output_tokens": max_output_tokens}
-                        if (max_output_tokens := self._request_max_output_tokens(request))
+                        if (
+                            max_output_tokens := self._request_max_output_tokens(
+                                request
+                            )
+                        )
                         is not None
                         else {}
                     ),
@@ -621,7 +625,9 @@ class OpenAIProvider(LLMProvider):
                 context_usage=usage.to_dict(),
                 provided_fields=loaded.keys(),
             )
-        return LLMStructuredOutput({}, context_usage=usage.to_dict(), provided_fields=())
+        return LLMStructuredOutput(
+            {}, context_usage=usage.to_dict(), provided_fields=()
+        )
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

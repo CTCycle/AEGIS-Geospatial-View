@@ -44,7 +44,9 @@ def test_input_sections_separate_instructions_state_history_and_tools() -> None:
         {"role": "tool", "tool_call_id": "1", "content": "y" * 800},
     ]
 
-    sections = estimate_input_sections(messages, working_state_prefix=NATIVE_CONTEXT_PREFIX)
+    sections = estimate_input_sections(
+        messages, working_state_prefix=NATIVE_CONTEXT_PREFIX
+    )
 
     assert sections["working_state"] > 100
     assert sections["tool_exchanges"] > 200
@@ -55,10 +57,18 @@ def test_input_sections_separate_instructions_state_history_and_tools() -> None:
 ###############################################################################
 def test_a_country_is_framed_by_its_extent_and_a_city_by_its_centre() -> None:
     area = ResolvedLocation(
-        label="Italy", latitude=42.8, longitude=12.8, location_type="region", bbox=[6.6, 35.5, 18.5, 47.1]
+        label="Italy",
+        latitude=42.8,
+        longitude=12.8,
+        location_type="region",
+        bbox=[6.6, 35.5, 18.5, 47.1],
     )
     city = ResolvedLocation(
-        label="Milan", latitude=45.46, longitude=9.19, location_type="city", bbox=[9.0, 45.3, 9.3, 45.6]
+        label="Milan",
+        latitude=45.46,
+        longitude=9.19,
+        location_type="city",
+        bbox=[9.0, 45.3, 9.3, 45.6],
     )
 
     assert location_frame_points(area) == [(6.6, 35.5), (18.5, 47.1)]

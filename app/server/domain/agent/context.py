@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
 
+
 ###############################################################################
 class ConversationDirective(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -18,6 +19,7 @@ class ConversationDirective(BaseModel):
     status: Literal["active", "superseded", "revoked"] = "active"
     superseding_directive_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class AgentContextPackage(BaseModel):
@@ -43,6 +45,7 @@ class AgentContextPackage(BaseModel):
     context_profile_metadata: dict[str, Any] = Field(
         default_factory=lambda: dict[str, Any]()
     )
+
 
 ###############################################################################
 class AgentContextView(BaseModel):
@@ -70,12 +73,8 @@ class AgentContextView(BaseModel):
     render_observations: list[dict[str, Any]] = Field(
         default_factory=lambda: list[dict[str, Any]]()
     )
-    policy_constraints: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]()
-    )
-    context_selection: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]()
-    )
+    policy_constraints: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    context_selection: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -92,20 +91,12 @@ class AgentContextView(BaseModel):
             active_directives=[dict(item) for item in state.active_directives],
             task_state=dict(state.task_state),
             map_memory=dict(state.map_memory),
-            summary=(
-                dict(state.summary)
-                if state.summary is not None
-                else None
-            ),
+            summary=(dict(state.summary) if state.summary is not None else None),
             relevant_tool_outcomes=[
                 dict(item) for item in state.relevant_tool_outcomes
             ],
-            recent_observations=[
-                dict(item) for item in (recent_observations or [])
-            ],
-            render_observations=[
-                dict(item) for item in (render_observations or [])
-            ],
+            recent_observations=[dict(item) for item in (recent_observations or [])],
+            render_observations=[dict(item) for item in (render_observations or [])],
             policy_constraints=dict(state.policy_constraints),
             context_selection={
                 "included_message_ids": list(state.included_message_ids),

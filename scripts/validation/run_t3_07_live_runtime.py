@@ -84,7 +84,9 @@ def _resolve_opencode_key() -> str | None:
 
 
 ###############################################################################
-def _http_json(method: str, url: str, *, body: dict | None = None, timeout: int = 30) -> dict:
+def _http_json(
+    method: str, url: str, *, body: dict | None = None, timeout: int = 30
+) -> dict:
     import urllib.request
 
     data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -160,9 +162,10 @@ def main() -> int:
     backend_env["UI_PORT"] = str(args.backend_port)
     backend_env.pop("AEGIS_T3_OPENCODE_GO_API_KEY", None)
 
-    with backend_stdout.open("w", encoding="utf-8") as out, backend_stderr.open(
-        "w", encoding="utf-8"
-    ) as err:
+    with (
+        backend_stdout.open("w", encoding="utf-8") as out,
+        backend_stderr.open("w", encoding="utf-8") as err,
+    ):
         backend = subprocess.Popen(
             [
                 str(PYTHON),

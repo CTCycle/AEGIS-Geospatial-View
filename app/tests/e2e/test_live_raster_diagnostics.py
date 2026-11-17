@@ -147,7 +147,7 @@ def _safe_trace_int(value: Any) -> int:
         return 0
     try:
         return max(0, int(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
 
 
@@ -227,7 +227,7 @@ def _read_conversation_id(page: Page) -> str | None:
         return None
     try:
         data = json.loads(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     chat_page = data.get("chatPage", {}) if isinstance(data, dict) else {}
     chat_panel = chat_page.get("chatPanel", {}) if isinstance(chat_page, dict) else {}
@@ -256,7 +256,7 @@ def _read_latest_run_trace(
         }
     try:
         snapshot = snapshot_response.json()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return {"status": "snapshot_invalid"}
     recent_runs = snapshot.get("recent_runs") if isinstance(snapshot, dict) else None
     if not isinstance(recent_runs, list) or not recent_runs:
@@ -286,7 +286,7 @@ def _read_latest_run_trace(
         }
     try:
         trace = trace_response.json()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return {
             "status": "trace_invalid",
             "conversation_id": conversation_id,

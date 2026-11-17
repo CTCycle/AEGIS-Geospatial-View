@@ -61,4 +61,9 @@ def place_targets(targets: Iterable[object], state: "AgentRunState") -> list[str
     ]
 
 
-__all__ = ["RouteReferenceKind", "place_targets", "route_reference_kind", "spells_layer"]
+__all__ = [
+    "RouteReferenceKind",
+    "place_targets",
+    "route_reference_kind",
+    "spells_layer",
+]

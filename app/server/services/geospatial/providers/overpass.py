@@ -38,6 +38,7 @@ AMENITY_GROUPS = {
     "fuel": ["fuel", "charging_station"],
 }
 
+
 ###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
@@ -100,9 +101,11 @@ class OverpassProvider(GeospatialProvider):
         )
         if amenity_tags is None:
             filters = json_object(request.params.get("filters"))
-            category = str(
-                request.params.get("category") or filters.get("category") or ""
-            ).strip().lower()
+            category = (
+                str(request.params.get("category") or filters.get("category") or "")
+                .strip()
+                .lower()
+            )
             amenity_tags = AMENITY_GROUPS.get(category)
             if category and amenity_tags is None and categories is None:
                 categories = [category]
@@ -137,7 +140,9 @@ class OverpassProvider(GeospatialProvider):
                         "category": item.get("amenity") or item.get("category"),
                     },
                     source=self.provider_id,
-                    category=str(item.get("amenity") or item.get("category") or "amenity"),
+                    category=str(
+                        item.get("amenity") or item.get("category") or "amenity"
+                    ),
                 )
             except NormalizationError:
                 continue
@@ -178,11 +183,12 @@ class OverpassProvider(GeospatialProvider):
             partial=bool(payload.get("truncated")),
         )
 
+
 ###############################################################################
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

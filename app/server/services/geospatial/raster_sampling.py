@@ -32,9 +32,11 @@ MAX_SUMMARY_LABELS = 8
 LegendKind = Literal["continuous", "categorical"]
 Rgb = tuple[int, int, int]
 
+
 ###############################################################################
 class RasterSamplingError(ValueError):
     """Raised when a coordinate, tile or legend cannot be sampled."""
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -46,6 +48,7 @@ class TilePixel:
     pixel_y: int
     tile_size: int
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class LegendEntry:
@@ -53,6 +56,7 @@ class LegendEntry:
     color: str
     value: float | None
     label: str
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -62,6 +66,7 @@ class CompiledLegend:
     units: str | None
     entries: tuple[LegendEntry, ...]
     nodata: tuple[Rgb, ...]
+
 
 ###############################################################################
 def lonlat_to_tile_pixel(
@@ -86,7 +91,10 @@ def lonlat_to_tile_pixel(
     y = min(tiles - 1, max(0, int(math.floor(world_y))))
     pixel_x = min(tile_size - 1, max(0, int((world_x - x) * tile_size)))
     pixel_y = min(tile_size - 1, max(0, int((world_y - y) * tile_size)))
-    return TilePixel(z=z, x=x, y=y, pixel_x=pixel_x, pixel_y=pixel_y, tile_size=tile_size)
+    return TilePixel(
+        z=z, x=x, y=y, pixel_x=pixel_x, pixel_y=pixel_y, tile_size=tile_size
+    )
+
 
 ###############################################################################
 def read_tile_rgba(png: bytes, pixel: TilePixel) -> tuple[int, int, int, int]:
@@ -106,15 +114,17 @@ def read_tile_rgba(png: bytes, pixel: TilePixel) -> tuple[int, int, int, int]:
     red, green, blue, alpha = rgba.getpixel((px, py))  # type: ignore[misc]
     return int(red), int(green), int(blue), int(alpha)  # pyright: ignore[reportUnknownArgumentType]
 
+
 ###############################################################################
 def compile_legend(legend: Mapping[str, Any]) -> CompiledLegend | None:
     """Validate a manifest legend once and precompute its RGB tuples."""
 
     try:
         key = json.dumps(legend, sort_keys=True, default=str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return _compile_legend_cached(key)
+
 
 ###############################################################################
 @lru_cache(maxsize=128)
@@ -159,6 +169,7 @@ def _compile_legend_cached(key: str) -> CompiledLegend | None:
         nodata=tuple(nodata),
     )
 
+
 ###############################################################################
 def match_legend(
     legend: CompiledLegend,
@@ -186,6 +197,7 @@ def match_legend(
         "matched_color": best.color,
     }
 
+
 ###############################################################################
 def sample_tile(
     png: bytes, pixel: TilePixel, legend: CompiledLegend
@@ -193,6 +205,7 @@ def sample_tile(
     """Read the legend value at one pixel of a decoded tile."""
 
     return match_legend(legend, read_tile_rgba(png, pixel))
+
 
 ###############################################################################
 def summarize_legend(legend: object) -> dict[str, Any] | None:
@@ -219,6 +232,7 @@ def summarize_legend(legend: object) -> dict[str, Any] | None:
         summary["label_count"] = len(labels)
     return summary
 
+
 ###############################################################################
 def _parse_hex_color(value: object) -> Rgb | None:
     if not isinstance(value, str):
@@ -231,13 +245,16 @@ def _parse_hex_color(value: object) -> Rgb | None:
     except ValueError:
         return None
 
+
 ###############################################################################
 def _hex(rgb: Rgb) -> str:
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
+
 ###############################################################################
 def _distance_squared(left: Rgb, right: Rgb) -> int:
     return sum((a - b) * (a - b) for a, b in zip(left, right, strict=True))
+
 
 ###############################################################################
 def _optional_text(value: object) -> str | None:

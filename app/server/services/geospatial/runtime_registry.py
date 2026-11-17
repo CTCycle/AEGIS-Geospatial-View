@@ -16,9 +16,9 @@ from server.services.geospatial.credential_resolver import (
 )
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
+
 ###############################################################################
 class RuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -170,7 +170,9 @@ class RuntimeRegistry:
         if mode in {"configured_source", "configuration-dependent"}:
             return "Configure the required local or trusted source before use."
         if mode == "ingestion_only":
-            return "Available only through dataset ingestion; it cannot be queried live."
+            return (
+                "Available only through dataset ingestion; it cannot be queried live."
+            )
         if self._auth_required(capability_id):
             return "Configure provider credentials in Settings under Geospatial Access."
         return "Capability access is not configured."
@@ -186,11 +188,11 @@ class RuntimeRegistry:
         return self._credential_resolver.is_configured(provider_id)
 
     # -------------------------------------------------------------------------
-    def _availability_mode(
-        self, capability_id: str, profile: dict[str, Any]
-    ) -> str:
+    def _availability_mode(self, capability_id: str, profile: dict[str, Any]) -> str:
         configured = str(profile.get("availability_mode") or "").strip().lower()
-        if configured and not (configured == "public" and self._auth_required(capability_id)):
+        if configured and not (
+            configured == "public" and self._auth_required(capability_id)
+        ):
             return configured
         return "credential" if self._auth_required(capability_id) else "public"
 
@@ -201,9 +203,7 @@ class RuntimeRegistry:
         return bool(json_object(auth).get("required", False))
 
     # -------------------------------------------------------------------------
-    def _credential_provider(
-        self, capability_id: str, profile: dict[str, Any]
-    ) -> str:
+    def _credential_provider(self, capability_id: str, profile: dict[str, Any]) -> str:
         profile_provider = str(profile.get("credential_provider") or "").strip().lower()
         if profile_provider:
             return profile_provider
@@ -257,11 +257,7 @@ class RuntimeRegistry:
         if not self.access_available(capability_id):
             profile = self._profile(capability_id) or {}
             mode = self._availability_mode(capability_id, profile)
-            return (
-                "missing_credentials"
-                if mode == "credential"
-                else "missing_access"
-            )
+            return "missing_credentials" if mode == "credential" else "missing_access"
         return "healthy"
 
     # -------------------------------------------------------------------------
@@ -280,6 +276,7 @@ class RuntimeRegistry:
         if not is_json_object(profile):
             return "global"
         return str(profile.get("coverage_policy") or "global")
+
 
 ###############################################################################
 def _read_boolean_env(name: str) -> bool:

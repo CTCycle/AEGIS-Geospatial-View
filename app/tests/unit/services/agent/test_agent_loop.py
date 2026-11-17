@@ -44,7 +44,10 @@ from server.services.agent.agent_loop import (
 )
 from server.services.agent.capability_router import CapabilityRouter
 from server.services.agent.completion import data_verified_empty
-from server.services.agent.tool_definitions import RouteRequestInput, TransformEvidenceInput
+from server.services.agent.tool_definitions import (
+    RouteRequestInput,
+    TransformEvidenceInput,
+)
 from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_handlers.evidence import EvidenceToolHandler
 from server.services.agent.tool_registry import ToolRegistry
@@ -53,6 +56,7 @@ from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.transport import LLMTransportPolicy
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_catalog_pages_continue_without_additional_model_calls() -> None:
@@ -60,34 +64,76 @@ async def test_catalog_pages_continue_without_additional_model_calls() -> None:
 
     provider = FakeProvider([])
     loop = _loop(provider)
+
     async def page(arguments, state):
         cursor = int(arguments.cursor)
         end = min(cursor + 12, 117)
-        return ToolResult(call_id="page", tool_name="discover_geospatial_capabilities",
-            status="success", summary="Inventory page.",
-            data={"capabilities": [{"id": f"source-{i}"} for i in range(cursor, end)],
-                "total": 117, "next_cursor": str(end) if end < 117 else None},
-            metadata=ToolExecutionMetadata(duration_ms=0))
-    loop.tool_registry.register(RegisteredTool(
-        definition=LLMToolDefinition(name="discover_geospatial_capabilities", description="Inventory",
-            parameters_json_schema=CapabilityDiscoveryInput.model_json_schema()),
-        input_model=CapabilityDiscoveryInput, handler=page,
-        domains=frozenset({CapabilityDomain.MIXED}), phases=frozenset({AgentPhase.BUILD_TOOL_CONTEXT}),
-        visibility="model", prerequisites=frozenset({"route"}), timeout_key="tool_execution_seconds", idempotent=True,
-        result_normalizer=lambda value, call_id: value.model_copy(update={"call_id": call_id})))
+        return ToolResult(
+            call_id="page",
+            tool_name="discover_geospatial_capabilities",
+            status="success",
+            summary="Inventory page.",
+            data={
+                "capabilities": [{"id": f"source-{i}"} for i in range(cursor, end)],
+                "total": 117,
+                "next_cursor": str(end) if end < 117 else None,
+            },
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+
+    loop.tool_registry.register(
+        RegisteredTool(
+            definition=LLMToolDefinition(
+                name="discover_geospatial_capabilities",
+                description="Inventory",
+                parameters_json_schema=CapabilityDiscoveryInput.model_json_schema(),
+            ),
+            input_model=CapabilityDiscoveryInput,
+            handler=page,
+            domains=frozenset({CapabilityDomain.MIXED}),
+            phases=frozenset({AgentPhase.BUILD_TOOL_CONTEXT}),
+            visibility="model",
+            prerequisites=frozenset({"route"}),
+            timeout_key="tool_execution_seconds",
+            idempotent=True,
+            result_normalizer=lambda value, call_id: value.model_copy(
+                update={"call_id": call_id}
+            ),
+        )
+    )
     state = _state()
     state.phase = AgentPhase.UPDATE_STATE
-    state.route = CapabilityRoute(primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
-        task_mode="execute", presentation="text", operation="discover_available_map_data", location_mode="none")
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
+        task_mode="execute",
+        presentation="text",
+        operation="discover_available_map_data",
+        location_mode="none",
+    )
     AgentLoop._compile_native_goal(state, state.route)
     state.max_iterations = 12
     state.model_calls = 1
-    state.tool_results = [ToolResult(call_id="first", tool_name="discover_geospatial_capabilities",
-        status="success", summary="First page", data={"capabilities": [{"id": "source-0"}],
-        "next_cursor": "12", "total": 117}, metadata=ToolExecutionMetadata(duration_ms=0))]
+    state.tool_results = [
+        ToolResult(
+            call_id="first",
+            tool_name="discover_geospatial_capabilities",
+            status="success",
+            summary="First page",
+            data={
+                "capabilities": [{"id": "source-0"}],
+                "next_cursor": "12",
+                "total": 117,
+            },
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    ]
     budget = AgentExecutionBudget(total_seconds=10, hard_max_seconds=10)
-    budget.configure_limits(max_model_calls=1, max_tool_calls=20, max_state_transitions=128)
-    request = AgentLoopRequest(provider="fake", model="fake", state=state, budget=budget)
+    budget.configure_limits(
+        max_model_calls=1, max_tool_calls=20, max_state_transitions=128
+    )
+    request = AgentLoopRequest(
+        provider="fake", model="fake", state=state, budget=budget
+    )
     messages = []
     for iteration in range(9):
         await loop._run_iteration(request, provider, messages, state.route, iteration)
@@ -97,9 +143,9 @@ async def test_catalog_pages_continue_without_additional_model_calls() -> None:
     assert provider.requests == []
     assert messages == []
 
+
 ###############################################################################
 class FakeProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult]) -> None:
         self.results = deque(results)
@@ -110,9 +156,9 @@ class FakeProvider:
         self.requests.append({"request": request, "kwargs": kwargs})
         return self.results.popleft()
 
+
 ###############################################################################
 class VisionFakeProvider(FakeProvider):
-
     # -------------------------------------------------------------------------
     def __init__(self, results: list[LLMResult], *, vision: bool | None = True) -> None:
         super().__init__(results)
@@ -123,9 +169,9 @@ class VisionFakeProvider(FakeProvider):
         _ = model
         return self._vision
 
+
 ###############################################################################
 class FakeFactory:
-
     # -------------------------------------------------------------------------
     def __init__(self, provider: FakeProvider) -> None:
         self.provider = provider
@@ -134,9 +180,9 @@ class FakeFactory:
     def get_provider(self, provider: str) -> FakeProvider:
         return self.provider
 
+
 ###############################################################################
 class FakeCapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def servable_queries(self, queries: Any) -> list[str]:
         return list(queries)
@@ -155,9 +201,9 @@ class FakeCapabilityRegistry:
     def list_basemaps(self) -> list[dict[str, object]]:
         return []
 
+
 ###############################################################################
 class FakeRuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         return True
@@ -166,9 +212,11 @@ class FakeRuntimeRegistry:
     def access_available(self, capability_id: str) -> bool:
         return True
 
+
 ###############################################################################
 class EmptyInput(BaseModel):
     pass
+
 
 ###############################################################################
 async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolResult:
@@ -179,6 +227,7 @@ async def _answer_handler(arguments: BaseModel, state: AgentRunState) -> ToolRes
         summary="tool completed",
         metadata=ToolExecutionMetadata(duration_ms=0),
     )
+
 
 ###############################################################################
 def _loop(
@@ -241,6 +290,7 @@ def _loop(
         capture_store=capture_store,
     )
 
+
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -249,6 +299,7 @@ def _state() -> AgentRunState:
         phase=AgentPhase.RECEIVE_REQUEST,
         user_message="find hospitals",
     )
+
 
 ###############################################################################
 def _route_call() -> LLMResult:
@@ -268,6 +319,7 @@ def _route_call() -> LLMResult:
             )
         ],
     )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -303,6 +355,7 @@ async def test_loop_routes_exposes_tools_and_finishes_from_final_model_text() ->
     assert provider.requests[0]["request"].provider_session_id == state.conversation_id
     assert state.transition_trace
 
+
 ###############################################################################
 def _route_call_with(*, drop: str | None = None, **updates: Any) -> LLMResult:
     arguments = {**(_route_call().tool_calls[0].arguments or {}), **updates}
@@ -313,6 +366,7 @@ def _route_call_with(*, drop: str | None = None, **updates: Any) -> LLMResult:
             LLMToolCall(id="route-1", name="route_request", arguments=arguments)
         ],
     )
+
 
 ###############################################################################
 async def _run_route(provider: FakeProvider, **options: Any) -> AgentLoopOutcome:
@@ -326,6 +380,7 @@ async def _run_route(provider: FakeProvider, **options: Any) -> AgentLoopOutcome
             **options,
         )
     )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -375,6 +430,7 @@ async def test_final_route_attempt_drops_invalid_optional_scope() -> None:
     assert outcome.state.route.spatial_scope is None
     assert outcome.state.route.capability_queries == ["hospitals"]
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_route_missing_required_field_is_never_salvaged() -> None:
@@ -389,9 +445,12 @@ async def test_route_missing_required_field_is_never_salvaged() -> None:
         "tool ran. Try naming the place and the data or map change you want."
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_plain_text_reply_instead_of_route_call_falls_back_to_conversation() -> None:
+async def test_plain_text_reply_instead_of_route_call_falls_back_to_conversation() -> (
+    None
+):
     provider = FakeProvider(
         [
             LLMResult(content="Hello!"),
@@ -405,11 +464,17 @@ async def test_plain_text_reply_instead_of_route_call_falls_back_to_conversation
     assert outcome.stopped_reason == "goal_satisfied"
     assert outcome.state.route is not None
     assert outcome.state.route.primary_domain is CapabilityDomain.CONVERSATION
-    assert "No tool call was returned" in provider.requests[1]["request"].messages[-1]["content"]
+    assert (
+        "No tool call was returned"
+        in provider.requests[1]["request"].messages[-1]["content"]
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_final_route_attempt_infers_execute_for_a_map_route_without_task_mode() -> None:
+async def test_final_route_attempt_infers_execute_for_a_map_route_without_task_mode() -> (
+    None
+):
     incomplete = _route_call_with(drop="task_mode", presentation="map")
     provider = FakeProvider(
         [incomplete, incomplete, *(LLMResult(content="Done.") for _ in range(4))]
@@ -419,6 +484,7 @@ async def test_final_route_attempt_infers_execute_for_a_map_route_without_task_m
 
     assert outcome.state.route is not None
     assert outcome.state.route.task_mode == "execute"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -447,6 +513,7 @@ async def test_conversation_with_empty_answers_uses_the_reserved_answer_call() -
         for message in provider.requests[-1]["request"].messages
         if message.get("role") == "assistant"
     )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -495,11 +562,15 @@ async def test_empty_answer_truncated_by_output_cap_fails_and_sends_global_cap(
     assert request_output_token_cap(llm_request) == 4096
     assert "Ignoring conflicting maximum output metadata aliases" not in caplog.text
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "text,expected",
     [
-        ("What would you like me to show? Name a place or dataset.", "clarification_required"),
+        (
+            "What would you like me to show? Name a place or dataset.",
+            "clarification_required",
+        ),
         ("Here is the map.", "no_progress"),
     ],
 )
@@ -524,6 +595,7 @@ def test_question_instead_of_unresolved_place_is_a_clarification(
     )
 
     assert stop == (expected, text)
+
 
 ###############################################################################
 def test_native_route_promotes_the_execution_profile_once() -> None:
@@ -555,6 +627,7 @@ def test_native_route_promotes_the_execution_profile_once() -> None:
 
     assert simple_budget.total_seconds == 150
     assert complex_budget.total_seconds == 300
+
 
 ###############################################################################
 def test_verified_render_closes_map_completion_contract() -> None:
@@ -595,6 +668,7 @@ def test_verified_render_closes_map_completion_contract() -> None:
 
     assert stop == ("goal_satisfied", "The map is ready.")
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("failure_codes", "blocked"),
@@ -623,6 +697,7 @@ def test_identical_map_plan_is_retried_once_only_after_a_render_timeout(
 
     assert AgentLoop._render_retry_blocked(state, "plan-a") is blocked  # pyright: ignore[reportPrivateUsage]
     assert AgentLoop._render_retry_blocked(state, "plan-b") is False  # pyright: ignore[reportPrivateUsage]
+
 
 ###############################################################################
 def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
@@ -669,6 +744,7 @@ def test_render_recovery_exhaustion_preserves_first_failure_cause() -> None:
     assert "The selected source was not registered." in outcome.final_text
     assert "A later generic validation check failed." not in outcome.final_text
 
+
 ###############################################################################
 def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
     state = _state()
@@ -712,39 +788,44 @@ def test_failed_render_requires_a_new_map_candidate_for_tool_progress() -> None:
         "no_progress",
         "Render recovery requires a materially different map action.",
     )
-    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
-        state,
-        state.route,
-        [discovery],
-        max_consecutive_tool_failures=3,
-        max_validation_corrections=2,
-        max_discovery_attempts=2,
-    ) == expected
-    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
-        state,
-        state.route,
-        [failed_map],
-        max_consecutive_tool_failures=3,
-        max_validation_corrections=2,
-        max_discovery_attempts=2,
-    ) == expected
+    assert (
+        AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+            state,
+            state.route,
+            [discovery],
+            max_consecutive_tool_failures=3,
+            max_validation_corrections=2,
+            max_discovery_attempts=2,
+        )
+        == expected
+    )
+    assert (
+        AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+            state,
+            state.route,
+            [failed_map],
+            max_consecutive_tool_failures=3,
+            max_validation_corrections=2,
+            max_discovery_attempts=2,
+        )
+        == expected
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correction() -> None:
+async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correction() -> (
+    None
+):
     provider = FakeProvider(
         [
             LLMResult(
                 content="",
-                tool_calls=[
-                    LLMToolCall(id="tool-1", name="test_tool", arguments={})
-                ],
+                tool_calls=[LLMToolCall(id="tool-1", name="test_tool", arguments={})],
             ),
             LLMResult(
                 content="",
-                tool_calls=[
-                    LLMToolCall(id="tool-2", name="test_tool", arguments={})
-                ],
+                tool_calls=[LLMToolCall(id="tool-2", name="test_tool", arguments={})],
             ),
         ]
     )
@@ -790,6 +871,7 @@ async def test_tool_turn_no_progress_after_render_failure_gets_bounded_correctio
     ] == ["failed_render_recovery"]
     assert provider.requests[1]["kwargs"]["tool_choice"] == "auto"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_verified_render_emits_tools_disabled_finalization_trace() -> None:
@@ -826,14 +908,20 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     assert all(event.payload["tool_choice"] == "none" for event in finalization)
     assert [event.payload["model_call_index"] for event in finalization] == [0, 1]
     assert set(finalization[0].payload) == {
-        "request_id", "conversation_id", "provider", "model",
+        "request_id",
+        "conversation_id",
+        "provider",
+        "model",
         "reason",
         "tools_exposed",
         "tool_choice",
         "model_call_index",
     }
     assert set(finalization[1].payload) == {
-        "request_id", "conversation_id", "provider", "model",
+        "request_id",
+        "conversation_id",
+        "provider",
+        "model",
         "reason",
         "tools_exposed",
         "tool_choice",
@@ -847,6 +935,7 @@ async def test_verified_render_emits_tools_disabled_finalization_trace() -> None
     )
     assert provider.requests[0]["kwargs"]["tool_choice"] == "none"
     assert provider.requests[0]["kwargs"]["tools"] is None
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -895,9 +984,11 @@ async def test_verified_single_place_map_reports_coordinates_without_another_mod
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("bar", ["｜", "｜｜", "|"])
-async def test_verified_render_suppresses_raw_dsml_finalization_content(bar: str) -> None:
+async def test_verified_render_suppresses_raw_dsml_finalization_content(
+    bar: str,
+) -> None:
     protocol_content = (
-        f'<{bar}DSML{bar} calls>\n<{bar}DSML{bar} invoke '
+        f"<{bar}DSML{bar} calls>\n<{bar}DSML{bar} invoke "
         'name="apply_map_plan">fit_location="florence, italy"'
     )
     provider = FakeProvider([LLMResult(content=protocol_content)])
@@ -923,6 +1014,7 @@ async def test_verified_render_suppresses_raw_dsml_finalization_content(bar: str
     completed = [event for event in events if event.kind == "finalization_completed"]
     assert len(completed) == 1
     assert completed[0].payload["outcome"] == "protocol_text_suppressed"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -970,6 +1062,7 @@ async def test_verified_map_state_finalization_uses_committed_overlays() -> None
         "Basemap: OpenStreetMap. Visible overlays: none."
     )
 
+
 ###############################################################################
 def test_native_goal_compiles_deterministic_completion_contract() -> None:
     state = _state()
@@ -1016,6 +1109,7 @@ def test_native_goal_compiles_deterministic_completion_contract() -> None:
     assert state.completion_contract.temporal_scope_required is True
     assert state.completion_contract.spatial_scope_required is True
 
+
 ###############################################################################
 def test_route_revision_cannot_drop_the_data_obligation() -> None:
     state = _state()
@@ -1034,7 +1128,10 @@ def test_route_revision_cannot_drop_the_data_obligation() -> None:
     assert previous is not None and "required_data_retrieved" in previous.requirements
 
     AgentLoop._compile_native_goal(  # pyright: ignore[reportPrivateUsage]
-        state, data_route.model_copy(update={"primary_domain": CapabilityDomain.MAP_RENDERING})
+        state,
+        data_route.model_copy(
+            update={"primary_domain": CapabilityDomain.MAP_RENDERING}
+        ),
     )
     assert state.completion_contract is not None
     assert "required_data_retrieved" not in state.completion_contract.requirements
@@ -1091,9 +1188,13 @@ def test_text_coordinate_resolution_does_not_require_provider_evidence() -> None
 
     assert checks["location_resolved"] is True
     assert checks["required_data_retrieved"] is True
-    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
-        state
-    ) == []
+    assert (
+        AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+            state
+        )
+        == []
+    )
+
 
 ###############################################################################
 def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> None:
@@ -1128,12 +1229,18 @@ def test_text_evidence_inspection_requires_only_a_saved_inspection_result() -> N
     checks = AgentLoop._completion_checks(state)  # pyright: ignore[reportPrivateUsage]
 
     assert checks["evidence_inspected"] is True
-    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
-        state
-    ) == []
+    assert (
+        AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+            state
+        )
+        == []
+    )
+
 
 ###############################################################################
-def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> None:
+def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary() -> (
+    None
+):
     state = _state()
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.MAP_RENDERING,
@@ -1156,6 +1263,7 @@ def test_map_add_route_requires_provider_data_when_data_retrieval_is_secondary()
     assert state.completion_contract is not None
     assert state.completion_contract.data_requirement == "provider_data"
     assert "required_data_retrieved" in state.completion_contract.requirements
+
 
 ###############################################################################
 def test_capability_discovery_route_completes_on_catalog_result() -> None:
@@ -1205,9 +1313,12 @@ def test_capability_discovery_route_completes_on_catalog_result() -> None:
     )
 
     assert AgentLoop._completion_checks(state)["capabilities_discovered"] is True  # pyright: ignore[reportPrivateUsage]
-    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
-        state
-    ) == []
+    assert (
+        AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+            state
+        )
+        == []
+    )
 
     state.tool_results[-1] = state.tool_results[-1].model_copy(
         update={"data": {"capabilities": [], "next_cursor": "12", "total": 20}}
@@ -1220,6 +1331,7 @@ def test_capability_discovery_route_completes_on_catalog_result() -> None:
         update={"data": {"capabilities": [], "next_cursor": None, "total": 20}}
     )
     assert AgentLoop._pending_catalog_discovery_cursor(state) is None  # pyright: ignore[reportPrivateUsage]
+
 
 ###############################################################################
 def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
@@ -1242,14 +1354,18 @@ def test_empty_catalog_discovery_can_complete_as_a_reportable_result() -> None:
         metadata=ToolExecutionMetadata(duration_ms=1),
     )
 
-    assert AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
-        state,
-        route,
-        [empty_result],
-        max_consecutive_tool_failures=3,
-        max_validation_corrections=3,
-        max_discovery_attempts=2,
-    ) is None
+    assert (
+        AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
+            state,
+            route,
+            [empty_result],
+            max_consecutive_tool_failures=3,
+            max_validation_corrections=3,
+            max_discovery_attempts=2,
+        )
+        is None
+    )
+
 
 ###############################################################################
 def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> None:
@@ -1302,7 +1418,10 @@ def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> N
         update={"data": {"options": ["Springfield, Illinois", "Springfield, Missouri"]}}
     )
     assert _stop([ambiguous]) == ("clarification_required", coverage)
-    assert state.clarification_options == ["Springfield, Illinois", "Springfield, Missouri"]
+    assert state.clarification_options == [
+        "Springfield, Illinois",
+        "Springfield, Missouri",
+    ]
     clarify_route = route.model_copy(
         update={"task_mode": "clarify", "clarification_options": ["A", "B"]}
     )
@@ -1310,6 +1429,7 @@ def test_coverage_rejection_stops_only_without_an_in_coverage_alternative() -> N
         state, clarify_route, "Which?"
     ) == ("clarification_required", "Which?")
     assert state.clarification_options == ["A", "B"]
+
 
 ###############################################################################
 def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None:
@@ -1380,6 +1500,7 @@ def test_exhausted_discovery_after_provider_failure_names_the_provider() -> None
         "No supported capability matched the request after discovery.",
     )
 
+
 ###############################################################################
 def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None:
     state = _state()
@@ -1425,9 +1546,13 @@ def test_text_geocode_resolution_satisfies_data_and_spatial_completion() -> None
 
     assert checks["required_data_retrieved"] is True
     assert checks["spatial_scope_applied"] is True
-    assert AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
-        state
-    ) == []
+    assert (
+        AgentLoop._pending_requirements_for_task_state(  # pyright: ignore[reportPrivateUsage]
+            state
+        )
+        == []
+    )
+
 
 ###############################################################################
 def test_location_only_map_recovery_requires_a_single_resolved_location() -> None:
@@ -1470,6 +1595,7 @@ def test_location_only_map_recovery_requires_a_single_resolved_location() -> Non
     )
     assert AgentLoop._completion_checks(state)["required_data_retrieved"] is False  # pyright: ignore[reportPrivateUsage]
 
+
 ###############################################################################
 def test_location_only_map_recovery_accepts_duplicate_same_location_results() -> None:
     state = _state()
@@ -1506,6 +1632,7 @@ def test_location_only_map_recovery_accepts_duplicate_same_location_results() ->
     assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
         state, route
     )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1566,6 +1693,7 @@ async def test_location_only_map_recovery_replaces_stale_failure_text(
 
     assert outcome.stopped_reason == "awaiting_render"
     assert outcome.final_text == "The map is ready."
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1664,6 +1792,7 @@ async def test_location_only_map_recovery_runs_after_a_location_tool_result(
     )
     assert outcome.state.prepared_map_session is not None
 
+
 ###############################################################################
 def test_location_only_map_recovery_uses_the_current_location_result() -> None:
     state = _state()
@@ -1703,9 +1832,13 @@ def test_location_only_map_recovery_uses_the_current_location_result() -> None:
     assert AgentLoop._needs_location_only_map_recovery(  # pyright: ignore[reportPrivateUsage]
         state, route
     )
-    assert AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
-        state
-    ) == "kolkata, india"
+    assert (
+        AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
+            state
+        )
+        == "kolkata, india"
+    )
+
 
 ###############################################################################
 def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> None:
@@ -1734,9 +1867,13 @@ def test_location_only_map_recovery_can_reuse_one_close_current_route_ref() -> N
         location_type="city",
     )
 
-    assert AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
-        state, route
-    ) == "kolkata, india"
+    assert (
+        AgentLoop._location_only_map_recovery_ref(  # pyright: ignore[reportPrivateUsage]
+            state, route
+        )
+        == "kolkata, india"
+    )
+
 
 ###############################################################################
 def test_hydrated_parent_location_never_satisfies_an_unresolved_landmark() -> None:
@@ -1753,7 +1890,10 @@ def test_hydrated_parent_location_never_satisfies_an_unresolved_landmark() -> No
     state.route = route
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
     state.location_refs["berlin"] = ResolvedLocation(
-        label="Berlin, Germany", latitude=52.52, longitude=13.4, confidence=0.9,
+        label="Berlin, Germany",
+        latitude=52.52,
+        longitude=13.4,
+        confidence=0.9,
         location_type="city",
     )
     state.tool_results.append(
@@ -1775,6 +1915,7 @@ def test_hydrated_parent_location_never_satisfies_an_unresolved_landmark() -> No
     )
     assert "Brandenburg Gate, Berlin, Germany" in disclosed
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
@@ -1794,6 +1935,7 @@ async def test_model_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
     assert outcome.state.model_calls == 1
     assert outcome.state.transitions == 1
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_transition_budget_exhaustion_has_a_distinct_terminal_reason() -> None:
@@ -1812,9 +1954,12 @@ async def test_transition_budget_exhaustion_has_a_distinct_terminal_reason() -> 
     assert outcome.state.termination_reason == "transition_budget_exhausted"
     assert outcome.state.transitions == 1
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_opencode_go_native_calls_use_conversation_session_and_compatible_thinking_mode() -> None:
+async def test_opencode_go_native_calls_use_conversation_session_and_compatible_thinking_mode() -> (
+    None
+):
     provider = FakeProvider([LLMResult(content="ready")])
     loop = _loop(provider)
     state = _state()
@@ -1836,6 +1981,7 @@ async def test_opencode_go_native_calls_use_conversation_session_and_compatible_
     captured = provider.requests[0]["request"]
     assert captured.provider_session_id == state.conversation_id
     assert captured.metadata["thinking_mode"] == "disabled"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1904,9 +2050,12 @@ async def test_model_retry_honors_provider_retry_after_within_budget(
     assert sleeps == expected_sleeps
     assert len(provider.requests) == expected_calls
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_model_retry_uses_same_provider_and_records_safe_transport_trace() -> None:
+async def test_model_retry_uses_same_provider_and_records_safe_transport_trace() -> (
+    None
+):
 
     ###############################################################################
     class _RetryingProvider(FakeProvider):
@@ -1970,6 +2119,7 @@ async def test_model_retry_uses_same_provider_and_records_safe_transport_trace()
     assert failure["exception_class"] == "ConnectError"
     assert failure["retryable"] is True
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
@@ -2009,6 +2159,7 @@ async def test_native_model_context_usage_is_recorded_and_emitted() -> None:
     assert request.state.context_usage_trace[0]["reported_input_tokens"] == 110
     assert request.state.model_trace[0]["status"] == "observed"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_run_control_stops_before_a_superseded_model_result_is_applied() -> None:
@@ -2039,6 +2190,7 @@ async def test_run_control_stops_before_a_superseded_model_result_is_applied() -
     assert outcome.state.tool_calls == 0
     assert outcome.state.termination_reason == "superseded"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_run_control_stops_cancelled_request_before_provider_call() -> None:
@@ -2055,6 +2207,7 @@ async def test_run_control_stops_cancelled_request_before_provider_call() -> Non
 
     assert outcome.stopped_reason == "cancelled"
     assert provider.requests == []
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2073,6 +2226,7 @@ async def test_iteration_limit_above_former_ceiling_is_not_clamped() -> None:
 
     assert state.max_iterations == 150
     assert state.task_state["max_iterations"] == 150
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2105,6 +2259,7 @@ async def test_loop_preserves_malformed_tool_call_as_failure() -> None:
 
     assert outcome.tool_results[0].error is not None
     assert outcome.tool_results[0].error.error_type == "malformed_call"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2142,12 +2297,19 @@ async def test_successful_tool_is_followed_by_one_final_model_step() -> None:
     assert assistant_message["tool_calls"][0]["name"] == "test_tool"
     assert assistant_message["tool_calls"][0]["arguments"] == {}
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_an_empty_final_answer_gets_one_correction_then_an_honest_fallback() -> None:
-    corrected = FakeProvider([LLMResult(content=""), LLMResult(content="Vienna is warmer.")])
+async def test_an_empty_final_answer_gets_one_correction_then_an_honest_fallback() -> (
+    None
+):
+    corrected = FakeProvider(
+        [LLMResult(content=""), LLMResult(content="Vienna is warmer.")]
+    )
     request = AgentLoopRequest(
-        provider="fake", model="fake-model", state=_state(),
+        provider="fake",
+        model="fake-model",
+        state=_state(),
         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
     )
     answer = await _loop(corrected)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
@@ -2156,9 +2318,13 @@ async def test_an_empty_final_answer_gets_one_correction_then_an_honest_fallback
     assert answer == "Vienna is warmer."
     assert len(corrected.requests) == 2
 
-    silent = FakeProvider([LLMResult(content=""), LLMResult(content=""), LLMResult(content="unused")])
+    silent = FakeProvider(
+        [LLMResult(content=""), LLMResult(content=""), LLMResult(content="unused")]
+    )
     request = AgentLoopRequest(
-        provider="fake", model="fake-model", state=_state(),
+        provider="fake",
+        model="fake-model",
+        state=_state(),
         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
     )
     answer = await _loop(silent)._finalize_completed_request(  # pyright: ignore[reportPrivateUsage]
@@ -2166,6 +2332,7 @@ async def test_an_empty_final_answer_gets_one_correction_then_an_honest_fallback
     )
     assert len(silent.requests) == 2
     assert "finished" not in answer
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2195,6 +2362,7 @@ async def test_model_cap_exhaustion_summarizes_gathered_evidence() -> None:
     assert "model-call limit was reached" in outcome.final_text
     assert len(provider.requests) == 3
 
+
 ###############################################################################
 def _exhausted_weather_request(provider: FakeProvider) -> AgentLoopRequest:
     state = _state()
@@ -2219,9 +2387,12 @@ def _exhausted_weather_request(provider: FakeProvider) -> AgentLoopRequest:
     state.model_calls = 1
     return request
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_completed_request_uses_the_reserved_terminal_call_at_the_model_cap() -> None:
+async def test_completed_request_uses_the_reserved_terminal_call_at_the_model_cap() -> (
+    None
+):
     provider = FakeProvider([LLMResult(content="Rome is 27.3 °C right now.")])
     request = _exhausted_weather_request(provider)
 
@@ -2235,12 +2406,15 @@ async def test_completed_request_uses_the_reserved_terminal_call_at_the_model_ca
     assert len(provider.requests) == 1
     assert request.budget.terminal_reserve_used
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_completed_request_stores_the_deterministic_text_when_the_answer_overclaims(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    provider = FakeProvider([LLMResult(content="Everything was fully completed for Rome.")])
+    provider = FakeProvider(
+        [LLMResult(content="Everything was fully completed for Rome.")]
+    )
     request = _exhausted_weather_request(provider)
     monkeypatch.setattr(
         AgentLoop,
@@ -2264,7 +2438,11 @@ async def test_completed_request_stores_the_deterministic_text_when_the_answer_o
     assert "fully completed" not in answer
     replaced = [e for e in events if e.payload.get("outcome") == "answer_replaced"]
     assert replaced and replaced[0].payload["final_answer_violations"]
-    assert replaced[0].payload["rejected_answer"] == "Everything was fully completed for Rome."
+    assert (
+        replaced[0].payload["rejected_answer"]
+        == "Everything was fully completed for Rome."
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2281,6 +2459,7 @@ async def test_completed_request_lists_gathered_evidence_when_synthesis_fails() 
     assert answer.startswith("Results gathered so far:")
     assert "Rome, Italy: 27.3 °C" in answer
     assert "(source: open_meteo)" in answer
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2305,18 +2484,14 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
             ),
             LLMResult(
                 content="",
-                tool_calls=[
-                    LLMToolCall(id="call-1", name="test_tool", arguments={})
-                ],
+                tool_calls=[LLMToolCall(id="call-1", name="test_tool", arguments={})],
             ),
             LLMResult(content="The tool result is complete."),
         ]
     )
     state = _state()
     state.context_hydrated = True
-    state.recent_messages = [
-        {"role": "assistant", "content": "Earlier context."}
-    ]
+    state.recent_messages = [{"role": "assistant", "content": "Earlier context."}]
     state.task_state = {"task": "find hospitals"}
     package = AgentContextPackage(
         current_user_message=state.user_message,
@@ -2359,6 +2534,7 @@ async def test_hydrated_context_is_rebuilt_with_the_latest_observation() -> None
         for message in latest_request.messages
     )
 
+
 ###############################################################################
 def test_tool_observation_preserves_bounded_result_data() -> None:
     result = ToolResult(
@@ -2389,6 +2565,7 @@ def test_tool_observation_preserves_bounded_result_data() -> None:
     assert observation["status"] == "success"
     assert observation["result"]["capabilities"][0]["id"] == "rainfall"
     assert observation["pagination"]["next_cursor"] == "1"
+
 
 ###############################################################################
 def test_capability_description_observation_preserves_contract_and_schema() -> None:
@@ -2431,6 +2608,7 @@ def test_capability_description_observation_preserves_contract_and_schema() -> N
         "forecast",
     ]
 
+
 ###############################################################################
 def test_trimmed_tool_results_stay_visible_through_canonical_context() -> None:
     state = _state()
@@ -2449,9 +2627,20 @@ def test_trimmed_tool_results_stay_visible_through_canonical_context() -> None:
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [{"id": "retained", "type": "function", "function": {"name": "test_tool", "arguments": "{}"}}],
+            "tool_calls": [
+                {
+                    "id": "retained",
+                    "type": "function",
+                    "function": {"name": "test_tool", "arguments": "{}"},
+                }
+            ],
         },
-        {"role": "tool", "tool_call_id": "retained", "name": "test_tool", "content": "retained observation"},
+        {
+            "role": "tool",
+            "tool_call_id": "retained",
+            "name": "test_tool",
+            "content": "retained observation",
+        },
     ]
     request = AgentLoopRequest(
         provider="fake",
@@ -2475,6 +2664,7 @@ def test_trimmed_tool_results_stay_visible_through_canonical_context() -> None:
         AgentLoop._working_state_message(state, 4096)  # pyright: ignore[reportPrivateUsage]
     )
     assert "tool_results" not in working and "render_observations" not in working
+
 
 ###############################################################################
 def test_working_state_remains_valid_json_when_compacted() -> None:
@@ -2503,6 +2693,7 @@ def test_working_state_remains_valid_json_when_compacted() -> None:
     assert payload["phase"] == state.phase.value
     assert payload["goal"] is None
     assert payload["completion_contract"] is None
+
 
 ###############################################################################
 def test_compacted_working_state_retains_goal_and_completion_invariants() -> None:
@@ -2542,6 +2733,7 @@ def test_compacted_working_state_retains_goal_and_completion_invariants() -> Non
     ]
     assert payload["route"]["primary_domain"] == "data_retrieval"
 
+
 ###############################################################################
 def test_responses_protocol_items_are_retained_for_the_next_model_turn() -> None:
     result = LLMResult(
@@ -2566,23 +2758,22 @@ def test_responses_protocol_items_are_retained_for_the_next_model_turn() -> None
 
     assert [item["type"] for item in messages] == ["reasoning", "function_call"]
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_successful_duplicate_call_replays_without_external_tool_execution() -> None:
+async def test_successful_duplicate_call_replays_without_external_tool_execution() -> (
+    None
+):
     provider = FakeProvider(
         [
             _route_call(),
             LLMResult(
                 content="",
-                tool_calls=[
-                    LLMToolCall(id="call-1", name="test_tool", arguments={})
-                ],
+                tool_calls=[LLMToolCall(id="call-1", name="test_tool", arguments={})],
             ),
             LLMResult(
                 content="",
-                tool_calls=[
-                    LLMToolCall(id="call-2", name="test_tool", arguments={})
-                ],
+                tool_calls=[LLMToolCall(id="call-2", name="test_tool", arguments={})],
             ),
             LLMResult(content="Duplicate handled."),
         ]
@@ -2600,9 +2791,9 @@ async def test_successful_duplicate_call_replays_without_external_tool_execution
     assert outcome.state.tool_calls == 1
     assert len(outcome.tool_results) == 2
 
+
 ###############################################################################
 class RetryThenUnexpectedProvider:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls = 0
@@ -2619,6 +2810,7 @@ class RetryThenUnexpectedProvider:
                 retryable=True,
             )
         raise AssertionError("The model retry exceeded the run deadline.")
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2642,6 +2834,7 @@ async def test_model_retry_cannot_restart_after_run_deadline() -> None:
         )
 
     assert provider.calls == 1
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2679,6 +2872,7 @@ async def test_map_route_text_cannot_stop_before_a_map_candidate_exists() -> Non
     assert outcome.stopped_reason == "failed"
     assert outcome.failure_category == "model_capability"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_exhausted_model_transport_retries_name_a_model_service_outage() -> None:
@@ -2710,7 +2904,9 @@ async def test_exhausted_model_transport_retries_name_a_model_service_outage() -
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_unexpected_loop_exception_is_an_internal_error_not_a_provider_error() -> None:
+async def test_unexpected_loop_exception_is_an_internal_error_not_a_provider_error() -> (
+    None
+):
     loop = _loop(FakeProvider([]))
 
     async def defective_route(*args: Any, **kwargs: Any) -> Any:
@@ -2729,67 +2925,147 @@ async def test_unexpected_loop_exception_is_an_internal_error_not_a_provider_err
     assert outcome.stopped_reason == "failed"
     assert outcome.failure_category == "internal_error"
 
+
 ###############################################################################
-@pytest.mark.parametrize('coverage,observed,expected', [
-    ({'spatial_scope_satisfied': False}, '2026-09-01T00:00:00Z', False),
-    ({'spatial_scope_satisfied': True}, '2026-08-01T00:00:00Z', False),
-    ({}, None, False),
-    ({'spatial_scope_satisfied': True}, '2026-09-01T00:00:00Z', True),
-])
-def test_completion_requires_verified_scope_for_every_requested_source(coverage, observed, expected) -> None:
+@pytest.mark.parametrize(
+    "coverage,observed,expected",
+    [
+        ({"spatial_scope_satisfied": False}, "2026-09-01T00:00:00Z", False),
+        ({"spatial_scope_satisfied": True}, "2026-08-01T00:00:00Z", False),
+        ({}, None, False),
+        ({"spatial_scope_satisfied": True}, "2026-09-01T00:00:00Z", True),
+    ],
+)
+def test_completion_requires_verified_scope_for_every_requested_source(
+    coverage, observed, expected
+) -> None:
     from server.services.agent.completion import CompletionEvaluator
+
     state = _state()
-    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
-        presentation='text', location_mode="none", explicit_capability_ids=['first', 'second'])
-    state.goal = AgentGoal(goal='Compare both sources', task_mode='execute', presentation='text',
-        operation='compare', location_mode="none", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'})
-    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
-        temporal_scope_required=True, spatial_scope_required=True)
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="none",
+        explicit_capability_ids=["first", "second"],
+    )
+    state.goal = AgentGoal(
+        goal="Compare both sources",
+        task_mode="execute",
+        presentation="text",
+        operation="compare",
+        location_mode="none",
+        temporal_scope={"reference_time_iso": "2026-09-01T00:00:00Z"},
+    )
+    state.completion_contract = CompletionContract(
+        operation="compare",
+        evidence_required=True,
+        temporal_scope_required=True,
+        spatial_scope_required=True,
+    )
+
     def result(capability):
-        return ToolResult(call_id=capability, tool_name='execute_geospatial_capability', status='success',
-            summary='Provider returned 200', data={'feature_count': 1}, evidence_refs=[capability],
-            metadata=ToolExecutionMetadata(duration_ms=0, capability_id=capability,
-                coverage=coverage, observation_time=observed))
-    state.tool_results = [result('first')]
-    assert CompletionEvaluator.data_checks(state)['required_data_retrieved'] is False
-    state.tool_results.append(result('second'))
+        return ToolResult(
+            call_id=capability,
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Provider returned 200",
+            data={"feature_count": 1},
+            evidence_refs=[capability],
+            metadata=ToolExecutionMetadata(
+                duration_ms=0,
+                capability_id=capability,
+                coverage=coverage,
+                observation_time=observed,
+            ),
+        )
+
+    state.tool_results = [result("first")]
+    assert CompletionEvaluator.data_checks(state)["required_data_retrieved"] is False
+    state.tool_results.append(result("second"))
     checks = CompletionEvaluator.data_checks(state)
-    assert (checks['spatial_scope_applied'] and checks['temporal_scope_applied']) is expected
-    state.tool_results.append(result('unrelated'))
+    assert (
+        checks["spatial_scope_applied"] and checks["temporal_scope_applied"]
+    ) is expected
+    state.tool_results.append(result("unrelated"))
     assessment = CompletionEvaluator.assess_evidence(state, state.tool_results[-1])
     assert assessment.data_relevant is False
     if not expected:
         assert CompletionEvaluator.assess_evidence(state, state.tool_results[0]).reasons
 
+
 ###############################################################################
-@pytest.mark.parametrize('second_time,second_spatial,resolved,expected', [
-    ('2026-08-01T00:00:00Z', True, ('paris', 'berlin'), False),
-    ('2026-09-01T00:00:00Z', False, ('paris', 'berlin'), False),
-    ('2026-09-01T00:00:00Z', True, ('paris',), False),
-    ('2026-09-01T00:00:00Z', True, ('paris', 'berlin'), True),
-])
-def test_completion_requires_scope_for_every_route_target(second_time, second_spatial, resolved, expected) -> None:
+@pytest.mark.parametrize(
+    "second_time,second_spatial,resolved,expected",
+    [
+        ("2026-08-01T00:00:00Z", True, ("paris", "berlin"), False),
+        ("2026-09-01T00:00:00Z", False, ("paris", "berlin"), False),
+        ("2026-09-01T00:00:00Z", True, ("paris",), False),
+        ("2026-09-01T00:00:00Z", True, ("paris", "berlin"), True),
+    ],
+)
+def test_completion_requires_scope_for_every_route_target(
+    second_time, second_spatial, resolved, expected
+) -> None:
     from server.services.agent.completion import CompletionEvaluator
+
     state = _state()
-    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
-        presentation='text', location_mode="target", target_refs=['paris', 'berlin'])
-    state.goal = AgentGoal(goal='Weather in Paris and Berlin', task_mode='execute', presentation='text',
-        operation='compare', location_mode="target", temporal_scope={'reference_time_iso': '2026-09-01T00:00:00Z'},
-        obligations=[RequestObligation(id=f'data:{target}', kind='data', target_ids=[target])
-                     for target in ('paris', 'berlin')])
-    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
-        temporal_scope_required=True, spatial_scope_required=True)
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="target",
+        target_refs=["paris", "berlin"],
+    )
+    state.goal = AgentGoal(
+        goal="Weather in Paris and Berlin",
+        task_mode="execute",
+        presentation="text",
+        operation="compare",
+        location_mode="target",
+        temporal_scope={"reference_time_iso": "2026-09-01T00:00:00Z"},
+        obligations=[
+            RequestObligation(id=f"data:{target}", kind="data", target_ids=[target])
+            for target in ("paris", "berlin")
+        ],
+    )
+    state.completion_contract = CompletionContract(
+        operation="compare",
+        evidence_required=True,
+        temporal_scope_required=True,
+        spatial_scope_required=True,
+    )
     for name in resolved:
-        state.location_refs[name] = ResolvedLocation(label=name.title(), latitude=48.0, longitude=2.0)
+        state.location_refs[name] = ResolvedLocation(
+            label=name.title(), latitude=48.0, longitude=2.0
+        )
+
     def result(target, observed, spatial):
-        return ToolResult(call_id=target, tool_name='execute_geospatial_capability', status='success',
-            summary='ok', data={'feature_count': 1, 'query': {'location_ref': target}}, evidence_refs=[target],
-            metadata=ToolExecutionMetadata(duration_ms=0, capability_id='weather',
-                coverage={'spatial_scope_satisfied': spatial, 'temporal_scope_satisfied': True},
-                observation_time=observed))
-    state.tool_results = [result('paris', '2026-09-01T00:00:00Z', True), result('berlin', second_time, second_spatial)]
+        return ToolResult(
+            call_id=target,
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="ok",
+            data={"feature_count": 1, "query": {"location_ref": target}},
+            evidence_refs=[target],
+            metadata=ToolExecutionMetadata(
+                duration_ms=0,
+                capability_id="weather",
+                coverage={
+                    "spatial_scope_satisfied": spatial,
+                    "temporal_scope_satisfied": True,
+                },
+                observation_time=observed,
+            ),
+        )
+
+    state.tool_results = [
+        result("paris", "2026-09-01T00:00:00Z", True),
+        result("berlin", second_time, second_spatial),
+    ]
     checks = CompletionEvaluator.data_checks(state)
     assert all(checks.values()) is expected
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2798,7 +3074,10 @@ async def test_completion_accepts_each_city_point_forecast_for_tomorrow() -> Non
     from server.services.agent.completion import CompletionEvaluator
     from server.services.geospatial.providers.base import ProviderRequest
     from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
-    tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
     class Service:
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
@@ -2806,52 +3085,119 @@ async def test_completion_accepts_each_city_point_forecast_for_tomorrow() -> Non
         async def get_weather_forecast(self, *, latitude, longitude, window):
             # Point forecasts stamp the current conditions with the sampling time
             # and return the hour-ending UTC hours of the requested window.
-            hours = [{"time": (window[0] + timedelta(hours=hour)).replace(tzinfo=None).isoformat(timespec="minutes"),
-                      "temperature_2m": 10.0, "precipitation": 0.0} for hour in range(1, 25)]
-            return {"kind": "weather_forecast", "latitude": latitude, "longitude": longitude,
-                    "observation_time": datetime.now(UTC).isoformat(), "coverage": {},
-                    "hourly_forecast": hours, "timezone": "UTC"}
+            hours = [
+                {
+                    "time": (window[0] + timedelta(hours=hour))
+                    .replace(tzinfo=None)
+                    .isoformat(timespec="minutes"),
+                    "temperature_2m": 10.0,
+                    "precipitation": 0.0,
+                }
+                for hour in range(1, 25)
+            ]
+            return {
+                "kind": "weather_forecast",
+                "latitude": latitude,
+                "longitude": longitude,
+                "observation_time": datetime.now(UTC).isoformat(),
+                "coverage": {},
+                "hourly_forecast": hours,
+                "timezone": "UTC",
+            }
 
     state = _state()
-    state.route = CapabilityRoute(primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode='execute',
-        presentation='text', location_mode="target", target_refs=['zurich', 'geneva'])
-    state.goal = AgentGoal(goal='Temperature tomorrow', task_mode='execute', presentation='text',
-        operation='compare', location_mode="target",
-        temporal_scope={'reference_time_iso': tomorrow.isoformat()})
-    state.completion_contract = CompletionContract(operation='compare', evidence_required=True,
-        temporal_scope_required=True)
-    for name, lat in (('zurich', 47.4), ('geneva', 46.2)):
-        state.location_refs[name] = ResolvedLocation(label=name.title(), latitude=lat, longitude=8.0)
-        response = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
-            capability_id='openmeteo_weather_forecast', bbox=(7.9, lat - .1, 8.1, lat + .1), time=tomorrow))
-        state.tool_results.append(ToolResult(call_id=name, tool_name='execute_geospatial_capability',
-            status='success', summary='ok', data={'feature_count': 1, 'query': {'location_ref': name}},
-            evidence_refs=[name], metadata=ToolExecutionMetadata(duration_ms=0,
-                capability_id='openmeteo_weather_forecast', coverage=response.coverage,
-                observation_time=response.observation_time)))
-    assert CompletionEvaluator.data_checks(state)['temporal_scope_applied'] is True
+    state.route = CapabilityRoute(
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="target",
+        target_refs=["zurich", "geneva"],
+    )
+    state.goal = AgentGoal(
+        goal="Temperature tomorrow",
+        task_mode="execute",
+        presentation="text",
+        operation="compare",
+        location_mode="target",
+        temporal_scope={"reference_time_iso": tomorrow.isoformat()},
+    )
+    state.completion_contract = CompletionContract(
+        operation="compare", evidence_required=True, temporal_scope_required=True
+    )
+    for name, lat in (("zurich", 47.4), ("geneva", 46.2)):
+        state.location_refs[name] = ResolvedLocation(
+            label=name.title(), latitude=lat, longitude=8.0
+        )
+        response = await OpenMeteoProvider(service=Service()).fetch(
+            ProviderRequest(
+                capability_id="openmeteo_weather_forecast",
+                bbox=(7.9, lat - 0.1, 8.1, lat + 0.1),
+                time=tomorrow,
+            )
+        )
+        state.tool_results.append(
+            ToolResult(
+                call_id=name,
+                tool_name="execute_geospatial_capability",
+                status="success",
+                summary="ok",
+                data={"feature_count": 1, "query": {"location_ref": name}},
+                evidence_refs=[name],
+                metadata=ToolExecutionMetadata(
+                    duration_ms=0,
+                    capability_id="openmeteo_weather_forecast",
+                    coverage=response.coverage,
+                    observation_time=response.observation_time,
+                ),
+            )
+        )
+    assert CompletionEvaluator.data_checks(state)["temporal_scope_applied"] is True
+
 
 ###############################################################################
-@pytest.mark.parametrize('observed,expected', [
-    ('2024-03-27T20:30:45+00:00', True),
-    ('2024-03-31T23:00:00+00:00', True),
-    ('2024-04-01T01:00:00+00:00', False),
-    ('2024-02-29T23:00:00+00:00', False),
-])
-def test_completion_checks_date_only_range_against_aware_observation(observed, expected) -> None:
+@pytest.mark.parametrize(
+    "observed,expected",
+    [
+        ("2024-03-27T20:30:45+00:00", True),
+        ("2024-03-31T23:00:00+00:00", True),
+        ("2024-04-01T01:00:00+00:00", False),
+        ("2024-02-29T23:00:00+00:00", False),
+    ],
+)
+def test_completion_checks_date_only_range_against_aware_observation(
+    observed, expected
+) -> None:
     from server.services.agent.completion import CompletionEvaluator
+
     state = _state()
-    state.goal = AgentGoal(goal='March quakes', task_mode='execute', presentation='map',
-        operation='show', location_mode="none",
-        temporal_scope={'start_time_iso': '2024-03-01', 'end_time_iso': '2024-03-31'})
-    state.completion_contract = CompletionContract(operation='show', evidence_required=True,
-        temporal_scope_required=True)
-    result = ToolResult(call_id='usgs', tool_name='execute_geospatial_capability', status='success',
-        summary='ok', data={'feature_count': 1}, evidence_refs=['usgs'],
-        metadata=ToolExecutionMetadata(duration_ms=0, capability_id='usgs',
-            coverage={'temporal_scope_satisfied': True}, observation_time=observed))
+    state.goal = AgentGoal(
+        goal="March quakes",
+        task_mode="execute",
+        presentation="map",
+        operation="show",
+        location_mode="none",
+        temporal_scope={"start_time_iso": "2024-03-01", "end_time_iso": "2024-03-31"},
+    )
+    state.completion_contract = CompletionContract(
+        operation="show", evidence_required=True, temporal_scope_required=True
+    )
+    result = ToolResult(
+        call_id="usgs",
+        tool_name="execute_geospatial_capability",
+        status="success",
+        summary="ok",
+        data={"feature_count": 1},
+        evidence_refs=["usgs"],
+        metadata=ToolExecutionMetadata(
+            duration_ms=0,
+            capability_id="usgs",
+            coverage={"temporal_scope_satisfied": True},
+            observation_time=observed,
+        ),
+    )
     assessment = CompletionEvaluator.assess_evidence(state, result)
     assert assessment.temporal_scope_satisfied is expected
+
 
 ###############################################################################
 def _vision_state(render_verified: bool = True) -> AgentRunState:
@@ -2867,6 +3213,7 @@ def _vision_state(render_verified: bool = True) -> AgentRunState:
         )
     ]
     return state
+
 
 ###############################################################################
 def _vision_capture_store(run_id: str = "request-1") -> RenderCaptureStore:
@@ -2885,6 +3232,7 @@ def _vision_capture_store(run_id: str = "request-1") -> RenderCaptureStore:
     )
     return store
 
+
 ###############################################################################
 def _image_parts(request: Any) -> list[dict[str, Any]]:
     for message in request.messages:
@@ -2892,6 +3240,7 @@ def _image_parts(request: Any) -> list[dict[str, Any]]:
         if isinstance(content, list):
             return content
     return []
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -2918,6 +3267,7 @@ async def test_always_policy_attaches_captured_map_to_next_model_step() -> None:
     assert state.vision_state.vision_calls == 1
     assert provider.requests[0]["request"].metadata.get("requires_vision") is True
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_non_vision_model_never_attaches() -> None:
@@ -2938,32 +3288,52 @@ async def test_non_vision_model_never_attaches() -> None:
     assert _image_parts(provider.requests[0]["request"]) == []
     assert state.vision_state is None
 
+
 ###############################################################################
 @pytest.mark.parametrize("vision", [True, False])
 @pytest.mark.asyncio
-async def test_user_attached_image_reaches_every_model_call_or_is_declared_unviewable(vision: bool) -> None:
+async def test_user_attached_image_reaches_every_model_call_or_is_declared_unviewable(
+    vision: bool,
+) -> None:
     import base64
 
     provider = VisionFakeProvider([LLMResult(content="ok")], vision=vision)
     store = RenderCaptureStore()
-    attachment_id = store.save_attachment(conversation_id="conversation-1", mime_type="image/jpeg",
-                                          image_base64=base64.b64encode(b"photo").decode("ascii"), width=8, height=8)
+    attachment_id = store.save_attachment(
+        conversation_id="conversation-1",
+        mime_type="image/jpeg",
+        image_base64=base64.b64encode(b"photo").decode("ascii"),
+        width=8,
+        height=8,
+    )
     assert store.bind_attachment(attachment_id, "conversation-1", "request-1")
     state = _state()
     loop = _loop(provider, capture_store=store)
-    request = AgentLoopRequest(provider="fake", model="m", state=state,
-                               budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10))
+    request = AgentLoopRequest(
+        provider="fake",
+        model="m",
+        state=state,
+        budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+    )
     await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
 
     sent = provider.requests[0]["request"]
     if vision:
         parts = _image_parts(sent)
-        assert parts[-1] == {"type": "image", "mime_type": "image/jpeg", "data": base64.b64encode(b"photo").decode("ascii")}
+        assert parts[-1] == {
+            "type": "image",
+            "mime_type": "image/jpeg",
+            "data": base64.b64encode(b"photo").decode("ascii"),
+        }
         assert "Image attached by the user" in parts[0]["text"]
         assert sent.metadata.get("requires_vision") is True
     else:
         assert _image_parts(sent) == []
-        assert any("cannot view images" in str(message.get("content")) for message in sent.messages)
+        assert any(
+            "cannot view images" in str(message.get("content"))
+            for message in sent.messages
+        )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -3002,9 +3372,12 @@ async def test_on_failure_policy_attaches_only_after_a_relevant_failure() -> Non
     assert state.vision_state is not None
     assert state.vision_state.vision_calls == 1
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call() -> None:
+async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call() -> (
+    None
+):
     provider = VisionFakeProvider([LLMResult(content="ok"), LLMResult(content="ok")])
     store = _vision_capture_store()
     state = _vision_state()
@@ -3019,12 +3392,11 @@ async def test_final_check_policy_skips_iteration_and_attaches_on_terminal_call(
     )
     await loop._model_step(request, provider, [], [])  # pyright: ignore[reportPrivateUsage]
     assert _image_parts(provider.requests[0]["request"]) == []
-    await loop._model_step(
-        request, provider, [], [], call_kind=TERMINAL_CALL_KIND
-    )  # pyright: ignore[reportPrivateUsage]
+    await loop._model_step(request, provider, [], [], call_kind=TERMINAL_CALL_KIND)  # pyright: ignore[reportPrivateUsage]
     assert _image_parts(provider.requests[1]["request"])[-1]["type"] == "image"
     assert state.vision_state is not None
     assert state.vision_state.vision_calls == 1
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -3045,6 +3417,7 @@ async def test_missing_capture_degrades_to_non_vision_without_failing() -> None:
 
     assert _image_parts(provider.requests[0]["request"]) == []
     assert state.vision_state is None
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -3072,12 +3445,11 @@ async def test_capture_missing_is_traced_only_when_an_image_was_wanted(
         vision_policy=policy,
         vision_max_calls=2,
     )
-    await loop._model_step(
-        request, provider, [], [], call_kind=TERMINAL_CALL_KIND
-    )  # pyright: ignore[reportPrivateUsage]
+    await loop._model_step(request, provider, [], [], call_kind=TERMINAL_CALL_KIND)  # pyright: ignore[reportPrivateUsage]
 
     assert traced == expected
     assert _image_parts(provider.requests[0]["request"]) == []
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -3097,17 +3469,28 @@ async def test_awaiting_render_capture_flag_is_policy_and_capability_gated() -> 
 
     # Vision-capable provider + always policy => capture requested.
     loop.provider_factory = FakeFactory(VisionFakeProvider([]))  # type: ignore[attr-defined]
-    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
-        _request("always", True)
-    ) is True
-    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
-        _request("disabled", True)
-    ) is False
+    assert (
+        loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+            _request("always", True)
+        )
+        is True
+    )
+    assert (
+        loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+            _request("disabled", True)
+        )
+        is False
+    )
     # Unknown vision capability degrades closed.
     loop.provider_factory = FakeFactory(VisionFakeProvider([], vision=None))  # type: ignore[attr-defined]
-    assert loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
-        _request("always", None)
-    ) is False
+    assert (
+        loop._capture_requested_for_outcome(  # pyright: ignore[reportPrivateUsage]
+            _request("always", None)
+        )
+        is False
+    )
+
+
 ###############################################################################
 @pytest.mark.parametrize(("profile", "model_calls"), [("simple", 10), ("complex", 7)])
 def test_tool_correction_lifts_a_simple_run_to_the_complex_budget(
@@ -3132,18 +3515,28 @@ def test_tool_correction_lifts_a_simple_run_to_the_complex_budget(
         assert request.budget.run_profile == "complex"
         assert request.budget.max_tool_calls == 20
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_incapable() -> None:
-    provider = FakeProvider([
-        LLMResult(
-            content="",
-            tool_calls=[
-                LLMToolCall(id=f"bad-{index}", name="test_tool", arguments=None, parse_error="bad_json")
-            ],
-        )
-        for index in range(4)
-    ])
+async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_incapable() -> (
+    None
+):
+    provider = FakeProvider(
+        [
+            LLMResult(
+                content="",
+                tool_calls=[
+                    LLMToolCall(
+                        id=f"bad-{index}",
+                        name="test_tool",
+                        arguments=None,
+                        parse_error="bad_json",
+                    )
+                ],
+            )
+            for index in range(4)
+        ]
+    )
     state = _state()
     state.context_hydrated = True
     state.route = CapabilityRoute(
@@ -3166,37 +3559,50 @@ async def test_identical_invalid_call_gets_repeat_feedback_and_ends_as_model_inc
     )
 
     repeat = next(
-        item for item in state.tool_results if item.error is not None
-        and item.error.code == "repeated_failed_fingerprint"
+        item
+        for item in state.tool_results
+        if item.error is not None and item.error.code == "repeated_failed_fingerprint"
     )
     assert repeat.data is not None
     feedback = repeat.data
     assert "'test_tool'" in repeat.summary and feedback["valid_tools"] == ["test_tool"]
-    assert any("finish with an answer" in action for action in feedback["allowed_next_actions"])
+    assert any(
+        "finish with an answer" in action for action in feedback["allowed_next_actions"]
+    )
     assert outcome.stopped_reason == "failed"
     assert outcome.failure_category == "model_capability"
     assert state.termination_reason == "model_incapable"
     assert "valid tools and arguments were available" in outcome.final_text
 
+
 ###############################################################################
 def test_stop_text_carries_the_provider_reason_for_an_empty_result() -> None:
     state = _state()
-    state.tool_results = [ToolResult(
-        call_id="gibs", tool_name="execute_geospatial_capability", status="valid_empty",
-        summary="No matching data.",
-        metadata=ToolExecutionMetadata(
-            duration_ms=0,
-            warnings=["No imagery is published for 2026-11-03; the latest available date is 2026-11-02."],
-        ),
-    )]
+    state.tool_results = [
+        ToolResult(
+            call_id="gibs",
+            tool_name="execute_geospatial_capability",
+            status="valid_empty",
+            summary="No matching data.",
+            metadata=ToolExecutionMetadata(
+                duration_ms=0,
+                warnings=[
+                    "No imagery is published for 2026-11-03; the latest available date is 2026-11-02."
+                ],
+            ),
+        )
+    ]
 
     note = AgentLoop._empty_result_note(state)  # pyright: ignore[reportPrivateUsage]
 
     assert "latest available date is 2026-11-02" in note
     assert AgentLoop._empty_result_note(_state()) == ""  # pyright: ignore[reportPrivateUsage]
 
+
 ###############################################################################
-def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_range() -> None:
+def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_range() -> (
+    None
+):
     state = _state()
     state.validation_corrections = 3
     state.tool_results = [
@@ -3205,32 +3611,50 @@ def test_impossible_argument_value_ends_as_unsupported_request_with_the_valid_ra
             tool_name="execute_geospatial_capability",
             status="failed",
             summary="Tool arguments failed semantic validation.",
-            data={"issues": [{
-                "path": "arguments.minmagnitude", "code": "out_of_range",
-                "message": "arguments.minmagnitude: number 15 is outside the valid range (maximum 10).",
-            }]},
+            data={
+                "issues": [
+                    {
+                        "path": "arguments.minmagnitude",
+                        "code": "out_of_range",
+                        "message": "arguments.minmagnitude: number 15 is outside the valid range (maximum 10).",
+                    }
+                ]
+            },
             metadata=ToolExecutionMetadata(duration_ms=0),
         )
     ]
     route = CapabilityRoute(
-        primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute",
-        presentation="text", location_mode="none",
+        primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+        task_mode="execute",
+        presentation="text",
+        location_mode="none",
     )
 
     stop = AgentLoop._evaluate_stop(  # pyright: ignore[reportPrivateUsage]
-        state, route, state.tool_results,
-        max_consecutive_tool_failures=3, max_validation_corrections=2, max_discovery_attempts=2,
+        state,
+        route,
+        state.tool_results,
+        max_consecutive_tool_failures=3,
+        max_validation_corrections=2,
+        max_discovery_attempts=2,
     )
     assert stop is not None and stop[0] == "unsupported_request"
     assert "maximum 10" in stop[1]
 
     outcome = _loop(FakeProvider([]))._outcome(  # pyright: ignore[reportPrivateUsage]
-        state, stop[1], stop[0],
-        AgentLoopRequest(provider="fake", model="fake-model", state=state,
-                         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10)),
+        state,
+        stop[1],
+        stop[0],
+        AgentLoopRequest(
+            provider="fake",
+            model="fake-model",
+            state=state,
+            budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
+        ),
     )
     assert outcome.stopped_reason == "insufficient_evidence"
     assert outcome.failure_category is None
+
 
 ###############################################################################
 def _map_request_state(*, hydrated: bool = True) -> AgentRunState:
@@ -3246,71 +3670,117 @@ def _map_request_state(*, hydrated: bool = True) -> AgentRunState:
         capability_queries=["wildfire hotspots"],
     )
     state.route = route
-    state.location_refs = {"portugal": ResolvedLocation(label="Portugal", latitude=39.4, longitude=-8.2)}
+    state.location_refs = {
+        "portugal": ResolvedLocation(label="Portugal", latitude=39.4, longitude=-8.2)
+    }
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
     return state
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_answer_describing_a_map_whose_render_failed_is_replaced_and_the_gap_disclosed() -> None:
+async def test_answer_describing_a_map_whose_render_failed_is_replaced_and_the_gap_disclosed() -> (
+    None
+):
     provider = FakeProvider([])
     state = _map_request_state()
     state.render_observations = [
         RenderObservation(
-            map_session_id="map-1", collection_revision=1, attempt=1, status="failed",
-            failure_code="render_timeout", recovery="terminal",
+            map_session_id="map-1",
+            collection_revision=1,
+            attempt=1,
+            status="failed",
+            failure_code="render_timeout",
+            recovery="terminal",
         )
     ]
     request = AgentLoopRequest(
-        provider="fake", model="fake-model", state=state,
+        provider="fake",
+        model="fake-model",
+        state=state,
         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
     )
     loop = _loop(provider)
 
     checked = await loop._verified_answer_text(  # pyright: ignore[reportPrivateUsage]
-        request, "What's on the map: a thermal-anomaly overlay for Portugal.", reason="test"
+        request,
+        "What's on the map: a thermal-anomaly overlay for Portugal.",
+        reason="test",
     )
 
     assert checked == ""
     assert "could not be confirmed" in loop._with_disclosure(state, "Hotspots found.")  # pyright: ignore[reportPrivateUsage]
 
+
 ###############################################################################
 def test_verified_empty_data_ends_the_run_with_the_unpresented_map_disclosed() -> None:
     state = _map_request_state()
-    state.tool_results.append(ToolResult(
-        call_id="usgs", tool_name="execute_geospatial_capability", status="valid_empty",
-        summary="No events matched.", semantic_outcome="resolved",
-        metadata=ToolExecutionMetadata(
-            duration_ms=1, capability_id="usgs_earthquakes", result_type="features",
-            coverage={"query_complete": True, "data_valid": True},
-        ),
-    ))
+    state.tool_results.append(
+        ToolResult(
+            call_id="usgs",
+            tool_name="execute_geospatial_capability",
+            status="valid_empty",
+            summary="No events matched.",
+            semantic_outcome="resolved",
+            metadata=ToolExecutionMetadata(
+                duration_ms=1,
+                capability_id="usgs_earthquakes",
+                result_type="features",
+                coverage={"query_complete": True, "data_valid": True},
+            ),
+        )
+    )
 
     assert data_verified_empty(state)
     answer = AgentLoop._with_disclosure(state, "No matching events were found.")  # pyright: ignore[reportPrivateUsage]
     assert "Not delivered: the requested map" in answer
+
 
 ###############################################################################
 # Trimmed from the recorded S12 conversation (conv_9bf5e08a, turns 2-4): a text
 # follow-up on a basemap-only map, comparing the evidence of two earlier turns.
 _S12_VIENNA = "evidence_76ca50d1c7af4156ac776555fe5d748f"
 _S12_PRAGUE = "evidence_713f3125e3764d36a17578b319898f54"
-_S12_UNITS = {"temperature_2m": "°C", "precipitation": "mm", "relative_humidity_2m": "%"}
+_S12_UNITS = {
+    "temperature_2m": "°C",
+    "precipitation": "mm",
+    "relative_humidity_2m": "%",
+}
 _S12_PARENTS: dict[str, tuple[dict[str, str], dict[str, Any]]] = {
-    _S12_VIENNA: ({"location_ref": "vienna", "resolved_location": "Vienna, Austria"}, {
-        "category": "wind", "id": "openmeteo:wind:48.2084:16.3725", "latitude": 48.2083537,
-        "longitude": 16.3725042, "name": "Open-Meteo wind forecast", "precipitation": 0.0,
-        "precipitation_probability": 0, "relative_humidity_2m": 60, "source": "openmeteo",
-        "metadata": {"humidity": 60, "pressure": 1002.5, "units": _S12_UNITS},
-        "temperature_2m": 10.0, "weather_code": 1,
-    }),
-    _S12_PRAGUE: ({"location_ref": "prague, czechia", "resolved_location": "Prague, Czechia"}, {
-        "category": "wind", "id": "openmeteo:wind:50.0875:14.4213", "latitude": 50.0874654,
-        "longitude": 14.4212535, "name": "Open-Meteo wind forecast", "precipitation": 0.0,
-        "precipitation_probability": 0, "relative_humidity_2m": 72, "source": "openmeteo",
-        "metadata": {"humidity": 72, "pressure": 1002.9, "units": _S12_UNITS},
-        "temperature_2m": 6.7, "weather_code": 0,
-    }),
+    _S12_VIENNA: (
+        {"location_ref": "vienna", "resolved_location": "Vienna, Austria"},
+        {
+            "category": "wind",
+            "id": "openmeteo:wind:48.2084:16.3725",
+            "latitude": 48.2083537,
+            "longitude": 16.3725042,
+            "name": "Open-Meteo wind forecast",
+            "precipitation": 0.0,
+            "precipitation_probability": 0,
+            "relative_humidity_2m": 60,
+            "source": "openmeteo",
+            "metadata": {"humidity": 60, "pressure": 1002.5, "units": _S12_UNITS},
+            "temperature_2m": 10.0,
+            "weather_code": 1,
+        },
+    ),
+    _S12_PRAGUE: (
+        {"location_ref": "prague, czechia", "resolved_location": "Prague, Czechia"},
+        {
+            "category": "wind",
+            "id": "openmeteo:wind:50.0875:14.4213",
+            "latitude": 50.0874654,
+            "longitude": 14.4212535,
+            "name": "Open-Meteo wind forecast",
+            "precipitation": 0.0,
+            "precipitation_probability": 0,
+            "relative_humidity_2m": 72,
+            "source": "openmeteo",
+            "metadata": {"humidity": 72, "pressure": 1002.9, "units": _S12_UNITS},
+            "temperature_2m": 6.7,
+            "weather_code": 0,
+        },
+    ),
 }
 
 
@@ -3323,17 +3793,28 @@ class _S12Evidence:
         self.records = {
             ref: (
                 AgentEvidenceSummary(
-                    evidence_id=ref, kind="vector", media_type="application/json", status="available",
+                    evidence_id=ref,
+                    kind="vector",
+                    media_type="application/json",
+                    status="available",
                     summary={
                         "capability_id": "get_weather_forecast",
                         "units": _S12_UNITS,
                         "query": query,
-                        "coverage": {"type": "point", "spatial_scope_satisfied": True, "temporal_scope_satisfied": True},
+                        "coverage": {
+                            "type": "point",
+                            "spatial_scope_satisfied": True,
+                            "temporal_scope_satisfied": True,
+                        },
                         # The nested shape the model reads next to flat records.
                         "observations": {"temperature_2m": feature["temperature_2m"]},
                     },
-                    provenance={"capability_id": "get_weather_forecast", "provider_id": "openmeteo"},
-                    byte_size=1, map_eligibility="renderable",
+                    provenance={
+                        "capability_id": "get_weather_forecast",
+                        "provider_id": "openmeteo",
+                    },
+                    byte_size=1,
+                    map_eligibility="renderable",
                 ),
                 json.dumps({"features": [feature]}).encode(),
             )
@@ -3343,13 +3824,20 @@ class _S12Evidence:
     # -------------------------------------------------------------------------
     def create(self, **kwargs: Any) -> AgentEvidenceSummary:
         return AgentEvidenceSummary(
-            evidence_id="evidence_e00afa0ff5074a97a35f438ce807085b", kind=kwargs["kind"],
-            media_type=kwargs["media_type"], status=kwargs["status"], summary=kwargs["summary"],
-            provenance=kwargs["provenance"], byte_size=1, map_eligibility="renderable",
+            evidence_id="evidence_e00afa0ff5074a97a35f438ce807085b",
+            kind=kwargs["kind"],
+            media_type=kwargs["media_type"],
+            status=kwargs["status"],
+            summary=kwargs["summary"],
+            provenance=kwargs["provenance"],
+            byte_size=1,
+            map_eligibility="renderable",
         )
 
     # -------------------------------------------------------------------------
-    def get_payload(self, ref: str, **kwargs: Any) -> tuple[AgentEvidenceSummary, bytes] | None:
+    def get_payload(
+        self, ref: str, **kwargs: Any
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
         return self.records.get(ref)
 
 
@@ -3358,59 +3846,92 @@ async def _s12_turn_four() -> AgentLoopRequest:
     """State of the recorded turn after its failed and its successful transform."""
 
     question = "Which of the two is warmer, and by how many degrees?"
-    analysis = AgentAnalysisIntent(kind="rank", metric="current temperature", order="descending", top_k=2)
-    vienna = ResolvedLocation(label="Vienna, Austria", latitude=48.2083537, longitude=16.3725042)
+    analysis = AgentAnalysisIntent(
+        kind="rank", metric="current temperature", order="descending", top_k=2
+    )
+    vienna = ResolvedLocation(
+        label="Vienna, Austria", latitude=48.2083537, longitude=16.3725042
+    )
     state = AgentRunState(
-        request_id="run_89f61a56", conversation_id="conv_9bf5e08a", phase=AgentPhase.EVALUATE_STOP,
-        user_message=question, context_hydrated=True,
+        request_id="run_89f61a56",
+        conversation_id="conv_9bf5e08a",
+        phase=AgentPhase.EVALUATE_STOP,
+        user_message=question,
+        context_hydrated=True,
         route=CapabilityRoute(
-            primary_domain=CapabilityDomain.DATA_RETRIEVAL, task_mode="execute", presentation="text",
-            location_mode="none", analysis=analysis, operation="inspect",
+            primary_domain=CapabilityDomain.DATA_RETRIEVAL,
+            task_mode="execute",
+            presentation="text",
+            location_mode="none",
+            analysis=analysis,
+            operation="inspect",
         ),
         goal=AgentGoal(
-            goal=question, task_mode="execute", presentation="text", operation="inspect",
-            location_mode="none", analysis=analysis,
+            goal=question,
+            task_mode="execute",
+            presentation="text",
+            operation="inspect",
+            location_mode="none",
+            analysis=analysis,
             obligations=[
                 RequestObligation(id="data", kind="data"),
-                RequestObligation(id="analysis:rank", kind="analysis", variable="current temperature"),
+                RequestObligation(
+                    id="analysis:rank", kind="analysis", variable="current temperature"
+                ),
             ],
         ),
         completion_contract=CompletionContract(
-            operation="inspect", data_requirement="provider_data",
+            operation="inspect",
+            data_requirement="provider_data",
             requirements=["result_locations_derived", "required_data_retrieved"],
         ),
         evidence_refs=[_S12_VIENNA, _S12_PRAGUE],
         location_refs={
             "vienna": vienna,
-            "prague, czechia": ResolvedLocation(label="Prague, Czechia", latitude=50.0874654, longitude=14.4212535),
+            "prague, czechia": ResolvedLocation(
+                label="Prague, Czechia", latitude=50.0874654, longitude=14.4212535
+            ),
         },
         active_map_session=MapSession(
             session_id="candidate-373f8682",
             resolved_location=vienna,
             basemap_id="osm_default",
-            viewport=ViewportPolicy(center_latitude=48.2083537, center_longitude=16.3725042),
+            viewport=ViewportPolicy(
+                center_latitude=48.2083537, center_longitude=16.3725042
+            ),
             basemap={"id": "osm_default", "label": "OpenStreetMap"},
             overlay_collection=OverlayCollectionState(),
         ),
     )
     handler = EvidenceToolHandler(repository=_S12Evidence())  # type: ignore[arg-type]
     for field in ("observations.temperature_2m", "temperature_2m"):
-        state.tool_results.append(await handler.transform(
-            TransformEvidenceInput.model_validate({
-                "evidence_refs": [_S12_VIENNA, _S12_PRAGUE],
-                "operations": [{"op": "sort", "field": field, "descending": True}, {"op": "limit", "value": 2}],
-            }),
-            state,
-        ))
+        state.tool_results.append(
+            await handler.transform(
+                TransformEvidenceInput.model_validate(
+                    {
+                        "evidence_refs": [_S12_VIENNA, _S12_PRAGUE],
+                        "operations": [
+                            {"op": "sort", "field": field, "descending": True},
+                            {"op": "limit", "value": 2},
+                        ],
+                    }
+                ),
+                state,
+            )
+        )
     return AgentLoopRequest(
-        provider="fake", model="fake-model", state=state,
+        provider="fake",
+        model="fake-model",
+        state=state,
         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
     )
 
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_s12_comparison_answer_survives_and_grounds_on_each_places_figure() -> None:
+async def test_s12_comparison_answer_survives_and_grounds_on_each_places_figure() -> (
+    None
+):
     # The recorded run lost its answer to "claims 'one point per city' but only 0 verified".
     draft = "Of the two cities, Vienna is warmer by 3.3 °C (10.0 °C vs 6.7 °C), from one point per city."
     provider = FakeProvider([LLMResult(content=draft)])
@@ -3420,7 +3941,9 @@ async def test_s12_comparison_answer_survives_and_grounds_on_each_places_figure(
 
     assert answer == draft
     analysis = next(
-        item for item in AgentLoop.completion_summary(request.state).obligations if item.kind == "analysis"
+        item
+        for item in AgentLoop.completion_summary(request.state).obligations
+        if item.kind == "analysis"
     )
     assert analysis.status == "met"
     assert analysis.cite_groups == [[10.0], [6.7]]
@@ -3447,7 +3970,10 @@ async def test_s12_the_nested_path_a_summary_shows_addresses_the_flat_records() 
     request = await _s12_turn_four()
     shown_path, _ = request.state.tool_results
     assert shown_path.status == "success"
-    assert [record["temperature_2m"] for record in shown_path.data["preview"]] == [10.0, 6.7]
+    assert [record["temperature_2m"] for record in shown_path.data["preview"]] == [
+        10.0,
+        6.7,
+    ]
 
 
 ###############################################################################
@@ -3458,12 +3984,17 @@ async def test_map_route_target_is_resolved_only_after_text_survives_a_correctio
     loop = _loop(FakeProvider([]))
     state = _state()
     state.route = CapabilityRoute(
-        primary_domain=CapabilityDomain.MAP_RENDERING, task_mode="execute", presentation="map",
-        location_mode="target", target_refs=["San Mauro Torinese"],
+        primary_domain=CapabilityDomain.MAP_RENDERING,
+        task_mode="execute",
+        presentation="map",
+        location_mode="target",
+        target_refs=["San Mauro Torinese"],
     )
     calls: list[Any] = []
 
-    async def execute(_request: Any, batch: Any, *_args: Any, **_kwargs: Any) -> list[ToolResult]:
+    async def execute(
+        _request: Any, batch: Any, *_args: Any, **_kwargs: Any
+    ) -> list[ToolResult]:
         calls.extend(batch)
         return []
 

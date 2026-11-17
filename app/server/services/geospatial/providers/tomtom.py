@@ -22,6 +22,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class TomTomProvider(GeospatialProvider):
     provider_id = "tomtom"
@@ -109,12 +110,14 @@ class TomTomProvider(GeospatialProvider):
             message="TomTom accepted the supplied API key.",
         )
 
+
 ###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
     return (
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
         f"absolute/{z}/{x}/{y}.png?key={api_key}"
     )
+
 
 ###############################################################################
 def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
@@ -136,6 +139,7 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
     return (
         f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
     )
+
 
 ###############################################################################
 def _normalize_incidents(
@@ -186,6 +190,7 @@ def _normalize_incidents(
         )
     return features
 
+
 ###############################################################################
 def _representative_coordinate(
     geometry: object,
@@ -217,12 +222,13 @@ def _representative_coordinate(
         return float(longitude), float(latitude)
     try:
         inside = shape(geometry).intersection(box(west, south, east, north))
-    except (ValueError, TypeError, KeyError, AttributeError, GEOSException):
+    except ValueError, TypeError, KeyError, AttributeError, GEOSException:
         return None
     if inside.is_empty:
         return None
     representative = inside.representative_point()
     return float(representative.x), float(representative.y)
+
 
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
@@ -232,12 +238,14 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
         return value[0], value[1]
     return _first_coordinate_pair(value[0])
 
+
 ###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
         if is_json_object(event) and event.get("description"):
             return str(event["description"])
     return None
+
 
 ###############################################################################
 def _incident_category(value: object) -> str:

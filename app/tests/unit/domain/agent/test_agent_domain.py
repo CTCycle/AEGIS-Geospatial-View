@@ -2,15 +2,26 @@ from __future__ import annotations
 import json
 import pytest
 from pydantic import ValidationError
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityDomain, CapabilityRoute, ConversationTask
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityDomain,
+    CapabilityRoute,
+    ConversationTask,
+)
 from server.prompts.capability_route import CAPABILITY_ROUTE_SYSTEM_PROMPT
 from server.domain.agent.conversation import ConversationState, PendingClarification
 from server.domain.agent.task_ledger import LEDGER_LIMIT, ledger_view, merge_ledger
 from server.domain.agent.map_plan import MapPlan
-from server.domain.agent.tool_result import ModelObservation, ToolExecutionError, ToolExecutionMetadata, ToolResult, ValidationIssue
+from server.domain.agent.tool_result import (
+    ModelObservation,
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+    ValidationIssue,
+)
 
 # --- test_capability_route.py ---
-
 
 
 ###############################################################################
@@ -44,6 +55,7 @@ def test_capability_route_is_bounded_and_strict() -> None:
             unexpected=True,
         )
 
+
 ###############################################################################
 def test_agent_state_tracks_native_loop_counters() -> None:
     state = AgentRunState(
@@ -64,6 +76,7 @@ def test_agent_state_tracks_native_loop_counters() -> None:
             unexpected=True,
         )
 
+
 ###############################################################################
 def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:
     state = AgentRunState(
@@ -81,6 +94,7 @@ def test_agent_run_state_is_the_single_checkpointable_native_state() -> None:
     assert restored.run_version == 3
     assert restored.conversation_revision == 7
     assert restored.request_id == state.request_id
+
 
 ###############################################################################
 def test_exposure_trace_iteration_is_checkpointable_after_render_resume() -> None:
@@ -102,8 +116,8 @@ def test_exposure_trace_iteration_is_checkpointable_after_render_resume() -> Non
 
     assert restored.exposure_trace[0]["iteration"] == 5
 
-# --- test_conversation.py ---
 
+# --- test_conversation.py ---
 
 
 ###############################################################################
@@ -117,6 +131,7 @@ def test_other_conversation_state_schema_versions_are_rejected() -> None:
                     "conversation_id": "conversation-future",
                 },
             )
+
 
 ###############################################################################
 def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
@@ -137,6 +152,7 @@ def test_unrelated_turn_defers_but_does_not_delete_clarification() -> None:
     assert state.pending_clarification is not None
     assert state.pending_clarification.question.endswith("Bracciano?")
 
+
 ###############################################################################
 def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     state = ConversationState.from_persisted(
@@ -154,6 +170,7 @@ def test_generic_unrelated_turn_does_not_answer_clarification() -> None:
     deferred = state.clarification_after_turn("Hello")
     assert deferred is not None
     assert deferred.status == "deferred"
+
 
 ###############################################################################
 def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
@@ -176,6 +193,7 @@ def test_direct_answer_resolves_and_preserves_terminal_clarification() -> None:
     assert preserved is not None
     assert preserved.status == "answered"
 
+
 ###############################################################################
 def test_infrastructure_option_matching_uses_word_boundaries() -> None:
     clarification = PendingClarification.from_turn(
@@ -194,6 +212,7 @@ def test_infrastructure_option_matching_uses_word_boundaries() -> None:
     assert clarification.match_option("charging points") == "EV charging stations"
     assert clarification.match_option("level crossings") is None
 
+
 ###############################################################################
 def test_chosen_option_label_answers_despite_wording_heuristics() -> None:
     clarification = PendingClarification.from_turn(
@@ -211,8 +230,8 @@ def test_chosen_option_label_answers_despite_wording_heuristics() -> None:
         assert answered.status == "answered"
         assert answered.selected_option == label
 
-# --- test_map_plan.py ---
 
+# --- test_map_plan.py ---
 
 
 ###############################################################################
@@ -236,6 +255,7 @@ def test_map_plan_parses_discriminated_actions() -> None:
 
     assert plan.actions[0].action == "set_layer_opacity"
     assert plan.actions[1].action == "set_viewport"
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -271,8 +291,8 @@ def test_map_plan_rejects_invalid_actions(payload: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         MapPlan.model_validate(payload)
 
-# --- test_tool_result.py ---
 
+# --- test_tool_result.py ---
 
 
 ###############################################################################
@@ -307,6 +327,7 @@ def test_tool_result_has_one_strict_model_visible_shape() -> None:
             unexpected=True,
         )
 
+
 ###############################################################################
 def test_tool_execution_error_restricts_recovery_and_issue_shape() -> None:
     error = ToolExecutionError(
@@ -329,6 +350,7 @@ def test_tool_execution_error_restricts_recovery_and_issue_shape() -> None:
             retryable=False,
             recovery="retry_forever",
         )
+
 
 ###############################################################################
 def test_model_observation_keeps_semantic_outcome_and_caps_raw_features() -> None:
@@ -359,6 +381,7 @@ def test_model_observation_keeps_semantic_outcome_and_caps_raw_features() -> Non
     assert isinstance(observation.result, dict)
     assert len(observation.result["features"]) <= 24
     assert len(str(observation.model_dump_json())) <= 3000
+
 
 ###############################################################################
 def test_oversized_inspect_evidence_records_are_trimmed_not_dropped() -> None:
@@ -391,64 +414,145 @@ def test_oversized_inspect_evidence_records_are_trimmed_not_dropped() -> None:
 
 
 ###############################################################################
-def test_task_ledger_is_additive_bounded_and_replaces_the_stale_route_in_the_projection() -> None:
-    route = {"primary_domain": "data_retrieval", "task_mode": "execute", "presentation": "text",
-             "target_refs": ["Tokyo"], "capability_queries": ["weather radar"]}
+def test_task_ledger_is_additive_bounded_and_replaces_the_stale_route_in_the_projection() -> (
+    None
+):
+    route = {
+        "primary_domain": "data_retrieval",
+        "task_mode": "execute",
+        "presentation": "text",
+        "target_refs": ["Tokyo"],
+        "capability_queries": ["weather radar"],
+    }
     # A v2 payload written before the ledger existed still validates.
-    state = ConversationState.from_persisted("ledger", {"conversation_id": "ledger", "route": route})
+    state = ConversationState.from_persisted(
+        "ledger", {"conversation_id": "ledger", "route": route}
+    )
     assert state.tasks == []
 
     def task(index: int, status: str) -> ConversationTask:
-        return ConversationTask.model_validate({
-            "task_id": f"data:city-{index}", "description": "data", "kind": "data", "status": status,
-            "source_request_id": f"request-{index}"})
+        return ConversationTask.model_validate(
+            {
+                "task_id": f"data:city-{index}",
+                "description": "data",
+                "kind": "data",
+                "status": status,
+                "source_request_id": f"request-{index}",
+            }
+        )
 
-    ledger = merge_ledger([task(0, "failed"), *(task(index, "completed") for index in range(1, LEDGER_LIMIT))], [])
+    ledger = merge_ledger(
+        [
+            task(0, "failed"),
+            *(task(index, "completed") for index in range(1, LEDGER_LIMIT)),
+        ],
+        [],
+    )
     ledger = merge_ledger(ledger, [task(LEDGER_LIMIT, "completed"), task(1, "failed")])
     # The oldest completed entry goes first, and a failure never erases a completed result.
     assert len(ledger) == LEDGER_LIMIT
     assert [item.task_id for item in ledger[:2]] == ["data:city-0", "data:city-2"]
 
-    projection = state.model_copy(update={"tasks": ledger}).context_projection("Just show Tokyo")
-    assert "route" not in projection and "goal" not in projection and "tasks" not in projection
+    projection = state.model_copy(update={"tasks": ledger}).context_projection(
+        "Just show Tokyo"
+    )
+    assert (
+        "route" not in projection
+        and "goal" not in projection
+        and "tasks" not in projection
+    )
     # The latest request's entries, plus earlier unfinished work in compact form.
     assert projection["conversation_tasks"] == [
         {"id": "data:city-0", "description": "data", "status": "failed"},
-        {"id": f"data:city-{LEDGER_LIMIT}", "status": "completed"}]
+        {"id": f"data:city-{LEDGER_LIMIT}", "status": "completed"},
+    ]
 
 
 ###############################################################################
-def _ledger_task(task_id: str, status: str, request: str, **extra: object) -> ConversationTask:
+def _ledger_task(
+    task_id: str, status: str, request: str, **extra: object
+) -> ConversationTask:
     kind = task_id.split(":")[0]
-    return ConversationTask.model_validate({
-        "task_id": task_id, "description": task_id, "kind": kind, "status": status,
-        "source_request_id": request, **extra})
+    return ConversationTask.model_validate(
+        {
+            "task_id": task_id,
+            "description": task_id,
+            "kind": kind,
+            "status": status,
+            "source_request_id": request,
+            **extra,
+        }
+    )
 
 
 def test_ledger_supersedes_unfinished_work_and_projects_earlier_blocked_tasks() -> None:
-    ledger = merge_ledger([], [
-        _ledger_task("location:paris", "completed", "r1", target_ids=["Paris"]),
-        _ledger_task("data:paris:temperature", "blocked", "r1", reason="tool_budget_exhausted",
-                     target_ids=["Paris"], variable="temperature")])
-    ledger = merge_ledger(ledger, [_ledger_task("data:rome:radar", "completed", "r2", target_ids=["Rome"])])
+    ledger = merge_ledger(
+        [],
+        [
+            _ledger_task("location:paris", "completed", "r1", target_ids=["Paris"]),
+            _ledger_task(
+                "data:paris:temperature",
+                "blocked",
+                "r1",
+                reason="tool_budget_exhausted",
+                target_ids=["Paris"],
+                variable="temperature",
+            ),
+        ],
+    )
+    ledger = merge_ledger(
+        ledger,
+        [_ledger_task("data:rome:radar", "completed", "r2", target_ids=["Rome"])],
+    )
 
     # A follow-up sees the earlier blocked work and why it stopped.
-    projected = ConversationState(conversation_id="c", tasks=ledger).context_projection("try that again")
-    assert {"id": "data:paris:temperature", "description": "data:paris:temperature", "status": "blocked",
-            "reason": "tool_budget_exhausted", "targets": ["Paris"]} in projected["conversation_tasks"]
+    projected = ConversationState(conversation_id="c", tasks=ledger).context_projection(
+        "try that again"
+    )
+    assert {
+        "id": "data:paris:temperature",
+        "description": "data:paris:temperature",
+        "status": "blocked",
+        "reason": "tool_budget_exhausted",
+        "targets": ["Paris"],
+    } in projected["conversation_tasks"]
 
     # A later request taking it over marks it superseded; it is no longer projected as open.
-    ledger = merge_ledger(ledger, [_ledger_task("data:paris:air-temperature", "completed", "r3",
-                                                target_ids=["Paris"], variable="air temperature")])
-    assert [item.status for item in ledger if item.target_ids == ["Paris"] and item.kind == "data"] == [
-        "superseded", "completed"]
+    ledger = merge_ledger(
+        ledger,
+        [
+            _ledger_task(
+                "data:paris:air-temperature",
+                "completed",
+                "r3",
+                target_ids=["Paris"],
+                variable="air temperature",
+            )
+        ],
+    )
+    assert [
+        item.status
+        for item in ledger
+        if item.target_ids == ["Paris"] and item.kind == "data"
+    ] == ["superseded", "completed"]
     assert not any(item.get("status") == "blocked" for item in ledger_view(ledger))
 
     # A later blocked attempt is recorded but never erases the completed result.
-    ledger = merge_ledger(ledger, [_ledger_task("data:paris:air-temperature", "blocked", "r4",
-                                                target_ids=["Paris"], variable="air temperature")])
-    assert [item.status for item in ledger if item.task_id == "data:paris:air-temperature"] == [
-        "completed", "blocked"]
+    ledger = merge_ledger(
+        ledger,
+        [
+            _ledger_task(
+                "data:paris:air-temperature",
+                "blocked",
+                "r4",
+                target_ids=["Paris"],
+                variable="air temperature",
+            )
+        ],
+    )
+    assert [
+        item.status for item in ledger if item.task_id == "data:paris:air-temperature"
+    ] == ["completed", "blocked"]
 
 
 def test_ledger_eviction_drops_superseded_then_completed_before_unresolved() -> None:
@@ -456,7 +560,10 @@ def test_ledger_eviction_drops_superseded_then_completed_before_unresolved() -> 
         _ledger_task("data:open", "blocked", "r0", reason="no_progress"),
         _ledger_task("data:done", "completed", "r1"),
         _ledger_task("data:old", "superseded", "r2"),
-        *(_ledger_task(f"data:open-{index}", "blocked", f"r{index + 3}") for index in range(LEDGER_LIMIT - 3)),
+        *(
+            _ledger_task(f"data:open-{index}", "blocked", f"r{index + 3}")
+            for index in range(LEDGER_LIMIT - 3)
+        ),
     ]
     ledger = merge_ledger(ledger, [_ledger_task("data:new", "blocked", "r-a")])
     assert "data:old" not in {item.task_id for item in ledger}
@@ -468,4 +575,7 @@ def test_ledger_eviction_drops_superseded_then_completed_before_unresolved() -> 
 
 def test_route_prompt_reserves_map_presentation_for_map_requests() -> None:
     # The route model chose "both" for plain value questions (S09).
-    assert "Use text for values and facts; map or both only when requested" in CAPABILITY_ROUTE_SYSTEM_PROMPT
+    assert (
+        "Use text for values and facts; map or both only when requested"
+        in CAPABILITY_ROUTE_SYSTEM_PROMPT
+    )

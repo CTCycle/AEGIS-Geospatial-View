@@ -25,15 +25,18 @@ from tests.e2e.helpers.chat_stub_payloads import (
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
+
 ###############################################################################
 def _open_layers(page: Page) -> None:
     toggle = page.get_by_role("button", name="Layers", exact=True)
     if toggle.get_attribute("aria-expanded") != "true":
         toggle.click()
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
@@ -156,9 +159,11 @@ def _setup_common_stubs(page: Page, turn_seed: int = 101) -> dict[str, object]:
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     return state
 
+
 ###############################################################################
 def _prepare_test_dirs(artifact_root: Path, test_id: str) -> dict[str, Path]:
     return ensure_test_artifact_dirs(artifact_root, test_id)
+
 
 ###############################################################################
 def test_documented_conversation_map_search_happy_path(
@@ -219,6 +224,7 @@ def test_documented_conversation_map_search_happy_path(
         backend_log_status="None expected, network mocked",
     )
 
+
 ###############################################################################
 def test_documented_conversation_follow_up_reuses_conversation(
     page: Page, base_url: str, artifact_root: Path
@@ -263,6 +269,7 @@ def test_documented_conversation_follow_up_reuses_conversation(
         backend_log_status="None expected, network mocked",
     )
 
+
 ###############################################################################
 def test_documented_conversation_ambiguity_requires_clarification(
     page: Page, base_url: str, artifact_root: Path
@@ -291,6 +298,7 @@ def test_documented_conversation_ambiguity_requires_clarification(
         ],
         backend_log_status="None expected, network mocked",
     )
+
 
 ###############################################################################
 def test_documented_conversation_direct_coordinates_no_map_session(
@@ -325,6 +333,7 @@ def test_documented_conversation_direct_coordinates_no_map_session(
         ],
         backend_log_status="None expected, network mocked",
     )
+
 
 ###############################################################################
 def test_documented_conversation_settings_roundtrip_and_restore(

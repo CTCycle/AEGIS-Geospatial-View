@@ -14,7 +14,11 @@ from server.contracts.events import RunEventType, RunEventVisibility, RunProgres
 from server.contracts.geospatial import MapSession
 from server.contracts.runs import AgentRunState as RunLifecycleState
 from server.domain.realtime import RealtimeRenderAckPayload
-from server.domain.agent.capability_route import AgentGoal, AgentRunState, CompletionContract
+from server.domain.agent.capability_route import (
+    AgentGoal,
+    AgentRunState,
+    CompletionContract,
+)
 from server.domain.agent.capability_route import RenderObservation
 from server.domain.agent.presentation_contract import PresentationContract
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
@@ -26,6 +30,7 @@ from server.services.agent_runs.events import RunEventPublisher
 # further deadline window, after which the run fails with the observed cause.
 MAX_RENDER_DEADLINE_EXTENSIONS = 1
 CONTRACT_FAILURE_PREFIX = "Presentation contract failed:"
+
 
 ###############################################################################
 class RenderAcknowledgementError(ValueError):
@@ -43,9 +48,11 @@ class RenderAcknowledgementError(ValueError):
         self.code = code
         self.details = dict(details or {})
 
+
 ###############################################################################
 def _json_object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
 
 ###############################################################################
 def _visible_fraction(viewport: object, bounds: object) -> float | None:
@@ -54,7 +61,7 @@ def _visible_fraction(viewport: object, bounds: object) -> float | None:
     try:
         vw, vs, ve, vn = (float(item) for item in cast(list[Any], viewport))
         west, south, east, north = (float(item) for item in cast(list[Any], bounds))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     area = (east - west) * (north - south)
     if area <= 0:
@@ -63,9 +70,11 @@ def _visible_fraction(viewport: object, bounds: object) -> float | None:
     height = max(0.0, min(north, vn) - max(south, vs))
     return round(min(1.0, width * height / area), 3)
 
+
 ###############################################################################
 def _json_list(value: object) -> list[Any]:
     return cast(list[Any], value) if isinstance(value, list) else []
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -77,6 +86,7 @@ class RenderAcknowledgementResult:
     duplicate: bool
     resume_required: bool = False
     observation: RenderObservation | None = None
+
 
 ###############################################################################
 class RenderCompletionService:
@@ -115,7 +125,9 @@ class RenderCompletionService:
     ) -> tuple[dict[str, Any], bool]:
         map_session_value: object = response_payload.get("map_session")
         if not isinstance(map_session_value, dict):
-            raise RenderAcknowledgementError("A map session is required for render preparation.")
+            raise RenderAcknowledgementError(
+                "A map session is required for render preparation."
+            )
         map_session = cast(dict[str, Any], map_session_value)
         collection = _json_object(map_session.get("overlay_collection"))
         revision = collection.get("revision")
@@ -123,7 +135,9 @@ class RenderCompletionService:
         if not isinstance(session_id, str) or not session_id:
             raise RenderAcknowledgementError("Prepared map has no session identity.")
         if not isinstance(revision, int) or revision < 0:
-            raise RenderAcknowledgementError("Prepared map has no valid collection revision.")
+            raise RenderAcknowledgementError(
+                "Prepared map has no valid collection revision."
+            )
         candidate_model = MapSession.model_validate(map_session)
         completion_contract = response_payload.get("completion_contract")
         native_goal = response_payload.get("goal")
@@ -149,20 +163,29 @@ class RenderCompletionService:
             contract = presentation_contract(state, candidate_model)
             checks = CompletionEvaluator.data_checks(state)
             for requirement in render_requirements:
-                if requirement.name in checks and state.completion_contract and (
-                    (requirement.name == "required_data_retrieved" and state.completion_contract.evidence_required)
-                    or (
-                        requirement.name == "spatial_scope_applied"
-                        and state.completion_contract.spatial_scope_required
-                        and state.completion_contract.evidence_required
-                    )
-                    or (
-                        requirement.name == "temporal_scope_applied"
-                        and state.completion_contract.temporal_scope_required
-                        and state.completion_contract.evidence_required
+                if (
+                    requirement.name in checks
+                    and state.completion_contract
+                    and (
+                        (
+                            requirement.name == "required_data_retrieved"
+                            and state.completion_contract.evidence_required
+                        )
+                        or (
+                            requirement.name == "spatial_scope_applied"
+                            and state.completion_contract.spatial_scope_required
+                            and state.completion_contract.evidence_required
+                        )
+                        or (
+                            requirement.name == "temporal_scope_applied"
+                            and state.completion_contract.temporal_scope_required
+                            and state.completion_contract.evidence_required
+                        )
                     )
                 ):
-                    requirement.status = "satisfied" if checks[requirement.name] else "pending"
+                    requirement.status = (
+                        "satisfied" if checks[requirement.name] else "pending"
+                    )
         render_requirements_payload = [
             item.model_dump(mode="json") for item in render_requirements
         ]
@@ -171,14 +194,28 @@ class RenderCompletionService:
             for instance in candidate_model.overlay_collection.instances
             if not RenderCompletionService._metadata_only(instance)
         ]
-        render_ack_timeout_seconds = float(_json_object(
-            _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
-        ).get("render_ack_seconds") or self.render_ack_timeout_seconds)
+        render_ack_timeout_seconds = float(
+            _json_object(
+                _json_object(
+                    _json_object(response_payload.get("execution_trace")).get(
+                        "checkpoint"
+                    )
+                ).get("execution_policy")
+            ).get("render_ack_seconds")
+            or self.render_ack_timeout_seconds
+        )
         presentation = {
             "render_ack_timeout_seconds": render_ack_timeout_seconds,
-            "max_render_attempts": int(_json_object(
-                _json_object(_json_object(response_payload.get("execution_trace")).get("checkpoint")).get("execution_policy")
-            ).get("max_render_attempts") or self.max_render_attempts),
+            "max_render_attempts": int(
+                _json_object(
+                    _json_object(
+                        _json_object(response_payload.get("execution_trace")).get(
+                            "checkpoint"
+                        )
+                    ).get("execution_policy")
+                ).get("max_render_attempts")
+                or self.max_render_attempts
+            ),
             "status": "pending",
             "map_session_id": session_id,
             "collection_revision": revision,
@@ -211,9 +248,9 @@ class RenderCompletionService:
                 contract.model_dump(mode="json") if contract is not None else None
             ),
             "vision_capture_requested": bool(
-                _json_object(
-                    _json_object(response_payload.get("execution_trace"))
-                ).get("vision_capture_requested")
+                _json_object(_json_object(response_payload.get("execution_trace"))).get(
+                    "vision_capture_requested"
+                )
                 or False
             ),
         }
@@ -279,7 +316,9 @@ class RenderCompletionService:
             )
             if snapshot is None:
                 return
-            event_ids = _json_list(_json_object(snapshot.presentation).get("durable_event_ids"))
+            event_ids = _json_list(
+                _json_object(snapshot.presentation).get("durable_event_ids")
+            )
             if event_ids:
                 await self.event_publisher.fanout_existing(str(event_ids[-1]))
 
@@ -382,7 +421,9 @@ class RenderCompletionService:
         """
 
         instances = map_session.overlay_collection.instances
-        return not instances or any(not cls._metadata_only(instance) for instance in instances)
+        return not instances or any(
+            not cls._metadata_only(instance) for instance in instances
+        )
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -400,11 +441,14 @@ class RenderCompletionService:
                 descriptor.get("result_status") or descriptor.get("resultStatus") or ""
             ).casefold()
             render_status = str(
-                descriptor.get("render_status")
-                or descriptor.get("renderStatus")
-                or ""
+                descriptor.get("render_status") or descriptor.get("renderStatus") or ""
             ).casefold()
-            if status in {"unavailable", "error", "failed", "invalid"} or render_status in {
+            if status in {
+                "unavailable",
+                "error",
+                "failed",
+                "invalid",
+            } or render_status in {
                 "unavailable",
                 "error",
                 "failed",
@@ -448,23 +492,28 @@ class RenderCompletionService:
             # the same normalized acknowledgment so retries remain idempotent,
             # including after the final render attempt has been consumed.
             acknowledgment = prior_acknowledgment
-            payload = RealtimeRenderAckPayload.model_validate({
-                key: value for key, value in acknowledgment.items()
-                if key != "original_acknowledgment"
-            })
-        prior_attempt = int(
-            prior_presentation.get("render_attempts")
-            or 0
-        )
+            payload = RealtimeRenderAckPayload.model_validate(
+                {
+                    key: value
+                    for key, value in acknowledgment.items()
+                    if key != "original_acknowledgment"
+                }
+            )
+        prior_attempt = int(prior_presentation.get("render_attempts") or 0)
         pending_response = _json_object(prior_presentation.get("pending_response"))
         pending_checkpoint = _json_object(
             _json_object(pending_response.get("execution_trace")).get("checkpoint")
         )
-        max_render_attempts = int(prior_presentation.get("max_render_attempts") or self.max_render_attempts)
-        render_ack_timeout_seconds = float(prior_presentation.get("render_ack_timeout_seconds") or self.render_ack_timeout_seconds)
-        action_fingerprint = str(
-            pending_checkpoint.get("prepared_map_action_fingerprint") or ""
-        ) or None
+        max_render_attempts = int(
+            prior_presentation.get("max_render_attempts") or self.max_render_attempts
+        )
+        render_ack_timeout_seconds = float(
+            prior_presentation.get("render_ack_timeout_seconds")
+            or self.render_ack_timeout_seconds
+        )
+        action_fingerprint = (
+            str(pending_checkpoint.get("prepared_map_action_fingerprint") or "") or None
+        )
         # A duplicate of the terminal retry is still idempotent, but a new
         # browser result after the configured bound is a protocol error.  In
         # particular, do not allow a late successful acknowledgment to bypass
@@ -504,16 +553,18 @@ class RenderCompletionService:
         try:
             if payload.status == "ready":
                 self._enforce_presentation_contract(prior_presentation, payload)
-            snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
-                conversation_id=conversation_id,
-                run_id=payload.run_id,
-                run_version=payload.run_version,
-                map_session_id=payload.map_session_id,
-                collection_revision=payload.collection_revision,
-                status=payload.status,
-                acknowledgment=acknowledgment,
-                resume=self.resume_mode,
-                observation=observation.model_dump(mode="json"),
+            snapshot, duplicate, pending_response = (
+                self.run_repository.acknowledge_render(
+                    conversation_id=conversation_id,
+                    run_id=payload.run_id,
+                    run_version=payload.run_version,
+                    map_session_id=payload.map_session_id,
+                    collection_revision=payload.collection_revision,
+                    status=payload.status,
+                    acknowledgment=acknowledgment,
+                    resume=self.resume_mode,
+                    observation=observation.model_dump(mode="json"),
+                )
             )
         except ValueError as exc:
             if "does not match the prepared map" in str(exc):
@@ -523,7 +574,9 @@ class RenderCompletionService:
                         "run_id": prior_snapshot.run_id,
                         "run_version": prior_snapshot.active_run_version,
                         "map_session_id": prior_presentation.get("map_session_id"),
-                        "collection_revision": prior_presentation.get("collection_revision"),
+                        "collection_revision": prior_presentation.get(
+                            "collection_revision"
+                        ),
                     }
                 observed_identity = {
                     "run_id": payload.run_id,
@@ -588,16 +641,18 @@ class RenderCompletionService:
                 }
             )
             try:
-                snapshot, duplicate, pending_response = self.run_repository.acknowledge_render(
-                    conversation_id=conversation_id,
-                    run_id=payload.run_id,
-                    run_version=payload.run_version,
-                    map_session_id=payload.map_session_id,
-                    collection_revision=payload.collection_revision,
-                    status="failed",
-                    acknowledgment=acknowledgment,
-                    resume=True,
-                    observation=observation.model_dump(mode="json"),
+                snapshot, duplicate, pending_response = (
+                    self.run_repository.acknowledge_render(
+                        conversation_id=conversation_id,
+                        run_id=payload.run_id,
+                        run_version=payload.run_version,
+                        map_session_id=payload.map_session_id,
+                        collection_revision=payload.collection_revision,
+                        status="failed",
+                        acknowledgment=acknowledgment,
+                        resume=True,
+                        observation=observation.model_dump(mode="json"),
+                    )
                 )
             except ValueError as retry_exc:
                 raise RenderAcknowledgementError(str(retry_exc)) from retry_exc
@@ -699,7 +754,9 @@ class RenderCompletionService:
             _visible_fraction(
                 payload.viewport_bounds,
                 _json_object(
-                    _json_object(presentation.get("pending_response")).get("map_session")
+                    _json_object(presentation.get("pending_response")).get(
+                        "map_session"
+                    )
                 ).get("bounds"),
             ),
         )
@@ -731,9 +788,8 @@ class RenderCompletionService:
             failed_checks = [
                 key for key, value in payload.checks.items() if value is False
             ]
-            failure_summary = (
-                "Render acknowledgment failed"
-                + (f" checks: {', '.join(failed_checks[:8])}." if failed_checks else ".")
+            failure_summary = "Render acknowledgment failed" + (
+                f" checks: {', '.join(failed_checks[:8])}." if failed_checks else "."
             )
         return RenderObservation(
             map_session_id=payload.map_session_id,

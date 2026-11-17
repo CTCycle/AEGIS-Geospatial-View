@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     )
     from server.contracts.geospatial import MapSession
 
+
 ###############################################################################
 class ToolRegistry:
     """Register, expose, and retrieve the typed native tool catalogue.
@@ -104,7 +105,10 @@ class ToolRegistry:
             if not self._prerequisites_satisfied(registered.prerequisites, state):
                 continue
             definition = registered.definition
-            if definition.name == "execute_geospatial_capability" and state.capability_ids:
+            if (
+                definition.name == "execute_geospatial_capability"
+                and state.capability_ids
+            ):
                 schema = dict(definition.parameters_json_schema)
                 properties = dict(schema.get("properties") or {})
                 capability_schema = dict(properties.get("capability_id") or {})
@@ -115,7 +119,10 @@ class ToolRegistry:
                         **dict(properties.get("arguments") or {}),
                         "description": "Capability-specific arguments. Call describe_geospatial_capability for the selected capability's argument_schema before execution; contracts differ between capabilities.",
                     }
-                if len(state.capability_ids) == 1 and registered.argument_schema_provider:
+                if (
+                    len(state.capability_ids) == 1
+                    and registered.argument_schema_provider
+                ):
                     try:
                         request = registered.input_model.model_validate(
                             {"capability_id": state.capability_ids[0]}
@@ -167,7 +174,10 @@ class ToolRegistry:
                 return False
             if prerequisite == "location_required" and (
                 state.route is None
-                or (state.route.location_mode == "none" and not _names_unresolved_place(state))
+                or (
+                    state.route.location_mode == "none"
+                    and not _names_unresolved_place(state)
+                )
             ):
                 return False
             if (
@@ -182,19 +192,32 @@ class ToolRegistry:
                 and not has_location
             ):
                 return False
-            if prerequisite == "analysis_complete_if_required" and not analysis_complete(state):
+            if (
+                prerequisite == "analysis_complete_if_required"
+                and not analysis_complete(state)
+            ):
                 return False
             if prerequisite == "evidence" and not _evidence_available_for_route(state):
                 return False
-            if prerequisite == "evidence_analysis_required" and not _evidence_analysis_required(state):
+            if (
+                prerequisite == "evidence_analysis_required"
+                and not _evidence_analysis_required(state)
+            ):
                 return False
-            if prerequisite == "history_recall_required" and not _history_recall_required(state):
+            if (
+                prerequisite == "history_recall_required"
+                and not _history_recall_required(state)
+            ):
                 return False
-            if prerequisite == "data_obligation_unmet" and not _data_obligation_unmet(state):
+            if prerequisite == "data_obligation_unmet" and not _data_obligation_unmet(
+                state
+            ):
                 return False
             if prerequisite == "active_map" and state.active_map_session is None:
                 return False
-            if prerequisite == "measurement_relevant" and not _measurement_relevant(state):
+            if prerequisite == "measurement_relevant" and not _measurement_relevant(
+                state
+            ):
                 return False
             if prerequisite == "provider_discovery_route":
                 if state.route is None:
@@ -223,9 +246,13 @@ class ToolRegistry:
                 ):
                     return False
             if prerequisite == "map_presentation":
-                if state.route is None or state.route.presentation not in {"map", "both"}:
+                if state.route is None or state.route.presentation not in {
+                    "map",
+                    "both",
+                }:
                     return False
         return True
+
 
 ###############################################################################
 def _catalog_discovery_can_continue(state: "AgentRunState") -> bool:
@@ -249,6 +276,7 @@ def _catalog_discovery_can_continue(state: "AgentRunState") -> bool:
         and latest.data.get("next_cursor") not in {None, ""}
     )
 
+
 _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
     {
         "remove_layer",
@@ -266,7 +294,13 @@ _ACTIVE_MAP_UPDATE_OPERATIONS = frozenset(
     }
 )
 # Active-map operations whose targets are layers or styles, never places.
-_LAYER_OPERATIONS = _ACTIVE_MAP_UPDATE_OPERATIONS - {"zoom_in", "zoom_out", "pan", "recenter"}
+_LAYER_OPERATIONS = _ACTIVE_MAP_UPDATE_OPERATIONS - {
+    "zoom_in",
+    "zoom_out",
+    "pan",
+    "recenter",
+}
+
 
 ###############################################################################
 def route_target_location_available(state: "AgentRunState") -> bool:
@@ -274,13 +308,16 @@ def route_target_location_available(state: "AgentRunState") -> bool:
 
     route = state.route
     if _is_active_map_update(state):
-        return state.active_map_session is not None and not _names_unresolved_place(state)
+        return state.active_map_session is not None and not _names_unresolved_place(
+            state
+        )
     target_refs = _route_location_targets(state)
     if not target_refs and route is not None and route.location_mode == "search_area":
         return False
     if not target_refs:
         return bool(state.location_refs) or state.active_map_session is not None
     return not unresolved_route_targets(state)
+
 
 ###############################################################################
 def _route_location_targets(state: "AgentRunState") -> list[str]:
@@ -290,6 +327,7 @@ def _route_location_targets(state: "AgentRunState") -> list[str]:
     if route.spatial_scope is not None and route.spatial_scope.target_refs:
         return place_targets(route.spatial_scope.target_refs, state)
     return place_targets(route.target_refs, state)
+
 
 ###############################################################################
 def unresolved_route_targets(state: "AgentRunState") -> list[str]:
@@ -308,6 +346,7 @@ def unresolved_route_targets(state: "AgentRunState") -> list[str]:
             for key, location in state.location_refs.items()
         )
     ]
+
 
 ###############################################################################
 def resolved_route_target_names(state: "AgentRunState") -> list[list[str]]:
@@ -333,17 +372,25 @@ def resolved_route_target_names(state: "AgentRunState") -> list[list[str]]:
         )
         if location is not None:
             names.append(
-                list(dict.fromkeys(
-                    spelling
-                    for spelling in (str(target), location.label, location.label.split(",")[0].strip())
-                    if spelling
-                ))
+                list(
+                    dict.fromkeys(
+                        spelling
+                        for spelling in (
+                            str(target),
+                            location.label,
+                            location.label.split(",")[0].strip(),
+                        )
+                        if spelling
+                    )
+                )
             )
     return names
+
 
 ###############################################################################
 def _is_active_map_update(state: "AgentRunState") -> bool:
     return state.route is not None and is_active_map_update(state.route, state)
+
 
 ###############################################################################
 def is_active_map_update(route: "CapabilityRoute", state: "AgentRunState") -> bool:
@@ -369,6 +416,7 @@ def is_active_map_update(route: "CapabilityRoute", state: "AgentRunState") -> bo
         if target
     )
 
+
 ###############################################################################
 def _names_layer(target: str, session: "MapSession") -> bool:
     folded = target.casefold()
@@ -378,6 +426,7 @@ def _names_layer(target: str, session: "MapSession") -> bool:
         for name in (instance.instance_id, instance.capability_id, instance.label)
         if name
     )
+
 
 ###############################################################################
 def _names_unresolved_place(state: "AgentRunState") -> bool:
@@ -415,6 +464,7 @@ def _names_unresolved_place(state: "AgentRunState") -> bool:
         return True
     return False
 
+
 ###############################################################################
 def _evidence_available_for_route(state: "AgentRunState") -> bool:
     """Do not expose stale evidence tools before a new map-data retrieval."""
@@ -442,10 +492,9 @@ def _evidence_available_for_route(state: "AgentRunState") -> bool:
         )
     return bool(state.evidence_refs)
 
+
 ###############################################################################
-def _task_mode_allows_tool(
-    registered: RegisteredTool, state: "AgentRunState"
-) -> bool:
+def _task_mode_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
     """Keep execution tools out of answer/clarify model turns."""
 
     if registered.visibility == "internal":
@@ -454,12 +503,14 @@ def _task_mode_allows_tool(
         return True
     return state.route is not None and state.route.task_mode == "execute"
 
+
 ###############################################################################
 def _route_domains(state: "AgentRunState") -> set[CapabilityDomain]:
     route = state.route
     if route is None:
         return set()
     return {route.primary_domain, *route.secondary_domains}
+
 
 ###############################################################################
 def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> bool:
@@ -476,13 +527,18 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
         )
     if registered.definition.name == "apply_map_plan":
         # A map must not present evidence whose requested filter failed.
-        return route.presentation in {"map", "both"} and not requested_transform_unmet(state)
+        return route.presentation in {"map", "both"} and not requested_transform_unmet(
+            state
+        )
     if (
         registered.definition.name == "execute_geospatial_capability"
         and not route_allows_capability_execution(route)
     ):
         return False
-    if registered.definition.name == "discover_geospatial_capabilities" and is_text_location_lookup(route):
+    if (
+        registered.definition.name == "discover_geospatial_capabilities"
+        and is_text_location_lookup(route)
+    ):
         return False
     if route.primary_domain is CapabilityDomain.MAP_STATE:
         return registered.definition.name == "apply_map_plan"
@@ -503,14 +559,19 @@ def _domain_allows_tool(registered: RegisteredTool, state: "AgentRunState") -> b
         return True
     return bool(registered.domains.intersection(route_domains))
 
+
 ###############################################################################
 def _evidence_analysis_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None or (not route.requires_geometry and analysis_unsupported(state)):
         return False
-    return (route.analysis is not None or route.requires_geometry
-            or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
-            or route.operation == "inspect_evidence")
+    return (
+        route.analysis is not None
+        or route.requires_geometry
+        or CapabilityDomain.SPATIAL_ANALYSIS in _route_domains(state)
+        or route.operation == "inspect_evidence"
+    )
+
 
 ###############################################################################
 def _measurement_relevant(state: "AgentRunState") -> bool:
@@ -526,29 +587,37 @@ def _measurement_relevant(state: "AgentRunState") -> bool:
         or len(state.location_refs) >= 2
     )
 
+
 ###############################################################################
 def _history_recall_required(state: "AgentRunState") -> bool:
     route = state.route
     if route is None:
         return False
     terms = " ".join(
-        [str(route.operation or ""), *[str(value) for value in route.capability_queries]]
+        [
+            str(route.operation or ""),
+            *[str(value) for value in route.capability_queries],
+        ]
     ).casefold()
     return CapabilityDomain.CONVERSATION in _route_domains(state) and any(
         marker in terms
         for marker in ("history", "conversation", "earlier", "previous", "remember")
     )
 
+
 ###############################################################################
 def _data_obligation_unmet(state: "AgentRunState") -> bool:
     if state.route is not None and state.route.analysis is not None:
         if analysis_unsupported(state):
             return False
-        ids = {result.metadata.capability_id for result in state.tool_results
-               if result.tool_name == "execute_geospatial_capability"
-               and result.status in {"success", "partial", "valid_empty"}
-               and result.metadata.result_type != "raster"
-               and result.metadata.capability_id}
+        ids = {
+            result.metadata.capability_id
+            for result in state.tool_results
+            if result.tool_name == "execute_geospatial_capability"
+            and result.status in {"success", "partial", "valid_empty"}
+            and result.metadata.result_type != "raster"
+            and result.metadata.capability_id
+        }
         return not ids or bool(uncovered_data_obligations(state))
     contract = state.completion_contract
     if contract is not None and contract.data_requirement != "provider_data":
@@ -596,6 +665,7 @@ def follow_up_investigation_open(state: "AgentRunState") -> bool:
         return False
     return bool(uncovered_data_obligations(state))
 
+
 ###############################################################################
 def analysis_complete(state: "AgentRunState") -> bool:
     route = state.route
@@ -607,8 +677,13 @@ def analysis_complete(state: "AgentRunState") -> bool:
         return True
     return any(
         result.tool_name == "transform_evidence"
-        and (result.status == "valid_empty" or (
-            result.status == "success" and isinstance(result.data, dict)
-            and result.data.get("located_record_count", 0) >= 1
-        )) for result in state.tool_results
+        and (
+            result.status == "valid_empty"
+            or (
+                result.status == "success"
+                and isinstance(result.data, dict)
+                and result.data.get("located_record_count", 0) >= 1
+            )
+        )
+        for result in state.tool_results
     )

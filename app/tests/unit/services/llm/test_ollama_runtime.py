@@ -18,11 +18,13 @@ def test_cache_hit_before_ttl_expiry() -> None:
     cache.set("http://localhost:11434", "llama3.2", True, now=100.0)
     assert cache.get("http://localhost:11434", "llama3.2", now=105.0) is True
 
+
 ###############################################################################
 def test_cache_expires_after_ttl() -> None:
     cache = OllamaToolCapabilityCache(ttl_seconds=5.0)
     cache.set("http://localhost:11434", "llama3.2", False, now=100.0)
     assert cache.get("http://localhost:11434", "llama3.2", now=106.0) is None
+
 
 ###############################################################################
 def test_models_do_not_share_cache_records() -> None:
@@ -32,6 +34,7 @@ def test_models_do_not_share_cache_records() -> None:
     assert cache.get("http://localhost:11434", "model-a", now=101.0) is True
     assert cache.get("http://localhost:11434", "model-b", now=101.0) is False
 
+
 ###############################################################################
 def test_base_urls_do_not_share_cache_records() -> None:
     cache = OllamaToolCapabilityCache(ttl_seconds=20.0)
@@ -39,6 +42,7 @@ def test_base_urls_do_not_share_cache_records() -> None:
     cache.set("http://127.0.0.1:11434", "llama3.2", False, now=100.0)
     assert cache.get("http://localhost:11434", "llama3.2", now=101.0) is True
     assert cache.get("http://127.0.0.1:11434", "llama3.2", now=101.0) is False
+
 
 # --- test_ollama_provider_tool_capabilities.py ---
 
@@ -51,12 +55,12 @@ def _tool() -> LLMToolDefinition:
         parameters_json_schema={"type": "object", "properties": {}},
     )
 
+
 ###############################################################################
 def test_ollama_uses_show_capabilities_when_present() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
@@ -69,12 +73,12 @@ def test_ollama_uses_show_capabilities_when_present() -> None:
     assert provider.supports_structured_output("llama") is True
     assert "structured_output" in provider.get_model_capabilities("llama")
 
+
 ###############################################################################
 def test_ollama_tag_capabilities_include_structured_output() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def _get_json(self, path: str):
             assert path == "/api/tags"
@@ -95,12 +99,12 @@ def test_ollama_tag_capabilities_include_structured_output() -> None:
     assert "tools" in model.capabilities
     assert model.metadata["tool_support_source"] == "ollama_tags"
 
+
 ###############################################################################
 def test_ollama_keeps_missing_tool_metadata_unknown_without_chat_inference() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def __init__(self) -> None:
             super().__init__(base_url="http://ollama-metadata-only.test")
@@ -134,6 +138,7 @@ def test_ollama_keeps_missing_tool_metadata_unknown_without_chat_inference() -> 
     assert provider.supports_tools("plain") is None
     assert provider.post_paths == ["/api/show"]
 
+
 ###############################################################################
 def test_ollama_uses_tool_support_cached_from_runtime_without_a_probe() -> None:
     provider = OllamaProvider(base_url="http://ollama-runtime-cache.test")
@@ -147,6 +152,7 @@ def test_ollama_uses_tool_support_cached_from_runtime_without_a_probe() -> None:
     assert provider.supports_tools("llama") is True
     assert provider._tool_support_source("llama") == "runtime"
 
+
 ###############################################################################
 def test_ollama_structured_requests_allow_the_longer_local_inference_window() -> None:
     provider = OllamaProvider(base_url="http://ollama.test")
@@ -154,13 +160,13 @@ def test_ollama_structured_requests_allow_the_longer_local_inference_window() ->
     assert provider._STRUCTURED_REQUEST_TIMEOUT_SECONDS == 90
     assert provider._DEFAULT_REQUEST_TIMEOUT_SECONDS == 30
 
+
 ###############################################################################
 def test_ollama_forced_single_tool_call_is_schema_constrained_and_decoded() -> None:
     posted: list[dict] = []
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def _show_payload(self, model: str):
             return None
@@ -187,6 +193,7 @@ def test_ollama_forced_single_tool_call_is_schema_constrained_and_decoded() -> N
     assert call.name == "execute_geospatial_capability"
     assert call.arguments == {"task_mode": "answer"}
     assert result.content == ""
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -225,12 +232,12 @@ def test_ollama_emits_native_tool_result_message_format() -> None:
     assert schema["type"] == "function"
     assert schema["function"]["name"] == "execute_geospatial_capability"
 
+
 ###############################################################################
 def test_ollama_reads_context_window_only_from_show_metadata() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
@@ -250,12 +257,12 @@ def test_ollama_reads_context_window_only_from_show_metadata() -> None:
         "context_metadata_authority": "provider",
     }
 
+
 ###############################################################################
 def test_ollama_does_not_infer_context_from_missing_or_malformed_metadata() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def __init__(self, payload: dict):
             super().__init__(base_url="http://ollama-context-empty.test")
@@ -274,12 +281,12 @@ def test_ollama_does_not_infer_context_from_missing_or_malformed_metadata() -> N
         == {}
     )
 
+
 ###############################################################################
 def test_ollama_rejects_conflicting_show_context_metadata() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
@@ -295,14 +302,12 @@ def test_ollama_rejects_conflicting_show_context_metadata() -> None:
         == {}
     )
 
+
 # --- test_request_deadline.py ---
-
-
 
 
 ###############################################################################
 class _Provider(OllamaProvider):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__(base_url="http://ollama-deadline.test")
@@ -319,6 +324,7 @@ class _Provider(OllamaProvider):
         self.stream_calls += 1
         yield {}
 
+
 ###############################################################################
 def _expired_request() -> LLMRequest:
     return LLMRequest(
@@ -326,6 +332,7 @@ def _expired_request() -> LLMRequest:
         messages=[],
         metadata={"deadline_monotonic": monotonic() - 1.0},
     )
+
 
 ###############################################################################
 def test_expired_ollama_request_never_starts_transport() -> None:
@@ -340,6 +347,7 @@ def test_expired_ollama_request_never_starts_transport() -> None:
     assert provider.post_calls == 0
     assert provider.stream_calls == 0
 
+
 ###############################################################################
 @pytest.mark.parametrize("value", [None, True, False, "not-a-number", float("nan")])
 def test_invalid_deadline_metadata_is_not_treated_as_a_bound(value) -> None:
@@ -351,9 +359,8 @@ def test_invalid_deadline_metadata_is_not_treated_as_a_bound(value) -> None:
 
     assert remaining_request_seconds(request) is None
 
+
 # --- test_transport_policy.py ---
-
-
 
 
 ###############################################################################
@@ -386,12 +393,14 @@ def test_transport_policy_controls_timeout_retry_proxy_and_environment() -> None
         "proxy": "http://proxy.test:8080",
     }
 
+
 ###############################################################################
 def test_transport_policy_rejects_invalid_values() -> None:
     with pytest.raises(ValueError, match="max_attempts"):
         LLMTransportPolicy(max_attempts=0)
     with pytest.raises(ValueError, match="proxy"):
         LLMTransportPolicy(proxy=42)  # type: ignore[arg-type]
+
 
 ###############################################################################
 def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
@@ -408,6 +417,7 @@ def test_transport_policy_can_be_built_from_native_execution_settings() -> None:
     assert policy.stream_timeout_seconds == 7.5
     assert policy.max_attempts == 3
     assert policy.retry_delay(1) == 0.0
+
 
 ###############################################################################
 def test_winerror_10013_is_safe_and_not_retryable() -> None:

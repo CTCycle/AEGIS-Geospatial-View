@@ -20,6 +20,7 @@ from server.services.geospatial.providers.http import (
     fetch_bytes_url,
 )
 
+
 ###############################################################################
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"
@@ -206,7 +207,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
         try:
             max_age = float(freshness_seconds)
             timestamp = datetime.fromisoformat(feed_timestamp)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         return (datetime.now(UTC) - timestamp).total_seconds() <= max_age
 

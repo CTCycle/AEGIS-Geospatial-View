@@ -33,17 +33,20 @@ LEGEND: dict[str, Any] = {
 }
 PIXEL = TilePixel(z=1, x=0, y=0, pixel_x=10, pixel_y=10, tile_size=256)
 
+
 ###############################################################################
 def _png(color: tuple[int, int, int, int], size: int = 256) -> bytes:
     buffer = BytesIO()
     Image.new("RGBA", (size, size), color).save(buffer, format="PNG")
     return buffer.getvalue()
 
+
 ###############################################################################
 def _legend():  # noqa: ANN202
     compiled = compile_legend(LEGEND)
     assert compiled is not None
     return compiled
+
 
 ###############################################################################
 def test_lonlat_maps_to_known_tile_and_pixel() -> None:
@@ -54,6 +57,7 @@ def test_lonlat_maps_to_known_tile_and_pixel() -> None:
     rome = lonlat_to_tile_pixel(12.4964, 41.9028, 8, tile_size=512)
     assert (rome.x, rome.y) == (136, 95)
     assert 0 <= rome.pixel_x < 512 and 0 <= rome.pixel_y < 512
+
 
 ###############################################################################
 def test_sample_tile_reads_nearest_legend_entry_within_tolerance() -> None:
@@ -67,6 +71,7 @@ def test_sample_tile_reads_nearest_legend_entry_within_tolerance() -> None:
         "matched_color": "#00ff00",
     }
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "color",
@@ -77,6 +82,7 @@ def test_sample_tile_returns_none_without_a_legend_colour(
     color: tuple[int, int, int, int],
 ) -> None:
     assert sample_tile(_png(color), PIXEL, _legend()) is None
+
 
 ###############################################################################
 def test_legend_summary_is_compact() -> None:
@@ -101,11 +107,16 @@ def test_legend_summary_is_compact() -> None:
     assert summary["labels"] == [f"class {index}" for index in range(8)]
     assert summary["label_count"] == 10
 
+
 ###############################################################################
-def _client(overlay: dict[str, Any], tile: bytes) -> tuple[TestClient, list[tuple[int, ...]]]:
+def _client(
+    overlay: dict[str, Any], tile: bytes
+) -> tuple[TestClient, list[tuple[int, ...]]]:
     service = GeospatialApiService(
         catalog_service=cast(Any, None),
-        catalog_snapshot=GeospatialManifestSnapshot.from_payload({"overlays": [overlay]}),
+        catalog_snapshot=GeospatialManifestSnapshot.from_payload(
+            {"overlays": [overlay]}
+        ),
         runtime_registry=cast(Any, SimpleNamespace(credential_resolver=None)),
         provider_registry=cast(Any, None),
     )
@@ -123,6 +134,7 @@ def _client(overlay: dict[str, Any], tile: bytes) -> tuple[TestClient, list[tupl
     app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: service
     return TestClient(app), fetched
 
+
 ###############################################################################
 def _overlay(**metadata: Any) -> dict[str, Any]:
     return {
@@ -132,8 +144,11 @@ def _overlay(**metadata: Any) -> dict[str, Any]:
         "metadata": {"layer_id": "fixture_rain", "max_zoom": 6, **metadata},
     }
 
+
 ###############################################################################
-def test_sample_endpoint_returns_legend_value_with_clamped_zoom_and_cached_tile() -> None:
+def test_sample_endpoint_returns_legend_value_with_clamped_zoom_and_cached_tile() -> (
+    None
+):
     client, fetched = _client(_overlay(legend=LEGEND), _png((255, 0, 0, 255)))
 
     url = "/api/geospatial/sample/fixture_rain?lon=12.5&lat=41.9&z=12&time=2026-11-01"
@@ -159,6 +174,7 @@ def test_sample_endpoint_returns_legend_value_with_clamped_zoom_and_cached_tile(
         },
     }
     assert len(fetched) == 1 and fetched[0][0] == 6
+
 
 ###############################################################################
 def test_sample_endpoint_rejects_layer_without_legend() -> None:

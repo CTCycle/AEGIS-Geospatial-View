@@ -23,6 +23,7 @@ from server.contracts.runs import AgentRunState
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
+
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,6 +31,7 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -44,6 +46,7 @@ class ChatTurnRequest(BaseModel):
     attachment_id: str | None = Field(default=None, max_length=64)
     map_view: ClientMapView | None = None
 
+
 ###############################################################################
 class ChatAttachmentCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -54,12 +57,14 @@ class ChatAttachmentCreateRequest(BaseModel):
     width: int = Field(ge=1, le=4096)
     height: int = Field(ge=1, le=4096)
 
+
 ###############################################################################
 class ChatAttachmentResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     attachment_id: str
     expires_in_seconds: int
+
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -94,6 +99,7 @@ class ContextUsageResponse(BaseModel):
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
+
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
@@ -135,6 +141,7 @@ class ChatOperationResult(BaseModel):
         | None
     ) = None
 
+
 ###############################################################################
 class AgentToolResultSummary(BaseModel):
     """Bounded model-independent summary of one native tool result."""
@@ -148,6 +155,7 @@ class AgentToolResultSummary(BaseModel):
     evidence_refs: list[str] = Field(default_factory=lambda: list[str]())
     map_candidate_id: str | None = None
     error: ToolExecutionError | None = None
+
 
 ###############################################################################
 class AgentTurnResponse(BaseModel):
@@ -183,6 +191,7 @@ class AgentTurnResponse(BaseModel):
     # Answer choices for a clarification operation; stored on the pending record.
     clarification_options: list[str] = Field(default_factory=lambda: list[str]())
 
+
 ###############################################################################
 class ChatTurnResponse(BaseModel):
     """Canonical public response for one native agent turn."""
@@ -211,6 +220,7 @@ class ChatTurnResponse(BaseModel):
     )
     conversation_state: ConversationState | None = None
 
+
 ###############################################################################
 class AgentRunAcceptedResponse(BaseModel):
     """Stable response for work accepted outside the synchronous window."""
@@ -227,6 +237,7 @@ class AgentRunAcceptedResponse(BaseModel):
     status_url: str
     realtime_url: str | None = None
     terminal: bool = False
+
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -252,6 +263,7 @@ class ModelCardDescriptor(BaseModel):
     ] = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
+
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -261,6 +273,7 @@ class ModelLibrarySourceStatus(BaseModel):
     stale: bool = False
     message: str | None = None
     model_count: int | None = None
+
 
 ###############################################################################
 class SelectedModelContextResponse(BaseModel):
@@ -274,6 +287,7 @@ class SelectedModelContextResponse(BaseModel):
     context_metadata_authority: Literal[
         "provider", "configured", "inferred", "unknown"
     ] = "unknown"
+
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -292,6 +306,7 @@ class ModelSettingsResponse(BaseModel):
     )
     selected_model_context: SelectedModelContextResponse
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelSettingsSnapshot:
@@ -305,6 +320,7 @@ class ModelSettingsSnapshot:
     openai_base_url: str | None
     google_base_url: str | None
     deepseek_base_url: str | None
+
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -356,6 +372,7 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
+
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -370,6 +387,7 @@ class ModelLibraryResponse(BaseModel):
         default_factory=lambda: dict[str, ModelLibrarySourceStatus]()
     )
 
+
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -383,15 +401,18 @@ class OllamaRefreshResponse(BaseModel):
         default_factory=lambda: list[ModelCardDescriptor]()
     )
 
+
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
 
+
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

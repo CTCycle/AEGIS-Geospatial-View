@@ -22,6 +22,7 @@ RuntimeAccessMode = Literal[
     "ingestion_only",
 ]
 
+
 ###############################################################################
 class CatalogIndex(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -38,6 +39,7 @@ class CatalogIndex(BaseModel):
     source_catalog_version: str
     capability_groups: list[str]
     health_summary: dict[str, int]
+
 
 ###############################################################################
 class RuntimeProfile(BaseModel):
@@ -60,6 +62,7 @@ class RuntimeProfile(BaseModel):
     availability_mode: RuntimeAccessMode | None = None
     local_source_env: str | None = None
 
+
 ###############################################################################
 class RuntimeProfilesDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -68,9 +71,11 @@ class RuntimeProfilesDocument(BaseModel):
     profiles: list[RuntimeProfile]
     routing_profiles: list[str]
 
+
 ###############################################################################
 class ManifestValidationError(ValueError):
     pass
+
 
 ###############################################################################
 class GeospatialManifestLoader:

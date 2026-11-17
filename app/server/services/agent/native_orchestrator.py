@@ -47,6 +47,7 @@ from server.services.llm.provider_contract import require_canonical_provider
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class NativeAgentOrchestrator:
     """Hydrate, run, and persist one canonical native agent turn."""
@@ -165,10 +166,17 @@ class NativeAgentOrchestrator:
             raise LLMConfigurationError(str(exc)) from exc
         execution_settings = (
             self.execution_settings_provider()
-            if self.execution_settings_provider is not None else self.execution_settings
+            if self.execution_settings_provider is not None
+            else self.execution_settings
         )
-        if checkpoint and is_json_object(checkpoint.get("execution_policy")) and checkpoint.get("execution_policy"):
-            execution_settings = AgentExecutionSettings(**checkpoint["execution_policy"])
+        if (
+            checkpoint
+            and is_json_object(checkpoint.get("execution_policy"))
+            and checkpoint.get("execution_policy")
+        ):
+            execution_settings = AgentExecutionSettings(
+                **checkpoint["execution_policy"]
+            )
         budget = self._new_execution_budget(execution_settings)
         persisted = self.conversation_repository.read_state(conversation_id)
         conversation_state = ConversationState.from_persisted(
@@ -552,7 +560,9 @@ class NativeAgentOrchestrator:
             )
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="evidence_summaries",
+                LOGGER,
+                exc,
+                stage="evidence_summaries",
                 conversation_id=conversation_id,
             )
             return []
@@ -633,8 +643,11 @@ class NativeAgentOrchestrator:
             )
         except Exception as exc:
             log_unexpected_failure(
-                LOGGER, exc, stage="load_existing_response",
-                conversation_id=conversation_id, request_id=request_id,
+                LOGGER,
+                exc,
+                stage="load_existing_response",
+                conversation_id=conversation_id,
+                request_id=request_id,
             )
             return None
 
@@ -693,15 +706,14 @@ class NativeAgentOrchestrator:
                         "conversation_id": conversation_id,
                         "stage": stage,
                         "status": "started",
-                        "remaining_deadline_ms": int(
-                            budget.remaining_seconds() * 1000
-                        ),
+                        "remaining_deadline_ms": int(budget.remaining_seconds() * 1000),
                     },
                 )
             except Exception:
                 pass
         with budget.observe(stage):
             yield
+
 
 ###############################################################################
 def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
@@ -734,6 +746,7 @@ def _native_tool_payload(response: AgentTurnResponse) -> dict[str, Any]:
         ),
         "execution_trace": response.execution_trace,
     }
+
 
 ###############################################################################
 def _native_constraints(response: AgentTurnResponse) -> dict[str, Any]:

@@ -42,9 +42,9 @@ from server.services.agent.tool_definitions import ProviderLayerDiscoveryInput
 from server.services.agent.tool_handlers.provider_layers import ProviderLayerToolHandler
 from server.services.agent.tool_registry import ToolRegistry
 
+
 ###############################################################################
 class FakeCapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         if capability_id == "places:hospitals":
@@ -81,9 +81,9 @@ class FakeCapabilityRegistry:
             {"id": "osm_dark"},
         ]
 
+
 ###############################################################################
 class FakeRuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def is_enabled(self, _capability_id: str) -> bool:
         return True
@@ -92,20 +92,21 @@ class FakeRuntimeRegistry:
     def access_available(self, _capability_id: str) -> bool:
         return True
 
+
 ###############################################################################
 class FakeResolver:
-
     # -------------------------------------------------------------------------
     async def resolve_location_signals(self, _signals: Any, _memory: Any) -> Any:
         raise AssertionError("location resolution is not part of exposure tests")
+
 
 ###############################################################################
 class FakeEvidenceRepository:
     pass
 
+
 ###############################################################################
 class FakeCapabilityExecutionService:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.context: ToolExecutionContext | None = None
@@ -129,6 +130,7 @@ class FakeCapabilityExecutionService:
             metadata=ToolExecutionMetadata(duration_ms=0),
         )
 
+
 ###############################################################################
 def _registry() -> ToolRegistry:
     runtime = FakeRuntimeRegistry()
@@ -144,6 +146,7 @@ def _registry() -> ToolRegistry:
     )
     return registry
 
+
 ###############################################################################
 def _state() -> AgentRunState:
     return AgentRunState(
@@ -152,6 +155,7 @@ def _state() -> AgentRunState:
         phase=AgentPhase.ROUTE_REQUEST,
         user_message="show hospitals",
     )
+
 
 ###############################################################################
 @pytest.mark.parametrize("task_mode", ["answer", "clarify"])
@@ -163,11 +167,14 @@ def test_answer_and_clarify_routes_expose_no_execution_tools(task_mode: str) -> 
         task_mode=task_mode,  # type: ignore[arg-type]
         presentation="text",
         location_mode="none",
-        clarification_question=("Which source should I use?" if task_mode == "clarify" else None),
+        clarification_question=(
+            "Which source should I use?" if task_mode == "clarify" else None
+        ),
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
 
     assert registry.expose(state) == []
+
 
 ###############################################################################
 def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
@@ -176,14 +183,13 @@ def test_apply_map_plan_describes_only_canonical_basemap_ids() -> None:
 
     assert tool is not None
     assert "enumerated canonical basemap IDs" in tool.definition.description
-    basemap_schema = tool.definition.parameters_json_schema["$defs"][
-        "SetBasemapAction"
-    ]
+    basemap_schema = tool.definition.parameters_json_schema["$defs"]["SetBasemapAction"]
     assert basemap_schema["properties"]["capability_id"]["enum"] == [
         "esri_world_imagery",
         "osm_dark",
         "osm_default",
     ]
+
 
 ###############################################################################
 def test_route_request_schema_inlines_enums_and_nested_scopes() -> None:
@@ -196,6 +202,7 @@ def test_route_request_schema_inlines_enums_and_nested_scopes() -> None:
     assert schema["properties"]["primary_domain"]["enum"] == [
         domain.value for domain in CapabilityDomain
     ]
+
 
 ###############################################################################
 def test_map_only_routes_expose_map_preparation_without_data_execution() -> None:
@@ -221,10 +228,15 @@ def test_map_only_routes_expose_map_preparation_without_data_execution() -> None
     assert "apply_map_plan" in exposed
     assert "execute_geospatial_capability" not in exposed
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("target", "satisfied"),
-    [("Springfield, Illinois", True), ("Springfield Illinois", True), ("Illinois", False)],
+    [
+        ("Springfield, Illinois", True),
+        ("Springfield Illinois", True),
+        ("Illinois", False),
+    ],
 )
 def test_route_target_answers_to_a_more_qualified_resolved_key(
     target: str, satisfied: bool
@@ -250,6 +262,7 @@ def test_route_target_answers_to_a_more_qualified_resolved_key(
     assert ("apply_map_plan" in exposed) is satisfied
     assert ("resolve_geospatial_location" in exposed) is not satisfied
 
+
 ###############################################################################
 def test_new_route_target_location_mode_resolution_even_with_active_map() -> None:
     registry = _registry()
@@ -263,7 +276,9 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
-        resolved_location=ResolvedLocation(label="Vermont, United States", latitude=44.0, longitude=-72.7),
+        resolved_location=ResolvedLocation(
+            label="Vermont, United States", latitude=44.0, longitude=-72.7
+        ),
         overlay_collection=SimpleNamespace(instances=[]),
     )
     state.location_refs = {
@@ -275,6 +290,7 @@ def test_new_route_target_location_mode_resolution_even_with_active_map() -> Non
     exposed = {tool.name for tool in registry.expose(state)}
 
     assert "resolve_geospatial_location" in exposed
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -296,9 +312,15 @@ def test_viewport_change_naming_a_new_place_can_resolve_it(
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.active_map_session = SimpleNamespace(  # type: ignore[assignment]
-        resolved_location=ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        resolved_location=ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
         overlay_collection=SimpleNamespace(
-            instances=[SimpleNamespace(instance_id="traffic-1", capability_id="traffic", label="Traffic")]
+            instances=[
+                SimpleNamespace(
+                    instance_id="traffic-1", capability_id="traffic", label="Traffic"
+                )
+            ]
         ),
     )
 
@@ -307,6 +329,7 @@ def test_viewport_change_naming_a_new_place_can_resolve_it(
     # The map plan follows once the named place has been resolved.
     assert ("resolve_geospatial_location" in exposed) is exposed_resolver
     assert ("apply_map_plan" in exposed) is not exposed_resolver
+
 
 ###############################################################################
 def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() -> None:
@@ -327,14 +350,19 @@ def test_follow_up_target_spelled_as_resolved_label_needs_no_new_resolution() ->
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.capability_ids = ["traffic"]
     state.location_refs = {
-        "zurich": ResolvedLocation(label="Zurich, Switzerland", latitude=47.37, longitude=8.54),
-        "lisbon": ResolvedLocation(label="Lisbon, Portugal", latitude=38.71, longitude=-9.14),
+        "zurich": ResolvedLocation(
+            label="Zurich, Switzerland", latitude=47.37, longitude=8.54
+        ),
+        "lisbon": ResolvedLocation(
+            label="Lisbon, Portugal", latitude=38.71, longitude=-9.14
+        ),
     }
 
     exposed = {tool.name for tool in registry.expose(state)}
 
     assert "resolve_geospatial_location" not in exposed
     assert "execute_geospatial_capability" in exposed
+
 
 ###############################################################################
 def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None:
@@ -357,6 +385,7 @@ def test_active_map_layer_lifecycle_exposes_only_map_plan_for_mutation() -> None
     assert "transform_evidence" not in exposed
     assert "inspect_evidence" not in exposed
     assert "discover_geospatial_capabilities" not in exposed
+
 
 ###############################################################################
 def test_free_text_operation_on_a_named_map_layer_uses_the_current_map() -> None:
@@ -388,6 +417,7 @@ def test_free_text_operation_on_a_named_map_layer_uses_the_current_map() -> None
     assert "apply_map_plan" in exposed
     assert "resolve_geospatial_location" not in exposed
 
+
 ###############################################################################
 def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
     registry = _registry()
@@ -403,8 +433,12 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.capability_ids = ["places:hospitals"]
     state.location_refs = {
-        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
-        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        "paris": ResolvedLocation(
+            label="Paris, France", latitude=48.85, longitude=2.35
+        ),
+        "berlin": ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
     }
 
     def executed(location_ref: str, *, data_valid: bool = True) -> ToolResult:
@@ -450,39 +484,59 @@ def test_comparison_keeps_execution_open_until_every_target_has_data() -> None:
         tool.name for tool in registry.expose(state)
     }
 
+
 ###############################################################################
 def test_current_calendar_day_does_not_become_a_rolling_previous_day() -> None:
     state = _state()
     state.goal = AgentGoal(
-        goal="Rainfall today", task_mode="execute", presentation="text",
-        operation="inspect", location_mode="none",
+        goal="Rainfall today",
+        task_mode="execute",
+        presentation="text",
+        operation="inspect",
+        location_mode="none",
         temporal_scope={"mode": "current", "granularity": "day"},
     )
-    bound = _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state)
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(capability_id="weather"), state
+    )
     assert bound.start_time_iso is None
     assert bound.temporal_mode == "current"
-    state.goal = state.goal.model_copy(update={
-        "temporal_scope": {"mode": "historical", "granularity": "day"},
-    })
-    assert _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state).start_time_iso is not None
+    state.goal = state.goal.model_copy(
+        update={
+            "temporal_scope": {"mode": "historical", "granularity": "day"},
+        }
+    )
+    assert (
+        _bind_execute_request(
+            ExecuteCapabilityInput(capability_id="weather"), state
+        ).start_time_iso
+        is not None
+    )
+
 
 ###############################################################################
 def test_forecast_day_binding_looks_ahead_instead_of_back() -> None:
     state = _state()
     state.goal = AgentGoal(
-        goal="Rainfall tomorrow", task_mode="execute", presentation="text",
-        operation="inspect", location_mode="none",
+        goal="Rainfall tomorrow",
+        task_mode="execute",
+        presentation="text",
+        operation="inspect",
+        location_mode="none",
         temporal_scope={"mode": "forecast", "granularity": "day"},
     )
     before = datetime.now(UTC)
 
-    bound = _bind_execute_request(ExecuteCapabilityInput(capability_id="weather"), state)
+    bound = _bind_execute_request(
+        ExecuteCapabilityInput(capability_id="weather"), state
+    )
 
     assert bound.start_time_iso is not None and bound.end_time_iso is not None
     start = datetime.fromisoformat(bound.start_time_iso)
     end = datetime.fromisoformat(bound.end_time_iso)
     assert start >= before
     assert end - start == timedelta(days=1)
+
 
 ###############################################################################
 def test_comparison_map_must_show_a_layer_for_every_target() -> None:
@@ -504,8 +558,12 @@ def test_comparison_map_must_show_a_layer_for_every_target() -> None:
     )
     state.capability_ids = ["places:hospitals"]
     state.location_refs = {
-        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
-        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        "paris": ResolvedLocation(
+            label="Paris, France", latitude=48.85, longitude=2.35
+        ),
+        "berlin": ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
     }
     for key in ("paris", "berlin"):
         state.evidence_refs.append(f"evidence-{key}")
@@ -526,24 +584,29 @@ def test_comparison_map_must_show_a_layer_for_every_target() -> None:
         )
 
     def plan(*keys: str) -> ApplyMapPlanInput:
-        return ApplyMapPlanInput.model_validate({
-            "expected_collection_revision": 0,
-            "actions": [
-                {
-                    "action": "add_evidence_layer",
-                    "evidence_ref": f"evidence-{key}",
-                    "capability_id": "places:hospitals",
-                }
-                for key in keys
-            ],
-        })
+        return ApplyMapPlanInput.model_validate(
+            {
+                "expected_collection_revision": 0,
+                "actions": [
+                    {
+                        "action": "add_evidence_layer",
+                        "evidence_ref": f"evidence-{key}",
+                        "capability_id": "places:hospitals",
+                    }
+                    for key in keys
+                ],
+            }
+        )
 
     errors = _map_plan_semantic_validator(plan("berlin"), state)
     assert any("Missing: Paris" in error for error in errors)
     assert _map_plan_semantic_validator(plan("paris", "berlin"), state) == []
 
+
 ###############################################################################
-def test_compiled_measurement_requirement_exposes_measure_tool_with_one_location() -> None:
+def test_compiled_measurement_requirement_exposes_measure_tool_with_one_location() -> (
+    None
+):
     registry = _registry()
     state = _state()
     state.route = CapabilityRoute(
@@ -556,13 +619,16 @@ def test_compiled_measurement_requirement_exposes_measure_tool_with_one_location
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
     state.location_refs = {
-        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
+        "paris": ResolvedLocation(
+            label="Paris, France", latitude=48.85, longitude=2.35
+        ),
     }
     assert "measure_geospatial" not in {tool.name for tool in registry.expose(state)}
 
     state.completion_requirements = ["measurement_computed"]
 
     assert "measure_geospatial" in {tool.name for tool in registry.expose(state)}
+
 
 ###############################################################################
 def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() -> None:
@@ -574,7 +640,12 @@ def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() ->
         task_mode="execute",
         presentation="text",
         location_mode="search_area",
-        analysis={"kind": "rank", "metric": "magnitude", "order": "descending", "top_k": 1},
+        analysis={
+            "kind": "rank",
+            "metric": "magnitude",
+            "order": "descending",
+            "top_k": 1,
+        },
         capability_queries=["earthquakes", "current weather"],
         target_refs=["Europe"],
     )
@@ -591,7 +662,9 @@ def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() ->
             tool_name="execute_geospatial_capability",
             status="success",
             summary="ok",
-            metadata=ToolExecutionMetadata(duration_ms=0, capability_id="places:hospitals"),
+            metadata=ToolExecutionMetadata(
+                duration_ms=0, capability_id="places:hospitals"
+            ),
         ),
         ToolResult(
             call_id="rank",
@@ -604,9 +677,15 @@ def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() ->
     ]
 
     exposed = {tool.name for tool in registry.expose(state)}
-    assert {"resolve_geospatial_location", "discover_geospatial_capabilities"} <= exposed
+    assert {
+        "resolve_geospatial_location",
+        "discover_geospatial_capabilities",
+    } <= exposed
 
-    for key, latitude, longitude in (("38.1, 20.5", 38.1, 20.5), ("10.0, -60.0", 10.0, -60.0)):
+    for key, latitude, longitude in (
+        ("38.1, 20.5", 38.1, 20.5),
+        ("10.0, -60.0", 10.0, -60.0),
+    ):
         state.location_refs[key] = ResolvedLocation(
             label=key, latitude=latitude, longitude=longitude
         )
@@ -634,27 +713,49 @@ def test_analysis_follow_up_can_investigate_a_derived_point_inside_the_area() ->
     assert location_errors("38.1, 20.5") == []
     assert location_errors("10.0, -60.0") != []
     bound = _bind_execute_request(
-        ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="38.1, 20.5"),
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals", location_ref="38.1, 20.5"
+        ),
         state,
     )
     assert "sampling" not in bound.arguments
     state.evidence_refs = ["weather-at-result", "raw-earthquakes"]
-    state.tool_results.append(ToolResult(
-        call_id="follow-up-weather", tool_name="execute_geospatial_capability",
-        status="success", summary="Weather at the epicentre.",
-        data={"query": {"location_ref": "38.1, 20.5"}},
-        evidence_refs=["weather-at-result"],
-        metadata=ToolExecutionMetadata(duration_ms=0),
-    ))
-    plan = ApplyMapPlanInput.model_validate({
-        "expected_collection_revision": 0,
-        "actions": [{"action": "add_evidence_layer", "capability_id": "weather",
-                     "evidence_ref": "weather-at-result"}],
-    })
+    state.tool_results.append(
+        ToolResult(
+            call_id="follow-up-weather",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Weather at the epicentre.",
+            data={"query": {"location_ref": "38.1, 20.5"}},
+            evidence_refs=["weather-at-result"],
+            metadata=ToolExecutionMetadata(duration_ms=0),
+        )
+    )
+    plan = ApplyMapPlanInput.model_validate(
+        {
+            "expected_collection_revision": 0,
+            "actions": [
+                {
+                    "action": "add_evidence_layer",
+                    "capability_id": "weather",
+                    "evidence_ref": "weather-at-result",
+                }
+            ],
+        }
+    )
     assert _map_plan_semantic_validator(plan, state) == []
-    raw_plan = plan.model_copy(update={"actions": [plan.actions[0].model_copy(
-        update={"evidence_ref": "raw-earthquakes"})]})
-    assert any("located derived evidence" in error for error in _map_plan_semantic_validator(raw_plan, state))
+    raw_plan = plan.model_copy(
+        update={
+            "actions": [
+                plan.actions[0].model_copy(update={"evidence_ref": "raw-earthquakes"})
+            ]
+        }
+    )
+    assert any(
+        "located derived evidence" in error
+        for error in _map_plan_semantic_validator(raw_plan, state)
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -665,20 +766,30 @@ async def test_current_map_view_resolves_to_the_client_reported_viewport() -> No
     handler = LocationToolHandler(resolver=FakeResolver())  # type: ignore[arg-type]
     state = _state()
 
-    missing = await handler.resolve(ResolveLocationInput(query="current map view"), state)
+    missing = await handler.resolve(
+        ResolveLocationInput(query="current map view"), state
+    )
     assert missing.error is not None and missing.error.recovery == "request_user_input"
 
-    state.map_memory = {"current_view": {
-        "bounds": [19.0, 36.0, 28.0, 41.5], "center": [23.5, 38.75], "zoom": 6.2,
-        "overlays": [], "source": "client_reported",
-    }}
-    resolved = await handler.resolve(ResolveLocationInput(target_id="current_map_view"), state)
+    state.map_memory = {
+        "current_view": {
+            "bounds": [19.0, 36.0, 28.0, 41.5],
+            "center": [23.5, 38.75],
+            "zoom": 6.2,
+            "overlays": [],
+            "source": "client_reported",
+        }
+    }
+    resolved = await handler.resolve(
+        ResolveLocationInput(target_id="current_map_view"), state
+    )
 
     location = state.location_refs["current_map_view"]
     assert resolved.status == "success"
     assert location.bbox == [19.0, 36.0, 28.0, 41.5]
     assert (location.longitude, location.latitude) == (23.5, 38.75)
     assert _lower_execution_extent({}, location, radius_m=None).kind == "bbox"
+
 
 ###############################################################################
 def test_capability_discovery_route_does_not_expose_data_execution() -> None:
@@ -709,7 +820,10 @@ def test_capability_discovery_route_does_not_expose_data_execution() -> None:
     assert "execute_geospatial_capability" not in exposed
 
     state.route = state.route.model_copy(update={"presentation": "both"})
-    assert "execute_geospatial_capability" in {tool.name for tool in registry.expose(state)}
+    assert "execute_geospatial_capability" in {
+        tool.name for tool in registry.expose(state)
+    }
+
 
 ###############################################################################
 def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> None:
@@ -740,6 +854,7 @@ def test_catalog_discovery_remains_exposed_while_a_page_cursor_is_pending() -> N
     assert "discover_geospatial_capabilities" in exposed
     assert "execute_geospatial_capability" not in exposed
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None:
@@ -757,6 +872,7 @@ async def test_capability_handler_uses_persisted_run_id_not_request_id() -> None
     assert service.context.run_id == "run-1"
     assert service.context.run_id != state.request_id
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_compatibility_state_has_no_foreign_run_id() -> None:
@@ -770,6 +886,7 @@ async def test_compatibility_state_has_no_foreign_run_id() -> None:
 
     assert service.context is not None
     assert service.context.run_id is None
+
 
 ###############################################################################
 def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() -> None:
@@ -827,6 +944,7 @@ def test_execute_binding_preserves_semantics_but_owns_scope_and_coordinates() ->
     assert bound.arguments == {"category": "hospital", "live": True}
     assert bound.filters == {"amenity": "hospital", "emergency": True}
 
+
 ###############################################################################
 def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
     state = _state()
@@ -856,6 +974,7 @@ def test_execute_binding_lowers_administrative_scope_to_resolved_bbox() -> None:
     )
 
     assert bound.bbox == [11.4, 36.6, 15.7, 38.4]
+
 
 ###############################################################################
 def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None:
@@ -892,6 +1011,7 @@ def test_execute_binding_lowers_implicit_radius_to_resolved_place_bbox() -> None
 
     assert bound.radius_m is None
     assert bound.bbox == [-97.9367663, 30.0985133, -97.5605288, 30.5166255]
+
 
 ###############################################################################
 def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> None:
@@ -943,6 +1063,7 @@ def test_map_plan_allows_location_only_candidate_after_valid_empty_data() -> Non
 
     assert _map_plan_semantic_validator(plan, state) == []
 
+
 ###############################################################################
 def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
     state = _state()
@@ -968,6 +1089,7 @@ def test_goal_target_reference_is_required_and_cannot_be_replaced() -> None:
         "another geography will not be substituted."
     ]
 
+
 ###############################################################################
 def test_manifest_argument_schema_is_checked_before_execution() -> None:
     state = _state()
@@ -986,11 +1108,13 @@ def test_manifest_argument_schema_is_checked_before_execution() -> None:
         "arguments.unexpected: additional property is not allowed.",
         "arguments.query: string is too short.",
     ]
-    assert errors[2].startswith("Allowed operations: none declared. Allowed arguments: query (string")
+    assert errors[2].startswith(
+        "Allowed operations: none declared. Allowed arguments: query (string"
+    )
+
 
 ###############################################################################
 class _MultiOperationRegistry(FakeCapabilityRegistry):
-
     # -------------------------------------------------------------------------
     def execution_contract(self, capability_id: str) -> dict[str, Any]:
         return {"supported_operations": ["show", "search"]}
@@ -1000,9 +1124,15 @@ class _MultiOperationRegistry(FakeCapabilityRegistry):
         return {
             "type": "object",
             "properties": {
-                "radius_km": {"type": "number", "minimum": 1, "maximum": 500, "default": 50},
+                "radius_km": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 50,
+                },
             },
         }
+
 
 ###############################################################################
 def _execute_errors(operation: str | None, arguments: dict[str, Any]) -> list[str]:
@@ -1016,6 +1146,7 @@ def _execute_errors(operation: str | None, arguments: dict[str, Any]) -> list[st
         capability_registry=_MultiOperationRegistry(),  # type: ignore[arg-type]
     )
 
+
 ###############################################################################
 def test_unknown_operation_is_rejected_with_the_allowed_list() -> None:
     errors = _execute_errors("teleport", {})
@@ -1024,16 +1155,23 @@ def test_unknown_operation_is_rejected_with_the_allowed_list() -> None:
     assert "Allowed operations: show, search." in errors[1]
     assert "radius_km (number, >=1, <=500, default 50)" in errors[1]
 
+
 ###############################################################################
-def test_unknown_or_mistyped_argument_is_rejected_without_declared_additional_properties() -> None:
-    errors = _execute_errors("search", {"radius": "far", "radius_km": "far", "colour": 1})
+def test_unknown_or_mistyped_argument_is_rejected_without_declared_additional_properties() -> (
+    None
+):
+    errors = _execute_errors(
+        "search", {"radius": "far", "radius_km": "far", "colour": 1}
+    )
 
     assert "arguments.colour: additional property is not allowed." in errors
     assert "arguments.radius_km: value must be a number." in errors
 
+
 ###############################################################################
 def test_valid_call_passes_with_several_shortlisted_candidates() -> None:
     assert _execute_errors("Search", {"radius_km": 25}) == []
+
 
 ###############################################################################
 def _route() -> CapabilityRoute:
@@ -1045,6 +1183,7 @@ def _route() -> CapabilityRoute:
         capability_queries=["hospitals"],
     )
 
+
 ###############################################################################
 def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> None:
     registry = _registry()
@@ -1054,9 +1193,9 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
 
     state.route = _route()
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
-    assert {
-        tool.name for tool in registry.expose(state)
-    } == {"resolve_geospatial_location"}
+    assert {tool.name for tool in registry.expose(state)} == {
+        "resolve_geospatial_location"
+    }
 
     state.capability_ids = ["places:hospitals"]
     assert [tool.name for tool in registry.expose(state)] == [
@@ -1085,12 +1224,11 @@ def test_route_tool_is_hidden_after_bootstrap_and_exposure_is_progressive() -> N
             metadata=ToolExecutionMetadata(duration_ms=0),
         )
     )
-    assert {
-        tool.name for tool in registry.expose(state)
-    } == {
+    assert {tool.name for tool in registry.expose(state)} == {
         "describe_geospatial_capability",
         "apply_map_plan",
     }
+
 
 ###############################################################################
 def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
@@ -1120,6 +1258,7 @@ def test_new_map_retrieval_does_not_expose_stale_evidence_tools() -> None:
     assert "inspect_evidence" not in exposed
     assert "transform_evidence" not in exposed
 
+
 ###############################################################################
 def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
     registry = _registry()
@@ -1147,6 +1286,7 @@ def test_map_rendering_add_layer_does_not_expose_stale_evidence_tools() -> None:
     assert "apply_map_plan" in exposed
     assert "inspect_evidence" not in exposed
     assert "transform_evidence" not in exposed
+
 
 ###############################################################################
 def test_map_add_route_ignores_capability_target_for_location_prerequisite() -> None:
@@ -1180,6 +1320,7 @@ def test_map_add_route_ignores_capability_target_for_location_prerequisite() -> 
     assert "execute_geospatial_capability" in exposed
     assert "resolve_geospatial_location" not in exposed
 
+
 ###############################################################################
 def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
     registry = _registry()
@@ -1198,9 +1339,7 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
         for tool in registry.expose(state)
         if tool.name == "execute_geospatial_capability"
     )
-    capability_schema = definition.parameters_json_schema["properties"][
-        "capability_id"
-    ]
+    capability_schema = definition.parameters_json_schema["properties"]["capability_id"]
     assert capability_schema["enum"] == ["places:hospitals"]
     assert definition.parameters_json_schema["properties"]["arguments"] == {
         "type": "object",
@@ -1208,6 +1347,7 @@ def test_capability_schema_is_specialized_to_validated_shortlist() -> None:
         "properties": {"query": {"type": "string", "minLength": 1}},
         "additionalProperties": False,
     }
+
 
 ###############################################################################
 def test_map_plan_is_not_exposed_for_text_only_routes() -> None:
@@ -1220,12 +1360,13 @@ def test_map_plan_is_not_exposed_for_text_only_routes() -> None:
         label="Zurich", latitude=47.3769, longitude=8.5417
     )
 
-    assert "apply_map_plan" not in {
-        tool.name for tool in registry.expose(state)
-    }
+    assert "apply_map_plan" not in {tool.name for tool in registry.expose(state)}
+
 
 ###############################################################################
-def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime() -> None:
+def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime() -> (
+    None
+):
     registry = _registry()
     state = _state()
     state.route = _route()
@@ -1253,6 +1394,7 @@ def test_policy_authorizes_typed_capability_calls_once_against_route_and_runtime
     assert allowed.allowed is True
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "capability_not_shortlisted"
+
 
 ###############################################################################
 def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
@@ -1283,6 +1425,7 @@ def test_policy_rejects_capability_execution_on_map_only_routes() -> None:
     assert rejected.allowed is False
     assert rejected.metadata["code"] == "route_domain_mismatch"
 
+
 ###############################################################################
 def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None:
     registry = _registry()
@@ -1312,13 +1455,18 @@ def test_policy_allows_capability_execution_on_data_bearing_map_routes() -> None
 
     assert allowed.allowed is True
 
+
 ###############################################################################
 def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -> None:
     # S16-T1: a US-only radar for Tokyo; the rejection names the covering
     # source (declared fallback, shortlisted, or any catalog substitute) and
     # tells the model to use it and disclose the substitution.
     def radar(
-        identifier: str, name: str, coverage: str, hints: list[str], fallback_ids: list[str] | None = None
+        identifier: str,
+        name: str,
+        coverage: str,
+        hints: list[str],
+        fallback_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         return {
             "id": identifier,
@@ -1332,14 +1480,20 @@ def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -
         }
 
     catalog = {
-        "us_radar": radar("us_radar", "US Radar", "united-states", ["radar", "precipitation"]),
+        "us_radar": radar(
+            "us_radar", "US Radar", "united-states", ["radar", "precipitation"]
+        ),
         "global_roads": radar("global_roads", "Global Roads", "global", ["roads"]),
-        "global_radar": radar("global_radar", "Global Radar", "global-partial", ["radar"]),
+        "global_radar": radar(
+            "global_radar", "Global Radar", "global-partial", ["radar"]
+        ),
     }
     state = _state()
     state.route = _route()
     state.location_refs = {
-        "tokyo": ResolvedLocation(label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan")
+        "tokyo": ResolvedLocation(
+            label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan"
+        )
     }
     tool = _registry().get("execute_geospatial_capability")
     assert tool is not None
@@ -1348,11 +1502,14 @@ def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -
         state.capability_ids = shortlist
         policy = PolicyEngine(
             capability_registry=SimpleNamespace(  # type: ignore[arg-type]
-                get_capability=source.get, list_capabilities=lambda: list(source.values())
+                get_capability=source.get,
+                list_capabilities=lambda: list(source.values()),
             ),
             runtime_registry=FakeRuntimeRegistry(),  # type: ignore[arg-type]
         )
-        return policy.authorize(tool, ExecuteCapabilityInput(capability_id="us_radar"), state)
+        return policy.authorize(
+            tool, ExecuteCapabilityInput(capability_id="us_radar"), state
+        )
 
     shortlisted = reject(catalog, ["us_radar", "global_roads", "global_radar"])
     # Not shortlisted: the catalog's substitute is still found.
@@ -1360,12 +1517,18 @@ def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -
     declared_catalog = {
         **catalog,
         "us_radar": radar(
-            "us_radar", "US Radar", "united-states", ["radar"], fallback_ids=["global_roads", "global_radar"]
+            "us_radar",
+            "US Radar",
+            "united-states",
+            ["radar"],
+            fallback_ids=["global_roads", "global_radar"],
         ),
     }
     # Declared fallbacks are tried first, and only one sharing the phenomenon qualifies.
     declared = reject(declared_catalog, ["us_radar"])
-    without = reject({key: catalog[key] for key in ("us_radar", "global_roads")}, ["us_radar"])
+    without = reject(
+        {key: catalog[key] for key in ("us_radar", "global_roads")}, ["us_radar"]
+    )
 
     for rejected in (shortlisted, discovered, declared):
         assert rejected.allowed is False
@@ -1380,14 +1543,13 @@ def test_coverage_rejection_offers_a_covering_source_for_the_same_phenomenon() -
     assert without.metadata["alternative_id"] == ""
     assert "No other available source covers Tokyo, Japan" in str(without.reason)
 
+
 ###############################################################################
 def test_location_reference_never_falls_back_to_another_resolved_location() -> None:
     state = _state()
     state.location_refs = {
         "rome": ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5),
-        "zurich": ResolvedLocation(
-            label="Zurich", latitude=47.3769, longitude=8.5417
-        ),
+        "zurich": ResolvedLocation(label="Zurich", latitude=47.3769, longitude=8.5417),
     }
 
     missing = ExecuteCapabilityInput(
@@ -1401,9 +1563,13 @@ def test_location_reference_never_falls_back_to_another_resolved_location() -> N
 
     assert _location_for_request(missing, state) is None
     assert _location_for_request(explicit, state) == state.location_refs["zurich"]
-    assert _location_for_request(
-        ExecuteCapabilityInput(capability_id="places:hospitals"), state
-    ) is None
+    assert (
+        _location_for_request(
+            ExecuteCapabilityInput(capability_id="places:hospitals"), state
+        )
+        is None
+    )
+
 
 ###############################################################################
 def test_location_reference_also_matches_the_resolved_label() -> None:
@@ -1434,27 +1600,35 @@ def test_location_reference_also_matches_the_resolved_label() -> None:
         location_mode="target",
         target_ids=["Zurich, Switzerland", "Lisbon, Portugal"],
     )
-    by_key = ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="lisbon")
-    elsewhere = ExecuteCapabilityInput(capability_id="places:hospitals", location_ref="rome")
+    by_key = ExecuteCapabilityInput(
+        capability_id="places:hospitals", location_ref="lisbon"
+    )
+    elsewhere = ExecuteCapabilityInput(
+        capability_id="places:hospitals", location_ref="rome"
+    )
 
     assert _location_for_request(by_key, state) == state.location_refs["lisbon"]
     assert not any(
-        "exact target" in error for error in _capability_semantic_validator(by_key, state)
+        "exact target" in error
+        for error in _capability_semantic_validator(by_key, state)
     )
     assert _location_for_request(elsewhere, state) is None
     assert any(
-        "exact target" in error for error in _capability_semantic_validator(elsewhere, state)
+        "exact target" in error
+        for error in _capability_semantic_validator(elsewhere, state)
     )
+
 
 ###############################################################################
 class _FakeProviderLayerService:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.limit: int | None = None
 
     # -------------------------------------------------------------------------
-    async def list_provider_layers(self, provider_id: str, **kwargs: Any) -> GeospatialProviderLayersResponse:
+    async def list_provider_layers(
+        self, provider_id: str, **kwargs: Any
+    ) -> GeospatialProviderLayersResponse:
         self.limit = int(kwargs["limit"])
         return GeospatialProviderLayersResponse(
             provider=provider_id,
@@ -1472,9 +1646,9 @@ class _FakeProviderLayerService:
             ],
         )
 
+
 ###############################################################################
 class _FakeEvidenceStore:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.payload: Any = None
@@ -1483,6 +1657,7 @@ class _FakeEvidenceStore:
     def create(self, **kwargs: Any) -> Any:
         self.payload = kwargs
         return type("Evidence", (), {"evidence_id": "evidence-provider-layers"})()
+
 
 ###############################################################################
 def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
@@ -1497,9 +1672,7 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
     )
     state.phase = AgentPhase.BUILD_TOOL_CONTEXT
 
-    assert {
-        tool.name for tool in registry.expose(state)
-    } == {
+    assert {tool.name for tool in registry.expose(state)} == {
         "discover_geospatial_capabilities",
         "discover_geospatial_provider_layers",
     }
@@ -1514,6 +1687,7 @@ def test_provider_layer_discovery_is_only_exposed_for_provider_route() -> None:
     assert "discover_geospatial_provider_layers" not in {
         tool.name for tool in registry.expose(state)
     }
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1544,38 +1718,57 @@ async def test_provider_layer_discovery_uses_bounded_pagination_and_evidence() -
     assert provider_service.limit == 250
     assert evidence_store.payload["run_id"] == "run-1"
 
+
 ###############################################################################
 def test_tool_inputs_normalize_unambiguous_model_spellings() -> None:
-    execute = ExecuteCapabilityToolInput.model_validate({
-        "capability_id": "openmeteo_weather_forecast",
-        "temporal_mode": "current",
-        "bbox": "[5.9, 45.8, 10.5, 47.8]",
-        "arguments": {"location_ref": "lugano"},
-    })
-    inspect = InspectEvidenceInput.model_validate({"evidence_ref": "evidence-1", "view": "records"})
+    execute = ExecuteCapabilityToolInput.model_validate(
+        {
+            "capability_id": "openmeteo_weather_forecast",
+            "temporal_mode": "current",
+            "bbox": "[5.9, 45.8, 10.5, 47.8]",
+            "arguments": {"location_ref": "lugano"},
+        }
+    )
+    inspect = InspectEvidenceInput.model_validate(
+        {"evidence_ref": "evidence-1", "view": "records"}
+    )
 
     assert execute.location_ref == "lugano" and execute.arguments == {}
     assert inspect.view == "page"
 
+
 ###############################################################################
-@pytest.mark.parametrize("location_type,expected", [("country", "bbox"), ("city", None)])
-def test_unscoped_country_target_is_queried_as_its_area(location_type: str, expected: str | None) -> None:
+@pytest.mark.parametrize(
+    "location_type,expected", [("country", "bbox"), ("city", None)]
+)
+def test_unscoped_country_target_is_queried_as_its_area(
+    location_type: str, expected: str | None
+) -> None:
     location = ResolvedLocation(
-        label="Japan", latitude=36.2, longitude=138.25,
-        bbox=[122.9, 20.2, 154.2, 45.7], location_type=location_type,
+        label="Japan",
+        latitude=36.2,
+        longitude=138.25,
+        bbox=[122.9, 20.2, 154.2, 45.7],
+        location_type=location_type,
     )
     extent = _lower_execution_extent({}, location, radius_m=None)
 
     assert (extent.kind if extent is not None and extent.bbox else None) == expected
 
 
-
 ###############################################################################
 def test_inspecting_evidence_can_rank_records_without_a_derived_dataset() -> None:
     from server.services.agent.tool_handlers.evidence import _inspect_payload
 
-    payload = {"features": [{"properties": {"place": name, "mag": mag}} for name, mag in (("a", 4.1), ("b", 6.1), ("c", 5.2))]}
-    top = _inspect_payload(payload, view="page", fields=["place"], cursor=None, limit=2, sort_by="mag")
+    payload = {
+        "features": [
+            {"properties": {"place": name, "mag": mag}}
+            for name, mag in (("a", 4.1), ("b", 6.1), ("c", 5.2))
+        ]
+    }
+    top = _inspect_payload(
+        payload, view="page", fields=["place"], cursor=None, limit=2, sort_by="mag"
+    )
     assert [item["place"] for item in top["records"]] == ["b", "c"]
 
 
@@ -1591,7 +1784,9 @@ def test_resolved_reference_matches_a_goal_target_spelled_differently() -> None:
         target_ids=["San Mauro Torinese, Turin, Piedmont, Italy"],
     )
     state.location_refs["san mauro torinese, piedmont, italy"] = ResolvedLocation(
-        label="San Mauro Torinese, Turin, Piedmont, 10099, Italy", latitude=45.1, longitude=7.76
+        label="San Mauro Torinese, Turin, Piedmont, 10099, Italy",
+        latitude=45.1,
+        longitude=7.76,
     )
 
     errors = _capability_semantic_validator(

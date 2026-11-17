@@ -33,13 +33,14 @@ CANONICAL_CREDENTIAL_PROVIDERS = frozenset(
     {*SUPPORTED_LLM_PROVIDERS, *PROVIDER_FACTORIES}
 )
 
+
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
     pass
 
+
 ###############################################################################
 class ChatSettingsService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -309,7 +310,10 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _require_canonical_credential_provider(provider: object) -> str:
-        if not isinstance(provider, str) or provider not in CANONICAL_CREDENTIAL_PROVIDERS:
+        if (
+            not isinstance(provider, str)
+            or provider not in CANONICAL_CREDENTIAL_PROVIDERS
+        ):
             raise ChatSettingsValidationError(
                 f"Unsupported credential provider '{provider}'. Expected a registered provider ID."
             )

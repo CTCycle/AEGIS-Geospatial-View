@@ -45,19 +45,23 @@ from server.services.geospatial.raster_tiles import (
     build_backend_raster_proxy_template,
 )
 
+
 ###############################################################################
 def _bbox_of_area(location: ResolvedLocation, area_km2: float) -> list[float]:
     """Return a square bbox of about ``area_km2`` centred on ``location``."""
 
     half_side_km = area_km2**0.5 / 2
     half_lat = min(half_side_km / 111.32, 85.0)
-    half_lon = min(half_side_km / (111.32 * max(cos(radians(location.latitude)), 0.01)), 179.0)
+    half_lon = min(
+        half_side_km / (111.32 * max(cos(radians(location.latitude)), 0.01)), 179.0
+    )
     return [
         location.longitude - half_lon,
         max(location.latitude - half_lat, -85.0),
         location.longitude + half_lon,
         min(location.latitude + half_lat, 85.0),
     ]
+
 
 ###############################################################################
 MAX_CITY_VIEWPORT_SPAN_DEGREES = 5.0
@@ -99,14 +103,15 @@ _GEOJSON_GEOMETRY_TYPES = frozenset(
 _RASTER_RENDERING_MODES = frozenset({"xyz", "raster-tile", "wmts", "wms", "tile"})
 _RENDERING_MODE_ALIASES = {"vector": "geojson", "feature-collection": "geojson"}
 
+
 ###############################################################################
 class MapPlanBuildError(ValueError):
-
     # -------------------------------------------------------------------------
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
+
 
 ###############################################################################
 class MapSessionBuilder:
@@ -268,14 +273,12 @@ class MapSessionBuilder:
             ):
                 if key in evidence_payload and key not in descriptor:
                     descriptor[key] = evidence_payload[key]
-            if (
-                "tile_url_template" not in descriptor
-                and isinstance(descriptor.get("tileUrl"), str)
+            if "tile_url_template" not in descriptor and isinstance(
+                descriptor.get("tileUrl"), str
             ):
                 descriptor["tile_url_template"] = descriptor["tileUrl"]
-            if (
-                "url" not in descriptor
-                and isinstance(descriptor.get("serviceUrl"), str)
+            if "url" not in descriptor and isinstance(
+                descriptor.get("serviceUrl"), str
             ):
                 descriptor["url"] = descriptor["serviceUrl"]
             render_payload = json_object(evidence_payload.get("render"))
@@ -293,15 +296,29 @@ class MapSessionBuilder:
                 )
             if action.value_encoding is not None:
                 field = action.value_encoding.field
-                features: list[dict[str, Any]] = render_data.get("features", []) if render_data else []
-                values = [feature.get("properties", {}).get(field) for feature in features]
-                numbers = [float(value) for value in values if isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)]
+                features: list[dict[str, Any]] = (
+                    render_data.get("features", []) if render_data else []
+                )
+                values = [
+                    feature.get("properties", {}).get(field) for feature in features
+                ]
+                numbers = [
+                    float(value)
+                    for value in values
+                    if isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                    and isfinite(value)
+                ]
                 if not numbers:
-                    raise MapPlanBuildError("invalid_value_field", f"Field '{field}' has no numeric values; choose a numeric evidence field.")
+                    raise MapPlanBuildError(
+                        "invalid_value_field",
+                        f"Field '{field}' has no numeric values; choose a numeric evidence field.",
+                    )
                 low, high = min(numbers), max(numbers)
                 # Areas (per-region counts) are shaded; points are sized circles.
                 polygonal = any(
-                    json_object(feature.get("geometry")).get("type") in {"Polygon", "MultiPolygon"}
+                    json_object(feature.get("geometry")).get("type")
+                    in {"Polygon", "MultiPolygon"}
                     for feature in features
                 )
                 if polygonal and action.value_encoding.mode == "heatmap":
@@ -309,8 +326,15 @@ class MapSessionBuilder:
                         "invalid_value_encoding",
                         "A heatmap needs point records; shade these areas with mode 'graduated'.",
                     )
-                descriptor["value_encoding"] = {"mode": action.value_encoding.mode, "field": field, "min": low, "max": high}
-                descriptor["legend"] = _value_encoding_legend(field, low, high, evidence.provenance)
+                descriptor["value_encoding"] = {
+                    "mode": action.value_encoding.mode,
+                    "field": field,
+                    "min": low,
+                    "max": high,
+                }
+                descriptor["legend"] = _value_encoding_legend(
+                    field, low, high, evidence.provenance
+                )
                 descriptor["rendering_mode"] = "choropleth" if polygonal else "circles"
                 if polygonal:
                     descriptor["geometry_type"] = "Polygon"
@@ -360,7 +384,9 @@ class MapSessionBuilder:
             )
             return OverlayCollectionService.merge_into_map_session(session, collection)
         if isinstance(action, KeepOnlyLayersAction):
-            current_ids = {item.instance_id for item in session.overlay_collection.instances}
+            current_ids = {
+                item.instance_id for item in session.overlay_collection.instances
+            }
             missing = sorted(set(action.instance_ids) - current_ids)
             if missing:
                 raise _unknown_layer(session, missing[0])
@@ -398,8 +424,11 @@ class MapSessionBuilder:
         if action.strategy == "fit_evidence":
             bbox = _evidence_bbox(evidence)
             if bbox is not None:
-                distinct_results = (0 < max(bbox[2] - bbox[0], bbox[3] - bbox[1])
-                                    < MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES) and any(
+                distinct_results = (
+                    0
+                    < max(bbox[2] - bbox[0], bbox[3] - bbox[1])
+                    < MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES
+                ) and any(
                     isinstance(count := item.summary.get("located_record_count"), int)
                     and count > 1
                     for item in evidence
@@ -407,8 +436,11 @@ class MapSessionBuilder:
                 # A ranked set of nearby results must remain distinguishable.
                 # This changes presentation only; provider query extents and
                 # the broad single-point viewport safeguard remain unchanged.
-                min_span = (MIN_LOCATION_VIEWPORT_SPAN_DEGREES if distinct_results
-                            else MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES)
+                min_span = (
+                    MIN_LOCATION_VIEWPORT_SPAN_DEGREES
+                    if distinct_results
+                    else MIN_EVIDENCE_VIEWPORT_SPAN_DEGREES
+                )
                 viewport = _viewport_for_bbox(
                     _with_min_span(bbox, min_span),
                     session.viewport,
@@ -421,7 +453,9 @@ class MapSessionBuilder:
                 return _with_viewport(
                     session,
                     _viewport_for_bbox(
-                        _bbox_of_area(session.resolved_location, action.target_area_km2),
+                        _bbox_of_area(
+                            session.resolved_location, action.target_area_km2
+                        ),
                         session.viewport,
                     ),
                 )
@@ -461,15 +495,20 @@ class MapSessionBuilder:
             (location.longitude, location.latitude)
             for location in (marked_locations[ref] for ref in action.location_refs)
         ]
-        west, south, east, north = (
-            _valid_bbox(current_view_bounds) or session_view_bbox(session)
-        )
+        west, south, east, north = _valid_bbox(
+            current_view_bounds
+        ) or session_view_bbox(session)
         view = [west, south, east, north]
-        if not all(west <= lon <= east and south <= lat <= north for lon, lat in points):
+        if not all(
+            west <= lon <= east and south <= lat <= north for lon, lat in points
+        ):
             # Frame the markers themselves: the old view does not show them all.
             lons = [lon for lon, _ in points]
             lats = [lat for _, lat in points]
-            pad = max(max(lons) - min(lons), max(lats) - min(lats)) * LOCATION_UNION_PADDING
+            pad = (
+                max(max(lons) - min(lons), max(lats) - min(lats))
+                * LOCATION_UNION_PADDING
+            )
             view = _with_min_span(
                 [min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad],
                 MARKER_VIEWPORT_MIN_SPAN_DEGREES,
@@ -480,7 +519,9 @@ class MapSessionBuilder:
                 and view[1] <= subject.latitude <= view[3]
             ):
                 session = session.model_copy(
-                    update={"resolved_location": marked_locations[action.location_refs[0]]},
+                    update={
+                        "resolved_location": marked_locations[action.location_refs[0]]
+                    },
                     deep=True,
                 )
         features: list[dict[str, Any]] = []
@@ -575,9 +616,7 @@ class MapSessionBuilder:
                 "id": capability_id,
                 "capability_id": capability_id,
                 "label": str(
-                    metadata.get("label")
-                    or capability.get("name")
-                    or capability_id
+                    metadata.get("label") or capability.get("name") or capability_id
                 ),
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": str(
@@ -606,11 +645,7 @@ class MapSessionBuilder:
             or descriptor.get("type")
             or ""
         )
-        provider = str(
-            render.get("provider")
-            or descriptor.get("provider")
-            or ""
-        )
+        provider = str(render.get("provider") or descriptor.get("provider") or "")
         proxy_template = build_backend_raster_proxy_template(
             str(descriptor.get("capability_id") or descriptor.get("id") or ""),
             provider=provider,
@@ -675,12 +710,16 @@ class MapSessionBuilder:
     def _validate_render_descriptor(descriptor: dict[str, Any]) -> None:
         """Reject candidates the browser renderer cannot consume safely."""
 
-        mode = str(
-            descriptor.get("rendering_mode")
-            or descriptor.get("renderingMode")
-            or descriptor.get("type")
-            or ""
-        ).strip().casefold()
+        mode = (
+            str(
+                descriptor.get("rendering_mode")
+                or descriptor.get("renderingMode")
+                or descriptor.get("type")
+                or ""
+            )
+            .strip()
+            .casefold()
+        )
         if mode in _RENDERING_MODE_ALIASES and descriptor.get("data") is not None:
             mode = _RENDERING_MODE_ALIASES[mode]
             descriptor["rendering_mode"] = mode
@@ -706,13 +745,14 @@ class MapSessionBuilder:
             return
         if mode in _RASTER_RENDERING_MODES:
             if mode in {"wms", "wmts"} and not descriptor.get("url"):
-                service_url = descriptor.get("service_url") or descriptor.get("serviceUrl")
+                service_url = descriptor.get("service_url") or descriptor.get(
+                    "serviceUrl"
+                )
                 if service_url:
                     descriptor["url"] = service_url
             has_source = bool(
                 _usable_render_url(
-                    descriptor.get("tile_url_template")
-                    or descriptor.get("url")
+                    descriptor.get("tile_url_template") or descriptor.get("url")
                 )
             )
             if not has_source:
@@ -742,6 +782,7 @@ class MapSessionBuilder:
             f"Unsupported browser rendering mode '{mode}'.",
         )
 
+
 ###############################################################################
 def _usable_render_url(value: object) -> bool:
     if not isinstance(value, str):
@@ -757,6 +798,7 @@ def _usable_render_url(value: object) -> bool:
         return bool(parsed.netloc)
     return candidate.startswith("/")
 
+
 ###############################################################################
 def _first_non_proxy_url(*values: object) -> str | None:
     for value in values:
@@ -766,6 +808,7 @@ def _first_non_proxy_url(*values: object) -> str | None:
         if candidate and not candidate.startswith("/api/geospatial/tiles/"):
             return candidate
     return None
+
 
 ###############################################################################
 def _valid_geojson_feature_collection(value: object) -> bool:
@@ -778,12 +821,14 @@ def _valid_geojson_feature_collection(value: object) -> bool:
         _valid_geojson_feature(feature) for feature in feature_items
     )
 
+
 ###############################################################################
 def _valid_geojson_feature(value: object) -> bool:
     feature = json_object(value)
     return feature.get("type") == "Feature" and _valid_geojson_geometry(
         feature.get("geometry")
     )
+
 
 ###############################################################################
 def _valid_geojson_geometry(value: object) -> bool:
@@ -833,6 +878,7 @@ def _valid_geojson_geometry(value: object) -> bool:
         ),
     )
 
+
 ###############################################################################
 def _valid_geojson_position(value: object) -> bool:
     if not isinstance(value, list):
@@ -840,14 +886,16 @@ def _valid_geojson_position(value: object) -> bool:
     position = cast(list[object], value)
     return len(position) >= 2 and all(_finite_number(item) for item in position)
 
+
 ###############################################################################
 def _finite_number(value: object) -> bool:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
     try:
         return isfinite(float(value))
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return False
+
 
 ###############################################################################
 def _valid_geojson_sequence(
@@ -860,6 +908,7 @@ def _valid_geojson_sequence(
         return False
     items = cast(list[object], value)
     return len(items) >= minimum and all(validator(item) for item in items)
+
 
 ###############################################################################
 def session_view_bbox(session: MapSession) -> list[float]:
@@ -880,6 +929,7 @@ def session_view_bbox(session: MapSession) -> list[float]:
             viewport.center_latitude + lat_span,
         ]
     )
+
 
 ###############################################################################
 def viewport_covering_evidence(
@@ -910,14 +960,20 @@ def viewport_covering_evidence(
     ]
     return _with_viewport(session, _viewport_for_bbox(union, session.viewport))
 
+
 ###############################################################################
 def location_frame_points(location: ResolvedLocation) -> list[tuple[float, float]]:
     """Points a view must contain to frame this place: an area's extent, else its centre."""
 
-    bbox = None if location.location_type in {"city", "municipality"} else _usable_location_bbox(location)
+    bbox = (
+        None
+        if location.location_type in {"city", "municipality"}
+        else _usable_location_bbox(location)
+    )
     if bbox is None:
         return [(location.longitude, location.latitude)]
     return [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
+
 
 ###############################################################################
 def viewport_covering_points(
@@ -947,6 +1003,7 @@ def viewport_covering_points(
     ]
     return _with_viewport(session, _viewport_for_bbox(padded, session.viewport))
 
+
 ###############################################################################
 def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
     return session.model_copy(
@@ -960,6 +1017,7 @@ def _with_viewport(session: MapSession, viewport: ViewportPolicy) -> MapSession:
         },
         deep=True,
     )
+
 
 ###############################################################################
 def _moved_viewport(
@@ -984,7 +1042,9 @@ def _moved_viewport(
     center_lon, center_lat = (min_lon + max_lon) / 2, (min_lat + max_lat) / 2
     if action.strategy == "pan":
         if action.direction is None:
-            raise MapPlanBuildError("viewport_direction_required", "pan requires a direction.")
+            raise MapPlanBuildError(
+                "viewport_direction_required", "pan requires a direction."
+            )
         east = {"east": 1, "west": -1}.get(action.direction, 0)
         north = {"north": 1, "south": -1}.get(action.direction, 0)
         center_lon += east * half_width * action.steps
@@ -993,7 +1053,9 @@ def _moved_viewport(
         if action.anchor == "location":
             center_lon = session.resolved_location.longitude
             center_lat = session.resolved_location.latitude
-        factor = 2.0 ** (-action.steps if action.strategy == "zoom_in" else action.steps)
+        factor = 2.0 ** (
+            -action.steps if action.strategy == "zoom_in" else action.steps
+        )
         half_width *= factor
         half_height *= factor
     min_half_span = MIN_LOCATION_VIEWPORT_SPAN_DEGREES / 2
@@ -1001,7 +1063,8 @@ def _moved_viewport(
     half_height = min(max(half_height, min_half_span), _MAX_VIEW_LATITUDE)
     center_lon = min(max(center_lon, -180.0 + half_width), 180.0 - half_width)
     center_lat = min(
-        max(center_lat, -_MAX_VIEW_LATITUDE + half_height), _MAX_VIEW_LATITUDE - half_height
+        max(center_lat, -_MAX_VIEW_LATITUDE + half_height),
+        _MAX_VIEW_LATITUDE - half_height,
     )
     return _viewport_for_bbox(
         [
@@ -1012,6 +1075,7 @@ def _moved_viewport(
         ],
         session.viewport,
     )
+
 
 ###############################################################################
 def _marker_name(ref: str, label: str) -> str:
@@ -1033,6 +1097,7 @@ def _marker_name(ref: str, label: str) -> str:
         return requested if requested != requested.casefold() else requested.title()
     return label_name
 
+
 ###############################################################################
 def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
     bbox = _usable_location_bbox(location)
@@ -1049,6 +1114,7 @@ def _viewport_for_location(location: ResolvedLocation) -> ViewportPolicy:
         center_longitude=location.longitude,
         bbox=bbox,
     )
+
 
 ###############################################################################
 def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
@@ -1069,6 +1135,7 @@ def _usable_location_bbox(location: ResolvedLocation) -> list[float] | None:
         return None
     return bbox
 
+
 ###############################################################################
 def _country_main_landmass_bbox(
     location: ResolvedLocation, bbox: list[float]
@@ -1085,20 +1152,26 @@ def _country_main_landmass_bbox(
     parts = list(shapely.get_parts(country_shapes()[code]))  # pyright: ignore[reportUnknownMemberType]
     largest = max(float(part.area) for part in parts)
     kept = [
-        part for part in parts
+        part
+        for part in parts
         if float(part.area) >= largest * COUNTRY_FRAME_MIN_PART_AREA_RATIO
     ]
     if len(kept) == len(parts):
         return None
     min_lon, min_lat, max_lon, max_lat = (
-        float(value) for value in shapely.union_all(kept).bounds  # pyright: ignore[reportUnknownMemberType]
+        float(value)
+        for value in shapely.union_all(kept).bounds  # pyright: ignore[reportUnknownMemberType]
     )
-    narrower = (max_lon - min_lon < bbox[2] - bbox[0]) or (max_lat - min_lat < bbox[3] - bbox[1])
+    narrower = (max_lon - min_lon < bbox[2] - bbox[0]) or (
+        max_lat - min_lat < bbox[3] - bbox[1]
+    )
     if not narrower or not (
-        min_lon <= location.longitude <= max_lon and min_lat <= location.latitude <= max_lat
+        min_lon <= location.longitude <= max_lon
+        and min_lat <= location.latitude <= max_lat
     ):
         return None
     return [min_lon, min_lat, max_lon, max_lat]
+
 
 ###############################################################################
 def _with_min_span(bbox: list[float], span: float) -> list[float]:
@@ -1114,6 +1187,7 @@ def _with_min_span(bbox: list[float], span: float) -> list[float]:
         min(180.0, center_lon + half_lon),
         min(90.0, center_lat + half_lat),
     ]
+
 
 ###############################################################################
 def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportPolicy:
@@ -1134,6 +1208,7 @@ def _viewport_for_bbox(bbox: list[float], previous: ViewportPolicy) -> ViewportP
         radius_m=max(lat_radius, lon_radius, previous.radius_m * 0.1),
         bbox=bbox,
     )
+
 
 ###############################################################################
 def _valid_bbox(value: object) -> list[float] | None:
@@ -1158,12 +1233,15 @@ def _valid_bbox(value: object) -> list[float] | None:
         return None
     return result
 
+
 ###############################################################################
 def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
     """Return the union of every evidence item's extent."""
 
     extents = [
-        extent for extent in (_single_evidence_bbox(item) for item in evidence) if extent
+        extent
+        for extent in (_single_evidence_bbox(item) for item in evidence)
+        if extent
     ]
     if not extents:
         return None
@@ -1174,11 +1252,13 @@ def _evidence_bbox(evidence: list[AgentEvidenceEnvelope]) -> list[float] | None:
         max(extent[3] for extent in extents),
     ]
 
+
 ###############################################################################
 # Colour ramp the client draws for value-encoded circles; keep in sync with
 # VALUE_ENCODING_RAMP in app/client/src/app/core/constants.ts.
 VALUE_ENCODING_LOW_COLOR = "#38bdf8"
 VALUE_ENCODING_HIGH_COLOR = "#ef4444"
+
 
 ###############################################################################
 def _value_encoding_legend(
@@ -1188,9 +1268,17 @@ def _value_encoding_legend(
     units = json_object(declared).get(field) if isinstance(declared, dict) else declared
     unit_text = units if isinstance(units, str) and units.strip() else None
     suffix = f" {unit_text}" if unit_text else ""
-    entries = [{"color": VALUE_ENCODING_LOW_COLOR, "value": low, "label": f"{low:g}{suffix}"}]
+    entries = [
+        {"color": VALUE_ENCODING_LOW_COLOR, "value": low, "label": f"{low:g}{suffix}"}
+    ]
     if high != low:  # a flat domain has no gradient to show
-        entries.append({"color": VALUE_ENCODING_HIGH_COLOR, "value": high, "label": f"{high:g}{suffix}"})
+        entries.append(
+            {
+                "color": VALUE_ENCODING_HIGH_COLOR,
+                "value": high,
+                "label": f"{high:g}{suffix}",
+            }
+        )
     return {
         "kind": "continuous",
         "title": field,
@@ -1198,6 +1286,7 @@ def _value_encoding_legend(
         "entries": entries,
         "nodata_colors": [],
     }
+
 
 ###############################################################################
 def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:
@@ -1213,6 +1302,7 @@ def _single_evidence_bbox(item: AgentEvidenceEnvelope) -> list[float] | None:
                 return bbox
     return None
 
+
 ###############################################################################
 def _geojson_render_data(value: object) -> dict[str, Any] | None:
     """Convert a bounded provider feature payload to client GeoJSON."""
@@ -1226,7 +1316,9 @@ def _geojson_render_data(value: object) -> dict[str, Any] | None:
     if all(
         item.get("type") == "Feature"
         and isinstance(item.get("geometry"), dict)
-        and isinstance(item.get("properties"), dict)  # flat derived records are converted below
+        and isinstance(
+            item.get("properties"), dict
+        )  # flat derived records are converted below
         for item in normalized_features
     ):
         return {"type": "FeatureCollection", "features": normalized_features}
@@ -1277,6 +1369,7 @@ def _geojson_render_data(value: object) -> dict[str, Any] | None:
 
 __all__ = ["MapPlanBuildError", "MapSessionBuilder"]
 
+
 ###############################################################################
 def _unknown_layer(session: MapSession, instance_id: str) -> MapPlanBuildError:
     """Name the layers that exist so the model can retry with a real id."""
@@ -1286,7 +1379,9 @@ def _unknown_layer(session: MapSession, instance_id: str) -> MapPlanBuildError:
         for item in session.overlay_collection.instances
     ]
     available = (
-        f" Layers on the map: {', '.join(layers)}." if layers else " The map has no layers."
+        f" Layers on the map: {', '.join(layers)}."
+        if layers
+        else " The map has no layers."
     )
     return MapPlanBuildError(
         "unknown_layer", f"Layer '{instance_id}' is not in the active map.{available}"

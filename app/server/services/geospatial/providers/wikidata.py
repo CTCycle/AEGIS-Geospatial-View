@@ -28,8 +28,14 @@ AREA = "P2046"
 ELEVATION = "P2044"
 OFFICIAL_WEBSITE = "P856"
 POINT_IN_TIME = "P585"
-AREA_UNITS_KM2 = {"Q712226": 1.0, "Q35852": 0.01, "Q25343": 0.000001, "Q232291": 2.589988}
+AREA_UNITS_KM2 = {
+    "Q712226": 1.0,
+    "Q35852": 0.01,
+    "Q25343": 0.000001,
+    "Q232291": 2.589988,
+}
 ELEVATION_UNITS_M = {"Q11573": 1.0, "Q3710": 0.3048}
+
 
 ###############################################################################
 class WikidataProvider(GeospatialProvider):
@@ -65,7 +71,9 @@ class WikidataProvider(GeospatialProvider):
         )
         entity = json_object(json_object(json_object(payload).get("entities")).get(qid))
         if not entity:
-            raise ProviderMalformedPayloadError("Wikidata returned no entity for the identifier.")
+            raise ProviderMalformedPayloadError(
+                "Wikidata returned no entity for the identifier."
+            )
         if entity.get("missing") is not None:
             raise ProviderInvalidQueryError("The Wikidata entity does not exist.")
         claims = json_object(entity.get("claims"))
@@ -81,7 +89,11 @@ class WikidataProvider(GeospatialProvider):
             "category": "place_facts",
             "latitude": latitude,
             "longitude": longitude,
-            **{key: value for key, value in facts.items() if not isinstance(value, dict)},
+            **{
+                key: value
+                for key, value in facts.items()
+                if not isinstance(value, dict)
+            },
         }
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -102,6 +114,7 @@ class WikidataProvider(GeospatialProvider):
                 "temporal_scope_satisfied": True,
             },
         )
+
 
 ###############################################################################
 def place_facts(claims: dict[str, Any]) -> dict[str, Any]:
@@ -126,10 +139,13 @@ def place_facts(claims: dict[str, Any]) -> dict[str, Any]:
             facts["elevation_m"] = round(value, 1)
     website = _best_statement(claims.get(OFFICIAL_WEBSITE))
     if website is not None:
-        url = json_object(json_object(website.get("mainsnak")).get("datavalue")).get("value")
+        url = json_object(json_object(website.get("mainsnak")).get("datavalue")).get(
+            "value"
+        )
         if isinstance(url, str) and url.startswith(("https://", "http://")):
             facts["official_website"] = url[:300]
     return facts
+
 
 ###############################################################################
 def _best_statement(statements: Any) -> dict[str, Any] | None:
@@ -151,33 +167,47 @@ def _best_statement(statements: Any) -> dict[str, Any] | None:
         key=lambda item: (item.get("rank") == "preferred", _point_in_time(item) or ""),
     )
 
+
 ###############################################################################
 def _quantity(statement: dict[str, Any]) -> float | None:
-    value = json_object(json_object(json_object(statement.get("mainsnak")).get("datavalue")).get("value"))
+    value = json_object(
+        json_object(json_object(statement.get("mainsnak")).get("datavalue")).get(
+            "value"
+        )
+    )
     try:
         return float(str(value.get("amount")))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _converted(statement: dict[str, Any], factors: dict[str, float]) -> float | None:
-    value = json_object(json_object(json_object(statement.get("mainsnak")).get("datavalue")).get("value"))
+    value = json_object(
+        json_object(json_object(statement.get("mainsnak")).get("datavalue")).get(
+            "value"
+        )
+    )
     unit = str(value.get("unit") or "").rsplit("/", 1)[-1]
     amount = _quantity(statement)
     if amount is None or unit not in factors:
         return None
     return amount * factors[unit]
 
+
 ###############################################################################
 def _point_in_time(statement: dict[str, Any]) -> str | None:
     qualifiers = json_object(statement.get("qualifiers")).get(POINT_IN_TIME)
     if not is_json_array(qualifiers) or not qualifiers:
         return None
-    value = json_object(json_object(json_object(qualifiers[0]).get("datavalue")).get("value"))
+    value = json_object(
+        json_object(json_object(qualifiers[0]).get("datavalue")).get("value")
+    )
     time = str(value.get("time") or "")
     # Wikidata times look like "+2023-01-01T00:00:00Z".
     match = re.match(r"^\+?(\d{4}-\d{2}-\d{2})", time)
     return match.group(1) if match else None
+
 
 ###############################################################################
 def _english(values: Any) -> str | None:

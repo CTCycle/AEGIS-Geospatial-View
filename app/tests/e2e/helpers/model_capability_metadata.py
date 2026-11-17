@@ -21,11 +21,11 @@ def selected_model_tool_support_metadata(
     catalog_response = page.request.get(f"{base_url}/api/chat/models", timeout=10_000)
     try:
         settings = settings_response.json()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         settings = {}
     try:
         catalog = catalog_response.json()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         catalog = {}
 
     settings = settings if isinstance(settings, dict) else {}

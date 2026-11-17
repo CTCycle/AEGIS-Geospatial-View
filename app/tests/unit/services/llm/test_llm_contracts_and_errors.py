@@ -5,7 +5,11 @@ import json
 from server.services.llm.errors import LLMProviderRequestError, LLMRequestSchemaError
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
-from server.domain.agent.tool_result import ToolExecutionError, ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import (
+    ToolExecutionError,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
@@ -13,8 +17,6 @@ from server.services.llm.opencode_provider import OPENCODE_GO_PROVIDER, OpenCode
 from server.services.llm.response_serialization import dump_response_payload
 
 # --- test_errors.py ---
-
-
 
 
 ###############################################################################
@@ -40,6 +42,7 @@ def test_provider_connection_errors_are_retryable() -> None:
     assert error.code == "provider_request_failed"
     assert error.retryable is True
 
+
 ###############################################################################
 def test_rate_limit_error_captures_retry_after_header() -> None:
     class _RateLimited(Exception):
@@ -55,6 +58,7 @@ def test_rate_limit_error_captures_retry_after_header() -> None:
     assert error.code == "provider_rate_limited"
     assert error.retryable is True
     assert error.retry_after_seconds == 2.0
+
 
 ###############################################################################
 def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
@@ -80,6 +84,7 @@ def test_provider_timeouts_are_terminal_and_preserve_context_usage() -> None:
     assert error.context_usage == context_usage
     assert error.timeout_origin == "provider_transport"
 
+
 ###############################################################################
 def test_bounded_deadline_timeout_is_classified_as_application_deadline() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -91,6 +96,7 @@ def test_bounded_deadline_timeout_is_classified_as_application_deadline() -> Non
 
     assert error.code == "provider_timeout"
     assert error.timeout_origin == "application_deadline"
+
 
 ###############################################################################
 def test_timeout_origin_can_preserve_cancellation_classification() -> None:
@@ -104,6 +110,7 @@ def test_timeout_origin_can_preserve_cancellation_classification() -> None:
     )
 
     assert error.timeout_origin == "cancelled"
+
 
 ###############################################################################
 def test_gateway_timeout_is_terminal_and_not_retryable() -> None:
@@ -122,6 +129,7 @@ def test_gateway_timeout_is_terminal_and_not_retryable() -> None:
     assert error.code == "provider_timeout"
     assert error.retryable is False
 
+
 ###############################################################################
 def test_non_transient_provider_errors_are_not_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -132,6 +140,7 @@ def test_non_transient_provider_errors_are_not_retryable() -> None:
     )
 
     assert error.retryable is False
+
 
 ###############################################################################
 def test_provider_context_overflow_is_not_misclassified_as_capability_failure() -> None:
@@ -150,6 +159,7 @@ def test_provider_context_overflow_is_not_misclassified_as_capability_failure() 
     assert error.category == "context_limit"
     assert error.code == "context_limit_exceeded"
 
+
 ###############################################################################
 def test_provider_bad_request_without_capability_evidence_stays_provider_api() -> None:
 
@@ -166,6 +176,7 @@ def test_provider_bad_request_without_capability_evidence_stays_provider_api() -
 
     assert error.category == "provider_api"
     assert error.code == "provider_bad_request"
+
 
 ###############################################################################
 def test_opencode_session_contract_rejection_is_sanitized() -> None:
@@ -187,6 +198,7 @@ def test_opencode_session_contract_rejection_is_sanitized() -> None:
     assert error.retryable is False
     assert "super-secret-token" not in str(error)
 
+
 ###############################################################################
 def test_explicit_provider_capability_rejection_is_classified_as_model_capability() -> (
     None
@@ -206,6 +218,7 @@ def test_explicit_provider_capability_rejection_is_classified_as_model_capabilit
     assert error.category == "model_capability"
     assert error.code == "provider_model_incompatible"
 
+
 ###############################################################################
 def test_malformed_tool_definition_is_classified_at_provider_boundary() -> None:
     request = LLMRequest(
@@ -224,8 +237,8 @@ def test_malformed_tool_definition_is_classified_at_provider_boundary() -> None:
         OpenAIProvider(api_key="test")._validate_request_capabilities(request)
     assert error.value.category == "schema_definition"
 
-# --- test_provider_contracts.py ---
 
+# --- test_provider_contracts.py ---
 
 
 ###############################################################################
@@ -240,6 +253,7 @@ def _tool() -> LLMToolDefinition:
         },
     )
 
+
 ###############################################################################
 def _request(provider: str, model: str) -> LLMRequest:
     return LLMRequest(
@@ -249,9 +263,9 @@ def _request(provider: str, model: str) -> LLMRequest:
         tools=[_tool()],
     )
 
+
 ###############################################################################
 class _Completions:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -276,13 +290,14 @@ class _Completions:
             model_dump=lambda *, mode="json", warnings=False: {"choices": []},
         )
 
+
 ###############################################################################
 class _OpenAICompatibleClient:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
+
 
 ###############################################################################
 def test_google_native_tool_contract_uses_function_declarations() -> None:
@@ -299,6 +314,7 @@ def test_google_native_tool_contract_uses_function_declarations() -> None:
     assert schema["parameters"]["required"] == ["query"]
     assert contents[0]["role"] == "model"
     assert contents[1]["parts"][0]["function_response"]["name"] == "resolve_location"
+
 
 ###############################################################################
 def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
@@ -326,13 +342,13 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(
         assert call["tool_choice"] == "auto"
         assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
+
 ###############################################################################
 def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     captured: dict[str, object] = {}
 
     ###############################################################################
     class _Provider(OllamaProvider):
-
         # -------------------------------------------------------------------------
         def supports_tools(self, model: str) -> bool:
             _ = model
@@ -363,6 +379,7 @@ def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     assert captured["payload"]["tools"][0]["function"]["name"] == "resolve_location"
     assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
+
 ###############################################################################
 def test_provider_contract_error_remains_structured() -> None:
     result = ToolResult(
@@ -382,6 +399,7 @@ def test_provider_contract_error_remains_structured() -> None:
     assert result.error is not None
     assert result.error.code == "provider_unavailable"
     assert result.error.recovery == "choose_alternate_tool"
+
 
 # --- test_llm_request_contract.py ---
 
@@ -403,8 +421,8 @@ def test_llm_request_preserves_tools_and_schema_for_provider_validation() -> Non
     assert request.tools == [tool]
     assert request.response_json_schema == {"type": "object", "properties": {}}
 
-# --- test_native_tool_parse_errors.py ---
 
+# --- test_native_tool_parse_errors.py ---
 
 
 ###############################################################################
@@ -432,6 +450,7 @@ def test_openai_preserves_invalid_json_and_real_empty_object() -> None:
     assert calls[0].parse_error == "invalid_json"
     assert calls[1].arguments == {}
     assert calls[1].parse_error is None
+
 
 ###############################################################################
 def test_google_and_ollama_reject_non_object_arguments() -> None:
@@ -469,6 +488,7 @@ def test_google_and_ollama_reject_non_object_arguments() -> None:
     assert ollama_calls[0].arguments is None
     assert ollama_calls[0].parse_error == "arguments_not_object"
 
+
 ###############################################################################
 def test_deepseek_preserves_missing_name_as_a_parse_error() -> None:
     response = SimpleNamespace(
@@ -493,8 +513,8 @@ def test_deepseek_preserves_missing_name_as_a_parse_error() -> None:
     assert calls[0].arguments == {}
     assert calls[0].parse_error == "missing_name"
 
-# --- test_response_serialization.py ---
 
+# --- test_response_serialization.py ---
 
 
 ###############################################################################

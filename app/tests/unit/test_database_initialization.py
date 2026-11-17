@@ -6,23 +6,34 @@ import socket
 import server.app as app_module
 from pathlib import Path
 from server.common.paths import resolve_database_configuration_path
-from server.configurations import build_database_settings, database_configuration as database_config, DatabaseSettings, environment
+from server.configurations import (
+    build_database_settings,
+    database_configuration as database_config,
+    DatabaseSettings,
+    environment,
+)
 from filelock import Timeout
 from sqlalchemy import inspect, text
 from server.repositories.database import migration_runner
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.migration_runner import DatabaseMigrationError
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.schemas import Base, CredentialEncryptionMaterial, ReferenceCountryRecord
-from server.repositories.schemas.models import ApplicationRuntimeSettingsRecord, ConversationRecord, ModelProviderSettingsRecord
+from server.repositories.schemas import (
+    Base,
+    CredentialEncryptionMaterial,
+    ReferenceCountryRecord,
+)
+from server.repositories.schemas.models import (
+    ApplicationRuntimeSettingsRecord,
+    ConversationRecord,
+    ModelProviderSettingsRecord,
+)
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.catalog.startup import seed_reference_catalog
 from fastapi.testclient import TestClient
 from server.repositories.database.engine import configure_sqlite_connection
 
 # --- test_database_configuration.py ---
-
-
 
 
 ###############################################################################
@@ -116,9 +127,8 @@ def test_atomic_save_keeps_last_valid_configuration_as_backup(
     assert database_config._read_configuration(backup_path) == first
     assert not list(config_path.parent.glob("*.tmp"))
 
+
 # --- test_database_initialization_policy.py ---
-
-
 
 
 ###############################################################################
@@ -128,12 +138,14 @@ def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
         sqlite_lock_timeout_seconds=timeout,
     )
 
+
 ###############################################################################
 def _initialize(repository: SQLiteRepository):
     return initialize_database(
         repository,
         on_ready=lambda: seed_reference_catalog(repository),
     )
+
 
 ###############################################################################
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
@@ -150,10 +162,9 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert repository.count_records(ReferenceCountryRecord) > 0
     assert repository.count_records(ApplicationRuntimeSettingsRecord) == 1
 
+
 ###############################################################################
-def test_existing_sqlite_database_is_idempotent(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_existing_sqlite_database_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(database_path))
     _initialize(repository)
@@ -176,6 +187,7 @@ def test_existing_sqlite_database_is_idempotent(
         second_repository.count_records(CredentialEncryptionMaterial),
         second_repository.count_records(ReferenceCountryRecord),
     ) == first_counts
+
 
 ###############################################################################
 def test_at_head_missing_required_seed_creates_backup_before_reseeding(
@@ -209,6 +221,7 @@ def test_at_head_missing_required_seed_creates_backup_before_reseeding(
     assert ModelSettingsRepository(repaired).has_required()
     assert repaired.count_records(ModelProviderSettingsRecord) == 1
 
+
 ###############################################################################
 def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
     tmp_path: Path,
@@ -231,6 +244,7 @@ def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
         not in inspect(verification_repository.engine).get_table_names()
     )
     assert verification_repository.count_records(ConversationRecord) == 1
+
 
 ###############################################################################
 def test_unknown_revision_is_rejected_and_original_file_is_restored(
@@ -260,6 +274,7 @@ def test_unknown_revision_is_rejected_and_original_file_is_restored(
     assert version == "unknown-revision"
     verification_repository.engine.dispose()
 
+
 ###############################################################################
 def test_seeding_failure_restores_existing_sqlite_database(
     monkeypatch,
@@ -285,6 +300,7 @@ def test_seeding_failure_restores_existing_sqlite_database(
     assert verification_repository.count_records(ReferenceCountryRecord) > 0
     assert not ModelSettingsRepository(verification_repository).has_required()
 
+
 ###############################################################################
 def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
@@ -295,6 +311,7 @@ def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
         _initialize(SQLiteRepository(_settings(database_path)))
 
     assert database_path.read_bytes() == original
+
 
 ###############################################################################
 def test_sqlite_migration_lock_timeout_is_reported(monkeypatch, tmp_path: Path) -> None:
@@ -320,9 +337,8 @@ def test_sqlite_migration_lock_timeout_is_reported(monkeypatch, tmp_path: Path) 
             )
         )
 
+
 # --- test_sqlite_application_startup.py ---
-
-
 
 
 ###############################################################################
@@ -518,14 +534,12 @@ def test_database_switch_keeps_each_database_settings_independent_and_survives_r
         )
     assert (data_dir / "database-settings.json").is_file()
 
+
 # --- test_sqlite_engine_listener.py ---
-
-
 
 
 ###############################################################################
 class _Cursor:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.statements: list[str] = []
@@ -538,9 +552,9 @@ class _Cursor:
     def close(self) -> None:
         return None
 
+
 ###############################################################################
 class _Connection:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.cursor_instance = _Cursor()
@@ -548,6 +562,7 @@ class _Connection:
     # -------------------------------------------------------------------------
     def cursor(self) -> _Cursor:
         return self.cursor_instance
+
 
 ###############################################################################
 def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
@@ -561,6 +576,7 @@ def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
         "PRAGMA busy_timeout=5000",
         "PRAGMA synchronous=NORMAL",
     ]
+
 
 ###############################################################################
 def test_sqlite_engine_applies_pragmas_to_live_connections(tmp_path: Path) -> None:
@@ -576,8 +592,8 @@ def test_sqlite_engine_applies_pragmas_to_live_connections(tmp_path: Path) -> No
 
     repository.engine.dispose()
 
-# --- test_sqlite_repository.py ---
 
+# --- test_sqlite_repository.py ---
 
 
 ###############################################################################
@@ -588,6 +604,7 @@ def test_repository_creates_parent_directory_for_database_path(tmp_path: Path) -
 
     assert database_path.parent.is_dir()
     repository.engine.dispose()
+
 
 ###############################################################################
 def test_repository_counts_records_using_short_lived_sessions(tmp_path: Path) -> None:

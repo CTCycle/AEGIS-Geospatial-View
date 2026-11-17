@@ -31,6 +31,7 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
+
 ###############################################################################
 class OvertureProvider(GeospatialProvider):
     """Query an ingested Overture Places GeoJSON index and optionally augment it with Overpass."""
@@ -174,7 +175,7 @@ class OvertureProvider(GeospatialProvider):
                     float(str(coordinates[0])),
                     float(str(coordinates[1])),
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if request.bbox and not _in_bbox(longitude, latitude, request.bbox):
                 continue
@@ -223,6 +224,7 @@ class OvertureProvider(GeospatialProvider):
                 break
         return features
 
+
 ###############################################################################
 def _in_bbox(
     longitude: float, latitude: float, bbox: tuple[float, float, float, float]
@@ -230,17 +232,20 @@ def _in_bbox(
     west, south, east, north = bbox
     return west <= longitude <= east and south <= latitude <= north
 
+
 ###############################################################################
 def _amenity_tags(request: ProviderRequest) -> list[str] | None:
     value = request.params.get("amenity_tags")
     return [str(item) for item in value] if is_json_array(value) else None
 
+
 ###############################################################################
 def _optional_int(value: object) -> int | None:
     try:
         return int(str(value)) if value is not None else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _is_true(value: object) -> bool:

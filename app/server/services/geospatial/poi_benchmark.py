@@ -9,6 +9,7 @@ from math import hypot
 from pathlib import Path
 from typing import Any
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class POIParityThresholds:
@@ -17,6 +18,7 @@ class POIParityThresholds:
     min_name_completeness: float = 0.90
     min_coordinate_completeness: float = 1.0
     max_duplicate_rate: float = 0.10
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ class POIParityReport:
     coordinate_completeness: float
     duplicate_rate: float
     meets_thresholds: bool
+
 
 ###############################################################################
 def load_poi_records(path: str | Path) -> list[dict[str, Any]]:
@@ -72,6 +75,7 @@ def load_poi_records(path: str | Path) -> list[dict[str, Any]]:
             }
         )
     return records
+
 
 ###############################################################################
 def benchmark_poi_parity(
@@ -124,6 +128,7 @@ def benchmark_poi_parity(
         meets_thresholds=passed,
     )
 
+
 ###############################################################################
 def _find_match(item: dict[str, Any], candidates: list[dict[str, Any]]) -> bool:
     item_id = str(item.get("id") or "").strip()
@@ -149,6 +154,7 @@ def _find_match(item: dict[str, Any], candidates: list[dict[str, Any]]) -> bool:
             return True
     return False
 
+
 ###############################################################################
 def _completeness(items: list[dict[str, Any]], field: str) -> float:
     return (
@@ -156,6 +162,7 @@ def _completeness(items: list[dict[str, Any]], field: str) -> float:
         if items
         else 1.0
     )
+
 
 ###############################################################################
 def _dedupe_keys(
@@ -170,12 +177,14 @@ def _dedupe_keys(
         for item in items
     }
 
+
 ###############################################################################
 def _number(value: object) -> float | None:
     try:
         return float(str(value)) if value is not None else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 ###############################################################################
 def _main() -> int:

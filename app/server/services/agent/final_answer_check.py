@@ -4,8 +4,16 @@ import re
 from collections.abc import Collection, Sequence
 
 _NUMBER_WORDS = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
 }
 _COUNT_CLAIM = re.compile(
     r"\b(?P<n>\d+|" + "|".join(_NUMBER_WORDS) + r"|both)\s+"
@@ -58,9 +66,13 @@ _LAYER_EDIT_CLAIM = re.compile(
 )
 _LAYER_WORD = re.compile(r"\b(?:layers?|overlays?)\b", re.IGNORECASE)
 _ANY_NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?!\w)")
-_NEGATION = re.compile(r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
+_NEGATION = re.compile(
+    r"(?:\bnot|n't|\bnever|\bunable to|\bno)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+)
 # "can be shown on the map" offers a map; it does not describe one.
-_OFFER = re.compile(r"\b(?:can|could|may|might|would)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
+_OFFER = re.compile(
+    r"\b(?:can|could|may|might|would)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+)
 
 
 _TIME_ZONE_DIFFERENCE = re.compile(
@@ -70,7 +82,8 @@ _TIME_ZONE_DIFFERENCE = re.compile(
 _SENTENCE_PARTS = re.compile(r"((?<=[.!?;])\s+|\n+)")
 _OMISSION_PREFIX = "does not disclose: "
 _RENDER_PENDING = re.compile(
-    r"\bawaiting (?:the )?render\w*|\bonce it renders\b|\bis (?:now )?rendering\b", re.IGNORECASE
+    r"\bawaiting (?:the )?render\w*|\bonce it renders\b|\bis (?:now )?rendering\b",
+    re.IGNORECASE,
 )
 
 
@@ -78,7 +91,9 @@ _RENDER_PENDING = re.compile(
 def only_omissions(violations: Sequence[str]) -> bool:
     """Whether every violation is a missing disclosure, which appending repairs."""
 
-    return bool(violations) and all(item.startswith(_OMISSION_PREFIX) for item in violations)
+    return bool(violations) and all(
+        item.startswith(_OMISSION_PREFIX) for item in violations
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -95,7 +110,9 @@ def drop_unsupported_time_zone_claims(text: str, utc_offsets: Collection[float])
     kept: list[str] = []
     for sentence, separator in zip(parts[::2], [*parts[1::2], ""], strict=True):
         claim = _TIME_ZONE_DIFFERENCE.search(sentence)
-        if claim and not _NEGATION.search(sentence[max(0, claim.start() - 24) : claim.start()]):
+        if claim and not _NEGATION.search(
+            sentence[max(0, claim.start() - 24) : claim.start()]
+        ):
             continue
         kept.extend((sentence, separator))
     return "".join(kept).strip() or text
@@ -106,7 +123,10 @@ def _mentions(text: str, name: str) -> bool:
     cleaned = name.strip()
     if not cleaned:
         return False
-    return re.search(rf"(?<!\w){re.escape(cleaned)}(?!\w)", text, re.IGNORECASE) is not None
+    return (
+        re.search(rf"(?<!\w){re.escape(cleaned)}(?!\w)", text, re.IGNORECASE)
+        is not None
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -115,14 +135,16 @@ def value_is_supported(raw: str, unit: str, evidence: Sequence[float]) -> bool:
 
     value = float(raw)
     decimals = len(raw.split(".")[1]) if "." in raw else 0
-    tolerance = 0.5 * 10 ** -decimals + 1e-9
+    tolerance = 0.5 * 10**-decimals + 1e-9
     candidates = {round(item, 6) for item in evidence}
     if unit.upper().endswith("F"):
         candidates |= {round(item * 9 / 5 + 32, 6) for item in candidates}
     if any(abs(value - item) <= tolerance for item in candidates):
         return True
     ordered = sorted(candidates)
-    return any(abs(abs(a - b) - abs(value)) <= tolerance for a in ordered for b in ordered)
+    return any(
+        abs(abs(a - b) - abs(value)) <= tolerance for a in ordered for b in ordered
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -132,6 +154,7 @@ def _cites_any(cited: Sequence[str], values: Sequence[float]) -> bool:
         if any(abs(float(raw) - value) <= tolerance for value in values):
             return True
     return False
+
 
 # -----------------------------------------------------------------------------
 def check_final_answer(
@@ -182,17 +205,27 @@ def check_final_answer(
     targets = {name.strip().lower() for name in target_names if name.strip()}
 
     if render_settled and (pending := _RENDER_PENDING.search(text)):
-        violations.append(f"says the render is pending ({pending.group(0)!r}) after it was verified")
+        violations.append(
+            f"says the render is pending ({pending.group(0)!r}) after it was verified"
+        )
 
     if targets:
         for place in other_places:
             if place.strip().lower() not in targets and _mentions(text, place):
-                violations.append(f"names '{place.strip()}', which is not a resolved target")
+                violations.append(
+                    f"names '{place.strip()}', which is not a resolved target"
+                )
 
     for match in _COUNT_CLAIM.finditer(text):
         raw = match.group("n").lower()
-        claimed = 2 if raw == "both" else int(raw) if raw.isdigit() else _NUMBER_WORDS[raw]
-        verified = layer_count if match.group("noun").lower() in _LAYER_NOUNS else feature_count
+        claimed = (
+            2 if raw == "both" else int(raw) if raw.isdigit() else _NUMBER_WORDS[raw]
+        )
+        verified = (
+            layer_count
+            if match.group("noun").lower() in _LAYER_NOUNS
+            else feature_count
+        )
         if verified is not None and claimed > verified:
             violations.append(f"claims {match.group(0)!r} but only {verified} verified")
 
@@ -216,7 +249,9 @@ def check_final_answer(
     if not _DISCLOSURE.search(text):
         for name in unresolved_targets:
             if _mentions(text, name):
-                violations.append(f"names '{name}' without disclosing it was not resolved")
+                violations.append(
+                    f"names '{name}' without disclosing it was not resolved"
+                )
 
     if unmet and not _DISCLOSURE.search(text):
         for match in _COMPLETENESS.finditer(text):
@@ -233,12 +268,16 @@ def check_final_answer(
         for match in _MAP_CLAIM.finditer(text):
             before = text[max(0, match.start() - 24) : match.start()]
             if not _NEGATION.search(before) and not _OFFER.search(before):
-                violations.append(f"describes map content ({match.group(0)!r}) but no map was verified")
+                violations.append(
+                    f"describes map content ({match.group(0)!r}) but no map was verified"
+                )
                 break
 
     for shown, total in truncations:
         if str(total) not in text and not _TRUNCATION_DISCLOSURE.search(text):
-            violations.append(f"does not disclose that the map layer shows {shown} of {total} records")
+            violations.append(
+                f"does not disclose that the map layer shows {shown} of {total} records"
+            )
 
     if layer_edits == 0:
         for sentence in _SENTENCE_BREAK.split(text):
@@ -246,28 +285,44 @@ def check_final_answer(
             if (
                 claim
                 and _LAYER_WORD.search(sentence)
-                and not _NEGATION.search(sentence[max(0, claim.start() - 24) : claim.start()])
+                and not _NEGATION.search(
+                    sentence[max(0, claim.start() - 24) : claim.start()]
+                )
             ):
-                violations.append(f"claims a layer was changed ({claim.group(0)!r}) but the map edit removed or hid none")
+                violations.append(
+                    f"claims a layer was changed ({claim.group(0)!r}) but the map edit removed or hid none"
+                )
                 break
 
     if evidence_numbers:
         for match in _UNIT_NUMBER.finditer(text):
             raw = match.group("n") or match.group("m")
             unit = match.group("unit") or ""
-            if (unit == "°" and _cites_any([raw], coordinates)) or _cites_any([raw], prior_numbers):
+            if (unit == "°" and _cites_any([raw], coordinates)) or _cites_any(
+                [raw], prior_numbers
+            ):
                 continue
             if not value_is_supported(raw, unit, evidence_numbers):
-                violations.append(f"cites {match.group(0)!r}, which the evidence does not support")
+                violations.append(
+                    f"cites {match.group(0)!r}, which the evidence does not support"
+                )
                 break
 
     groups = [group for group in cite_groups if group]
     if groups:
         cited = _ANY_NUMBER.findall(text)
-        differences = [abs(a - b) for i, first in enumerate(groups) for second in groups[i + 1 :] for a in first for b in second]
+        differences = [
+            abs(a - b)
+            for i, first in enumerate(groups)
+            for second in groups[i + 1 :]
+            for a in first
+            for b in second
+        ]
         if not all(_cites_any(cited, group) for group in groups) and not (
             len(groups) > 1 and _cites_any(cited, differences)
         ):
-            violations.append("cites no value for the requested result although the evidence has them")
+            violations.append(
+                "cites no value for the requested result although the evidence has them"
+            )
 
     return violations

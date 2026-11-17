@@ -24,12 +24,16 @@ _MAX_TRACE_DEPTH = 5
 _MAX_TRACE_ITEMS = 48
 _MAX_TRACE_STRING = 4_096
 
+
 ###############################################################################
 def public_protocol_projection(value: Any) -> Any:
     """Omit private SDK continuation from transport output without mutating checkpoints."""
     if isinstance(value, dict):
-        return {key: public_protocol_projection(item) for key, item in cast(dict[str, Any], value).items()
-                if key not in {"provider_continuation", "google_content"}}
+        return {
+            key: public_protocol_projection(item)
+            for key, item in cast(dict[str, Any], value).items()
+            if key not in {"provider_continuation", "google_content"}
+        }
     if isinstance(value, list):
         return [public_protocol_projection(item) for item in cast(list[Any], value)]
     return value
@@ -65,6 +69,7 @@ TraceKind = Literal[
     "user_image_unsupported",
 ]
 
+
 ###############################################################################
 class AgentTraceEvent(BaseModel):
     """Operational trace metadata; never a chain-of-thought transcript."""
@@ -86,6 +91,7 @@ class AgentTraceEvent(BaseModel):
     redaction: dict[str, Any] = Field(default_factory=dict)
     payload: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class AgentCheckpoint(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -99,6 +105,7 @@ class AgentCheckpoint(BaseModel):
     state_hash: str
     completed_call_fingerprints: list[str] = Field(default_factory=list)
     completion_reason: str | None = None
+
 
 ###############################################################################
 def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[str]]:
@@ -158,6 +165,7 @@ def redact_trace_value(value: object, *, path: str = "$") -> tuple[object, list[
     result = visit(value, path, 0)
     return result, list(dict.fromkeys(redacted))
 
+
 ###############################################################################
 def redact_trace_url(value: str, *, path: str = "$") -> tuple[str, list[str]]:
     """Redact sensitive query parameters while retaining the URL shape."""
@@ -178,7 +186,9 @@ def redact_trace_url(value: str, *, path: str = "$") -> tuple[str, list[str]]:
             redactions.append(f"{path}.query.{key}")
         else:
             query.append((key, query_value))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))[:_MAX_TRACE_STRING], redactions
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )[:_MAX_TRACE_STRING], redactions
 
 
 __all__ = [

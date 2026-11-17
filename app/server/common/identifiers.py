@@ -30,6 +30,7 @@ def normalize_target_key(value: str) -> str:
     ascii_text = re.sub(r"[^A-Za-z0-9]+", " ", ascii_text)
     return " ".join(ascii_text.casefold().split())
 
+
 ###############################################################################
 def location_ref_matches(requested: str, key: str, label: str | None) -> bool:
     """A resolved location answers to its reference key and its resolved label.
@@ -47,6 +48,7 @@ def location_ref_matches(requested: str, key: str, label: str | None) -> bool:
     # the geocoded label never repeats.
     plain = re.sub(r"\([^)]*\)", " ", requested)
     return plain != requested and _matches(plain, key, label)
+
 
 ###############################################################################
 def _matches(requested: str, key: str, label: str | None) -> bool:
@@ -67,7 +69,8 @@ def _matches(requested: str, key: str, label: str | None) -> bool:
         if (
             name
             and target_tokens[: len(name)] == name
-            and set(target_tokens[len(name) :]) <= set(normalize_target_key(candidate).split())
+            and set(target_tokens[len(name) :])
+            <= set(normalize_target_key(candidate).split())
         ):
             return True
     return False

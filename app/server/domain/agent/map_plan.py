@@ -29,10 +29,12 @@ def is_mark_locations_operation(operation: object) -> bool:
 class MapActionBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+
 ###############################################################################
 class SetBasemapAction(MapActionBase):
     action: Literal["set_basemap"]
     capability_id: str
+
 
 ###############################################################################
 class ValueEncoding(MapActionBase):
@@ -49,11 +51,13 @@ class AddEvidenceLayerAction(MapActionBase):
     visible: bool = True
     opacity: float = Field(default=1.0, ge=0.0, le=1.0)
 
+
 ###############################################################################
 class SetLayerVisibilityAction(MapActionBase):
     action: Literal["set_layer_visibility"]
     instance_id: str
     visible: bool
+
 
 ###############################################################################
 class SetLayerOpacityAction(MapActionBase):
@@ -61,15 +65,18 @@ class SetLayerOpacityAction(MapActionBase):
     instance_id: str
     opacity: float = Field(ge=0.0, le=1.0)
 
+
 ###############################################################################
 class RemoveLayerAction(MapActionBase):
     action: Literal["remove_layer"]
     instance_id: str
 
+
 ###############################################################################
 class KeepOnlyLayersAction(MapActionBase):
     action: Literal["keep_only_layers"]
     instance_ids: list[str] = Field(min_length=1, max_length=32)
+
 
 ###############################################################################
 class MarkLocationsAction(MapActionBase):
@@ -91,9 +98,7 @@ class SetViewportAction(MapActionBase):
         "fit_evidence", "fit_location", "preserve_current", "zoom_in", "zoom_out", "pan"
     ]
     location_ref: str | None = None
-    evidence_refs: list[str] = Field(
-        default_factory=lambda: list[str](), max_length=16
-    )
+    evidence_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     target_area_km2: float | None = Field(
         default=None,
         gt=0,
@@ -126,6 +131,7 @@ MapAction = Annotated[
     | SetViewportAction,
     Field(discriminator="action"),
 ]
+
 
 ###############################################################################
 class MapPlan(BaseModel):

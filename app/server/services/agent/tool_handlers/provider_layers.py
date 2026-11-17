@@ -23,6 +23,7 @@ from server.services.geospatial.api_service import (
     GeospatialCapabilityNotFoundError,
 )
 
+
 ###############################################################################
 class ProviderLayerToolHandler:
     """Discover provider-native layers through the canonical tool boundary."""
@@ -128,6 +129,7 @@ class ProviderLayerToolHandler:
             ),
         )
 
+
 ###############################################################################
 def _cursor_offset(cursor: str | None) -> int:
     if cursor is None or not cursor.strip():
@@ -136,6 +138,7 @@ def _cursor_offset(cursor: str | None) -> int:
         return max(0, int(cursor))
     except ValueError:
         return 0
+
 
 ###############################################################################
 def _failure(

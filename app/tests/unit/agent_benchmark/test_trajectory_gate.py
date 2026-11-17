@@ -7,8 +7,11 @@ import pytest
 
 from tests.agent_benchmark.trajectories import SCENARIOS, run_scenario
 
-BASELINE_PATH = Path(__file__).parents[2] / "agent_benchmark" / "trajectory_baseline.v1.json"
+BASELINE_PATH = (
+    Path(__file__).parents[2] / "agent_benchmark" / "trajectory_baseline.v1.json"
+)
 TOKEN_TOLERANCE = 1.05
+
 
 ###############################################################################
 @pytest.mark.asyncio

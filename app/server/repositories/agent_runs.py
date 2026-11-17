@@ -38,6 +38,7 @@ from server.repositories.schemas.models import (
 ###############################################################################
 JsonObject = dict[str, Any]
 
+
 ###############################################################################
 def _json_object(value: object) -> JsonObject:
     """Narrow a JSON value at a repository boundary."""
@@ -45,11 +46,13 @@ def _json_object(value: object) -> JsonObject:
         return cast(JsonObject, value)
     return {}
 
+
 ###############################################################################
 def _json_list(value: object) -> list[Any]:
     if isinstance(value, list):
         return cast(list[Any], value)
     return []
+
 
 ###############################################################################
 _RENDER_EXPIRY_MESSAGES = {
@@ -57,6 +60,7 @@ _RENDER_EXPIRY_MESSAGES = {
     "render_client_disconnected": "The browser connection was lost before it acknowledged the prepared map.",
     "render_client_hidden": "The browser page stayed hidden before it acknowledged the prepared map.",
 }
+
 
 ###############################################################################
 def _finalize_pending_presentation(
@@ -82,6 +86,7 @@ def _finalize_pending_presentation(
     presentation.pop("pending_response", None)
     return presentation
 
+
 ###############################################################################
 @dataclass(frozen=True, slots=True)
 class AgentRunControl:
@@ -92,15 +97,13 @@ class AgentRunControl:
     state: AgentRunState
     cancel_requested_at: datetime | None
 
+
 ###############################################################################
 class AgentRunRepository:
-
     MAX_PAGE_LIMIT = 50
     MAX_TRACE_LIMIT = 200
     MAX_QUERY_CHARS = 300
-    RASTER_RENDERING_MODES = frozenset(
-        {"raster-tile", "tile", "xyz", "wms", "wmts"}
-    )
+    RASTER_RENDERING_MODES = frozenset({"raster-tile", "tile", "xyz", "wms", "wmts"})
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -324,7 +327,7 @@ class AgentRunRepository:
             return snapshot
         try:
             typed = AgentTaskState.model_validate(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return snapshot
         return snapshot.model_copy(
             update={
@@ -406,9 +409,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             if session.get(ConversationRecord, normalized_conversation_id) is None:
                 raise ValueError("Conversation not found.")
-            filters = [
-                AgentRunRecord.conversation_id == normalized_conversation_id
-            ]
+            filters = [AgentRunRecord.conversation_id == normalized_conversation_id]
             if not include_terminal:
                 filters.append(
                     AgentRunRecord.state.notin_(
@@ -445,9 +446,7 @@ class AgentRunRepository:
                 )
             total = int(
                 session.scalar(
-                    select(func.count())
-                    .select_from(AgentRunRecord)
-                    .where(*all_filters)
+                    select(func.count()).select_from(AgentRunRecord).where(*all_filters)
                 )
                 or 0
             )
@@ -477,13 +476,11 @@ class AgentRunRepository:
             if isinstance(raw_task_state, dict):
                 try:
                     typed_task_state = AgentTaskState.model_validate(raw_task_state)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     typed_task_state = None
                 if typed_task_state is not None:
                     summary["current_iteration"] = typed_task_state.current_iteration
-                    summary["task_state"] = typed_task_state.model_dump(
-                        mode="json"
-                    )
+                    summary["task_state"] = typed_task_state.model_dump(mode="json")
             summaries.append(summary)
         pagination = {
             "cursor": cursor,
@@ -548,8 +545,7 @@ class AgentRunRepository:
         bounded_limit = max(1, min(int(limit), self.MAX_TRACE_LIMIT))
         parsed_cursor = _parse_sequence_cursor(cursor)
         effective_after = max(
-            value
-            for value in (after_sequence or 0, parsed_cursor or 0)
+            value for value in (after_sequence or 0, parsed_cursor or 0)
         )
         if effective_after < 0:
             raise ValueError("after_sequence must be non-negative.")
@@ -852,9 +848,7 @@ class AgentRunRepository:
             record = self._require_run(session, run_id)
             previous_presentation = _json_object(record.presentation_json)
             merged_presentation = dict(presentation)
-            previous_attempts = int(
-                previous_presentation.get("render_attempts") or 0
-            )
+            previous_attempts = int(previous_presentation.get("render_attempts") or 0)
             merged_presentation["render_attempts"] = max(
                 previous_attempts,
                 int(presentation.get("render_attempts") or 0),
@@ -939,15 +933,22 @@ class AgentRunRepository:
                 or expected_session != map_session_id
                 or expected_revision != collection_revision
             ):
-                raise ValueError("Render acknowledgment does not match the prepared map.")
+                raise ValueError(
+                    "Render acknowledgment does not match the prepared map."
+                )
             if run.presentation_status in {"ready", "failed"}:
                 previous = presentation.get("acknowledgment")
                 if previous == acknowledgment:
                     return self._to_snapshot(run), True, presentation
-                raise ValueError("A different render acknowledgment was already accepted.")
+                raise ValueError(
+                    "A different render acknowledgment was already accepted."
+                )
             if resume and presentation.get("acknowledgment") == acknowledgment:
                 return self._to_snapshot(run), True, presentation
-            if run.presentation_status != "pending" or run.state != AgentRunState.AWAITING_RENDER.value:
+            if (
+                run.presentation_status != "pending"
+                or run.state != AgentRunState.AWAITING_RENDER.value
+            ):
                 raise ValueError("Run is not awaiting map rendering.")
 
             pending_response_value: object = presentation.get("pending_response")
@@ -959,20 +960,22 @@ class AgentRunRepository:
                     raise ValueError(
                         "A ready render acknowledgment must include viewport bounds."
                     )
-                required_checks = _json_object(presentation.get("required_render_checks"))
+                required_checks = _json_object(
+                    presentation.get("required_render_checks")
+                )
                 checks = _json_object(acknowledgment.get("checks"))
                 missing_checks = [
                     str(name)
                     for name, required in required_checks.items()
-                    if required is True
-                    and checks.get(name) is not True
+                    if required is True and checks.get(name) is not True
                 ]
                 if missing_checks:
                     raise ValueError(
                         "Required render checks failed: " + ", ".join(missing_checks)
                     )
                 required_overlay_ids = [
-                    str(item) for item in _json_list(presentation.get("required_overlay_ids"))
+                    str(item)
+                    for item in _json_list(presentation.get("required_overlay_ids"))
                 ]
                 if required_overlay_ids:
                     overlay_results = [
@@ -1021,7 +1024,9 @@ class AgentRunRepository:
                                     if candidate.get("overlay_id") == capability_id
                                     or candidate.get("capability_id") == capability_id
                                 ]
-                                if len(required_capability_instances.get(capability_id, []))
+                                if len(
+                                    required_capability_instances.get(capability_id, [])
+                                )
                                 == 1
                                 else []
                             )
@@ -1041,7 +1046,10 @@ class AgentRunRepository:
                                     missing_overlays.append(overlay_id)
                                 elif (
                                     not valid_empty
-                                    and _json_object(instance.get("descriptor")).get("empty_tiles_expected") is not True
+                                    and _json_object(instance.get("descriptor")).get(
+                                        "empty_tiles_expected"
+                                    )
+                                    is not True
                                     and instance.get("visible") is not False
                                     and result.get("result_visible") is not True
                                 ):
@@ -1070,7 +1078,11 @@ class AgentRunRepository:
                         result = by_id.get(str(overlay_id))
                         if result is None:
                             instance = pending_instances.get(str(overlay_id))
-                            capability_id = str(instance.get("capability_id") or "") if instance else ""
+                            capability_id = (
+                                str(instance.get("capability_id") or "")
+                                if instance
+                                else ""
+                            )
                             aliases = [
                                 candidate
                                 for candidate in overlay_results
@@ -1078,7 +1090,9 @@ class AgentRunRepository:
                                 or candidate.get("capability_id") == capability_id
                             ]
                             result = aliases[0] if len(aliases) == 1 else None
-                        rendered_count = result.get("rendered_feature_count") if result else None
+                        rendered_count = (
+                            result.get("rendered_feature_count") if result else None
+                        )
                         instance = pending_instances.get(str(overlay_id))
                         if instance is not None and instance.get("visible") is False:
                             continue
@@ -1135,10 +1149,13 @@ class AgentRunRepository:
                 )
                 if not checkpoint:
                     raise ValueError("Prepared map checkpoint is missing.")
-                render_attempt = max(
-                    int(presentation.get("render_attempts") or 0),
-                    int(checkpoint.get("render_attempts") or 0),
-                ) + 1
+                render_attempt = (
+                    max(
+                        int(presentation.get("render_attempts") or 0),
+                        int(checkpoint.get("render_attempts") or 0),
+                    )
+                    + 1
+                )
                 render_observation = dict(observation or {})
                 render_observation.setdefault("attempt", render_attempt)
                 observations: list[JsonObject] = [
@@ -1172,9 +1189,9 @@ class AgentRunRepository:
                         failed_fingerprints = _json_object(
                             checkpoint.get("failed_render_fingerprints")
                         )
-                        failed_fingerprints[fingerprint] = int(
-                            failed_fingerprints.get(fingerprint) or 0
-                        ) + 1
+                        failed_fingerprints[fingerprint] = (
+                            int(failed_fingerprints.get(fingerprint) or 0) + 1
+                        )
                         checkpoint["failed_render_fingerprints"] = dict(
                             list(failed_fingerprints.items())[-32:]
                         )
@@ -1197,9 +1214,9 @@ class AgentRunRepository:
                             raise ValueError(
                                 "Prepared map does not match the current contract."
                             ) from exc
-                        state = state.with_committed_map(committed_map, datetime.now(UTC)).model_copy(
-                            update={"revision": conversation.context_revision}
-                        )
+                        state = state.with_committed_map(
+                            committed_map, datetime.now(UTC)
+                        ).model_copy(update={"revision": conversation.context_revision})
                         checkpoint["active_map_session"] = candidate_map
                     else:
                         state = state.model_copy(
@@ -1264,10 +1281,12 @@ class AgentRunRepository:
                     try:
                         committed_map = MapSession.model_validate(candidate_map)
                     except (TypeError, ValueError) as exc:
-                        raise ValueError("Prepared map does not match the current contract.") from exc
-                    state = state.with_committed_map(committed_map, datetime.now(UTC)).model_copy(
-                        update={"revision": conversation.context_revision}
-                    )
+                        raise ValueError(
+                            "Prepared map does not match the current contract."
+                        ) from exc
+                    state = state.with_committed_map(
+                        committed_map, datetime.now(UTC)
+                    ).model_copy(update={"revision": conversation.context_revision})
                 else:
                     state = state.model_copy(
                         update={"revision": conversation.context_revision}
@@ -1332,7 +1351,9 @@ class AgentRunRepository:
                             "Required map completion checks failed: "
                             + ", ".join(blocked_after_ack)
                         )
-                    updated_presentation["completion_requirements"] = updated_requirements
+                    updated_presentation["completion_requirements"] = (
+                        updated_requirements
+                    )
                 updated_presentation.pop("pending_response", None)
                 durable_event_creates = [
                     RunEventCreate(
@@ -1382,7 +1403,9 @@ class AgentRunRepository:
                     pending_response["task_state"] = task_state
                 run.state = AgentRunState.FAILED.value
                 run.completed_at = datetime.now(UTC)
-                run.error_code = str(acknowledgment.get("failure_code") or "render_failed")
+                run.error_code = str(
+                    acknowledgment.get("failure_code") or "render_failed"
+                )
                 run.error_message = "The prepared map could not be rendered."
                 run.presentation_status = "failed"
                 updated_presentation = {
@@ -1586,7 +1609,7 @@ class AgentRunRepository:
             return None
         try:
             normalized = [float(item) for item in bounds_items]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         west, south, east, north = normalized
         if not all(math.isfinite(item) for item in normalized):
@@ -1611,7 +1634,9 @@ class AgentRunRepository:
         instances = _json_list(collection.get("instances"))
         return {
             str(item.get("instance_id")): item
-            for item in (cast(JsonObject, item) for item in instances if isinstance(item, dict))
+            for item in (
+                cast(JsonObject, item) for item in instances if isinstance(item, dict)
+            )
             if item.get("instance_id")
         }
 
@@ -1666,7 +1691,7 @@ class AgentRunRepository:
             return False
         try:
             other = [float(item) for item in right_items]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         l_west, l_south, l_east, l_north = left
         r_west, r_south, r_east, r_north = other
@@ -1724,7 +1749,7 @@ class AgentRunRepository:
             )
             updated = cast(
                 CursorResult[Any],
-            session.execute(
+                session.execute(
                     update(AgentRunRecord)
                     .where(
                         AgentRunRecord.id == run_id,
@@ -1891,6 +1916,7 @@ class AgentRunRepository:
             presentation=record.presentation_json,
         )
 
+
 ###############################################################################
 def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
     """Locate a bounded task ledger in a known native event envelope."""
@@ -1907,6 +1933,7 @@ def _task_state_from_payload(payload: JsonObject) -> dict[str, Any] | None:
         if isinstance(candidate, dict):
             return dict(cast(dict[str, Any], candidate))
     return None
+
 
 ###############################################################################
 def _terminal_task_state_payload(
@@ -1926,10 +1953,12 @@ def _terminal_task_state_payload(
         return None
     try:
         typed = AgentTaskState.model_validate(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     requirements = [
-        item.model_copy(update={"status": "satisfied" if status == "completed" else "failed"})
+        item.model_copy(
+            update={"status": "satisfied" if status == "completed" else "failed"}
+        )
         for item in typed.completion_requirements
     ]
     tasks = [item.model_copy(update={"status": status}) for item in typed.tasks]
@@ -1941,6 +1970,7 @@ def _terminal_task_state_payload(
             "completion_requirements": requirements,
         }
     ).model_dump(mode="json", exclude_none=True)
+
 
 ###############################################################################
 def _final_render_message(pending_response: JsonObject) -> str:
@@ -2026,6 +2056,7 @@ _NAMED_SECRET_PATTERN = re.compile(
     r"\s*[:=]\s*[^\s,;]+"
 )
 
+
 ###############################################################################
 def redact_trace_payload(
     value: object,
@@ -2056,6 +2087,7 @@ def redact_trace_payload(
         return {"items": safe}
     return {"value": safe}
 
+
 ###############################################################################
 def _redact_trace_value(
     value: object,
@@ -2081,7 +2113,11 @@ def _redact_trace_value(
             if normalized_key in _TRACE_REASONING_KEYS:
                 # A route/goal's typed analysis intent is operational state,
                 # distinct from an SDK's unstructured analysis/reasoning text.
-                if normalized_key != "analysis" or mapping.get("location_mode") not in ("none", "target", "search_area"):
+                if normalized_key != "analysis" or mapping.get("location_mode") not in (
+                    "none",
+                    "target",
+                    "search_area",
+                ):
                     continue
                 try:
                     if raw_value is not None:
@@ -2131,9 +2167,11 @@ def _redact_trace_value(
         return safe_value
     return value
 
+
 ###############################################################################
 def _is_trace_secret_key(normalized_key: str) -> bool:
     return any(marker in normalized_key for marker in _TRACE_SECRET_MARKERS)
+
 
 ###############################################################################
 def _safe_trace_string(value: str | None) -> str | None:
@@ -2149,9 +2187,11 @@ def _safe_trace_string(value: str | None) -> str | None:
         )
     )
 
+
 ###############################################################################
 def _iso_datetime(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
+
 
 ###############################################################################
 def _aware_datetime(value: datetime | None) -> datetime | None:
@@ -2159,11 +2199,13 @@ def _aware_datetime(value: datetime | None) -> datetime | None:
         return None
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
+
 ###############################################################################
 def _sqlite_contains_pattern(value: str) -> str:
     escaped = value.casefold().replace("\\", "\\\\")
     escaped = escaped.replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
 
 ###############################################################################
 def _encode_run_cursor(row: AgentRunRecord) -> str:
@@ -2174,6 +2216,7 @@ def _encode_run_cursor(row: AgentRunRecord) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
 
 ###############################################################################
 def _decode_run_cursor(cursor: str | None) -> tuple[datetime, str] | None:
@@ -2193,6 +2236,7 @@ def _decode_run_cursor(cursor: str | None) -> tuple[datetime, str] | None:
     if timestamp.tzinfo is not None:
         timestamp = timestamp.astimezone(UTC).replace(tzinfo=None)
     return timestamp, run_id
+
 
 ###############################################################################
 def _parse_sequence_cursor(cursor: str | None) -> int | None:

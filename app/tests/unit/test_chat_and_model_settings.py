@@ -1,6 +1,11 @@
 from __future__ import annotations
 from pydantic import ValidationError
-from server.contracts.chat import ModelSettingsUpdateRequest, OllamaPullRequest, OllamaPullResponse, OllamaRefreshResponse
+from server.contracts.chat import (
+    ModelSettingsUpdateRequest,
+    OllamaPullRequest,
+    OllamaPullResponse,
+    OllamaRefreshResponse,
+)
 from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
@@ -10,14 +15,27 @@ from server.repositories.model_settings import ModelSettingsRepository
 import pytest
 from typing import Any
 from unittest.mock import Mock, call
-from tests.e2e.helpers.model_capability_metadata import selected_model_tool_support_metadata
+from tests.e2e.helpers.model_capability_metadata import (
+    selected_model_tool_support_metadata,
+)
 from server.prompts.context import build_compacted_history_summary
 from server.services.llm.errors import LLMContextLimitError
-from server.services.llm.context_budget import RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY, apply_reported_usage, calculate_context_usage_percent, compute_context_usage, compute_ollama_context_usage, estimate_message_tokens, merge_provider_context_usage, normalize_model_context_profile, prepare_request, profile_to_request_metadata, resolve_model_context_profile
+from server.services.llm.context_budget import (
+    RESPONSE_SCHEMA_EMBEDDED_METADATA_KEY,
+    apply_reported_usage,
+    calculate_context_usage_percent,
+    compute_context_usage,
+    compute_ollama_context_usage,
+    estimate_message_tokens,
+    merge_provider_context_usage,
+    normalize_model_context_profile,
+    prepare_request,
+    profile_to_request_metadata,
+    resolve_model_context_profile,
+)
 from server.services.llm.types import LLMRequest, LLMToolDefinition, ModelContextProfile
 
 # --- test_chat_domain_contract.py ---
-
 
 
 ###############################################################################
@@ -29,6 +47,7 @@ def test_model_settings_update_request_forbids_unknown_fields() -> None:
     else:
         raise AssertionError("Expected ValidationError for unknown field")
 
+
 ###############################################################################
 def test_model_settings_update_request_requires_string_credentials() -> None:
     try:
@@ -37,6 +56,7 @@ def test_model_settings_update_request_requires_string_credentials() -> None:
         pass
     else:
         raise AssertionError("Expected ValidationError for non-string credential value")
+
 
 ###############################################################################
 def test_model_settings_update_request_accepts_valid_payload() -> None:
@@ -51,6 +71,7 @@ def test_model_settings_update_request_accepts_valid_payload() -> None:
     assert payload.agent_model_provider == "openai"
     assert payload.credentials["openai"]["api_key"] == "secret"
 
+
 ###############################################################################
 def test_model_settings_update_request_rejects_invalid_base_urls() -> None:
     try:
@@ -60,15 +81,16 @@ def test_model_settings_update_request_rejects_invalid_base_urls() -> None:
     else:
         raise AssertionError("Expected ValidationError for invalid Ollama URL")
 
+
 # --- test_chat_maintenance_service.py ---
 
 
 ###############################################################################
 class _UnusedProviderFactory:
-
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ANN201
         raise AssertionError(f"Unexpected provider lookup: {provider}")
+
 
 ###############################################################################
 def test_maintenance_service_delegates_to_ollama_provider() -> None:
@@ -76,7 +98,6 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
 
     ###############################################################################
     class _Provider:
-
         # -------------------------------------------------------------------------
         def __init__(self, *, base_url: str) -> None:
             provider_calls.append(("init", base_url))
@@ -134,6 +155,7 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
     assert health.ok is True
     assert ("pull_model", "llama3.2") in provider_calls
 
+
 ###############################################################################
 def test_maintenance_service_does_not_report_catalog_failure_as_success() -> None:
 
@@ -165,13 +187,12 @@ def test_maintenance_service_does_not_report_catalog_failure_as_success() -> Non
     assert refresh.stale is True
     assert "ollama unavailable" in (refresh.message or "")
 
-# --- test_chat_settings_service.py ---
 
+# --- test_chat_settings_service.py ---
 
 
 ###############################################################################
 class _SettingsRepo:
-
     # -------------------------------------------------------------------------
     def get_required(self):  # noqa: ANN201
         return SimpleNamespace(
@@ -184,9 +205,9 @@ class _SettingsRepo:
             deepseek_base_url=None,
         )
 
+
 ###############################################################################
 class _CredentialsRepo:
-
     # -------------------------------------------------------------------------
     def list_active(self):  # noqa: ANN201
         return [
@@ -202,14 +223,15 @@ class _CredentialsRepo:
             ),
         ]
 
+
 ###############################################################################
 class _Crypto:
-
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         if encrypted_value == "broken":
             raise ValueError("bad key")
         return "secret"
+
 
 ###############################################################################
 def test_settings_response_reports_credential_health() -> None:
@@ -233,6 +255,7 @@ def test_settings_response_reports_credential_health() -> None:
         "google": {"api_key": "unreadable"},
     }
 
+
 # --- test_llm_settings_repository.py ---
 
 
@@ -255,8 +278,8 @@ def test_model_settings_repository_creates_and_updates_record(sqlite_backend) ->
     assert updated.agent_model_provider == "google"
     assert updated.agent_model_name == "gemini-2.0-flash"
 
-# --- test_model_settings_repository.py ---
 
+# --- test_model_settings_repository.py ---
 
 
 ###############################################################################
@@ -267,6 +290,7 @@ def test_get_required_fails_when_initialization_has_not_seeded_settings(
 
     with pytest.raises(RuntimeError, match="database initialization must seed it"):
         repo.get_required()
+
 
 ###############################################################################
 def test_seed_required_creates_singleton_and_is_idempotent(sqlite_backend) -> None:
@@ -280,6 +304,7 @@ def test_seed_required_creates_singleton_and_is_idempotent(sqlite_backend) -> No
     assert current.active_provider_mode == "cloud"
     assert current.agent_model_provider == ""
     assert current.agent_model_name == ""
+
 
 ###############################################################################
 def test_update_persists_selected_agent_model(sqlite_backend) -> None:
@@ -300,15 +325,12 @@ def test_update_persists_selected_agent_model(sqlite_backend) -> None:
     assert current.agent_model_provider == "ollama"
     assert current.agent_model_name == "llama3.2"
 
+
 # --- test_model_capability_metadata_helper.py ---
-
-
-
 
 
 ###############################################################################
 class _Response:
-
     # -------------------------------------------------------------------------
     def __init__(self, status: int, payload: dict[str, Any]) -> None:
         self.status = status
@@ -379,8 +401,8 @@ def test_selected_model_tool_support_uses_metadata_without_inference(
     ]
     request.post.assert_not_called()
 
-# --- test_context_budget.py ---
 
+# --- test_context_budget.py ---
 
 
 ###############################################################################
@@ -398,6 +420,7 @@ def _request(
         ],
         metadata=dict(metadata or {}),
     )
+
 
 ###############################################################################
 def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
@@ -420,6 +443,7 @@ def test_static_catalog_profile_is_exact_and_provider_scoped() -> None:
     assert usage.peak_request_tokens == usage.estimated_input_tokens
     assert usage.total_input_tokens == usage.estimated_input_tokens
 
+
 ###############################################################################
 def test_model_name_alone_never_creates_a_local_context_cap() -> None:
     assert resolve_model_context_profile("ollama", "qwen3.5:2b") is None
@@ -429,6 +453,7 @@ def test_model_name_alone_never_creates_a_local_context_cap() -> None:
     assert usage.usage_percent is None
     assert usage.usage_source == "estimated"
     assert usage.estimated_input_tokens > 0
+
 
 ###############################################################################
 def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> None:
@@ -454,9 +479,12 @@ def test_provider_metadata_supplies_the_local_cap_and_schema_reservation() -> No
     assert usage.context_profile_source == "ollama_show_model_info"
     assert usage.usable_prompt_budget_tokens == 36_352
 
+
 ###############################################################################
 @pytest.mark.parametrize("value", [True, False, 0, -1, 1.5, "not-a-number"])
-def test_context_profile_normalizer_rejects_malformed_token_counts(value: object) -> None:
+def test_context_profile_normalizer_rejects_malformed_token_counts(
+    value: object,
+) -> None:
     assert (
         normalize_model_context_profile(
             "ollama",
@@ -469,8 +497,11 @@ def test_context_profile_normalizer_rejects_malformed_token_counts(value: object
         is None
     )
 
+
 ###############################################################################
-def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_authority() -> None:
+def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_authority() -> (
+    None
+):
     assert (
         normalize_model_context_profile(
             "opencode",
@@ -500,7 +531,10 @@ def test_context_profile_normalizer_rejects_conflicting_aliases_and_preserves_au
     assert profile.context_window_tokens == 8192
     assert profile.maximum_output_tokens == 512
     assert profile.metadata_authority == "provider"
-    assert profile_to_request_metadata(profile)["context_profile_model"] == "runtime-model"
+    assert (
+        profile_to_request_metadata(profile)["context_profile_model"] == "runtime-model"
+    )
+
 
 ###############################################################################
 def test_provider_usage_cannot_erase_canonical_model_limit() -> None:
@@ -531,6 +565,7 @@ def test_provider_usage_cannot_erase_canonical_model_limit() -> None:
     assert merged.selected_context_window == 40_960
     assert merged.reported_input_tokens == 640
     assert merged.reported_output_tokens == 32
+
 
 ###############################################################################
 def test_complete_request_counts_messages_tools_and_response_schema_before_compaction() -> (
@@ -568,6 +603,7 @@ def test_complete_request_counts_messages_tools_and_response_schema_before_compa
     assert usage.usable_prompt_budget_tokens == 1280
     assert usage.usage_percent is not None
 
+
 ###############################################################################
 def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
     messages = [
@@ -592,6 +628,7 @@ def test_embedded_response_schema_is_counted_once_as_a_message() -> None:
 
     assert usage.response_schema_tokens == 0
     assert usage.estimated_input_tokens == estimate_message_tokens(messages)
+
 
 ###############################################################################
 def test_provider_reported_input_and_output_replace_estimate_without_losing_it() -> (
@@ -625,6 +662,7 @@ def test_provider_reported_input_and_output_replace_estimate_without_losing_it()
     assert updated.usage_source == "provider_reported"
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
+
 ###############################################################################
 def test_output_only_provider_usage_is_hybrid() -> None:
     usage = compute_context_usage(_request("hello"), provider="test")
@@ -635,6 +673,7 @@ def test_output_only_provider_usage_is_hybrid() -> None:
     assert updated.usage_source == "hybrid"
     assert updated.estimated_input_tokens == updated.effective_input_tokens
     assert updated.total_output_tokens == 19
+
 
 ###############################################################################
 def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> None:
@@ -661,11 +700,13 @@ def test_nested_provider_usage_is_preserved_from_stream_completion_payload() -> 
     assert updated.usage_source == "provider_reported"
     assert updated.usage_percent == round(700 / 4096 * 100, 1)
 
+
 ###############################################################################
 def test_context_usage_percent_uses_model_limit_and_can_show_overage() -> None:
     assert calculate_context_usage_percent(700, 4096) == round(700 / 4096 * 100, 1)
     assert calculate_context_usage_percent(5000, 4096) == round(5000 / 4096 * 100, 1)
     assert calculate_context_usage_percent(700, None) is None
+
 
 ###############################################################################
 def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_current_input() -> (
@@ -694,6 +735,7 @@ def test_prepare_request_compacts_explicitly_bounded_history_and_preserves_curre
     )
     assert prepared.metadata["_context_compaction_applied"] is True
 
+
 ###############################################################################
 def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
     request = LLMRequest(
@@ -709,6 +751,7 @@ def test_prepare_request_does_not_invent_limit_for_unknown_model() -> None:
 
     assert prepared.messages == request.messages
 
+
 ###############################################################################
 def test_unknown_model_rejects_oversized_current_request_without_inventing_capacity() -> (
     None
@@ -719,6 +762,7 @@ def test_unknown_model_rejects_oversized_current_request_without_inventing_capac
     usage = compute_context_usage(request, provider="unknown")
     assert usage.model_context_limit is None
     assert usage.usage_percent is None
+
 
 ###############################################################################
 def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:
@@ -737,6 +781,7 @@ def test_unknown_model_compacts_history_to_application_input_ceiling() -> None:
     )
     assert prepared.messages[-1]["content"] == "Show Rome"
     assert prepared.metadata["_context_compaction_applied"] is True
+
 
 ###############################################################################
 def test_context_limit_failure_preserves_preflight_usage() -> None:

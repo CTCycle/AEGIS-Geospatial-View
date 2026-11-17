@@ -18,6 +18,7 @@ from server.repositories.schemas import Base
 
 T = TypeVar("T")
 
+
 ###############################################################################
 def run_async_in_thread(coroutine: Coroutine[Any, Any, T]) -> T:
     """Run a coroutine safely when Playwright leaves an event loop active."""
@@ -29,6 +30,7 @@ def run_async_in_thread(coroutine: Coroutine[Any, Any, T]) -> T:
     with ThreadPoolExecutor(max_workers=1) as executor:
         return executor.submit(asyncio.run, coroutine).result()
 
+
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
     for value in values:
@@ -39,12 +41,14 @@ def _pick_first_non_empty(*values: str | None) -> str | None:
             return stripped
     return None
 
+
 ###############################################################################
 def _normalize_host(raw_host: str | None, default_host: str) -> str:
     host = (raw_host or default_host).strip() or default_host
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
+
 
 ###############################################################################
 def _build_base_url(
@@ -81,6 +85,7 @@ CANONICAL_CACHE_ROOT = (REPOSITORY_ROOT / "runtimes" / "cache").resolve()
 CANONICAL_PYTEST_CACHE = (CANONICAL_CACHE_ROOT / "pytest").resolve()
 CANONICAL_PYTEST_TEMP = (CANONICAL_CACHE_ROOT / "pytest-tmp").resolve()
 
+
 ###############################################################################
 def _is_within(path: Path, root: Path) -> bool:
     try:
@@ -88,6 +93,7 @@ def _is_within(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
 
 ###############################################################################
 def pytest_configure(config: pytest.Config) -> None:
@@ -105,6 +111,7 @@ def pytest_configure(config: pytest.Config) -> None:
         raise pytest.UsageError(
             "pytest cache_dir must resolve to runtimes/cache/pytest"
         )
+
 
 ###############################################################################
 @pytest.fixture(scope="session", autouse=True)
@@ -124,9 +131,9 @@ def isolated_runtime_data(
         if previous_data_dir is None:
             os.environ.pop("AEGIS_DATA_DIR", None)
 
+
 ###############################################################################
 class _SnapshotSaver:
-
     # -------------------------------------------------------------------------
     def __init__(self, snapshot_dir: Path) -> None:
         self.snapshot_dir = snapshot_dir
@@ -138,9 +145,9 @@ class _SnapshotSaver:
         page.screenshot(path=str(target), full_page=True)
         return target
 
+
 ###############################################################################
 class _BackendLogTailReader:
-
     # -------------------------------------------------------------------------
     def __init__(self, backend_log_path: Path) -> None:
         self.backend_log_path = backend_log_path
@@ -154,17 +161,20 @@ class _BackendLogTailReader:
         ).splitlines()
         return "\n".join(content[-max(1, lines) :])
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the API."""
     return API_BASE_URL
+
 
 ###############################################################################
 @pytest.fixture
@@ -176,6 +186,7 @@ def api_context(playwright):
     context = playwright.request.new_context(base_url=API_BASE_URL)
     yield context
     context.dispose()
+
 
 ###############################################################################
 @pytest.fixture(scope="session")
@@ -189,10 +200,12 @@ def artifact_root() -> Path:
         (root / child).mkdir(parents=True, exist_ok=True)
     return root
 
+
 ###############################################################################
 @pytest.fixture(scope="session")
 def backend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "backend.log"
+
 
 ###############################################################################
 @pytest.fixture
@@ -203,15 +216,18 @@ def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
     target.mkdir(parents=True, exist_ok=True)
     return target
 
+
 ###############################################################################
 @pytest.fixture
 def save_snapshot(snapshot_dir: Path) -> _SnapshotSaver:
     return _SnapshotSaver(snapshot_dir)
 
+
 ###############################################################################
 @pytest.fixture
 def read_backend_log_tail(backend_log_path: Path) -> _BackendLogTailReader:
     return _BackendLogTailReader(backend_log_path)
+
 
 ###############################################################################
 @pytest.fixture

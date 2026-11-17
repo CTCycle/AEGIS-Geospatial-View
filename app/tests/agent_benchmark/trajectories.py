@@ -41,12 +41,14 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 ROUTE_TOOL = "route_request"
 DEFAULT_SYNTHESIS = "Here is the requested result."
 
+
 ###############################################################################
 def call(call_id: str, name: str, arguments: dict[str, Any]) -> LLMResult:
     return LLMResult(
         content="",
         tool_calls=[LLMToolCall(id=call_id, name=name, arguments=arguments)],
     )
+
 
 ###############################################################################
 def calls(*items: tuple[str, str, dict[str, Any]]) -> LLMResult:
@@ -57,6 +59,7 @@ def calls(*items: tuple[str, str, dict[str, Any]]) -> LLMResult:
             for call_id, name, arguments in items
         ],
     )
+
 
 ###############################################################################
 class ScriptedModel:
@@ -80,9 +83,9 @@ class ScriptedModel:
         # Tools-disabled response synthesis after the scripted work.
         return LLMResult(content=DEFAULT_SYNTHESIS)
 
+
 ###############################################################################
 class _ModelFactory:
-
     # -------------------------------------------------------------------------
     def __init__(self, model: ScriptedModel) -> None:
         self.model = model
@@ -92,9 +95,9 @@ class _ModelFactory:
         del provider
         return self.model
 
+
 ###############################################################################
 class _Resolver:
-
     # -------------------------------------------------------------------------
     def __init__(
         self, places: dict[str, ResolvedLocation | ClarificationRequest]
@@ -121,6 +124,7 @@ class _Resolver:
             return self.places[key]
         raise AssertionError(f"Unscripted location: {signal.raw_value!r}")
 
+
 ###############################################################################
 class _Providers:
     """Return a two-point feature payload for any provider request."""
@@ -136,7 +140,11 @@ class _Providers:
             payload={
                 "features": [
                     {"latitude": latitude, "longitude": longitude, metric: 9.0},
-                    {"latitude": latitude + 1, "longitude": longitude + 1, metric: 100.0},
+                    {
+                        "latitude": latitude + 1,
+                        "longitude": longitude + 1,
+                        metric: 100.0,
+                    },
                 ],
                 "value_kind": "model_estimate",
             },
@@ -144,7 +152,9 @@ class _Providers:
             result_status="ok",
             units={metric: "mm"},
             coverage={
-                "bbox": list(request.bbox) if request.bbox else [longitude, latitude, longitude + 1, latitude + 1],
+                "bbox": list(request.bbox)
+                if request.bbox
+                else [longitude, latitude, longitude + 1, latitude + 1],
                 "type": "grid_sample",
                 "point_count": 2,
                 "spatial_scope_satisfied": True,
@@ -152,9 +162,9 @@ class _Providers:
             },
         )
 
+
 ###############################################################################
 class _Evidence:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.records: dict[str, tuple[AgentEvidenceSummary, bytes]] = {}
@@ -177,7 +187,9 @@ class _Evidence:
         return summary
 
     # -------------------------------------------------------------------------
-    def get_payload(self, ref: str, **kwargs: Any) -> tuple[AgentEvidenceSummary, bytes] | None:
+    def get_payload(
+        self, ref: str, **kwargs: Any
+    ) -> tuple[AgentEvidenceSummary, bytes] | None:
         del kwargs
         return self.records.get(ref)
 
@@ -186,6 +198,7 @@ class _Evidence:
         del kwargs
         record = self.records.get(ref)
         return record[0] if record else None
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -205,8 +218,11 @@ class Scenario:
         default_factory=lambda: list[dict[str, Any]]()
     )
 
+
 ###############################################################################
-def _location(label: str, latitude: float, longitude: float, kind: str = "city") -> ResolvedLocation:
+def _location(
+    label: str, latitude: float, longitude: float, kind: str = "city"
+) -> ResolvedLocation:
     return ResolvedLocation(
         label=label,
         latitude=latitude,
@@ -217,9 +233,12 @@ def _location(label: str, latitude: float, longitude: float, kind: str = "city")
         location_type=kind,
     )
 
+
 ###############################################################################
 def _show_place_map(evidence_ref: str | None = None) -> dict[str, Any]:
-    actions: list[dict[str, Any]] = [{"action": "set_basemap", "capability_id": "osm_default"}]
+    actions: list[dict[str, Any]] = [
+        {"action": "set_basemap", "capability_id": "osm_default"}
+    ]
     if evidence_ref is not None:
         actions.append(
             {
@@ -229,6 +248,7 @@ def _show_place_map(evidence_ref: str | None = None) -> dict[str, Any]:
             }
         )
     return {"expected_collection_revision": 0, "actions": actions}
+
 
 _PLACE_ROUTE = {
     "primary_domain": "place_search",
@@ -256,21 +276,38 @@ _RAIN_RANK_ROUTE = {
 
 
 def _inspect(call_id: str, view: str, limit: int = 20) -> LLMResult:
-    return call(call_id, "inspect_evidence", {"evidence_ref": "evidence-1", "view": view, "limit": limit})
+    return call(
+        call_id,
+        "inspect_evidence",
+        {"evidence_ref": "evidence-1", "view": view, "limit": limit},
+    )
 
 
 def _nested_weather(call_id: str, place: str) -> tuple[str, str, dict[str, Any]]:
     # The weaker-model shape: location_ref nested inside provider arguments.
-    return (call_id, "execute_geospatial_capability", {"capability_id": _WEATHER, "arguments": {"location_ref": place}})
+    return (
+        call_id,
+        "execute_geospatial_capability",
+        {"capability_id": _WEATHER, "arguments": {"location_ref": place}},
+    )
+
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         scenario_id="show_colosseum",
         user_message="Show the Colosseum",
         route=_PLACE_ROUTE,
-        places={"Colosseum": _location("Colosseum, Rome, Italy", 41.8902, 12.4922, "landmark")},
+        places={
+            "Colosseum": _location(
+                "Colosseum, Rome, Italy", 41.8902, 12.4922, "landmark"
+            )
+        },
         steps=lambda: [
-            call("resolve-1", "resolve_geospatial_location", {"query": "Colosseum", "target_id": "Colosseum"}),
+            call(
+                "resolve-1",
+                "resolve_geospatial_location",
+                {"query": "Colosseum", "target_id": "Colosseum"},
+            ),
             call("map-1", "apply_map_plan", _show_place_map()),
         ],
     ),
@@ -279,7 +316,15 @@ SCENARIOS: tuple[Scenario, ...] = (
         user_message="Show 41.89, 12.49 on the map",
         route=_PLACE_ROUTE,
         steps=lambda: [
-            call("resolve-1", "resolve_geospatial_location", {"query": "41.89, 12.49", "target_id": "point", "expected_location_type": "coordinates"}),
+            call(
+                "resolve-1",
+                "resolve_geospatial_location",
+                {
+                    "query": "41.89, 12.49",
+                    "target_id": "point",
+                    "expected_location_type": "coordinates",
+                },
+            ),
             call("map-1", "apply_map_plan", _show_place_map()),
         ],
     ),
@@ -289,11 +334,17 @@ SCENARIOS: tuple[Scenario, ...] = (
         route=_PLACE_ROUTE,
         places={
             "Springfield": ClarificationRequest(
-                question="Which Springfield?", reason="Ambiguous place", missing_fields=["location"]
+                question="Which Springfield?",
+                reason="Ambiguous place",
+                missing_fields=["location"],
             )
         },
         steps=lambda: [
-            call("resolve-1", "resolve_geospatial_location", {"query": "Springfield", "target_id": "Springfield"}),
+            call(
+                "resolve-1",
+                "resolve_geospatial_location",
+                {"query": "Springfield", "target_id": "Springfield"},
+            ),
         ],
     ),
     Scenario(
@@ -309,15 +360,34 @@ SCENARIOS: tuple[Scenario, ...] = (
             "explicit_capability_ids": [_WEATHER],
             "operation": "compare",
         },
-        places={"Paris": _location("Paris, France", 48.8566, 2.3522), "Berlin": _location("Berlin, Germany", 52.52, 13.405)},
+        places={
+            "Paris": _location("Paris, France", 48.8566, 2.3522),
+            "Berlin": _location("Berlin, Germany", 52.52, 13.405),
+        },
         steps=lambda: [
             calls(
-                ("resolve-paris", "resolve_geospatial_location", {"query": "Paris", "target_id": "Paris"}),
-                ("resolve-berlin", "resolve_geospatial_location", {"query": "Berlin", "target_id": "Berlin"}),
+                (
+                    "resolve-paris",
+                    "resolve_geospatial_location",
+                    {"query": "Paris", "target_id": "Paris"},
+                ),
+                (
+                    "resolve-berlin",
+                    "resolve_geospatial_location",
+                    {"query": "Berlin", "target_id": "Berlin"},
+                ),
             ),
             calls(
-                ("weather-paris", "execute_geospatial_capability", {"capability_id": _WEATHER, "location_ref": "Paris"}),
-                ("weather-berlin", "execute_geospatial_capability", {"capability_id": _WEATHER, "location_ref": "Berlin"}),
+                (
+                    "weather-paris",
+                    "execute_geospatial_capability",
+                    {"capability_id": _WEATHER, "location_ref": "Paris"},
+                ),
+                (
+                    "weather-berlin",
+                    "execute_geospatial_capability",
+                    {"capability_id": _WEATHER, "location_ref": "Berlin"},
+                ),
             ),
             LLMResult(content="Berlin is wetter than Paris today."),
         ],
@@ -339,14 +409,22 @@ SCENARIOS: tuple[Scenario, ...] = (
             "temporal_scope": {"mode": "current", "granularity": "day"},
         },
         steps=lambda: [
-            call("execute-1", "execute_geospatial_capability", {"capability_id": _WEATHER}),
+            call(
+                "execute-1",
+                "execute_geospatial_capability",
+                {"capability_id": _WEATHER},
+            ),
             call(
                 "transform-1",
                 "transform_evidence",
                 {
                     "evidence_refs": ["evidence-1"],
                     "operations": [
-                        {"op": "sort", "field": "precipitation_sum_mm", "descending": True},
+                        {
+                            "op": "sort",
+                            "field": "precipitation_sum_mm",
+                            "descending": True,
+                        },
                         {"op": "limit", "value": 1},
                     ],
                 },
@@ -362,9 +440,16 @@ SCENARIOS: tuple[Scenario, ...] = (
                             "action": "add_evidence_layer",
                             "capability_id": _WEATHER,
                             "evidence_ref": "evidence-2",
-                            "value_encoding": {"mode": "graduated", "field": "precipitation_sum_mm"},
+                            "value_encoding": {
+                                "mode": "graduated",
+                                "field": "precipitation_sum_mm",
+                            },
                         },
-                        {"action": "set_viewport", "strategy": "fit_evidence", "evidence_refs": ["evidence-2"]},
+                        {
+                            "action": "set_viewport",
+                            "strategy": "fit_evidence",
+                            "evidence_refs": ["evidence-2"],
+                        },
                     ],
                 },
             ),
@@ -389,8 +474,16 @@ SCENARIOS: tuple[Scenario, ...] = (
             {"role": "assistant", "content": "Rome, Italy is now shown on the map."},
         ],
         steps=lambda: [
-            call("resolve-1", "resolve_geospatial_location", {"query": "Rome", "target_id": "Rome"}),
-            call("weather-1", "execute_geospatial_capability", {"capability_id": _WEATHER}),
+            call(
+                "resolve-1",
+                "resolve_geospatial_location",
+                {"query": "Rome", "target_id": "Rome"},
+            ),
+            call(
+                "weather-1",
+                "execute_geospatial_capability",
+                {"capability_id": _WEATHER},
+            ),
             LLMResult(content="It is currently mild in Rome."),
         ],
     ),
@@ -403,7 +496,11 @@ SCENARIOS: tuple[Scenario, ...] = (
         route={**_PLACE_ROUTE, "presentation": "both", "target_refs": ["Switzerland"]},
         places={"Switzerland": _location("Switzerland", 46.8, 8.2, "country")},
         steps=lambda: [
-            call("resolve-1", "resolve_geospatial_location", {"query": "Switzerland", "target_id": "Switzerland"}),
+            call(
+                "resolve-1",
+                "resolve_geospatial_location",
+                {"query": "Switzerland", "target_id": "Switzerland"},
+            ),
             LLMResult(content="The major Swiss airports are shown on the map."),
         ],
     ),
@@ -413,7 +510,11 @@ SCENARIOS: tuple[Scenario, ...] = (
         user_message="Show where in Europe it rained most today",
         route=_RAIN_RANK_ROUTE,
         steps=lambda: [
-            call("execute-1", "execute_geospatial_capability", {"capability_id": _WEATHER}),
+            call(
+                "execute-1",
+                "execute_geospatial_capability",
+                {"capability_id": _WEATHER},
+            ),
             _inspect("inspect-1", "metadata"),
             _inspect("inspect-2", "schema"),
             _inspect("inspect-3", "sample"),
@@ -446,9 +547,21 @@ SCENARIOS: tuple[Scenario, ...] = (
         },
         steps=lambda: [
             calls(
-                ("resolve-lugano", "resolve_geospatial_location", {"query": "Lugano", "target_id": "Lugano"}),
-                ("resolve-como", "resolve_geospatial_location", {"query": "Como", "target_id": "Como"}),
-                ("resolve-milan", "resolve_geospatial_location", {"query": "Milan", "target_id": "Milan"}),
+                (
+                    "resolve-lugano",
+                    "resolve_geospatial_location",
+                    {"query": "Lugano", "target_id": "Lugano"},
+                ),
+                (
+                    "resolve-como",
+                    "resolve_geospatial_location",
+                    {"query": "Como", "target_id": "Como"},
+                ),
+                (
+                    "resolve-milan",
+                    "resolve_geospatial_location",
+                    {"query": "Milan", "target_id": "Milan"},
+                ),
             ),
             calls(
                 _nested_weather("weather-lugano", "Lugano"),
@@ -466,15 +579,31 @@ SCENARIOS: tuple[Scenario, ...] = (
         route={**_RAIN_RANK_ROUTE, "presentation": "text", "secondary_domains": []},
         recent_messages=[
             {"role": "user", "content": "Show where in Europe it rained most today"},
-            {"role": "assistant", "content": "The map shows today's sampled rainfall across Europe."},
+            {
+                "role": "assistant",
+                "content": "The map shows today's sampled rainfall across Europe.",
+            },
         ],
         prior_evidence=[
             {
                 "features": [
-                    {"latitude": 45.0, "longitude": 22.0, "name": "Isverna", "precipitation_sum_mm": 39.2},
-                    {"latitude": 47.0, "longitude": 11.0, "name": "Innsbruck", "precipitation_sum_mm": 12.0},
+                    {
+                        "latitude": 45.0,
+                        "longitude": 22.0,
+                        "name": "Isverna",
+                        "precipitation_sum_mm": 39.2,
+                    },
+                    {
+                        "latitude": 47.0,
+                        "longitude": 11.0,
+                        "name": "Innsbruck",
+                        "precipitation_sum_mm": 12.0,
+                    },
                 ],
-                "coverage": {"spatial_scope_satisfied": True, "temporal_scope_satisfied": True},
+                "coverage": {
+                    "spatial_scope_satisfied": True,
+                    "temporal_scope_satisfied": True,
+                },
                 "query": {"location_ref": "Europe"},
             }
         ],
@@ -485,7 +614,11 @@ SCENARIOS: tuple[Scenario, ...] = (
                 {
                     "evidence_refs": ["evidence-1"],
                     "operations": [
-                        {"op": "sort", "field": "precipitation_sum_mm", "descending": True},
+                        {
+                            "op": "sort",
+                            "field": "precipitation_sum_mm",
+                            "descending": True,
+                        },
                         {"op": "limit", "value": 1},
                     ],
                 },
@@ -495,12 +628,15 @@ SCENARIOS: tuple[Scenario, ...] = (
     ),
 )
 
+
 ###############################################################################
 def build_loop(
     model: ScriptedModel, scenario: Scenario, evidence: _Evidence | None = None
 ) -> AgentLoop:
     capabilities = CapabilityRegistry()
-    runtime = RuntimeRegistry(catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None)
+    runtime = RuntimeRegistry(
+        catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None
+    )
     registry = ToolRegistry(runtime_registry=runtime)
     register_agent_tools(
         registry,
@@ -513,13 +649,18 @@ def build_loop(
     )
     return AgentLoop(
         provider_factory=_ModelFactory(model),  # type: ignore[arg-type]
-        capability_router=CapabilityRouter(capability_registry=capabilities, runtime_registry=runtime),
+        capability_router=CapabilityRouter(
+            capability_registry=capabilities, runtime_registry=runtime
+        ),
         tool_registry=registry,
         tool_executor=ToolExecutor(
             tool_registry=registry,
-            policy_engine=PolicyEngine(capability_registry=capabilities, runtime_registry=runtime),
+            policy_engine=PolicyEngine(
+                capability_registry=capabilities, runtime_registry=runtime
+            ),
         ),
     )
+
 
 ###############################################################################
 async def run_scenario(scenario: Scenario) -> dict[str, Any]:
@@ -531,7 +672,11 @@ async def run_scenario(scenario: Scenario) -> dict[str, Any]:
             media_type="application/json",
             status="available",
             payload={"features": item["features"]},
-            summary={"coverage": item["coverage"], "query": item["query"], "record_count": len(item["features"])},
+            summary={
+                "coverage": item["coverage"],
+                "query": item["query"],
+                "record_count": len(item["features"]),
+            },
             provenance={"capability_id": _WEATHER, "provider_id": "openmeteo"},
         ).evidence_id
         for item in scenario.prior_evidence
@@ -566,7 +711,9 @@ async def run_scenario(scenario: Scenario) -> dict[str, Any]:
         "termination_reason": outcome.stopped_reason,
         "model_calls": state.model_calls,
         "tool_calls": len(outcome.tool_results),
-        "failed_tool_calls": sum(1 for item in outcome.tool_results if item.status == "failed"),
+        "failed_tool_calls": sum(
+            1 for item in outcome.tool_results if item.status == "failed"
+        ),
         "iterations": state.current_iteration,
         "no_progress_corrections": state.no_progress_corrections,
         "stuck_notices": state.stuck_notices,
@@ -575,6 +722,7 @@ async def run_scenario(scenario: Scenario) -> dict[str, Any]:
         "total_estimated_input_tokens": sum(per_call),
         "wall_ms": round(elapsed_ms, 2),
     }
+
 
 ###############################################################################
 async def run_all() -> list[dict[str, Any]]:

@@ -37,18 +37,12 @@ _MESSAGE_PROJECTION_KEYS = (
     "output",
 )
 type BoundedJson = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | dict[str, "BoundedJson"]
-    | list["BoundedJson"]
+    None | bool | int | float | str | dict[str, "BoundedJson"] | list["BoundedJson"]
 )
+
 
 ###############################################################################
 class AgentContextAssembler:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -172,11 +166,7 @@ class AgentContextAssembler:
             # projected content remains verbatim whenever the whole item fits.
             source_costs.append(
                 estimate_json_tokens(
-                    {
-                        key: item[key]
-                        for key in _MESSAGE_PROJECTION_KEYS
-                        if key in item
-                    }
+                    {key: item[key] for key in _MESSAGE_PROJECTION_KEYS if key in item}
                 )
             )
         groups = _message_groups(projected)
@@ -184,11 +174,12 @@ class AgentContextAssembler:
         included_tokens = 0
         for group_index in range(len(groups) - 1, -1, -1):
             group = groups[group_index]
-            group_cost = sum(
-                estimate_json_tokens(projected[index]) for index in group
-            )
+            group_cost = sum(estimate_json_tokens(projected[index]) for index in group)
             source_cost = sum(source_costs[index] for index in group)
-            if source_cost > raw_capacity or included_tokens + group_cost > raw_capacity:
+            if (
+                source_cost > raw_capacity
+                or included_tokens + group_cost > raw_capacity
+            ):
                 # An oversized item should not prevent later inspection of
                 # smaller, relevant history entries.  A call/result group is
                 # considered one unit so its members can never be split.
@@ -207,7 +198,9 @@ class AgentContextAssembler:
         ]
         included_index_set = set(included_indices)
         omitted = [
-            item for index, item in enumerate(projected) if index not in included_index_set
+            item
+            for index, item in enumerate(projected)
+            if index not in included_index_set
         ]
         omitted_ids = [
             int(item["id"]) for item in omitted if isinstance(item.get("id"), int)
@@ -230,8 +223,7 @@ class AgentContextAssembler:
                 else []
             )
             merged_facts = [
-                item for item in [*prior_facts, *omitted[-12:]]
-                if is_json_object(item)
+                item for item in [*prior_facts, *omitted[-12:]] if is_json_object(item)
             ]
             seen_facts: set[tuple[object, str, str]] = set()
             facts: list[dict[str, Any]] = []
@@ -256,7 +248,9 @@ class AgentContextAssembler:
                     dict.fromkeys(
                         [
                             *(
-                                list(json_array(prior_summary.get("source_message_ids")))
+                                list(
+                                    json_array(prior_summary.get("source_message_ids"))
+                                )
                                 if isinstance(prior_summary, dict)
                                 else []
                             ),
@@ -295,7 +289,9 @@ class AgentContextAssembler:
             context_allocation={
                 "phase": phase,
                 "model": model,
-                "estimator_source": "model_profile" if profile is not None else "conservative_chars_per_token",
+                "estimator_source": "model_profile"
+                if profile is not None
+                else "conservative_chars_per_token",
                 "usable_input_tokens": usable,
                 "mandatory_tokens": mandatory_tokens,
                 "evidence_budget": evidence_budget,
@@ -303,7 +299,9 @@ class AgentContextAssembler:
                 "conversation_budget": raw_capacity,
                 "conversation_tokens": included_tokens,
                 "summary_budget": summary_capacity,
-                "summary_tokens": estimate_json_tokens(summary) if summary is not None else 0,
+                "summary_tokens": estimate_json_tokens(summary)
+                if summary is not None
+                else 0,
                 "response_reserve_tokens": output_reserve or 0,
                 "safety_tokens": 512,
                 "compacted_ids": omitted_ids,
@@ -316,10 +314,12 @@ class AgentContextAssembler:
             ),
         )
 
+
 ###############################################################################
 def _bounded_object(value: object) -> dict[str, Any]:
     bounded = _bounded_json_value(value, depth=0)
     return bounded if is_json_object(bounded) else {}
+
 
 ###############################################################################
 def _bounded_map_memory(value: object) -> dict[str, Any]:
@@ -346,9 +346,7 @@ def _bounded_map_memory(value: object) -> dict[str, Any]:
             descriptor = raw_instance.get("descriptor")
             descriptor = descriptor if is_json_object(descriptor) else {}
             instance_id = str(
-                raw_instance.get("instance_id")
-                or descriptor.get("instance_id")
-                or ""
+                raw_instance.get("instance_id") or descriptor.get("instance_id") or ""
             ).strip()
             if not instance_id:
                 continue
@@ -380,6 +378,7 @@ def _bounded_map_memory(value: object) -> dict[str, Any]:
     }
     bounded["active_visualization"] = active_bounded
     return bounded
+
 
 ###############################################################################
 def select_pair_safe_messages(
@@ -432,6 +431,7 @@ def select_pair_safe_messages(
     selected_indices = sorted(index for group in selected for index in group)
     return [messages[index] for index in selected_indices]
 
+
 ###############################################################################
 def _message_groups(messages: list[dict[str, Any]]) -> list[list[int]]:
     """Build stable connected components for call/result message exchanges."""
@@ -472,6 +472,7 @@ def _message_groups(messages: list[dict[str, Any]]) -> list[list[int]]:
         grouped.setdefault(find(index), []).append(index)
     return sorted(grouped.values(), key=lambda item: item[0])
 
+
 ###############################################################################
 def _message_call_ids(message: dict[str, Any]) -> list[str]:
     """Return call identifiers present in one request or result item."""
@@ -502,6 +503,7 @@ def _message_call_ids(message: dict[str, Any]) -> list[str]:
                     break
     return list(dict.fromkeys(values))
 
+
 ###############################################################################
 def _group_is_pair_safe(messages: list[dict[str, Any]], group: list[int]) -> bool:
     call_ids: set[str] = set()
@@ -513,13 +515,18 @@ def _group_is_pair_safe(messages: list[dict[str, Any]], group: list[int]) -> boo
         ids = set(_message_call_ids(message))
         if message_type == "function_call_output" or role == "tool":
             result_ids.update(ids)
-        elif message_type == "function_call" or role == "assistant" and message.get("tool_calls"):
+        elif (
+            message_type == "function_call"
+            or role == "assistant"
+            and message.get("tool_calls")
+        ):
             call_ids.update(ids)
     if not call_ids and not result_ids:
         return True
     # A group made from an assistant tool call and all matching results is
     # valid.  Reasoning-only items remain valid semantic context.
     return bool(call_ids) and call_ids == result_ids
+
 
 ###############################################################################
 def _group_has_tool_exchange(messages: list[dict[str, Any]], group: list[int]) -> bool:
@@ -547,6 +554,7 @@ _RELEVANCE_STOP_WORDS = frozenset(
         "within",
     }
 )
+
 
 ###############################################################################
 def _select_relevant_outcomes(
@@ -596,12 +604,14 @@ def _select_relevant_outcomes(
     selected = {index for _, index, _ in ranked[: min(32, len(ranked))]}
     return [item for index, item in enumerate(outcomes) if index in selected]
 
+
 ###############################################################################
 def json_text(value: object) -> str:
     try:
         return str(value) if isinstance(value, str) else json.dumps(value, default=str)
     except Exception:
         return str(value)
+
 
 ###############################################################################
 def _walk_values(value: object, *, keys: set[str]) -> list[object]:
@@ -618,6 +628,7 @@ def _walk_values(value: object, *, keys: set[str]) -> list[object]:
         for child in value:
             found.extend(_walk_values(child, keys=keys))
     return found
+
 
 ###############################################################################
 def _bounded_json_value(

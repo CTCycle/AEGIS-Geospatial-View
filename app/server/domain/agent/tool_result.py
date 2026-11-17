@@ -36,14 +36,9 @@ ToolRecovery = Literal[
 ]
 ToolSemanticOutcome = Literal["resolved", "ambiguous", "not_found", "failed"]
 type BoundedJson = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | dict[str, "BoundedJson"]
-    | list["BoundedJson"]
+    None | bool | int | float | str | dict[str, "BoundedJson"] | list["BoundedJson"]
 )
+
 
 ###############################################################################
 class ValidationIssue(BaseModel):
@@ -52,6 +47,7 @@ class ValidationIssue(BaseModel):
     path: str
     code: str
     message: str
+
 
 ###############################################################################
 class ToolExecutionError(BaseModel):
@@ -67,6 +63,7 @@ class ToolExecutionError(BaseModel):
     )
     upstream_status: int | None = Field(default=None, ge=100, le=599)
     timeout_origin: str | None = None
+
 
 ###############################################################################
 class ToolExecutionMetadata(BaseModel):
@@ -90,9 +87,14 @@ class ToolExecutionMetadata(BaseModel):
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     source_url: str | None = None
     covered_queries: list[str] = Field(default_factory=lambda: list[str]())
-    geometry_operations: list[str] = Field(default_factory=lambda: list[str](), max_length=8)
+    geometry_operations: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=8
+    )
     # Stored facts about the evidence a map plan layered, for completion checks.
-    layer_evidence: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    layer_evidence: list[dict[str, Any]] = Field(
+        default_factory=lambda: list[dict[str, Any]]()
+    )
+
 
 ###############################################################################
 class EvidenceAssessment(BaseModel):
@@ -126,6 +128,7 @@ class ToolResult(BaseModel):
     continuation: str | None = None
     assessment: EvidenceAssessment | None = None
 
+
 ###############################################################################
 class ModelObservation(BaseModel):
     """Bounded observation projected from one application tool result.
@@ -158,7 +161,9 @@ class ModelObservation(BaseModel):
 
     # -------------------------------------------------------------------------
     @classmethod
-    def from_tool_result(cls, value: ToolResult, *, max_chars: int = 4096) -> "ModelObservation":
+    def from_tool_result(
+        cls, value: ToolResult, *, max_chars: int = 4096
+    ) -> "ModelObservation":
         projected, projected_truncated = _project_result_data(
             value.tool_name,
             value.data,
@@ -180,9 +185,7 @@ class ModelObservation(BaseModel):
         if projected_object is not None:
             raw_pagination = projected_object.get("pagination")
             if is_json_object(raw_pagination):
-                pagination = _bounded_json_value(
-                    raw_pagination, depth=0, max_depth=3
-                )
+                pagination = _bounded_json_value(raw_pagination, depth=0, max_depth=3)
             elif "next_cursor" in projected_object:
                 pagination = {"next_cursor": projected_object.get("next_cursor")}
         metadata = value.metadata.model_dump(mode="json", exclude_none=True)
@@ -205,6 +208,7 @@ class ModelObservation(BaseModel):
             continuation=value.continuation,
             assessment=value.assessment,
         )
+
 
 ###############################################################################
 def _project_result_data(
@@ -299,7 +303,9 @@ def _project_result_data(
             ),
             "evidence_ref": data.get("evidence_ref"),
         }
-        return _fit_projection(projected, max_chars=max_chars, preserve_keys=("layers",))
+        return _fit_projection(
+            projected, max_chars=max_chars, preserve_keys=("layers",)
+        )
 
     # Catalog discovery and evidence inspection are the result types where
     # removing ``data`` would remove the useful observation entirely. Keep
@@ -308,9 +314,7 @@ def _project_result_data(
     if tool_name == "discover_geospatial_capabilities":
         data_object = data if is_json_object(data) else None
         raw_items = (
-            data_object.get(
-                "capabilities", data_object.get("items", list[Any]())
-            )
+            data_object.get("capabilities", data_object.get("items", list[Any]()))
             if data_object is not None
             else list[Any]()
         )
@@ -368,7 +372,9 @@ def _project_result_data(
                 data.get("source_summary"), depth=0, max_depth=3
             ),
         }
-        return _fit_projection(projected, max_chars=max_chars, preserve_keys=("result",))
+        return _fit_projection(
+            projected, max_chars=max_chars, preserve_keys=("result",)
+        )
 
     if (
         tool_name == "execute_geospatial_capability"
@@ -436,6 +442,7 @@ def _project_result_data(
         return None, False
     return _fit_projection(bounded, max_chars=max_chars)
 
+
 ###############################################################################
 def _fit_projection(
     value: dict[str, Any] | list[Any] | None,
@@ -445,7 +452,9 @@ def _fit_projection(
 ) -> tuple[dict[str, Any] | list[Any] | None, bool]:
     bounded = value
     truncated = False
-    serialized = json.dumps(bounded, ensure_ascii=True, separators=(",", ":"), default=str)
+    serialized = json.dumps(
+        bounded, ensure_ascii=True, separators=(",", ":"), default=str
+    )
     if len(serialized) <= max_chars:
         return bounded, False
 
@@ -500,6 +509,7 @@ def _fit_projection(
         truncated = True
     return bounded, truncated
 
+
 ###############################################################################
 def _bounded_json_value(
     value: Any,
@@ -550,6 +560,7 @@ def _bounded_json_value(
             for child in items[:list_limit]
         ]
     return str(value)[:string_limit]
+
 
 ###############################################################################
 def _bounded_strings(value: Any, *, limit: int, item_chars: int) -> list[str]:

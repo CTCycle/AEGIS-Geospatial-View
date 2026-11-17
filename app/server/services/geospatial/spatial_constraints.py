@@ -9,12 +9,14 @@ from pyproj import Geod, Transformer
 from shapely.geometry import Point, shape
 from shapely.ops import transform
 
+
 ###############################################################################
 class SpatialConstraintError(ValueError):
     """Raised when a requested scope or geometry cannot be trusted."""
 
 
 _GEOD = Geod(ellps="WGS84")
+
 
 ###############################################################################
 def normalize_bbox(value: Iterable[object]) -> list[float]:
@@ -37,8 +39,11 @@ def normalize_bbox(value: Iterable[object]) -> list[float]:
         raise SpatialConstraintError("Bounding box longitude order is invalid.")
     # west > east is retained as an explicit antimeridian crossing.
     if west == east and south != north:
-        raise SpatialConstraintError("A non-degenerate bbox cannot have equal longitudes.")
+        raise SpatialConstraintError(
+            "A non-degenerate bbox cannot have equal longitudes."
+        )
     return [west, south, east, north]
+
 
 ###############################################################################
 def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
@@ -57,6 +62,7 @@ def validate_point(latitude: object, longitude: object) -> tuple[float, float]:
         raise SpatialConstraintError("Coordinates are outside EPSG:4326 bounds.")
     return latitude_value, longitude_value
 
+
 ###############################################################################
 def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
     """Reject malformed or invalid GeoJSON geometry before map assembly."""
@@ -74,6 +80,7 @@ def validate_geojson_geometry(geometry: object) -> dict[str, Any]:
         raise SpatialConstraintError("GeoJSON geometry is empty or invalid.")
     return geometry_object
 
+
 ###############################################################################
 def geodesic_distance_m(
     first_latitude: float,
@@ -87,6 +94,7 @@ def geodesic_distance_m(
         first_latitude, first_longitude, second_latitude, second_longitude
     )[0]
 
+
 ###############################################################################
 def geodesic_inverse(
     first_latitude: float,
@@ -98,8 +106,11 @@ def geodesic_inverse(
 
     first = validate_point(first_latitude, first_longitude)
     second = validate_point(second_latitude, second_longitude)
-    azimuth, _back_azimuth, distance = _GEOD.inv(first[1], first[0], second[1], second[0])
+    azimuth, _back_azimuth, distance = _GEOD.inv(
+        first[1], first[0], second[1], second[0]
+    )
     return float(distance), float(azimuth) % 360.0
+
 
 ###############################################################################
 def geodesic_bbox_area_km2(bbox: Iterable[float]) -> float:
@@ -110,6 +121,7 @@ def geodesic_bbox_area_km2(bbox: Iterable[float]) -> float:
         [west, east, east, west], [south, south, north, north]
     )
     return abs(float(area)) / 1_000_000.0
+
 
 ###############################################################################
 def feature_matches_constraint(

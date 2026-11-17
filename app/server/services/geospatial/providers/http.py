@@ -82,6 +82,7 @@ def async_http_client() -> httpx.AsyncClient:
 
     return _ASYNC_HTTP_CLIENT
 
+
 ###############################################################################
 @contextmanager
 def raster_diagnostic_scope(
@@ -100,20 +101,20 @@ def raster_diagnostic_scope(
     finally:
         _RASTER_DIAGNOSTIC_CONTEXT.reset(token)
 
+
 ###############################################################################
 @contextmanager
 def request_timeout_scope(timeout_seconds: float | None) -> Generator[None, None, None]:
     """Apply one provider request's remaining timeout to shared HTTP helpers."""
 
     token = _REQUEST_TIMEOUT_SECONDS.set(
-        None
-        if timeout_seconds is None
-        else max(0.001, float(timeout_seconds))
+        None if timeout_seconds is None else max(0.001, float(timeout_seconds))
     )
     try:
         yield
     finally:
         _REQUEST_TIMEOUT_SECONDS.reset(token)
+
 
 ###############################################################################
 async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any:
@@ -124,6 +125,7 @@ async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any
         raise ProviderMalformedPayloadError(
             "Provider returned malformed JSON."
         ) from exc
+
 
 ###############################################################################
 async def fetch_bytes_url(
@@ -137,9 +139,7 @@ async def fetch_bytes_url(
         timeout_seconds = _REQUEST_TIMEOUT_SECONDS.get()
         if timeout_seconds is not None:
             request_kwargs["timeout"] = timeout_seconds
-        async with _ASYNC_HTTP_CLIENT.stream(
-            "GET", url, **request_kwargs
-        ) as response:
+        async with _ASYNC_HTTP_CLIENT.stream("GET", url, **request_kwargs) as response:
             _raise_for_status(response)
             content_length = response.headers.get("content-length")
             if content_length and _valid_content_length(content_length) > max_bytes:
@@ -187,9 +187,7 @@ async def fetch_raster_image_url(
         timeout_seconds = _REQUEST_TIMEOUT_SECONDS.get()
         if timeout_seconds is not None:
             request_kwargs["timeout"] = timeout_seconds
-        async with _ASYNC_HTTP_CLIENT.stream(
-            "GET", url, **request_kwargs
-        ) as response:
+        async with _ASYNC_HTTP_CLIENT.stream("GET", url, **request_kwargs) as response:
             content_type = _safe_content_type(response.headers.get("content-type"))
             content_length = _content_length(response.headers.get("content-length"))
             failure_phase = "response_headers"
@@ -476,7 +474,7 @@ def _content_length(value: str | None) -> int | None:
         return None
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return max(0, parsed)
 
@@ -507,6 +505,7 @@ def _looks_like_image(body: bytes) -> bool:
         )
     )
 
+
 ###############################################################################
 def _raise_for_status(response: httpx.Response) -> None:
     status_code = response.status_code
@@ -525,6 +524,7 @@ def _raise_for_status(response: httpx.Response) -> None:
         raise ProviderInvalidQueryError("Provider rejected the requested query.")
     raise ProviderUnavailableError(f"Provider HTTP error {status_code}.")
 
+
 ###############################################################################
 def _valid_content_length(value: str) -> int:
     try:
@@ -533,14 +533,17 @@ def _valid_content_length(value: str) -> int:
         return 0
     return max(0, parsed)
 
+
 ###############################################################################
 def _retry_after_seconds(headers: httpx.Headers) -> float | None:
     return parse_retry_after(headers.get("retry-after"))
+
 
 ###############################################################################
 async def fetch_text_url(url: str, headers: dict[str, str] | None = None) -> str:
     body = await fetch_bytes_url(url, headers)
     return body.decode("utf-8", errors="replace")
+
 
 ###############################################################################
 async def call_json_fetcher(
@@ -551,6 +554,7 @@ async def call_json_fetcher(
         return await value
     return value
 
+
 ###############################################################################
 async def call_text_fetcher(
     fetcher: TextFetcher, url: str, headers: dict[str, str] | None = None
@@ -559,6 +563,7 @@ async def call_text_fetcher(
     if inspect.isawaitable(value):
         return await value
     return value
+
 
 ###############################################################################
 async def call_bytes_fetcher(

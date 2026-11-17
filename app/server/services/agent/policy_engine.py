@@ -13,8 +13,12 @@ from server.domain.agent.capability_route import AgentRunState
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.policies import ToolAuthorizationResult
 from server.domain.agent.tools import RegisteredTool
-from server.services.geospatial.capability_registry import CapabilityRegistry, coverage_matches
+from server.services.geospatial.capability_registry import (
+    CapabilityRegistry,
+    coverage_matches,
+)
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+
 
 ###############################################################################
 class PolicyEngine:
@@ -154,20 +158,28 @@ class PolicyEngine:
             alternative = self._covering_alternative(capability, location, state)
             return ToolAuthorizationResult(
                 allowed=False,
-                reason=_coverage_explanation(capability, coverage, location, alternative),
+                reason=_coverage_explanation(
+                    capability, coverage, location, alternative
+                ),
                 metadata={
                     "code": "unavailable_coverage",
                     "coverage": coverage,
                     "country": location.country or "",
-                    "alternative_id": str(alternative.get("id") or "") if alternative else "",
+                    "alternative_id": str(alternative.get("id") or "")
+                    if alternative
+                    else "",
                     "rejected_name": _capability_name(capability),
-                    "alternative_name": _capability_name(alternative) if alternative else "",
+                    "alternative_name": _capability_name(alternative)
+                    if alternative
+                    else "",
                     "region": _coverage_region(coverage),
                 },
             )
 
         allowed_provider_ids = constraints.get("allowed_provider_ids")
-        provider_id = str(capability.get("providerId") or capability.get("provider_id") or "")
+        provider_id = str(
+            capability.get("providerId") or capability.get("provider_id") or ""
+        )
         if (
             is_json_array(allowed_provider_ids)
             and allowed_provider_ids
@@ -236,10 +248,14 @@ class PolicyEngine:
         substitutes = [
             item
             for item in self.capability_registry.list_capabilities()
-            if json_object(item.get("executionContract")) and _is_substitute(item, capability)
+            if json_object(item.get("executionContract"))
+            and _is_substitute(item, capability)
         ]
         substitutes.sort(
-            key=lambda item: (-len(phenomena & _routing_hints(item)), str(item.get("id") or ""))
+            key=lambda item: (
+                -len(phenomena & _routing_hints(item)),
+                str(item.get("id") or ""),
+            )
         )
         return next(
             (
@@ -270,7 +286,9 @@ class PolicyEngine:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _location_for_arguments(arguments: BaseModel, state: AgentRunState) -> ResolvedLocation | None:
+    def _location_for_arguments(
+        arguments: BaseModel, state: AgentRunState
+    ) -> ResolvedLocation | None:
         location_ref = str(getattr(arguments, "location_ref", "") or "").strip()
         if location_ref:
             for key, location in state.location_refs.items():
@@ -294,25 +312,32 @@ def _is_substitute(candidate: dict[str, Any], failed: dict[str, Any]) -> bool:
         == json_object(failed.get("executionContract")).get(kind)
     )
 
+
 ###############################################################################
 def _declared_coverage(capability: dict[str, Any]) -> str:
     contract = json_object(capability.get("executionContract"))
     return str(contract.get("coverage") or capability.get("coverage") or "").strip()
+
 
 ###############################################################################
 def _routing_hints(capability: dict[str, Any]) -> set[str]:
     hints = json_array(json_object(capability.get("agenticUse")).get("plannerHints"))
     return {str(item).strip().casefold() for item in hints if str(item).strip()}
 
+
 ###############################################################################
 def _capability_name(capability: dict[str, Any]) -> str:
     label = json_object(capability.get("metadata")).get("label")
     return str(capability.get("name") or label or capability.get("id") or "This source")
 
+
 ###############################################################################
 def _coverage_region(coverage: str) -> str:
     words = coverage.replace("-", " ").replace("_", " ").split()
-    return " ".join(word.upper() if len(word) <= 3 else word.capitalize() for word in words)
+    return " ".join(
+        word.upper() if len(word) <= 3 else word.capitalize() for word in words
+    )
+
 
 ###############################################################################
 def _coverage_explanation(
@@ -341,6 +366,7 @@ def _coverage_explanation(
         "Which other data should I show there?"
     )
 
+
 ###############################################################################
 def route_allows_capability_execution(route: Any) -> bool:
     """Whether a route may execute provider capabilities at all.
@@ -349,7 +375,10 @@ def route_allows_capability_execution(route: Any) -> bool:
     the model only to be rejected when called.
     """
 
-    if route.operation == "discover_available_map_data" and route.presentation in {"map", "both"}:
+    if route.operation == "discover_available_map_data" and route.presentation in {
+        "map",
+        "both",
+    }:
         # Layers found by discovery can only reach the map through execution.
         return True
     route_domains = {route.primary_domain, *route.secondary_domains}

@@ -50,6 +50,7 @@ _AUTHORITY_RANK: dict[ContextMetadataAuthority, int] = {
     "provider": 3,
 }
 
+
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     if isinstance(value, bool):
@@ -60,6 +61,7 @@ def _positive_int(value: object) -> int | None:
         number = int(value.strip())
         return number if number > 0 else None
     return None
+
 
 ###############################################################################
 def _normalized_alias_value(
@@ -87,6 +89,7 @@ def _normalized_alias_value(
         )
         return None
     return next(iter(values))
+
 
 ###############################################################################
 def normalize_model_context_profile(
@@ -131,7 +134,9 @@ def normalize_model_context_profile(
         else "unknown"
     )
     if raw_authority not in _AUTHORITY_RANK:
-        _LOGGER.warning("Ignoring unsupported context metadata authority: %r", raw_authority)
+        _LOGGER.warning(
+            "Ignoring unsupported context metadata authority: %r", raw_authority
+        )
     source = payload.get("context_profile_source") or default_metadata_source
     return ModelContextProfile(
         provider=provider,
@@ -139,12 +144,15 @@ def normalize_model_context_profile(
         context_window_tokens=context_window,
         maximum_output_tokens=maximum_output,
         default_output_reserve=default_output_reserve or maximum_output or 0,
-        tokenizer_strategy=str(payload.get("tokenizer_strategy") or "chars_per_token_4"),
+        tokenizer_strategy=str(
+            payload.get("tokenizer_strategy") or "chars_per_token_4"
+        ),
         supports_context_caching=bool(payload.get("supports_context_caching")),
         supports_server_compaction=bool(payload.get("supports_server_compaction")),
         metadata_source=str(source),
         metadata_authority=authority,
     )
+
 
 ###############################################################################
 def profile_to_request_metadata(profile: ModelContextProfile) -> dict[str, Any]:
@@ -163,6 +171,7 @@ def profile_to_request_metadata(profile: ModelContextProfile) -> dict[str, Any]:
         "context_profile_model": profile.model,
     }
 
+
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
     total = 0
@@ -176,6 +185,7 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
     total += estimate_image_tokens(messages)
     return max(total, 1)
 
+
 ###############################################################################
 def estimate_input_sections(
     messages: list[dict[str, Any]], *, working_state_prefix: str
@@ -185,15 +195,27 @@ def estimate_input_sections(
     sections = {"system": 0, "working_state": 0, "conversation": 0, "tool_exchanges": 0}
     for message in messages:
         role = message.get("role")
-        if role == "tool" or message.get("tool_calls") or message.get("type") in {
-            "function_call", "function_call_output", "reasoning",
-        }:
+        if (
+            role == "tool"
+            or message.get("tool_calls")
+            or message.get("type")
+            in {
+                "function_call",
+                "function_call_output",
+                "reasoning",
+            }
+        ):
             sections["tool_exchanges"] += estimate_json_tokens(message)
-        elif role == "system" and str(message.get("content") or "").startswith(working_state_prefix):
+        elif role == "system" and str(message.get("content") or "").startswith(
+            working_state_prefix
+        ):
             sections["working_state"] += estimate_message_tokens([message])
         else:
-            sections["system" if role == "system" else "conversation"] += estimate_message_tokens([message])
+            sections["system" if role == "system" else "conversation"] += (
+                estimate_message_tokens([message])
+            )
     return sections
+
 
 ###############################################################################
 def estimate_json_tokens(value: object) -> int:
@@ -202,6 +224,7 @@ def estimate_json_tokens(value: object) -> int:
     return max(
         1, math.ceil(len(json.dumps(value, default=str, separators=(",", ":"))) / 4)
     )
+
 
 ###############################################################################
 def calculate_context_usage_percent(
@@ -222,9 +245,11 @@ def calculate_context_usage_percent(
         return None
     return round((effective_input / model_context_limit) * 100, 1)
 
+
 ###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
     return request.metadata
+
 
 ###############################################################################
 def _profile_for_request(
@@ -277,6 +302,7 @@ def _profile_for_request(
         metadata=metadata,
     )
 
+
 ###############################################################################
 def resolve_model_context_profile(
     provider: str,
@@ -296,6 +322,7 @@ def resolve_model_context_profile(
         LLMRequest(model=model, messages=[], metadata=dict(metadata or {})),
     )
 
+
 ###############################################################################
 def request_output_token_cap(request: LLMRequest) -> int | None:
     """Return the configured output-token cap, clamped to the model maximum."""
@@ -310,6 +337,7 @@ def request_output_token_cap(request: LLMRequest) -> int | None:
     if configured is None:
         return None
     return min(configured, maximum) if maximum is not None else configured
+
 
 ###############################################################################
 def _expected_output_tokens(
@@ -332,6 +360,7 @@ def _expected_output_tokens(
     # metadata; inventing a cap here would make both compaction and the UI
     # falsely determinate.
     return 0
+
 
 ###############################################################################
 def _context_components(
@@ -382,6 +411,7 @@ def _context_components(
     usable = max(0, min(application_usable, model_usable))
     return expected_output, tool_tokens, schema_tokens, CONTEXT_HEADROOM_TOKENS, usable
 
+
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
     normalized = provider
@@ -401,8 +431,10 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         # The input estimate is heuristic and Ollama silently drops the oldest
         # prompt tokens once num_ctx is exceeded, so allocate with headroom.
         required = (
-            estimated + estimated // OLLAMA_INPUT_ESTIMATE_HEADROOM_DIVISOR
-            + expected_output + safety_margin
+            estimated
+            + estimated // OLLAMA_INPUT_ESTIMATE_HEADROOM_DIVISOR
+            + expected_output
+            + safety_margin
         )
         step = OLLAMA_CONTEXT_ALLOCATION_STEP
         selected_window = min(limit, ((required + step - 1) // step) * step)
@@ -433,6 +465,7 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         peak_request_tokens=estimated,
         total_input_tokens=estimated,
     )
+
 
 ###############################################################################
 def merge_provider_context_usage(
@@ -482,9 +515,7 @@ def merge_provider_context_usage(
 
     next_limit = reported_limit if can_replace_limit else usage.model_context_limit
     next_percent = calculate_context_usage_percent(
-        reported_input
-        if reported_input is not None
-        else usage.effective_input_tokens,
+        reported_input if reported_input is not None else usage.effective_input_tokens,
         next_limit,
     )
     if reported_input is None and reported_output is None and not can_replace_limit:
@@ -508,13 +539,16 @@ def merge_provider_context_usage(
             if reported_output is not None
             else usage.reported_output_tokens
         ),
-        selected_context_window=next_limit if can_replace_limit else usage.selected_context_window,
+        selected_context_window=next_limit
+        if can_replace_limit
+        else usage.selected_context_window,
         model_context_limit=next_limit,
         usage_percent=next_percent,
         usage_source=source,
         context_profile_source=(
             str(payload.get("context_profile_source"))
-            if can_replace_limit and isinstance(payload.get("context_profile_source"), str)
+            if can_replace_limit
+            and isinstance(payload.get("context_profile_source"), str)
             else usage.context_profile_source
         ),
         context_metadata_authority=(
@@ -523,14 +557,10 @@ def merge_provider_context_usage(
             else usage.context_metadata_authority
         ),
         peak_request_tokens=(
-            reported_input
-            if reported_input is not None
-            else usage.peak_request_tokens
+            reported_input if reported_input is not None else usage.peak_request_tokens
         ),
         total_input_tokens=(
-            reported_input
-            if reported_input is not None
-            else usage.total_input_tokens
+            reported_input if reported_input is not None else usage.total_input_tokens
         ),
         total_output_tokens=(
             reported_output
@@ -538,6 +568,7 @@ def merge_provider_context_usage(
             else usage.total_output_tokens
         ),
     )
+
 
 ###############################################################################
 def apply_reported_usage(
@@ -559,7 +590,7 @@ def apply_reported_usage(
         for value in values:
             try:
                 parsed = int(value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if parsed >= 0:
                 return parsed
@@ -611,6 +642,7 @@ def apply_reported_usage(
         usage_source=source,
     )
 
+
 ###############################################################################
 def compute_ollama_context_usage(
     request: LLMRequest,
@@ -623,6 +655,7 @@ def compute_ollama_context_usage(
         else request
     )
     return compute_context_usage(effective, provider="ollama")
+
 
 ###############################################################################
 def _message_blocks(
@@ -664,6 +697,7 @@ def _message_blocks(
         blocks.append(([index], [message]))
         index += 1
     return blocks
+
 
 ###############################################################################
 def _compact_messages(
@@ -779,12 +813,16 @@ def _compact_messages(
         return [], True
     return selected, True
 
+
 ###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     usage = compute_context_usage(request, provider=provider)
     usable = usage.usable_prompt_budget_tokens
     if usable is None:
-        usable = _positive_int(request.metadata.get("application_input_token_ceiling")) or UNKNOWN_MODEL_INPUT_CEILING
+        usable = (
+            _positive_int(request.metadata.get("application_input_token_ceiling"))
+            or UNKNOWN_MODEL_INPUT_CEILING
+        )
     if usage.estimated_input_tokens <= usable:
         return request
     message_budget = max(

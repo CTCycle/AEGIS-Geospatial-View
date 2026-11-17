@@ -49,6 +49,7 @@ from server.services.llm.types import (
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 RETIRED_DEEPSEEK_MODELS = frozenset({"deepseek-chat", "deepseek-reasoner"})
 
+
 ###############################################################################
 class DeepSeekProvider(LLMProvider):
     provider_name = "deepseek"
@@ -84,9 +85,7 @@ class DeepSeekProvider(LLMProvider):
             "base_url": self.base_url,
             "timeout": self.transport_policy.timeout_for(stage),
             "max_retries": 0,
-            "http_client": httpx.Client(
-                **self.transport_policy.httpx_options(stage)
-            ),
+            "http_client": httpx.Client(**self.transport_policy.httpx_options(stage)),
         }
         headers = self._request_headers(request)
         if headers:
@@ -115,9 +114,7 @@ class DeepSeekProvider(LLMProvider):
         return AsyncOpenAI(**kwargs)
 
     # -------------------------------------------------------------------------
-    def _client_for_request(
-        self, request: LLMRequest, *, stage: str = "chat"
-    ) -> Any:
+    def _client_for_request(self, request: LLMRequest, *, stage: str = "chat") -> Any:
         client = self._client(request, stage=stage)
         remaining = remaining_request_seconds(request)
         if remaining is None:
@@ -137,7 +134,7 @@ class DeepSeekProvider(LLMProvider):
                 return None
             try:
                 parsed = int(value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
             return parsed if parsed > 0 else None
 
@@ -654,7 +651,9 @@ class DeepSeekProvider(LLMProvider):
                             invalid_paths.append(f"{location} ({error_type})")
                 except Exception:  # noqa: BLE001
                     invalid_paths = []
-            detail = "The provider response did not match the requested extraction schema."
+            detail = (
+                "The provider response did not match the requested extraction schema."
+            )
             if invalid_paths:
                 detail += " Invalid fields: " + ", ".join(invalid_paths[:8]) + "."
             raise LLMResponseParsingError(
@@ -1045,6 +1044,7 @@ class DeepSeekProvider(LLMProvider):
             return None
         finish_reason = getattr(choices[0], "finish_reason", None)
         return str(finish_reason) if finish_reason else None
+
 
 ###############################################################################
 def _is_reasoning_only(response: Any) -> bool:

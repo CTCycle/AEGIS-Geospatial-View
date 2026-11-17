@@ -28,7 +28,10 @@ def _write(root: Path, relative_path: str, contents: str = "fixture\n") -> Path:
 
 
 def _make_repository_fixture(root: Path) -> dict[str, Path]:
-    shutil.copy2(REPOSITORY_ROOT / "setup_and_maintenance.ps1", root / "setup_and_maintenance.ps1")
+    shutil.copy2(
+        REPOSITORY_ROOT / "setup_and_maintenance.ps1",
+        root / "setup_and_maintenance.ps1",
+    )
     _write(root, "settings/.env.example", "FASTAPI_PORT=8000\n")
     data_root = root.parent / "external-app-data"
     external_db = root.parent / "external-store" / "chosen.db"
@@ -83,7 +86,9 @@ def _make_repository_fixture(root: Path) -> dict[str, Path]:
         "env": root / "settings/.env",
         "upload": _write(root, "data/geospatial/uploads/kept.gpkg"),
         "vector": _write(root, "data/vectors/kept.bin"),
-        "runtime_dataset": _write(data_root, "geospatial/overture/places.geojson", "{}\n"),
+        "runtime_dataset": _write(
+            data_root, "geospatial/overture/places.geojson", "{}\n"
+        ),
         "unknown_runtime_file": _write(data_root, "unrelated.keep"),
         "catalog": _write(root, "data/catalog/index.json", "{}\n"),
         "qa": _write(root, "assets/QA/report.md", "retained evidence\n"),
@@ -103,8 +108,12 @@ def _make_repository_fixture(root: Path) -> dict[str, Path]:
         "root_ruff_cache": _write(root, ".ruff_cache/cache.bin"),
         "pytest_cache": _write(root, "app/server/nested/.pytest_cache/cache.bin"),
         "bytecode": _write(root, "app/tests/__pycache__/module.pyc"),
-        "validation_bytecode": _write(root, "scripts/validation/__pycache__/helper.pyc"),
-        "app_runtime_cache": _write(root, "app/runtimes/cache/test-runtime/database.db"),
+        "validation_bytecode": _write(
+            root, "scripts/validation/__pycache__/helper.pyc"
+        ),
+        "app_runtime_cache": _write(
+            root, "app/runtimes/cache/test-runtime/database.db"
+        ),
         "node_cache": _write(root, "app/client/node_modules/.cache/cache.bin"),
         "angular_cache": _write(root, "app/client/.angular/cache/cache.bin"),
         "frontend_build": _write(root, "app/client/dist/browser/index.html"),
@@ -113,7 +122,9 @@ def _make_repository_fixture(root: Path) -> dict[str, Path]:
         "runtime": _write(root, "runtimes/python/python.exe"),
         "backend_venv": _write(root, "app/server/.venv/Scripts/python.exe"),
         "root_venv": _write(root, ".venv/Scripts/python.exe"),
-        "frontend_dependency": _write(root, "app/client/node_modules/package.json", "{}\n"),
+        "frontend_dependency": _write(
+            root, "app/client/node_modules/package.json", "{}\n"
+        ),
     }
     return paths
 
@@ -133,7 +144,15 @@ def _run_launcher(
     environment.pop("AEGIS_CACHE_ROOT", None)
     if catalog_override is not None:
         environment["AEGIS_MOBILITY_DATABASE_CATALOG_PATH"] = str(catalog_override)
-    arguments = [PWSH or "pwsh", "-NoLogo", "-NoProfile", "-File", str(launcher), "-Action", action]
+    arguments = [
+        PWSH or "pwsh",
+        "-NoLogo",
+        "-NoProfile",
+        "-File",
+        str(launcher),
+        "-Action",
+        action,
+    ]
     if what_if:
         arguments.append("-WhatIf")
     if confirm_removal:
@@ -149,7 +168,9 @@ def _run_launcher(
     )
 
 
-def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path) -> None:
+def test_launcher_preview_cache_and_uninstall_preserve_user_data(
+    tmp_path: Path,
+) -> None:
     pwsh = _require_windows_powershell()
     assert pwsh == PWSH
     repository = tmp_path / "fixture-repository"
@@ -167,7 +188,19 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
         catalog_override=paths["external_catalog_override"],
     )
     assert preview.returncode == 0, preview.stdout + preview.stderr
-    for key in ("cache_file", "ruff_cache", "root_ruff_cache", "pytest_cache", "bytecode", "validation_bytecode", "app_runtime_cache", "node_cache", "angular_cache", "frontend_build", "legacy_cache"):
+    for key in (
+        "cache_file",
+        "ruff_cache",
+        "root_ruff_cache",
+        "pytest_cache",
+        "bytecode",
+        "validation_bytecode",
+        "app_runtime_cache",
+        "node_cache",
+        "angular_cache",
+        "frontend_build",
+        "legacy_cache",
+    ):
         assert str(paths[key]) in preview.stdout
         assert paths[key].exists()
     assert str(paths["external_catalog_override"]) in preview.stdout
@@ -191,7 +224,19 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
         catalog_override=paths["external_catalog_override"],
     )
     assert repeated.returncode == 0, repeated.stdout + repeated.stderr
-    for key in ("cache_file", "ruff_cache", "root_ruff_cache", "pytest_cache", "bytecode", "validation_bytecode", "app_runtime_cache", "node_cache", "angular_cache", "frontend_build", "legacy_cache"):
+    for key in (
+        "cache_file",
+        "ruff_cache",
+        "root_ruff_cache",
+        "pytest_cache",
+        "bytecode",
+        "validation_bytecode",
+        "app_runtime_cache",
+        "node_cache",
+        "angular_cache",
+        "frontend_build",
+        "legacy_cache",
+    ):
         assert not paths[key].exists()
     for key in (
         "database",
@@ -215,17 +260,13 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
     assert str(paths["app_log"]) in log_preview.stdout
     assert str(paths["console_log"]) in log_preview.stdout
     assert str(paths["database"]) not in log_preview.stdout
-    removed_logs = _run_launcher(
-        launcher, outside, "RemoveLogs", confirm_removal=True
-    )
+    removed_logs = _run_launcher(launcher, outside, "RemoveLogs", confirm_removal=True)
     assert removed_logs.returncode == 0, removed_logs.stdout + removed_logs.stderr
     assert not paths["app_log"].exists()
     assert not paths["console_log"].exists()
 
     paths["legacy_cache"].write_text("generated cache\n", encoding="utf-8")
-    paths["external_catalog_override"].write_text(
-        "generated cache\n", encoding="utf-8"
-    )
+    paths["external_catalog_override"].write_text("generated cache\n", encoding="utf-8")
     _write(repository, "data/logs/AEGIS_test.log")
     _write(repository, "data/logs/backend-console.log")
     _write(repository, "runtimes/uv/uv.exe")
@@ -240,7 +281,9 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
         what_if=True,
         catalog_override=paths["external_catalog_override"],
     )
-    assert uninstall_preview.returncode == 0, uninstall_preview.stdout + uninstall_preview.stderr
+    assert uninstall_preview.returncode == 0, (
+        uninstall_preview.stdout + uninstall_preview.stderr
+    )
     assert str(paths["app_log"]) in uninstall_preview.stdout
     assert str(paths["database"]) not in uninstall_preview.stdout
     assert str(paths["database_settings"]) not in uninstall_preview.stdout
@@ -255,7 +298,15 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
         catalog_override=paths["external_catalog_override"],
     )
     assert uninstalled.returncode == 0, uninstalled.stdout + uninstalled.stderr
-    for key in ("runtime", "backend_venv", "root_venv", "frontend_dependency", "frontend_build", "app_log", "console_log"):
+    for key in (
+        "runtime",
+        "backend_venv",
+        "root_venv",
+        "frontend_dependency",
+        "frontend_build",
+        "app_log",
+        "console_log",
+    ):
         assert not paths[key].exists()
     assert not uninstall_runtime_cache.exists()
     assert not paths["legacy_cache"].exists()
@@ -280,23 +331,49 @@ def test_launcher_preview_cache_and_uninstall_preserve_user_data(tmp_path: Path)
     assert data_preview.returncode == 0, data_preview.stdout + data_preview.stderr
     assert str(paths["database"]) in data_preview.stdout
     assert str(paths["recovery_database"]) not in data_preview.stdout
-    for key in ("database_journal", "database_wal", "database_shm", "migration_lock", "migration_backup"):
+    for key in (
+        "database_journal",
+        "database_wal",
+        "database_shm",
+        "migration_lock",
+        "migration_backup",
+    ):
         assert str(paths[key]) in data_preview.stdout
     assert str(paths["upload"]) in data_preview.stdout
     assert str(paths["vector"]) in data_preview.stdout
     assert paths["database"].exists()
 
-    removed_data = _run_launcher(launcher, outside, "RemoveAllData", confirm_removal=True)
+    removed_data = _run_launcher(
+        launcher, outside, "RemoveAllData", confirm_removal=True
+    )
     assert removed_data.returncode == 0, removed_data.stdout + removed_data.stderr
-    for key in ("database", "database_journal", "database_wal", "database_shm", "migration_lock", "migration_backup", "database_settings", "upload", "vector", "runtime_dataset", "app_log", "console_log"):
+    for key in (
+        "database",
+        "database_journal",
+        "database_wal",
+        "database_shm",
+        "migration_lock",
+        "migration_backup",
+        "database_settings",
+        "upload",
+        "vector",
+        "runtime_dataset",
+        "app_log",
+        "console_log",
+    ):
         assert not paths[key].exists()
     assert paths["database_settings_backup"].exists() is False
-    assert paths["recovery_database"].read_text(encoding="utf-8") == "stale recovery-path sentinel"
+    assert (
+        paths["recovery_database"].read_text(encoding="utf-8")
+        == "stale recovery-path sentinel"
+    )
     for key in ("env", "catalog", "qa", "unknown_runtime_file"):
         assert paths[key].exists()
 
 
-def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp_path: Path) -> None:
+def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(
+    tmp_path: Path,
+) -> None:
     _require_windows_powershell()
     repository = tmp_path / "fixture-repository"
     repository.mkdir()
@@ -356,7 +433,12 @@ def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp
     icacls = shutil.which("icacls.exe")
     if identity.returncode == 0 and icacls is not None:
         denied = subprocess.run(
-            [icacls, str(restricted.parent), "/deny", f"{identity.stdout.strip()}:(OI)(CI)(RD)"],
+            [
+                icacls,
+                str(restricted.parent),
+                "/deny",
+                f"{identity.stdout.strip()}:(OI)(CI)(RD)",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -370,7 +452,12 @@ def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp
                 assert "incomplete:" in permission_failure.stdout
             finally:
                 restored = subprocess.run(
-                    [icacls, str(restricted.parent), "/remove:d", identity.stdout.strip()],
+                    [
+                        icacls,
+                        str(restricted.parent),
+                        "/remove:d",
+                        identity.stdout.strip(),
+                    ],
                     capture_output=True,
                     text=True,
                     check=False,
@@ -383,8 +470,11 @@ def test_launcher_cleanup_reports_locked_paths_and_does_not_follow_junctions(tmp
     assert final.returncode == 0, final.stdout + final.stderr
     assert paths["database"].exists()
 
+
 ###############################################################################
-def test_batch_entrypoint_uses_non_menu_launch_and_maintenance_menu_hides_launch() -> None:
+def test_batch_entrypoint_uses_non_menu_launch_and_maintenance_menu_hides_launch() -> (
+    None
+):
     launcher = (REPOSITORY_ROOT / "setup_and_maintenance.ps1").read_text(
         encoding="utf-8"
     )

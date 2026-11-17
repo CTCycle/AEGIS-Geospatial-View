@@ -8,6 +8,7 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
+
 ###############################################################################
 def _catalog_model(
     *,
@@ -57,7 +58,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Cost-optimized OpenAI reasoning model for balanced speed and quality.",
         provider="openai",
         family="gpt-5",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=400_000,
         maximum_output_tokens=128_000,
         default_output_reserve=8_192,
@@ -71,7 +79,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="High-throughput OpenAI model for lightweight classification and extraction tasks.",
         provider="openai",
         family="gpt-5",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=400_000,
         maximum_output_tokens=128_000,
         default_output_reserve=8_192,
@@ -85,7 +100,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Flagship OpenAI reasoning model for complex multi-step planning and coding.",
         provider="openai",
         family="gpt-5.2",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=400_000,
         maximum_output_tokens=128_000,
         default_output_reserve=16_384,
@@ -99,7 +121,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="General-purpose OpenAI model with strong instruction following and tool use.",
         provider="openai",
         family="gpt-4.1",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=1_047_576,
         maximum_output_tokens=32_768,
         default_output_reserve=8_192,
@@ -112,7 +141,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Fast OpenAI model for responsive chat and structured native responses.",
         provider="openai",
         family="gpt-4.1",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=1_047_576,
         maximum_output_tokens=32_768,
         default_output_reserve=8_192,
@@ -125,7 +161,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Google model for complex reasoning, planning, and long-context workflows.",
         provider="google",
         family="gemini-2.5",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=1_048_576,
         maximum_output_tokens=65_536,
         default_output_reserve=8_192,
@@ -138,7 +181,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Balanced Google model for multimodal chat and high-volume interactive tasks.",
         provider="google",
         family="gemini-2.5",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=1_048_576,
         maximum_output_tokens=65_536,
         default_output_reserve=8_192,
@@ -151,7 +201,14 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
         description="Fast and cost-efficient Google model for frequent lightweight operations.",
         provider="google",
         family="gemini-2.5",
-        capabilities=["chat", "stream", "structured", "structured_output", "tools", "vision"],
+        capabilities=[
+            "chat",
+            "stream",
+            "structured",
+            "structured_output",
+            "tools",
+            "vision",
+        ],
         context_window_tokens=1_048_576,
         maximum_output_tokens=65_536,
         default_output_reserve=8_192,
@@ -161,13 +218,15 @@ CLOUD_MODEL_CATALOG: tuple[ModelDescriptor, ...] = (
     ),
 )
 
+
 ###############################################################################
 def _positive_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number > 0 else None
+
 
 ###############################################################################
 def get_model_context_profile(provider: str, model: str) -> ModelContextProfile | None:
@@ -212,6 +271,7 @@ def get_model_context_profile(provider: str, model: str) -> ModelContextProfile 
                 ),
             )
     return None
+
 
 ###############################################################################
 def get_cloud_model_catalog() -> list[ModelDescriptor]:

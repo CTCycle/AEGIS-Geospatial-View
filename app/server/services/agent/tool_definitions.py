@@ -9,9 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from server.domain.agent.capability_route import CapabilityRoute
 from server.domain.agent.map_plan import MapAction
 
+
 ###############################################################################
 class StrictToolInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
 
 ###############################################################################
 class ResolveLocationInput(StrictToolInput):
@@ -28,7 +30,7 @@ class ResolveLocationInput(StrictToolInput):
             "landmark",
             "poi",
             "region",
-    "macro_region",
+            "macro_region",
             "river",
             "road",
             "street",
@@ -59,6 +61,7 @@ class ResolveLocationInput(StrictToolInput):
             raise ValueError("Either query or target_id is required.")
         return self
 
+
 ###############################################################################
 class CapabilityDiscoveryInput(StrictToolInput):
     query: str | None = Field(default=None, max_length=300)
@@ -66,6 +69,7 @@ class CapabilityDiscoveryInput(StrictToolInput):
     provider_id: str | None = Field(default=None, max_length=100)
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=12, ge=1, le=50)
+
 
 ###############################################################################
 class ProviderLayerDiscoveryInput(StrictToolInput):
@@ -75,9 +79,11 @@ class ProviderLayerDiscoveryInput(StrictToolInput):
     limit: int = Field(default=20, ge=1, le=50)
     refresh: bool = False
 
+
 ###############################################################################
 class DescribeCapabilityInput(StrictToolInput):
     capability_id: str = Field(min_length=1, max_length=200)
+
 
 ###############################################################################
 class ExecuteCapabilityInput(StrictToolInput):
@@ -100,12 +106,24 @@ class ExecuteCapabilityInput(StrictToolInput):
     filters: dict[str, Any] = Field(default_factory=dict)
     arguments: dict[str, Any] = Field(default_factory=dict)
 
+
 _SERVER_OWNED_EXECUTE_FIELDS = (
-    "temporal_mode", "start_time_iso", "end_time_iso", "bbox", "radius_m",
-    "latitude", "longitude",
+    "temporal_mode",
+    "start_time_iso",
+    "end_time_iso",
+    "bbox",
+    "radius_m",
+    "latitude",
+    "longitude",
 )
 # Record listings are pages; "records" is the most common model spelling.
-_INSPECT_VIEW_ALIASES = {"records": "page", "rows": "page", "data": "sample", "summary": "statistics"}
+_INSPECT_VIEW_ALIASES = {
+    "records": "page",
+    "rows": "page",
+    "data": "sample",
+    "summary": "statistics",
+}
+
 
 ###############################################################################
 class ExecuteCapabilityToolInput(StrictToolInput):
@@ -145,10 +163,12 @@ class ExecuteCapabilityToolInput(StrictToolInput):
         data["arguments"] = remaining
         return data
 
+
 ###############################################################################
 class EvidencePoint(StrictToolInput):
     lon: float = Field(ge=-180, le=180)
     lat: float = Field(ge=-90, le=90)
+
 
 ###############################################################################
 class InspectEvidenceInput(StrictToolInput):
@@ -167,6 +187,7 @@ class InspectEvidenceInput(StrictToolInput):
             normalized = view.strip().casefold()
             data["view"] = _INSPECT_VIEW_ALIASES.get(normalized, normalized)
         return data
+
     fields: list[str] = Field(default_factory=list, max_length=32)
     cursor: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)
@@ -186,12 +207,14 @@ class InspectEvidenceInput(StrictToolInput):
             raise ValueError("values_at needs at least one point as {lon, lat}.")
         return self
 
+
 ###############################################################################
 class AttributeFilterOperation(StrictToolInput):
     op: Literal["attribute_filter"]
     field: str = Field(min_length=1, max_length=200)
     operator: Literal["eq", "neq", "in", "contains", "gte", "lte"] = "eq"
     value: Any
+
 
 ###############################################################################
 class TemporalFilterOperation(StrictToolInput):
@@ -200,6 +223,7 @@ class TemporalFilterOperation(StrictToolInput):
     start: str | None = Field(default=None, max_length=80)
     end: str | None = Field(default=None, max_length=80)
 
+
 ###############################################################################
 class SpatialFilterOperation(StrictToolInput):
     op: Literal["spatial_filter"]
@@ -207,21 +231,25 @@ class SpatialFilterOperation(StrictToolInput):
     center: list[float] = Field(min_length=2, max_length=2)
     radius_km: float = Field(gt=0, le=20_000)
 
+
 ###############################################################################
 class SortOperation(StrictToolInput):
     op: Literal["sort"]
     field: str = Field(min_length=1, max_length=200)
     descending: bool = False
 
+
 ###############################################################################
 class LimitOperation(StrictToolInput):
     op: Literal["limit"]
     value: int = Field(ge=1, le=10_000)
 
+
 ###############################################################################
 class FieldProjectionOperation(StrictToolInput):
     op: Literal["field_projection"]
     fields: list[str] = Field(min_length=1, max_length=64)
+
 
 ###############################################################################
 class AggregateOperation(StrictToolInput):
@@ -246,11 +274,13 @@ class DistanceFromOperation(StrictToolInput):
     op: Literal["distance_from"]
     location_ref: str = Field(min_length=1, max_length=200)
 
+
 ###############################################################################
 class CountryTagOperation(StrictToolInput):
     """Add each located record's ISO alpha-2 country code as country_iso2."""
 
     op: Literal["country_tag"]
+
 
 ###############################################################################
 class AreaOperation(StrictToolInput):
@@ -258,12 +288,14 @@ class AreaOperation(StrictToolInput):
 
     op: Literal["area"]
 
+
 ###############################################################################
 class BufferOperation(StrictToolInput):
     """Replace each located record with a polygon buffer zone of distance_km around it."""
 
     op: Literal["buffer"]
     distance_km: float = Field(gt=0, le=500)
+
 
 ###############################################################################
 class SpatialJoinOperation(StrictToolInput):
@@ -280,8 +312,11 @@ class SpatialJoinOperation(StrictToolInput):
     @model_validator(mode="after")
     def _distance_for_within_distance(self) -> "SpatialJoinOperation":
         if (self.predicate == "within_distance") != (self.distance_km is not None):
-            raise ValueError("distance_km is required with, and only with, predicate within_distance.")
+            raise ValueError(
+                "distance_km is required with, and only with, predicate within_distance."
+            )
         return self
+
 
 ###############################################################################
 class OverlayOperation(StrictToolInput):
@@ -311,10 +346,12 @@ EvidenceOperation = Annotated[
     Field(discriminator="op"),
 ]
 
+
 ###############################################################################
 class TransformEvidenceInput(StrictToolInput):
     evidence_refs: list[str] = Field(min_length=1, max_length=8)
     operations: list[EvidenceOperation] = Field(min_length=1, max_length=8)
+
 
 ###############################################################################
 class MeasureGeospatialInput(StrictToolInput):
@@ -334,6 +371,7 @@ class MeasureGeospatialInput(StrictToolInput):
         description="Exact resolved location references (target_id values).",
     )
 
+
 ###############################################################################
 class SearchConversationHistoryInput(StrictToolInput):
     """Bounded recall of original messages from the active conversation."""
@@ -348,10 +386,12 @@ class SearchConversationHistoryInput(StrictToolInput):
 # descriptive schema/class name in generated tool definitions.
 HistorySearchInput = SearchConversationHistoryInput
 
+
 ###############################################################################
 class ApplyMapPlanInput(StrictToolInput):
     expected_collection_revision: int = Field(ge=0)
     actions: list[MapAction] = Field(min_length=1, max_length=32)
+
 
 ###############################################################################
 def _require_route_fields(schema: dict[str, Any]) -> None:

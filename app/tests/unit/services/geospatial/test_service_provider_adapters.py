@@ -2,7 +2,11 @@ from __future__ import annotations
 import asyncio
 import pytest
 from urllib.parse import parse_qs, urlparse
-from server.services.geospatial.providers.base import ProviderMalformedPayloadError, ProviderRequest, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderMalformedPayloadError,
+    ProviderRequest,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.gbif import GBIFProvider
 from server.services.geospatial.openmeteo import OpenMeteoRequestError, OpenMeteoService
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
@@ -11,8 +15,6 @@ from server.services.geospatial.overpass import OverpassService
 from server.services.geospatial.providers.overpass import OverpassProvider
 
 # --- test_gbif_provider.py ---
-
-
 
 
 ###############################################################################
@@ -26,6 +28,7 @@ def _provider_for_payload(
         return payload
 
     return GBIFProvider(fetcher=fetcher), requested_urls
+
 
 ###############################################################################
 def test_gbif_provider_normalizes_occurrence_provenance() -> None:
@@ -106,6 +109,7 @@ def test_gbif_provider_normalizes_occurrence_provenance() -> None:
     assert query["basisOfRecord"] == ["HUMAN_OBSERVATION"]
     assert query["geometry"][0].startswith("POLYGON((8.0 46.0")
 
+
 ###############################################################################
 def test_gbif_provider_requires_bounded_non_antimeridian_extent() -> None:
     provider, _requested_urls = _provider_for_payload({})
@@ -130,6 +134,7 @@ def test_gbif_provider_requires_bounded_non_antimeridian_extent() -> None:
             )
         )
 
+
 ###############################################################################
 def test_gbif_provider_clamps_interactive_limit_to_300() -> None:
     provider, requested_urls = _provider_for_payload(
@@ -150,6 +155,7 @@ def test_gbif_provider_clamps_interactive_limit_to_300() -> None:
     assert response.payload["sampleLimit"] == 300
     assert parse_qs(urlparse(requested_urls[0]).query)["limit"] == ["300"]
 
+
 ###############################################################################
 def test_gbif_provider_defaults_to_maximum_interactive_page() -> None:
     provider, requested_urls = _provider_for_payload(
@@ -167,6 +173,7 @@ def test_gbif_provider_defaults_to_maximum_interactive_page() -> None:
 
     assert response.payload["sampleLimit"] == 300
     assert parse_qs(urlparse(requested_urls[0]).query)["limit"] == ["300"]
+
 
 ###############################################################################
 def test_gbif_provider_marks_sampled_results() -> None:
@@ -203,6 +210,7 @@ def test_gbif_provider_marks_sampled_results() -> None:
     assert response.payload["totalMatched"] == 301
     assert response.payload["sampleLimit"] == 2
     assert any("limited to 2" in warning for warning in response.warnings)
+
 
 ###############################################################################
 def test_gbif_provider_filters_invalid_coordinates_and_supports_empty_results() -> None:
@@ -246,6 +254,7 @@ def test_gbif_provider_filters_invalid_coordinates_and_supports_empty_results() 
     assert empty_response.result_status == "valid_empty"
     assert empty_response.payload["features"] == []
 
+
 ###############################################################################
 @pytest.mark.parametrize("payload", [[], {}, {"results": {}}])
 def test_gbif_provider_rejects_malformed_payloads(payload: object) -> None:
@@ -261,14 +270,12 @@ def test_gbif_provider_rejects_malformed_payloads(payload: object) -> None:
             )
         )
 
+
 # --- test_openmeteo_elevation.py ---
-
-
 
 
 ###############################################################################
 class StubOpenMeteoService(OpenMeteoService):
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.elevation_base_url = "https://api.open-meteo.com/v1/elevation"
@@ -309,6 +316,7 @@ class StubOpenMeteoService(OpenMeteoService):
             "attribution": "Data from Open-Meteo; Copernicus DEM GLO-90",
         }
 
+
 ###############################################################################
 def test_openmeteo_provider_routes_and_normalizes_elevation() -> None:
     provider = OpenMeteoProvider(service=StubOpenMeteoService())
@@ -334,6 +342,7 @@ def test_openmeteo_provider_routes_and_normalizes_elevation() -> None:
     assert feature["latitude"] == 46.0
     assert feature["longitude"] == 8.5
 
+
 ###############################################################################
 def _service_with_elevation_payload(
     monkeypatch: pytest.MonkeyPatch,
@@ -356,6 +365,7 @@ def _service_with_elevation_payload(
     monkeypatch.setattr(service, "_get_json", fake_get_json)
     return service, calls
 
+
 ###############################################################################
 def test_openmeteo_service_parses_numeric_elevation(
     monkeypatch: pytest.MonkeyPatch,
@@ -376,6 +386,7 @@ def test_openmeteo_service_parses_numeric_elevation(
         }
     ]
 
+
 ###############################################################################
 @pytest.mark.parametrize("payload", [{}, {"elevation": []}, {"elevation": [None]}])
 def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
@@ -388,6 +399,7 @@ def test_openmeteo_service_marks_missing_or_empty_elevation_as_valid_empty(
 
     assert result["result_status"] == "valid_empty"
     assert result["elevation"] is None
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -407,6 +419,7 @@ def test_openmeteo_service_rejects_malformed_elevation_payload(
     with pytest.raises(OpenMeteoRequestError, match=message):
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
 
+
 ###############################################################################
 def test_openmeteo_service_preserves_negative_elevation(
     monkeypatch: pytest.MonkeyPatch,
@@ -419,6 +432,7 @@ def test_openmeteo_service_preserves_negative_elevation(
 
     assert result["result_status"] == "ok"
     assert result["elevation"] == -430.5
+
 
 ###############################################################################
 def test_openmeteo_service_propagates_provider_request_errors(
@@ -436,6 +450,7 @@ def test_openmeteo_service_propagates_provider_request_errors(
 
     with pytest.raises(OpenMeteoRequestError, match="HTTP 503"):
         asyncio.run(service.get_elevation(latitude=46.0, longitude=8.5))
+
 
 ###############################################################################
 def test_openmeteo_provider_translates_service_request_errors(
@@ -461,8 +476,8 @@ def test_openmeteo_provider_translates_service_request_errors(
             )
         )
 
-# --- test_overpass_residential_buildings.py ---
 
+# --- test_overpass_residential_buildings.py ---
 
 
 ###############################################################################
@@ -490,6 +505,7 @@ class _BuildingService:
             ],
         }
 
+
 ###############################################################################
 def test_overpass_provider_routes_residential_capability_separately() -> None:
     async def _run() -> None:
@@ -504,6 +520,7 @@ def test_overpass_provider_routes_residential_capability_separately() -> None:
         assert "OpenStreetMap" in response.attribution[0]
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_residential_building_normalization_rejects_non_polygons() -> None:

@@ -24,9 +24,11 @@ GEOSPATIAL_LAYERS_REFERENCE_FILE_NAME = "geospatial_layers.json"
 GIBS_TILE_MATRIX_SETS_REFERENCE_FILE_NAME = "gibs_tile_matrix_sets.json"
 GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME = "gibs_layer_defaults.json"
 
+
 ###############################################################################
 def get_catalog_root() -> Path:
     return DATA_PATH / "catalog"
+
 
 ###############################################################################
 def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog:
@@ -53,6 +55,7 @@ def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog
         gibs_layer_defaults=tuple(gibs_layer_defaults),
     )
 
+
 ###############################################################################
 def _load_json_file(path: Path) -> dict[str, Any]:
     if not path.is_file():
@@ -63,9 +66,11 @@ def _load_json_file(path: Path) -> dict[str, Any]:
         raise ValueError(f"Reference catalog file must contain an object: {path}")
     return payload
 
+
 ###############################################################################
 def _normalize_alias_key(value: str) -> str:
     return value.strip().casefold()
+
 
 ###############################################################################
 def _require_string(value: Any, *, field_name: str) -> str:
@@ -74,12 +79,14 @@ def _require_string(value: Any, *, field_name: str) -> str:
         raise ValueError(f"{field_name} must be a non-empty string.")
     return normalized
 
+
 ###############################################################################
 def _require_iso2(value: Any, *, field_name: str) -> str:
     normalized = _require_string(value, field_name=field_name).upper()
     if len(normalized) != 2:
         raise ValueError(f"{field_name} must be a two-letter ISO2 code.")
     return normalized
+
 
 ###############################################################################
 def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
@@ -105,6 +112,7 @@ def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
             seen_iso3.add(iso3)
         countries.append(CountryReferenceEntry(iso2=iso2, name=name, iso3=iso3))
     return countries
+
 
 ###############################################################################
 def _parse_country_aliases(
@@ -132,6 +140,7 @@ def _parse_country_aliases(
         seen_aliases.add(alias_key)
         aliases.append(CountryAliasReferenceEntry(alias=alias, iso2=iso2))
     return aliases
+
 
 ###############################################################################
 def _parse_geospatial_layers(
@@ -169,6 +178,7 @@ def _parse_geospatial_layers(
             )
         )
     return layers
+
 
 ###############################################################################
 def _parse_gibs_tile_matrix_sets(
@@ -208,6 +218,7 @@ def _parse_gibs_tile_matrix_sets(
             )
         )
     return tile_matrix_sets
+
 
 ###############################################################################
 def _parse_gibs_layer_defaults(
@@ -250,6 +261,7 @@ def _parse_gibs_layer_defaults(
         )
     return defaults
 
+
 ###############################################################################
 def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
     if value is None:
@@ -265,8 +277,12 @@ def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
 
 ###############################################################################
 @lru_cache(maxsize=8)
-def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEntry, ...]:
-    payload = _load_json_file((catalog_root or get_catalog_root()) / "reference" / "macro_regions.json")
+def load_macro_regions(
+    catalog_root: Path | None = None,
+) -> tuple[MacroRegionEntry, ...]:
+    payload = _load_json_file(
+        (catalog_root or get_catalog_root()) / "reference" / "macro_regions.json"
+    )
     entries = payload.get("macro_regions")
     if not is_json_array(entries):
         raise ValueError("macro_regions.json must contain a macro_regions list.")
@@ -284,13 +300,29 @@ def load_macro_regions(catalog_root: Path | None = None) -> tuple[MacroRegionEnt
         raw_aliases = item.get("aliases", [])
         if not is_json_array(raw_aliases):
             raise ValueError("Macro-region aliases must be a list.")
-        aliases = tuple(_require_string(alias, field_name="macro_region.alias") for alias in raw_aliases)
+        aliases = tuple(
+            _require_string(alias, field_name="macro_region.alias")
+            for alias in raw_aliases
+        )
         for alias in (name, *aliases):
             key = _normalize_alias_key(alias)
             if key in seen:
                 raise ValueError(f"Duplicate macro-region alias: {alias}")
             seen.add(key)
-        region = MacroRegionEntry.model_validate({"id": region_id, "name": name, "aliases": aliases, "bbox": item.get("bbox"), "kind": _require_string(item.get("kind"), field_name="macro_region.kind"), "countries": _parse_string_list(item.get("countries", []), field_name="macro_region.countries")})
+        region = MacroRegionEntry.model_validate(
+            {
+                "id": region_id,
+                "name": name,
+                "aliases": aliases,
+                "bbox": item.get("bbox"),
+                "kind": _require_string(
+                    item.get("kind"), field_name="macro_region.kind"
+                ),
+                "countries": _parse_string_list(
+                    item.get("countries", []), field_name="macro_region.countries"
+                ),
+            }
+        )
         w, south, e, north = region.bbox
         if not (-180 <= w < e <= 180 and -85 <= south < north <= 85):
             raise ValueError(f"Invalid macro-region bbox: {name}")
@@ -319,6 +351,7 @@ def country_iso3(text: str) -> str | None:
     """ISO alpha-3 code for an ISO2/ISO3 code, country name or alias."""
 
     return _country_iso3_index().get(_normalize_alias_key(text))
+
 
 ###############################################################################
 def find_macro_region_entry(text: str) -> MacroRegionEntry | None:

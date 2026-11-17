@@ -8,19 +8,38 @@ from fastapi.testclient import TestClient
 from server.api import geospatial
 from server.api.geospatial import raise_service_http_error
 from server.app import create_app, app
-from server.contracts.geospatial import GeospatialLayerRenderDescriptor, GeospatialProviderLayerDescriptor
+from server.contracts.geospatial import (
+    GeospatialLayerRenderDescriptor,
+    GeospatialProviderLayerDescriptor,
+)
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 from server.services.geospatial import api_service as api_service_module
-from server.services.geospatial.api_service import GeospatialApiService, GeospatialApiServiceError, GeospatialCapabilityNotFoundError, GeospatialInvalidRequestError, GeospatialTileCredentialError, GeospatialTileRequestError, GeospatialUnsupportedTileError
+from server.services.geospatial.api_service import (
+    GeospatialApiService,
+    GeospatialApiServiceError,
+    GeospatialCapabilityNotFoundError,
+    GeospatialInvalidRequestError,
+    GeospatialTileCredentialError,
+    GeospatialTileRequestError,
+    GeospatialUnsupportedTileError,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
-from server.services.geospatial.providers.base import ProviderRateLimitError, ProviderTimeoutError, ProviderUnavailableError, ProviderRequest
-from server.services.geospatial.providers.http import RasterHttpDiagnostic, RasterHttpError
+from server.services.geospatial.providers.base import (
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    ProviderRequest,
+)
+from server.services.geospatial.providers.http import (
+    RasterHttpDiagnostic,
+    RasterHttpError,
+)
 from server.services.geospatial.raster_tiles import web_mercator_tile_bbox
 from tests.conftest import run_async_in_thread
 from server.services.geospatial.tiler import build_vector_tile_manifest
@@ -29,20 +48,19 @@ from pathlib import Path
 # --- test_geospatial_api_contracts.py ---
 
 
-
-
 ###############################################################################
 def create_started_client() -> TestClient:
     client = TestClient(create_app())
     client.__enter__()
     return client
 
+
 ###############################################################################
 class _NoCredentials:
-
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
+
 
 ###############################################################################
 def _build_api_service(
@@ -64,6 +82,7 @@ def _build_api_service(
         rainviewer_service=rainviewer_service,
     )
 
+
 ###############################################################################
 def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
     client = create_started_client()
@@ -75,6 +94,7 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
     assert payload["status"] == "ok"
     assert payload["payload"]["renderingMode"] == "metadata-only"
 
+
 ###############################################################################
 def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     client = create_started_client()
@@ -83,6 +103,7 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok"}
+
 
 ###############################################################################
 @pytest.mark.parametrize("endpoint", ["features", "geojson"])
@@ -93,7 +114,6 @@ def test_geospatial_direct_layer_endpoints_refuse_disabled_capabilities(
 
     ###############################################################################
     class RecordingRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -119,6 +139,7 @@ def test_geospatial_direct_layer_endpoints_refuse_disabled_capabilities(
     assert response.json()["detail"] == "Capability is disabled."
     assert fetched == []
 
+
 ###############################################################################
 def test_geospatial_features_render_contract_still_uses_provider_envelope() -> None:
     client = create_started_client()
@@ -130,12 +151,12 @@ def test_geospatial_features_render_contract_still_uses_provider_envelope() -> N
     assert payload["status"] in {"ok", "unavailable"}
     assert "payload" in payload
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> None:
 
     ###############################################################################
     class GeoJsonRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -179,12 +200,12 @@ def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> 
     assert payload["type"] == "FeatureCollection"
     assert payload["features"][0]["id"] == "quake-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
 
     ###############################################################################
     class SingleFeatureRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -224,12 +245,12 @@ def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
     assert len(payload["features"]) == 1
     assert payload["features"][0]["id"] == "quake-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_converts_normalized_point_records() -> None:
 
     ###############################################################################
     class NormalizedPointRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -271,6 +292,7 @@ def test_geospatial_geojson_render_endpoint_converts_normalized_point_records() 
     assert feature["geometry"] == {"type": "Point", "coordinates": [12.5, 41.9]}
     assert feature["properties"] == {"name": "Gauge 1", "value": 1.25}
 
+
 ###############################################################################
 def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collection() -> (
     None
@@ -278,7 +300,6 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
 
     ###############################################################################
     class CameraRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -322,12 +343,12 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
     assert payload["type"] == "FeatureCollection"
     assert payload["features"][0]["id"] == "cam-1"
 
+
 ###############################################################################
 def test_geospatial_geojson_render_endpoint_rejects_malformed_payload() -> None:
 
     ###############################################################################
     class MalformedRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -356,6 +377,7 @@ def test_geospatial_geojson_render_endpoint_rejects_malformed_payload() -> None:
     assert response.status_code == 502
     assert response.json()["detail"]["error_code"] == "malformed_response"
 
+
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(
     monkeypatch,
@@ -367,6 +389,7 @@ def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secre
 
     assert response.status_code == 401
     assert "TOMTOM_API_KEY" not in response.text
+
 
 ###############################################################################
 def test_geospatial_tile_proxy_ignores_environment_credentials(
@@ -396,6 +419,7 @@ def test_geospatial_tile_proxy_ignores_environment_credentials(
     assert captured == {}
     assert "tomtom-secret-forbidden" not in response.text
 
+
 ###############################################################################
 def test_raster_tile_utility_returns_exact_web_mercator_bbox() -> None:
     assert web_mercator_tile_bbox(1, 1, 1) == (
@@ -404,6 +428,7 @@ def test_raster_tile_utility_returns_exact_web_mercator_bbox() -> None:
         20037508.342789244,
         0.0,
     )
+
 
 ###############################################################################
 def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> None:
@@ -454,6 +479,7 @@ def test_geospatial_fema_tile_proxy_materializes_bounded_export_request() -> Non
     assert headers["Origin"] == "https://hazards-fema.maps.arcgis.com"
     assert "webappviewer" in headers["Referer"]
 
+
 ###############################################################################
 def test_relay_config_validates_manifest_relay_transport() -> None:
     service = _build_api_service(ProviderRegistry())
@@ -497,13 +523,18 @@ def test_relay_config_validates_manifest_relay_transport() -> None:
     )
     assert (
         service._relay_config(
-            {"relay": {"base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy"}}
+            {
+                "relay": {
+                    "base_url": "https://hazards-fema.maps.arcgis.com/sharing/proxy"
+                }
+            }
         )
         is None
     )
     assert service._relay_config({"relay": None}) is None
     assert service._relay_config({"relay": {"base_url": "not-a-url"}}) is None
     assert service._relay_config({}) is None
+
 
 ###############################################################################
 def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() -> None:
@@ -544,6 +575,7 @@ def test_geospatial_esa_tile_proxy_materializes_bounded_wms_get_map_request() ->
     ]
     assert query["exceptions"] == ["application/vnd.ogc.se_inimage"]
     assert "tilematrix" not in query
+
 
 ###############################################################################
 def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() -> None:
@@ -587,13 +619,15 @@ def test_geospatial_eea_tile_proxy_materializes_bounded_wms_get_map_request() ->
     assert query["exceptions"] == ["application/vnd.ogc.se_xml"]
     assert "tilematrix" not in query
 
+
 ###############################################################################
-def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> None:
+def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time() -> (
+    None
+):
     captured: dict[str, str] = {}
 
     ###############################################################################
     class GibsRegistry:
-
         # -------------------------------------------------------------------------
         async def describe_layer(self, provider_id: str, layer_id: str):
             assert provider_id == "gibs"
@@ -639,8 +673,7 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
     )
 
     response = client.get(
-        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/2/1/3.png"
-        "?time=2026-06-20"
+        "/api/geospatial/tiles/gibs:MODIS_Terra_NDVI_8Day/2/1/3.png?time=2026-06-20"
     )
 
     assert response.status_code == 200
@@ -650,13 +683,13 @@ def test_geospatial_gibs_tile_proxy_uses_provider_descriptor_and_requested_time(
         "GoogleMapsCompatible_Level9/2/3/1.png"
     )
 
+
 ###############################################################################
 def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> None:
     captured: dict[str, str] = {}
 
     ###############################################################################
     class GibsRegistry:
-
         # -------------------------------------------------------------------------
         async def describe_layer(self, provider_id: str, layer_id: str):
             assert provider_id == "gibs"
@@ -725,6 +758,7 @@ def test_geospatial_gibs_stable_capability_maps_to_provider_layer_and_time() -> 
         ",".join(str(value) for value in web_mercator_tile_bbox(2, 1, 3))
     ]
 
+
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() -> None:
     captured: list[str] = []
@@ -746,6 +780,7 @@ def test_geospatial_tile_proxy_rejects_malformed_coordinates_before_network() ->
 
     assert response.status_code == 400
     assert captured == []
+
 
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_unresolved_template_before_network() -> None:
@@ -784,6 +819,7 @@ def test_geospatial_tile_proxy_rejects_unresolved_template_before_network() -> N
     assert response.status_code == 404
     assert captured == []
 
+
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_unknown_capability_without_network() -> None:
     captured: list[str] = []
@@ -806,6 +842,7 @@ def test_geospatial_tile_proxy_rejects_unknown_capability_without_network() -> N
     assert response.status_code == 404
     assert captured == []
     assert "evil.example" not in response.text
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -835,6 +872,7 @@ def test_geospatial_tile_proxy_normalizes_upstream_failures_without_details(
 
     assert response.status_code == 502
     assert "sensitive" not in response.text
+
 
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_non_image_http_200_body(monkeypatch) -> None:
@@ -884,10 +922,11 @@ def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_respon
         service
     )
 
-    with caplog.at_level(logging.WARNING, logger="server.services.geospatial.api_service"):
+    with caplog.at_level(
+        logging.WARNING, logger="server.services.geospatial.api_service"
+    ):
         response = client.get(
-            "/api/geospatial/tiles/fema_nfhl_flood_zones/4/5/6.png"
-            "?api_key=secret-token"
+            "/api/geospatial/tiles/fema_nfhl_flood_zones/4/5/6.png?api_key=secret-token"
         )
 
     assert response.status_code == 502
@@ -901,8 +940,11 @@ def test_geospatial_tile_proxy_logs_safe_raster_diagnostic_and_normalizes_respon
     assert "content_length=42" in caplog.text
     assert "upstream=https://fema.example/arcgis/tile" in caplog.text
 
+
 ###############################################################################
-def test_geospatial_tile_proxy_reports_upstream_404_as_no_data_not_provider_fault() -> None:
+def test_geospatial_tile_proxy_reports_upstream_404_as_no_data_not_provider_fault() -> (
+    None
+):
     diagnostic = RasterHttpDiagnostic(
         category="invalid_request",
         failure_phase="response_headers",
@@ -926,6 +968,7 @@ def test_geospatial_tile_proxy_reports_upstream_404_as_no_data_not_provider_faul
 
     assert response.status_code == 404
     assert "no imagery" in response.json()["detail"]
+
 
 ###############################################################################
 def test_geospatial_relay_tile_proxy_retries_transient_upstream_failures(
@@ -965,6 +1008,7 @@ def test_geospatial_relay_tile_proxy_retries_transient_upstream_failures(
     assert response.status_code == 200
     assert calls == 3
 
+
 ###############################################################################
 def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> None:
     sanitized = GeospatialApiService._sanitize_tile_url(
@@ -974,6 +1018,7 @@ def test_geospatial_tile_proxy_sanitizes_sensitive_query_values_in_logs() -> Non
     assert "secret-value" not in sanitized
     assert "api_key=%5BREDACTED%5D" in sanitized
     assert "format=image%2Fpng" in sanitized
+
 
 ###############################################################################
 def test_rainviewer_tile_proxy_uses_cached_latest_metadata_and_same_origin_route(
@@ -1047,6 +1092,7 @@ def test_rainviewer_tile_proxy_rejects_unsupported_zoom_and_forecast_time(
 
     assert response.status_code == 404
 
+
 ###############################################################################
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
     client = create_started_client()
@@ -1059,13 +1105,13 @@ def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok", "unavailable"}
 
+
 ###############################################################################
 def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> None:
     captured: dict[str, object] = {}
 
     ###############################################################################
     class MetadataRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -1107,6 +1153,7 @@ def test_geospatial_raster_features_forward_manifest_metadata_to_provider() -> N
         "esa-worldcover-map-10m-2021-v2_map"
     )
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("provider_error", "expected_status"),
@@ -1121,7 +1168,6 @@ def test_geospatial_features_map_provider_failures_without_500(
 
     ###############################################################################
     class FailingRegistry:
-
         # -------------------------------------------------------------------------
         def build_from_manifests(self) -> None:
             return None
@@ -1143,6 +1189,7 @@ def test_geospatial_features_map_provider_failures_without_500(
     assert payload["status"] == expected_status
     assert payload["provider"] == "usgs"
 
+
 ###############################################################################
 def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) -> None:
     monkeypatch.delenv("WINDY_WEBCAMS_API_KEY", raising=False)
@@ -1152,6 +1199,7 @@ def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) ->
 
     assert response.status_code == 200
     assert response.json()["status"] == "missing-credential"
+
 
 ###############################################################################
 def test_geospatial_credential_status_ignores_environment_variables(
@@ -1167,6 +1215,7 @@ def test_geospatial_credential_status_ignores_environment_variables(
     assert payload["required"] is True
     assert payload["configured"] is False
     assert "environmentVariable" not in payload
+
 
 ###############################################################################
 @pytest.mark.parametrize("provider_id", ["opentripmap", "openchargemap"])
@@ -1184,6 +1233,7 @@ def test_optional_provider_credential_status_uses_saved_storage_only(
     configured = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
     assert configured.status_code == 200
     assert configured.json()["configured"] is False
+
 
 ###############################################################################
 def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
@@ -1204,6 +1254,7 @@ def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
         "windy_webcams",
     }
 
+
 ###############################################################################
 def test_account_setup_includes_experimental_automation_support() -> None:
     client = create_started_client()
@@ -1216,6 +1267,7 @@ def test_account_setup_includes_experimental_automation_support() -> None:
         assert item["automation"]["support"] in supported
         assert item["automation"]["experimental"] is True
         assert item["automation"]["experimental_label"] == "Experimental guided setup"
+
 
 ###############################################################################
 def test_google_maps_is_manual_only_and_billing_aware() -> None:
@@ -1234,6 +1286,7 @@ def test_google_maps_is_manual_only_and_billing_aware() -> None:
         "billing" in note.lower() for note in google_maps["automation"]["safety_notes"]
     )
 
+
 ###############################################################################
 def test_opentripmap_is_unsupported() -> None:
     client = create_started_client()
@@ -1248,6 +1301,7 @@ def test_opentripmap_is_unsupported() -> None:
     )
     assert opentripmap["automation"]["support"] == "unsupported"
 
+
 ###############################################################################
 def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "secret-tomtom-value")
@@ -1257,6 +1311,7 @@ def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "secret-tomtom-value" not in str(response.json())
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1300,6 +1355,7 @@ def test_raise_service_http_error_maps_expected_statuses(
     assert exc_info.value.status_code == expected_status
     assert exc_info.value.detail == expected_detail
 
+
 ###############################################################################
 def test_raise_service_http_error_uses_generic_fallback_for_unknown_error() -> None:
     with pytest.raises(HTTPException) as exc_info:
@@ -1308,8 +1364,8 @@ def test_raise_service_http_error_uses_generic_fallback_for_unknown_error() -> N
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "Geospatial service request failed."
 
-# --- test_geospatial_plan_completion_surface.py ---
 
+# --- test_geospatial_plan_completion_surface.py ---
 
 
 ###############################################################################
@@ -1326,6 +1382,7 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
 
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].startswith("https://")
+
 
 ###############################################################################
 def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
@@ -1355,6 +1412,7 @@ def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
     assert response.payload["feedCount"] == 1
     assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
     assert response.payload["feeds"][0]["license"].endswith("license")
+
 
 ###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:
@@ -1389,12 +1447,12 @@ def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:
         == 1
     )
 
+
 # --- test_openapi_schema.py ---
 
 
-
-
 SHARED_OPENAPI_PATH = Path(__file__).resolve().parents[2] / "shared" / "openapi.json"
+
 
 ###############################################################################
 def test_shared_openapi_schema_matches_runtime() -> None:

@@ -98,41 +98,51 @@ _RELAY_TRANSIENT_CATEGORIES = frozenset(
     }
 )
 
+
 ###############################################################################
 class GeospatialApiServiceError(Exception):
     """Base exception for geospatial API service failures."""
+
 
 ###############################################################################
 class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
 
+
 ###############################################################################
 class GeospatialCapabilityDisabledError(GeospatialApiServiceError):
     """Raised when a manifest capability is disabled for this deployment."""
+
 
 ###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
     """Raised when query parameters cannot be parsed safely."""
 
+
 ###############################################################################
 class GeospatialTileCredentialError(GeospatialApiServiceError):
     """Raised when a tile provider credential is missing or rejected."""
+
 
 ###############################################################################
 class GeospatialTileRequestError(GeospatialApiServiceError):
     """Raised when a tile provider request fails."""
 
+
 ###############################################################################
 class GeospatialTileNoDataError(GeospatialApiServiceError):
     """Raised when the provider has no tile for the requested time or area."""
+
 
 ###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
+
 ###############################################################################
 class GeospatialSampleUnavailableError(GeospatialApiServiceError):
     """Raised when a raster capability has no legend to read values from."""
+
 
 ###############################################################################
 class GeospatialProviderResponseError(GeospatialApiServiceError):
@@ -143,6 +153,7 @@ class GeospatialProviderResponseError(GeospatialApiServiceError):
         super().__init__(message)
         self.error_code = error_code
         self.status_code = status_code
+
 
 ###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
@@ -169,6 +180,7 @@ def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
         "features": [_normalize_geojson_feature(item) for item in json_array(features)],
     }
 
+
 ###############################################################################
 def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
     if not is_json_object(value):
@@ -188,10 +200,7 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         )
     latitude = value.get("latitude")
     longitude = value.get("longitude")
-    if (
-        not _valid_latitude(latitude)
-        or not _valid_longitude(longitude)
-    ):
+    if not _valid_latitude(latitude) or not _valid_longitude(longitude):
         raise GeospatialProviderResponseError(
             "Provider feature is missing GeoJSON geometry or numeric coordinates.",
             error_code="malformed_response",
@@ -213,6 +222,7 @@ def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
         "properties": properties,
     }
 
+
 ###############################################################################
 def _valid_latitude(value: object) -> TypeGuard[int | float]:
     return (
@@ -222,6 +232,7 @@ def _valid_latitude(value: object) -> TypeGuard[int | float]:
         and -90.0 <= float(value) <= 90.0
     )
 
+
 ###############################################################################
 def _valid_longitude(value: object) -> TypeGuard[int | float]:
     return (
@@ -230,6 +241,7 @@ def _valid_longitude(value: object) -> TypeGuard[int | float]:
         and math.isfinite(float(value))
         and -180.0 <= float(value) <= 180.0
     )
+
 
 ###############################################################################
 def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
@@ -251,20 +263,19 @@ def _valid_geojson_geometry(value: dict[str, Any]) -> bool:
         return False
     return _valid_coordinate_array(value.get("coordinates"))
 
+
 ###############################################################################
 def _valid_coordinate_array(value: object) -> bool:
     if not is_json_array(value) or not value:
         return False
     if all(
-        isinstance(item, int | float) and not isinstance(item, bool)
-        for item in value
+        isinstance(item, int | float) and not isinstance(item, bool) for item in value
     ):
         return (
-            len(value) >= 2
-            and _valid_longitude(value[0])
-            and _valid_latitude(value[1])
+            len(value) >= 2 and _valid_longitude(value[0]) and _valid_latitude(value[1])
         )
     return all(_valid_coordinate_array(item) for item in value)
+
 
 ###############################################################################
 def _provider_response_error(
@@ -286,9 +297,9 @@ def _provider_response_error(
         status_code=error_status[error_code],
     )
 
+
 ###############################################################################
 class GeospatialApiService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -313,9 +324,9 @@ class GeospatialApiService:
             credential_resolver or runtime_registry.credential_resolver
         )
         self.rainviewer_service = rainviewer_service or RainViewerService()
-        self._sample_tiles: OrderedDict[tuple[str, int, int, int, str | None], tuple[float, bytes]] = (
-            OrderedDict()
-        )
+        self._sample_tiles: OrderedDict[
+            tuple[str, int, int, int, str | None], tuple[float, bytes]
+        ] = OrderedDict()
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -707,7 +718,9 @@ class GeospatialApiService:
             return self._manifest_by_id(capability_id)
         except GeospatialCapabilityNotFoundError:
             prefix = "gibs:"
-            layer_id = capability_id[len(prefix) :] if capability_id.startswith(prefix) else ""
+            layer_id = (
+                capability_id[len(prefix) :] if capability_id.startswith(prefix) else ""
+            )
             if not layer_id or not all(
                 character.isalnum() or character in "_-." for character in layer_id
             ):
@@ -757,14 +770,14 @@ class GeospatialApiService:
                     "RainViewer public tiles are limited to zoom 7."
                 )
             try:
-                radar_metadata = await self.rainviewer_service.get_latest_radar_metadata()
+                radar_metadata = (
+                    await self.rainviewer_service.get_latest_radar_metadata()
+                )
             except RainViewerRequestError as exc:
                 raise GeospatialTileRequestError(
                     "RainViewer radar metadata is unavailable."
                 ) from exc
-            tile_template = str(
-                radar_metadata.get("tile_url_template") or ""
-            ).strip()
+            tile_template = str(radar_metadata.get("tile_url_template") or "").strip()
             if not tile_template:
                 raise GeospatialUnsupportedTileError(
                     "RainViewer radar metadata has no tile URL."
@@ -783,9 +796,11 @@ class GeospatialApiService:
                 "Tile URL is missing from provider metadata."
             )
 
-        rendering_mode = str(
-            manifest.get("renderingMode") or manifest.get("type") or ""
-        ).strip().lower()
+        rendering_mode = (
+            str(manifest.get("renderingMode") or manifest.get("type") or "")
+            .strip()
+            .lower()
+        )
         source_protocol = str(metadata.get("source_protocol") or "").strip().lower()
         if rendering_mode in {"wmts"} or source_protocol == "wmts":
             return build_wmts_get_tile_url(
@@ -793,15 +808,13 @@ class GeospatialApiService:
                 layer_id=str(
                     metadata.get("layer_id") or metadata.get("layers") or capability_id
                 ),
-                style=str(metadata.get("style") or metadata.get("wmts_style") or "default"),
+                style=str(
+                    metadata.get("style") or metadata.get("wmts_style") or "default"
+                ),
                 image_format=str(
-                    metadata.get("format")
-                    or metadata.get("wmts_format")
-                    or "image/png"
+                    metadata.get("format") or metadata.get("wmts_format") or "image/png"
                 ),
-                tile_matrix_set=str(
-                    metadata.get("tile_matrix_set") or "EPSG:3857"
-                ),
+                tile_matrix_set=str(metadata.get("tile_matrix_set") or "EPSG:3857"),
                 z=z,
                 x=x,
                 y=y,
@@ -823,8 +836,7 @@ class GeospatialApiService:
                 style=str(metadata.get("style") or ""),
                 version=str(metadata.get("wms_version") or "1.1.1"),
                 exceptions=str(
-                    metadata.get("wms_exceptions")
-                    or "application/vnd.ogc.se_inimage"
+                    metadata.get("wms_exceptions") or "application/vnd.ogc.se_inimage"
                 ),
                 z=z,
                 x=x,
@@ -859,7 +871,11 @@ class GeospatialApiService:
             raise GeospatialUnsupportedTileError("NASA GIBS layer id is invalid.")
         try:
             layer = await self.provider_registry.describe_layer("gibs", layer_id)
-        except (ProviderNotRegisteredError, ProviderRegistryError, ProviderError) as exc:
+        except (
+            ProviderNotRegisteredError,
+            ProviderRegistryError,
+            ProviderError,
+        ) as exc:
             raise GeospatialTileRequestError(
                 "NASA GIBS layer description is unavailable."
             ) from exc
@@ -933,8 +949,7 @@ class GeospatialApiService:
         if not normalized:
             return None
         if len(normalized) > 64 or not all(
-            character.isalnum() or character in "-:TZ+./_"
-            for character in normalized
+            character.isalnum() or character in "-:TZ+./_" for character in normalized
         ):
             raise GeospatialInvalidRequestError("Raster time is invalid.")
         return normalized
@@ -1351,8 +1366,7 @@ class GeospatialApiService:
                 )
             template = template.replace("{api_key}", quote(api_key, safe=""))
         if not any(
-            token in template
-            for token in ("{z}", "{x}", "{y}", "{bbox-epsg-3857}")
+            token in template for token in ("{z}", "{x}", "{y}", "{bbox-epsg-3857}")
         ):
             raise GeospatialUnsupportedTileError(
                 f"Capability '{capability_id}' does not expose a tile template."
@@ -1393,7 +1407,10 @@ class GeospatialApiService:
         if not base_url.startswith("https://"):
             return None
         parsed = urlsplit(base_url)
-        if parsed.hostname != _FEMA_RELAY_HOST or parsed.path.rstrip("/") != _FEMA_RELAY_PATH:
+        if (
+            parsed.hostname != _FEMA_RELAY_HOST
+            or parsed.path.rstrip("/") != _FEMA_RELAY_PATH
+        ):
             return None
         required_headers = relay.get("required_headers")
         if not is_json_object(required_headers):
@@ -1440,9 +1457,7 @@ class GeospatialApiService:
         if not body:
             raise ProviderUnavailableError("Provider returned an empty tile body.")
         # Keep the service boundary defensive for test doubles and future helpers.
-        if not body.startswith(
-            (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"RIFF")
-        ):
+        if not body.startswith((b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"RIFF")):
             raise ProviderUnavailableError("Provider returned a non-image tile body.")
         return body
 

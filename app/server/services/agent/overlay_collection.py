@@ -20,6 +20,7 @@ from server.contracts.geospatial import (
 )
 from server.domain.agent.decision import ResolvedLocation
 
+
 ###############################################################################
 class OverlayCollectionService:
     """Resolve and apply typed overlay commands without refetching the map.
@@ -251,17 +252,26 @@ class OverlayCollectionService:
                 cls._concept_matches(concepts, value) for value in selector.concepts
             ):
                 return False
-        if selector.providers and not identity_bound and cls._norm(instance.provider) not in {
-            cls._norm(item) for item in selector.providers
-        }:
+        if (
+            selector.providers
+            and not identity_bound
+            and cls._norm(instance.provider)
+            not in {cls._norm(item) for item in selector.providers}
+        ):
             return False
-        if selector.overlay_types and not identity_bound and cls._norm(instance.overlay_type) not in {
-            cls._norm(item) for item in selector.overlay_types
-        }:
+        if (
+            selector.overlay_types
+            and not identity_bound
+            and cls._norm(instance.overlay_type)
+            not in {cls._norm(item) for item in selector.overlay_types}
+        ):
             return False
-        if selector.rendering_modes and not identity_bound and cls._norm(instance.rendering_mode) not in {
-            cls._norm(item) for item in selector.rendering_modes
-        }:
+        if (
+            selector.rendering_modes
+            and not identity_bound
+            and cls._norm(instance.rendering_mode)
+            not in {cls._norm(item) for item in selector.rendering_modes}
+        ):
             return False
         if selector.tags and not identity_bound:
             tags = {
@@ -393,8 +403,7 @@ class OverlayCollectionService:
         location_attributes = cls._location_attributes(location)
         if target_attributes:
             if any(
-                key in location_attributes
-                and location_attributes[key] != value
+                key in location_attributes and location_attributes[key] != value
                 for key, value in target_attributes.items()
             ):
                 return False
@@ -467,9 +476,10 @@ class OverlayCollectionService:
                     if isinstance(instance_radius, (int, float)) and instance_radius > 0
                     else 0.0
                 )
-                return cls._distance_m(view_point, instance_point) <= float(
-                    view_radius
-                ) + padding
+                return (
+                    cls._distance_m(view_point, instance_point)
+                    <= float(view_radius) + padding
+                )
             return view_point == instance_point
         target = scope.location or {}
         target_bbox = target.get("bbox")
@@ -694,9 +704,7 @@ class OverlayCollectionService:
             for key in ("tags", "action_tags", "map_type_tags"):
                 raw_values = item.get(key)
                 tag_values.extend(
-                    value
-                    for value in json_array(raw_values)
-                    if isinstance(value, str)
+                    value for value in json_array(raw_values) if isinstance(value, str)
                 )
                 tag_values.extend(
                     value
@@ -741,17 +749,26 @@ class OverlayCollectionService:
             }:
                 continue
             identity_bound = bool(selector.instance_ids or selector.capability_ids)
-            if selector.providers and not identity_bound and cls._norm(provider) not in {
-                cls._norm(value) for value in selector.providers
-            }:
+            if (
+                selector.providers
+                and not identity_bound
+                and cls._norm(provider)
+                not in {cls._norm(value) for value in selector.providers}
+            ):
                 continue
-            if selector.overlay_types and not identity_bound and cls._norm(overlay_type) not in {
-                cls._norm(value) for value in selector.overlay_types
-            }:
+            if (
+                selector.overlay_types
+                and not identity_bound
+                and cls._norm(overlay_type)
+                not in {cls._norm(value) for value in selector.overlay_types}
+            ):
                 continue
-            if selector.rendering_modes and not identity_bound and cls._norm(rendering_mode) not in {
-                cls._norm(value) for value in selector.rendering_modes
-            }:
+            if (
+                selector.rendering_modes
+                and not identity_bound
+                and cls._norm(rendering_mode)
+                not in {cls._norm(value) for value in selector.rendering_modes}
+            ):
                 continue
             if selector.tags and not identity_bound:
                 candidate_tags = {
@@ -764,12 +781,21 @@ class OverlayCollectionService:
                     for value in selector.tags
                 ):
                     continue
-            if selector.concepts and not identity_bound and not any(
-                cls._concept_matches(haystack, value) for value in selector.concepts
+            if (
+                selector.concepts
+                and not identity_bound
+                and not any(
+                    cls._concept_matches(haystack, value) for value in selector.concepts
+                )
             ):
                 continue
-            if selector.labels and not identity_bound and not any(
-                cls._concept_matches(label_haystack, value) for value in selector.labels
+            if (
+                selector.labels
+                and not identity_bound
+                and not any(
+                    cls._concept_matches(label_haystack, value)
+                    for value in selector.labels
+                )
             ):
                 continue
             candidates.append(

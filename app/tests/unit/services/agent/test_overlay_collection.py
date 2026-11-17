@@ -15,6 +15,7 @@ from server.contracts.geospatial import (
 from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
 
+
 ###############################################################################
 def _instance(
     instance_id: str,
@@ -44,6 +45,7 @@ def _instance(
         visible=visible,
         descriptor={"id": instance_id, "label": label, "capability_id": capability_id},
     )
+
 
 ###############################################################################
 def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
@@ -77,6 +79,7 @@ def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
     assert updated.instances[1].descriptor == traffic.descriptor
     assert result.updated_instance_ids == ["weather-zurich"]
 
+
 ###############################################################################
 def test_identity_resolution_falls_through_unmatched_instance_alias_to_capability() -> (
     None
@@ -105,6 +108,7 @@ def test_identity_resolution_falls_through_unmatched_instance_alias_to_capabilit
 
     assert updated.instances[0].visible is False
     assert result.updated_instance_ids == ["weather-zurich"]
+
 
 ###############################################################################
 def test_location_scoped_remove_does_not_remove_other_scope() -> None:
@@ -137,6 +141,7 @@ def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     assert [item.instance_id for item in updated.instances] == ["weather-switzerland"]
     assert result.removed_instance_ids == ["weather-zurich"]
 
+
 ###############################################################################
 def test_location_scope_matches_partial_canonical_place_without_coordinates() -> None:
     bologna = _instance(
@@ -168,6 +173,7 @@ def test_location_scope_matches_partial_canonical_place_without_coordinates() ->
 
     assert [item.instance_id for item in updated.instances] == ["species-bologna"]
     assert result.added_instance_ids == []
+
 
 ###############################################################################
 def test_current_view_remove_removes_only_visible_overlays_inside_view() -> None:
@@ -225,6 +231,7 @@ def test_current_view_remove_removes_only_visible_overlays_inside_view() -> None
     ]
     assert result.removed_instance_ids == ["inside-visible"]
 
+
 ###############################################################################
 def test_current_view_remove_uses_viewport_center_when_bbox_is_unavailable() -> None:
     collection = OverlayCollectionState(
@@ -266,6 +273,7 @@ def test_current_view_remove_uses_viewport_center_when_bbox_is_unavailable() -> 
     assert [item.instance_id for item in updated.instances] == ["other-location"]
     assert result.removed_instance_ids == ["same-location"]
 
+
 ###############################################################################
 def test_keep_only_removes_nonmatching_instances() -> None:
     collection = OverlayCollectionState(
@@ -299,6 +307,7 @@ def test_keep_only_removes_nonmatching_instances() -> None:
     assert [item.instance_id for item in updated.instances] == ["weather"]
     assert result.removed_instance_ids == ["traffic"]
 
+
 ###############################################################################
 def test_revision_conflict_preserves_collection() -> None:
     collection = OverlayCollectionState(revision=3)
@@ -313,6 +322,7 @@ def test_revision_conflict_preserves_collection() -> None:
     assert updated == collection
     assert result.revision == 3
     assert result.clarification
+
 
 ###############################################################################
 def test_apply_overlay_commands_binds_default_revision_between_mutations() -> None:
@@ -366,6 +376,7 @@ def test_apply_overlay_commands_binds_default_revision_between_mutations() -> No
     assert updated.overlay_collection.revision == 2
     assert updated.overlay_collection.instances[0].visible is False
 
+
 ###############################################################################
 def test_local_overlay_partition_keeps_provider_work_independent() -> None:
     collection = OverlayCollectionState(
@@ -395,6 +406,7 @@ def test_local_overlay_partition_keeps_provider_work_independent() -> None:
 
     assert applicable == [remove]
     assert not OverlayCollectionService.can_apply_locally(collection, [remove, add])
+
 
 ###############################################################################
 def test_add_reuses_same_capability_and_scope_identity() -> None:
@@ -438,6 +450,7 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
     assert second.instances[0].instance_id == first.instances[0].instance_id
     assert second_result.added_instance_ids == []
 
+
 ###############################################################################
 def test_missing_location_scope_binds_to_the_map_session_target() -> None:
     weather = _instance(
@@ -467,9 +480,7 @@ def test_missing_location_scope_binds_to_the_map_session_target() -> None:
         [
             OverlayCommand(
                 action="add",
-                selector=OverlaySelector(
-                    capability_ids=["openmeteo_weather_forecast"]
-                ),
+                selector=OverlaySelector(capability_ids=["openmeteo_weather_forecast"]),
                 scope=OverlayScope(kind="location"),
             )
         ],
@@ -480,6 +491,7 @@ def test_missing_location_scope_binds_to_the_map_session_target() -> None:
     assert len(updated.overlay_collection.instances) == 1
     assert results[0].added_instance_ids == []
     assert updated.overlay_collection.revision == 0
+
 
 ###############################################################################
 def test_catalog_selector_filters_provider_type_and_tags() -> None:
@@ -522,6 +534,7 @@ def test_catalog_selector_filters_provider_type_and_tags() -> None:
     assert updated.instances[0].capability_id == "weather-official"
     assert updated.instances[0].descriptor["tags"] == ["forecast"]
 
+
 ###############################################################################
 def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> None:
     command = OverlayCommand(
@@ -551,6 +564,7 @@ def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> Non
     assert result.added_instance_ids == [updated.instances[0].instance_id]
     assert updated.instances[0].capability_id == "openmeteo_weather_forecast"
 
+
 ###############################################################################
 def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mutation() -> (
     None
@@ -577,6 +591,7 @@ def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mut
     assert result.unmatched_selectors == ["imagery"]
     assert result.clarification is not None
     assert "active map basemap, not an overlay" in result.clarification
+
 
 ###############################################################################
 def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
@@ -608,6 +623,7 @@ def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     )
     assert still_unchanged == unchanged
     assert no_match_result.unmatched_selectors == ["missing"]
+
 
 ###############################################################################
 def test_provider_candidate_is_committed_against_active_revision_without_dropping_state() -> (
@@ -664,6 +680,7 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
         "openmeteo_weather_forecast"
     )
 
+
 ###############################################################################
 def test_merge_replaces_only_the_authoritative_collection() -> None:
     weather = _instance(
@@ -694,6 +711,7 @@ def test_merge_replaces_only_the_authoritative_collection() -> None:
     assert "overlay_ids" not in serialized
     assert "overlays" not in serialized
     assert "failed_overlays" not in serialized
+
 
 ###############################################################################
 def test_tool_overlay_instances_merge_into_active_map_without_refetch() -> None:
@@ -761,6 +779,7 @@ def test_tool_overlay_instances_merge_into_active_map_without_refetch() -> None:
     }
     assert merged.overlay_collection.revision == 1
 
+
 ###############################################################################
 def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() -> None:
     location = ResolvedLocation(
@@ -814,9 +833,11 @@ def test_server_side_prepared_sessions_are_merged_without_reembedding_payload() 
     )
 
     assert isinstance(merged, MapSession)
-    assert {
-        item.capability_id for item in merged.overlay_collection.instances
-    } == {"rainviewer_precipitation_radar", "openmeteo_weather_forecast"}
+    assert {item.capability_id for item in merged.overlay_collection.instances} == {
+        "rainviewer_precipitation_radar",
+        "openmeteo_weather_forecast",
+    }
+
 
 ###############################################################################
 def test_multi_target_overlay_merge_preserves_each_location_scope() -> None:
@@ -889,14 +910,25 @@ def test_multi_target_overlay_merge_preserves_each_location_scope() -> None:
     }
     assert scoped == {"Paris": "Paris, France", "London": "London, United Kingdom"}
 
+
 ###############################################################################
 def test_overlay_merge_does_not_drop_unrelated_existing_layers() -> None:
     location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
     old = _instance(
-        "old", "old_search", label="Old search", scope_key="Rome", latitude=41.9, longitude=12.5
+        "old",
+        "old_search",
+        label="Old search",
+        scope_key="Rome",
+        latitude=41.9,
+        longitude=12.5,
     )
     new = _instance(
-        "new", "new_search", label="New search", scope_key="Rome", latitude=41.9, longitude=12.5
+        "new",
+        "new_search",
+        label="New search",
+        scope_key="Rome",
+        latitude=41.9,
+        longitude=12.5,
     )
     active = MapSession(
         session_id="active",
@@ -915,7 +947,9 @@ def test_overlay_merge_does_not_drop_unrelated_existing_layers() -> None:
     )
 
     assert isinstance(merged, MapSession)
-    assert [instance.capability_id for instance in merged.overlay_collection.instances] == [
+    assert [
+        instance.capability_id for instance in merged.overlay_collection.instances
+    ] == [
         "old_search",
         "new_search",
     ]

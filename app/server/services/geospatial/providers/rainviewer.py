@@ -19,6 +19,7 @@ from server.services.geospatial.rainviewer import (
     RainViewerServiceError,
 )
 
+
 ###############################################################################
 class RainViewerProvider(GeospatialProvider):
     provider_id = "rainviewer"
@@ -107,7 +108,9 @@ class RainViewerProvider(GeospatialProvider):
             and math.isfinite(float(request.params[key]))
             for key in ("latitude", "longitude")
         )
-        temporal_mode = str(request.params.get("temporal_mode") or "").strip().casefold()
+        temporal_mode = (
+            str(request.params.get("temporal_mode") or "").strip().casefold()
+        )
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,

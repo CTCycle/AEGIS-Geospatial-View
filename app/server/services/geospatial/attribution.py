@@ -4,9 +4,9 @@ from server.common.typing import json_object
 
 from server.domain.geospatial.registry import AttributionEntry
 
+
 ###############################################################################
 class AttributionService:
-
     # -------------------------------------------------------------------------
     def from_manifest(self, manifest: dict[str, object]) -> AttributionEntry:
         license_payload = manifest.get("license")

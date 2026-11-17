@@ -14,6 +14,7 @@ from server.domain.agent.capability_route import (
 )
 from server.domain.agent.decision import ResolvedLocation
 
+
 ###############################################################################
 class AgentStateFactory:
     """Create a typed state projection from request-scoped lifecycle data."""
@@ -78,7 +79,9 @@ class AgentStateFactory:
             user_message=normalized_message,
             active_map_session=active_map_session,
             location_refs=dict(location_refs or {}),
-            evidence_refs=list(dict.fromkeys(str(item) for item in evidence_refs or [])),
+            evidence_refs=list(
+                dict.fromkeys(str(item) for item in evidence_refs or [])
+            ),
             prior_tasks=list(prior_tasks or []),
             **context_values,
         )

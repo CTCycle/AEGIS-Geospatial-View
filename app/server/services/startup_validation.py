@@ -4,6 +4,7 @@ from server.common.typing import is_json_array, is_json_object
 from server.domain.agent.capability_domains import CapabilityDomain
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
 
+
 ###############################################################################
 def run_startup_validations(
     catalog_snapshot: GeospatialManifestSnapshot,

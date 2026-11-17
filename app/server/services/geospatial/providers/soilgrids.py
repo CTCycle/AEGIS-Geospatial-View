@@ -15,19 +15,39 @@ SOILGRIDS_BASE_URL = "https://maps.isric.org/mapserv"
 SOILGRIDS_HOMOLOSINE_CRS = "+proj=igh +datum=WGS84 +units=m +no_defs"
 SOILGRIDS_PROPERTIES: dict[str, dict[str, object]] = {
     "bdod": {"label": "Bulk density", "unit": "cg/cm3", "conversion_factor": 100},
-    "cec": {"label": "Cation exchange capacity at pH 7", "unit": "mmol(c)/kg", "conversion_factor": 10},
+    "cec": {
+        "label": "Cation exchange capacity at pH 7",
+        "unit": "mmol(c)/kg",
+        "conversion_factor": 10,
+    },
     "cfvo": {"label": "Coarse fragments", "unit": "cm3/dm3", "conversion_factor": 10},
     "clay": {"label": "Clay", "unit": "g/kg", "conversion_factor": 10},
     "nitrogen": {"label": "Total nitrogen", "unit": "cg/kg", "conversion_factor": 100},
-    "ocd": {"label": "Organic carbon density", "unit": "hg/m3", "conversion_factor": 10},
+    "ocd": {
+        "label": "Organic carbon density",
+        "unit": "hg/m3",
+        "conversion_factor": 10,
+    },
     "ocs": {"label": "Organic carbon stock", "unit": "t/ha", "conversion_factor": 10},
     "soc": {"label": "Soil organic carbon", "unit": "dg/kg", "conversion_factor": 10},
     "phh2o": {"label": "Soil pH in water", "unit": "pH x 10", "conversion_factor": 10},
     "sand": {"label": "Sand", "unit": "g/kg", "conversion_factor": 10},
     "silt": {"label": "Silt", "unit": "g/kg", "conversion_factor": 10},
-    "wv0010": {"label": "Volumetric water content at 10 kPa", "unit": "1e-3 cm3/cm3", "conversion_factor": 10},
-    "wv1500": {"label": "Volumetric water content at 1500 kPa", "unit": "1e-3 cm3/cm3", "conversion_factor": 10},
-    "wv0033": {"label": "Volumetric water content at 33 kPa", "unit": "1e-3 cm3/cm3", "conversion_factor": 10},
+    "wv0010": {
+        "label": "Volumetric water content at 10 kPa",
+        "unit": "1e-3 cm3/cm3",
+        "conversion_factor": 10,
+    },
+    "wv1500": {
+        "label": "Volumetric water content at 1500 kPa",
+        "unit": "1e-3 cm3/cm3",
+        "conversion_factor": 10,
+    },
+    "wv0033": {
+        "label": "Volumetric water content at 33 kPa",
+        "unit": "1e-3 cm3/cm3",
+        "conversion_factor": 10,
+    },
 }
 SOILGRIDS_STANDARD_DEPTHS = {
     "0-5cm",
@@ -38,6 +58,7 @@ SOILGRIDS_STANDARD_DEPTHS = {
     "100-200cm",
 }
 SOILGRIDS_QUANTILES = {"mean", "Q0.05", "Q0.5", "Q0.95"}
+
 
 ###############################################################################
 class SoilGridsProvider(GeospatialProvider):
@@ -55,7 +76,9 @@ class SoilGridsProvider(GeospatialProvider):
             raise ProviderUnavailableError(
                 f"Unsupported SoilGrids property '{property_id}'."
             )
-        allowed_depths = {"0-30cm"} if property_id == "ocs" else SOILGRIDS_STANDARD_DEPTHS
+        allowed_depths = (
+            {"0-30cm"} if property_id == "ocs" else SOILGRIDS_STANDARD_DEPTHS
+        )
         allowed_quantiles = {"mean"} if property_id == "ocs" else SOILGRIDS_QUANTILES
         if depth not in allowed_depths:
             raise ProviderUnavailableError(
@@ -112,6 +135,7 @@ class SoilGridsProvider(GeospatialProvider):
             attribution=["ISRIC - World Soil Information, SoilGrids"],
             result_type="metadata",
         )
+
 
 ###############################################################################
 def _coverage_download_url(

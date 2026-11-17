@@ -20,6 +20,7 @@ SteeringDeltaKind = Literal[
     "instruction",
 ]
 
+
 ###############################################################################
 class SteeringDelta(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,6 +30,7 @@ class SteeringDelta(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     preserve_evidence: bool = True
     invalidates_scope_dependent_evidence: bool = False
+
 
 ###############################################################################
 def classify_steering_delta(message: str) -> SteeringDelta:
@@ -64,6 +66,7 @@ def classify_steering_delta(message: str) -> SteeringDelta:
         return SteeringDelta(kind="clarification", text=normalized)
     return SteeringDelta(kind="instruction", text=normalized)
 
+
 ###############################################################################
 class SteeringMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -95,6 +98,7 @@ class SteeringMessageRequest(BaseModel):
             raise ValueError("client_mutation_id is too long")
         return normalized
 
+
 ###############################################################################
 class SteeringMessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -108,6 +112,7 @@ class SteeringMessageResponse(BaseModel):
     duplicate: bool = False
     delta: SteeringDelta | None = None
     state_delta_applied: bool = False
+
 
 ###############################################################################
 class SteeringMessageRecord(BaseModel):

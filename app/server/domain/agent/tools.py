@@ -20,6 +20,7 @@ ToolArgumentSchemaProvider = Callable[
     [BaseModel, "AgentRunState"], dict[str, Any] | None
 ]
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RegisteredTool:

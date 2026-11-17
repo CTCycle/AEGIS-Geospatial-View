@@ -16,6 +16,7 @@ CLARIFICATION_MIN_OPTIONS = 2
 CLARIFICATION_MAX_OPTIONS = 5
 CLARIFICATION_OPTION_MAX_CHARS = 100
 
+
 ###############################################################################
 def normalize_clarification_options(values: Iterable[object] | None) -> list[str]:
     """Return distinct, trimmed answer choices, or none when fewer than two."""
@@ -33,6 +34,7 @@ def normalize_clarification_options(values: Iterable[object] | None) -> list[str
         return []
     return options[:CLARIFICATION_MAX_OPTIONS]
 
+
 ###############################################################################
 class ClarificationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -47,6 +49,7 @@ class ClarificationRequest(BaseModel):
     def _normalize_options(cls, value: list[str]) -> list[str]:
         return normalize_clarification_options(value)
 
+
 ###############################################################################
 class LocationResolutionProvenance(BaseModel):
     """Provider evidence for a location resolved outside the tool registry."""
@@ -58,6 +61,7 @@ class LocationResolutionProvenance(BaseModel):
     fetched_at: datetime = Field(default_factory=utc_now)
     result_status: str = "ok"
     result_type: str = "location"
+
 
 ###############################################################################
 class LocationHierarchyEntry(BaseModel):
@@ -72,6 +76,7 @@ class LocationHierarchyEntry(BaseModel):
     source: str = "text"
     canonical_label: str | None = None
 
+
 ###############################################################################
 class LocationHierarchy(BaseModel):
     """The single target and its geographic parent context."""
@@ -82,6 +87,7 @@ class LocationHierarchy(BaseModel):
     parents: list[LocationHierarchyEntry] = Field(
         default_factory=list[LocationHierarchyEntry]
     )
+
 
 ###############################################################################
 class ResolvedLocation(BaseModel):

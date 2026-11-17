@@ -97,8 +97,15 @@ _LOCATION_MAP_DATA_TERMS = frozenset(
         "stations",
         "data",
         "points",
-        "most", "highest", "hottest", "wettest", "rain", "temperature",
-        "seismic", "earthquake", "hotspot",
+        "most",
+        "highest",
+        "hottest",
+        "wettest",
+        "rain",
+        "temperature",
+        "seismic",
+        "earthquake",
+        "hotspot",
     }
 )
 _PLACE_SEARCH_DATA_TERMS = frozenset(
@@ -141,20 +148,81 @@ _FAST_ROUTE_MAX_PLACE_TOKENS = 5
 _FAST_ROUTE_EXCLUDED_TERMS = _LOCATION_MAP_DATA_TERMS | frozenset(
     {
         # Compound, comparative or relational requests.
-        "and", "or", "then", "also", "plus", "with", "without", "vs", "versus",
-        "compare", "between", "from", "to", "in", "on", "at", "over", "for",
-        "by", "via", "into", "all", "every", "each",
+        "and",
+        "or",
+        "then",
+        "also",
+        "plus",
+        "with",
+        "without",
+        "vs",
+        "versus",
+        "compare",
+        "between",
+        "from",
+        "to",
+        "in",
+        "on",
+        "at",
+        "over",
+        "for",
+        "by",
+        "via",
+        "into",
+        "all",
+        "every",
+        "each",
         # References to conversation or map state.
-        "it", "its", "there", "that", "this", "these", "those", "here",
-        "them", "my", "our", "your", "same", "again", "previous", "last",
+        "it",
+        "its",
+        "there",
+        "that",
+        "this",
+        "these",
+        "those",
+        "here",
+        "them",
+        "my",
+        "our",
+        "your",
+        "same",
+        "again",
+        "previous",
+        "last",
         # Map operations and data words outside the catalog vocabulary.
-        "zoom", "pan", "layer", "layers", "basemap", "style", "route",
-        "routes", "directions", "distance", "far", "nearest", "closest",
-        "weather", "forecast", "rainfall", "snow", "wind", "flight",
-        "flights", "ship", "ships", "volcano", "volcanoes", "wildfire",
-        "wildfires", "fire", "fires", "flood", "floods",
+        "zoom",
+        "pan",
+        "layer",
+        "layers",
+        "basemap",
+        "style",
+        "route",
+        "routes",
+        "directions",
+        "distance",
+        "far",
+        "nearest",
+        "closest",
+        "weather",
+        "forecast",
+        "rainfall",
+        "snow",
+        "wind",
+        "flight",
+        "flights",
+        "ship",
+        "ships",
+        "volcano",
+        "volcanoes",
+        "wildfire",
+        "wildfires",
+        "fire",
+        "fires",
+        "flood",
+        "floods",
     }
 )
+
 
 ###############################################################################
 def build_location_map_route(target_refs: list[str] | None = None) -> CapabilityRoute:
@@ -169,6 +237,7 @@ def build_location_map_route(target_refs: list[str] | None = None) -> Capability
         target_refs=list(target_refs or []),
     )
 
+
 ###############################################################################
 def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | None:
     """Build a bounded map route when route bootstrap misses a plain place request."""
@@ -179,6 +248,7 @@ def build_location_map_fallback_route(user_message: str) -> CapabilityRoute | No
     if terms.intersection(_LOCATION_MAP_DATA_TERMS):
         return None
     return build_location_map_route()
+
 
 ###############################################################################
 def is_location_only_map_request(
@@ -200,11 +270,26 @@ def is_location_only_map_request(
         return False
     return not terms.intersection(
         {
-            "find", "search", "near", "nearby", "within", "around", "poi",
-            "amenity", "amenities", "cafe", "cafes", "hospital", "hospitals",
-            "station", "stations", "data", "points",
+            "find",
+            "search",
+            "near",
+            "nearby",
+            "within",
+            "around",
+            "poi",
+            "amenity",
+            "amenities",
+            "cafe",
+            "cafes",
+            "hospital",
+            "hospitals",
+            "station",
+            "stations",
+            "data",
+            "points",
         }
     )
+
 
 ###############################################################################
 def _fast_route_target(user_message: str) -> tuple[str, bool] | None:
@@ -221,7 +306,11 @@ def _fast_route_target(user_message: str) -> tuple[str, bool] | None:
             if abs(latitude) <= 90 and abs(longitude) <= 180
             else None
         )
-    components = re.split(r"\s+in\s+", target, maxsplit=1, flags=re.IGNORECASE) if coordinate_output else [target]
+    components = (
+        re.split(r"\s+in\s+", target, maxsplit=1, flags=re.IGNORECASE)
+        if coordinate_output
+        else [target]
+    )
     if any(_FAST_ROUTE_PLACE.fullmatch(component) is None for component in components):
         return None
     target = ", ".join(components)
@@ -251,9 +340,9 @@ def build_conversation_fallback_route() -> CapabilityRoute:
         location_mode="none",
     )
 
+
 ###############################################################################
 class CapabilityRouter:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -343,14 +432,19 @@ class CapabilityRouter:
                 secondary = [CapabilityDomain.MAP_RENDERING]
         elif CapabilityDomain.PLACE_SEARCH in secondary:
             secondary.remove(CapabilityDomain.PLACE_SEARCH)
-        if CapabilityDomain.DATA_RETRIEVAL in secondary and primary is CapabilityDomain.DATA_RETRIEVAL:
+        if (
+            CapabilityDomain.DATA_RETRIEVAL in secondary
+            and primary is CapabilityDomain.DATA_RETRIEVAL
+        ):
             secondary.remove(CapabilityDomain.DATA_RETRIEVAL)
         return (
             route.model_copy(
                 update={
                     "primary_domain": primary,
                     "secondary_domains": secondary,
-                    "target_refs": [r for r in route.target_refs if r not in references],
+                    "target_refs": [
+                        r for r in route.target_refs if r not in references
+                    ],
                     "spatial_scope": spatial,
                     "capability_queries": queries,
                 }
@@ -433,9 +527,7 @@ class CapabilityRouter:
         )
         if map_data_reason is not None:
             reasons.append(map_data_reason)
-        proposed, analysis_reason = _normalize_metadata_only_analysis_route(
-            proposed
-        )
+        proposed, analysis_reason = _normalize_metadata_only_analysis_route(proposed)
         if analysis_reason is not None:
             reasons.append(analysis_reason)
         proposed, temporal_reason = _normalize_recent_scope(proposed)
@@ -446,7 +538,10 @@ class CapabilityRouter:
         )
         if location_map_reason is not None:
             reasons.append(location_map_reason)
-        if is_mark_locations_operation(proposed.operation) and proposed.task_mode == "execute":
+        if (
+            is_mark_locations_operation(proposed.operation)
+            and proposed.task_mode == "execute"
+        ):
             if not proposed.target_refs:
                 return CapabilityRouteDecision(
                     status="clarification",
@@ -496,13 +591,19 @@ class CapabilityRouter:
         if proposed.primary_domain is not CapabilityDomain.MAP_STATE:
             # A target that only repeats the requested data is not a place; a
             # global request then falls back to World below.
-            subject_refs = [ref for ref in proposed.target_refs if names_data_subject(ref, proposed)]
+            subject_refs = [
+                ref for ref in proposed.target_refs if names_data_subject(ref, proposed)
+            ]
             if subject_refs:
                 proposed = proposed.model_copy(
                     update={
-                        "target_refs": [r for r in proposed.target_refs if r not in subject_refs],
+                        "target_refs": [
+                            r for r in proposed.target_refs if r not in subject_refs
+                        ],
                         "target_requirements": [
-                            r for r in proposed.target_requirements if r.target_ref not in subject_refs
+                            r
+                            for r in proposed.target_requirements
+                            if r.target_ref not in subject_refs
                         ],
                     }
                 )
@@ -560,7 +661,11 @@ class CapabilityRouter:
             and active_state.active_map_session is None
             and proposed.location_mode == "none"
         ):
-            proposed = proposed.model_copy(update={"location_mode": "search_area" if proposed.analysis else "target"})
+            proposed = proposed.model_copy(
+                update={
+                    "location_mode": "search_area" if proposed.analysis else "target"
+                }
+            )
             reasons.append("location_required_for_new_map")
         if (
             proposed.task_mode == "execute"
@@ -571,27 +676,45 @@ class CapabilityRouter:
             proposed = proposed.model_copy(update={"location_mode": "target"})
             reasons.append("location_required_for_semantic_scope")
 
-        if proposed.analysis is not None and proposed.location_mode == "target" and (
-            proposed.spatial_scope is None
-            or proposed.spatial_scope.relationship not in {"near", "around", "within_distance"}
+        if (
+            proposed.analysis is not None
+            and proposed.location_mode == "target"
+            and (
+                proposed.spatial_scope is None
+                or proposed.spatial_scope.relationship
+                not in {"near", "around", "within_distance"}
+            )
         ):
             proposed = proposed.model_copy(update={"location_mode": "search_area"})
         if proposed.location_mode == "search_area":
-            refs = proposed.target_refs or (
-                proposed.spatial_scope.target_refs if proposed.spatial_scope else []
-            ) or ["World"]
-            proposed = proposed.model_copy(update={
-                "target_refs": refs,
-                "spatial_scope": proposed.spatial_scope or AgentSpatialScope(
-                    kind="bbox", relationship="in", target_refs=refs
-                ),
-            })
+            refs = (
+                proposed.target_refs
+                or (
+                    proposed.spatial_scope.target_refs if proposed.spatial_scope else []
+                )
+                or ["World"]
+            )
+            proposed = proposed.model_copy(
+                update={
+                    "target_refs": refs,
+                    "spatial_scope": proposed.spatial_scope
+                    or AgentSpatialScope(
+                        kind="bbox", relationship="in", target_refs=refs
+                    ),
+                }
+            )
 
         if proposed.analysis is not None or proposed.requires_geometry:
             # Analysis and geometry derivation (area, buffer, join, overlay) are
             # performed by transform_evidence, never by inventing a provider
             # operation such as rank_precipitation, measure_area or buffer_and_clip.
-            proposed = proposed.model_copy(update={"operation": "show" if proposed.presentation in {"map", "both"} else "inspect"})
+            proposed = proposed.model_copy(
+                update={
+                    "operation": "show"
+                    if proposed.presentation in {"map", "both"}
+                    else "inspect"
+                }
+            )
 
         route_domains = {proposed.primary_domain, *proposed.secondary_domains}
         basemaps = (
@@ -609,13 +732,25 @@ class CapabilityRouter:
             # resolved Tokyo: a place the message names again is the new map's
             # target, and a model target the message never mentions (the
             # removed layer's subject, "weather radar") is not a place.
-            named = [name for _, name in places_named_in(user_message, active_state.location_refs)]
+            named = [
+                name
+                for _, name in places_named_in(user_message, active_state.location_refs)
+            ]
             if named:
                 message_words = set(normalize_target_key(user_message).split())
-                places = list(dict.fromkeys([
-                    *named,
-                    *(ref for ref in places if set(normalize_target_key(ref).split()) <= message_words),
-                ]))
+                places = list(
+                    dict.fromkeys(
+                        [
+                            *named,
+                            *(
+                                ref
+                                for ref in places
+                                if set(normalize_target_key(ref).split())
+                                <= message_words
+                            ),
+                        ]
+                    )
+                )
         if basemaps and active_state.active_map_session is None and places:
             # With no map yet, a named place makes this a new map (for example
             # the answer to "Which place should I show?"); the requested style
@@ -637,7 +772,11 @@ class CapabilityRouter:
             if active_state.active_map_session is None:
                 requested = match_requested_basemap(user_message, basemaps)
                 style = next(
-                    (basemap_label(item) for item in basemaps if item.get("id") == requested),
+                    (
+                        basemap_label(item)
+                        for item in basemaps
+                        if item.get("id") == requested
+                    ),
                     None,
                 )
                 return CapabilityRouteDecision(
@@ -679,13 +818,17 @@ class CapabilityRouter:
                     status="rejected",
                     route=proposed,
                     rejected_capability_ids=rejected,
-                    reason_codes=[*dict.fromkeys([*reasons, "clarification_question_missing"])],
+                    reason_codes=[
+                        *dict.fromkeys([*reasons, "clarification_question_missing"])
+                    ],
                 )
             return CapabilityRouteDecision(
                 status="clarification",
                 route=proposed,
                 rejected_capability_ids=rejected,
-                reason_codes=[*dict.fromkeys([*reasons, "model_requested_clarification"])],
+                reason_codes=[
+                    *dict.fromkeys([*reasons, "model_requested_clarification"])
+                ],
                 clarification_question=proposed.clarification_question,
                 clarification_options=list(proposed.clarification_options),
             )
@@ -840,7 +983,11 @@ class CapabilityRouter:
                 ],
             )
 
-        status = "rejected" if reasons and "clarification_question_not_allowed" in reasons else "accepted"
+        status = (
+            "rejected"
+            if reasons and "clarification_question_not_allowed" in reasons
+            else "accepted"
+        )
         return CapabilityRouteDecision(
             status=status,
             route=proposed,
@@ -848,6 +995,7 @@ class CapabilityRouter:
             rejected_capability_ids=rejected,
             reason_codes=list(dict.fromkeys(reasons)),
         )
+
 
 ###############################################################################
 def _reconcile_declared_obligations(
@@ -895,8 +1043,12 @@ def _reconcile_declared_obligations(
     for item in validated.obligations:
         if item.kind in dropped_kinds:
             continue
-        if item.kind == "identification" and item.target_refs and not any(
-            parse_coordinate_pair(ref) is not None for ref in item.target_refs
+        if (
+            item.kind == "identification"
+            and item.target_refs
+            and not any(
+                parse_coordinate_pair(ref) is not None for ref in item.target_refs
+            )
         ):
             # Only bare coordinates need naming; a named target already is one.
             continue
@@ -908,7 +1060,9 @@ def _reconcile_declared_obligations(
             # The requested view size is framing, not data to retrieve.
             continue
         places = [
-            ref for ref in item.target_refs if normalize_target_key(ref) not in removed_places
+            ref
+            for ref in item.target_refs
+            if normalize_target_key(ref) not in removed_places
         ]
         if item.target_refs and not places:
             # Every place it named was a catalog reference, not a place.
@@ -917,6 +1071,7 @@ def _reconcile_declared_obligations(
     if kept == validated.obligations:
         return validated
     return validated.model_copy(update={"obligations": kept})
+
 
 ###############################################################################
 # One direct subject-identity match, the weight the registry gives a capability
@@ -935,19 +1090,18 @@ def _is_view_anchor(ref: str, session: MapSession) -> bool:
     place_words = set(re.findall(r"\w+", session.resolved_location.label.casefold()))
     return words - CENTRE_TERMS - _VIEW_ANCHOR_FILLER <= place_words
 
+
 ###############################################################################
 def _is_executable_candidate(capability: dict[str, object]) -> bool:
     """Keep renderer-only descriptors out of the generic provider tool."""
 
-    kind = str(
-        capability.get("capabilityKind")
-        or capability.get("capability_kind")
-        or ""
-    ).strip().casefold()
-    return (
-        kind != "basemap"
-        and capability.get("runtime_render_ready") is not False
+    kind = (
+        str(capability.get("capabilityKind") or capability.get("capability_kind") or "")
+        .strip()
+        .casefold()
     )
+    return kind != "basemap" and capability.get("runtime_render_ready") is not False
+
 
 ###############################################################################
 def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
@@ -991,6 +1145,7 @@ def _route_contract_reason_codes(route: CapabilityRoute) -> list[str]:
         reasons.append("answer_route_disallows_clarification_question")
     return reasons
 
+
 ###############################################################################
 def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if len(state.location_refs) == 1:
@@ -998,6 +1153,7 @@ def _single_known_location(state: AgentRunState) -> ResolvedLocation | None:
     if state.active_map_session is not None:
         return state.active_map_session.resolved_location
     return None
+
 
 ###############################################################################
 def _route_terms(route: CapabilityRoute) -> set[str]:
@@ -1008,6 +1164,7 @@ def _route_terms(route: CapabilityRoute) -> set[str]:
         for token in re.findall(r"[a-z0-9]+", str(value).casefold())
         if len(token) > 1
     }
+
 
 ###############################################################################
 def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
@@ -1044,6 +1201,7 @@ def _is_broad_infrastructure_route(route: CapabilityRoute) -> bool:
     )
     return not specific_terms
 
+
 ###############################################################################
 def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
     """Guard raw generic infrastructure wording before model subtype guesses."""
@@ -1072,6 +1230,7 @@ def _is_ambiguous_infrastructure_message(user_message: str) -> bool:
     }
     return not terms.intersection(subtype_terms)
 
+
 ###############################################################################
 def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
     if route.spatial_scope is None:
@@ -1092,13 +1251,22 @@ def _is_unsupported_boundary_route(route: CapabilityRoute) -> bool:
         )
     )
 
+
 ###############################################################################
 # Map-state requests no ``apply_map_plan`` action can perform: map furniture the
 # plan cannot draw, and questions about what is already shown.
 _TEXT_ANSWERED_MAP_STATE_WORDS = frozenset(
     {
-        "legend", "label", "labels", "annotate", "annotation",
-        "explain", "describe", "interpret", "summarize", "summarise",
+        "legend",
+        "label",
+        "labels",
+        "annotate",
+        "annotation",
+        "explain",
+        "describe",
+        "interpret",
+        "summarize",
+        "summarise",
     }
 )
 
@@ -1123,6 +1291,7 @@ def _answer_unsupported_map_state_route(
         return route, None
     return build_conversation_fallback_route(), "map_state_operation_answered_in_text"
 
+
 ###############################################################################
 def _normalize_route_semantics(
     route: CapabilityRoute,
@@ -1132,9 +1301,7 @@ def _normalize_route_semantics(
     raw_operation = route.operation
     operation = None
     if raw_operation is not None:
-        operation = re.sub(
-            r"[^a-z0-9]+", "_", str(raw_operation).casefold()
-        ).strip("_")
+        operation = re.sub(r"[^a-z0-9]+", "_", str(raw_operation).casefold()).strip("_")
     normalized_queries = [
         re.sub(
             r"\s+",
@@ -1158,6 +1325,7 @@ def _normalize_route_semantics(
         ),
         "route_semantics_normalized",
     )
+
 
 ###############################################################################
 def _normalize_capability_inventory_route(
@@ -1261,10 +1429,18 @@ def _normalize_capability_inventory_route(
     has_specific_subject = bool(message_terms - generic_terms - target_terms)
     operation = "discover_available_map_data"
     if message_terms & {"basemap", "basemaps"} and not message_terms & {
-        "layer", "layers", "data", "dataset", "datasets", "capability", "capabilities"
+        "layer",
+        "layers",
+        "data",
+        "dataset",
+        "datasets",
+        "capability",
+        "capabilities",
     }:
         return (
-            route.model_copy(update={"operation": operation, "capability_queries": ["basemap"]}),
+            route.model_copy(
+                update={"operation": operation, "capability_queries": ["basemap"]}
+            ),
             "capability_inventory_route_normalized",
         )
     if route.operation == operation and has_specific_subject:
@@ -1276,6 +1452,7 @@ def _normalize_capability_inventory_route(
             update={"operation": operation, "capability_queries": []}
         )
     return normalized, "capability_inventory_route_normalized"
+
 
 ###############################################################################
 def _normalize_text_only_coordinate_route(
@@ -1335,6 +1512,7 @@ def _normalize_text_only_coordinate_route(
         "text_only_coordinate_lookup_route_normalized",
     )
 
+
 ###############################################################################
 def _normalize_text_evidence_inspection_route(
     route: CapabilityRoute,
@@ -1385,6 +1563,7 @@ def _normalize_text_evidence_inspection_route(
         ),
         "text_evidence_inspection_route_normalized",
     )
+
 
 ###############################################################################
 def _normalize_data_bearing_map_route(
@@ -1463,9 +1642,7 @@ def _normalize_data_bearing_map_route(
                 ]
             )
             return (
-                route.model_copy(
-                    update={"secondary_domains": secondary_domains[:3]}
-                ),
+                route.model_copy(update={"secondary_domains": secondary_domains[:3]}),
                 "data_bearing_place_search_route_normalized",
             )
 
@@ -1497,6 +1674,7 @@ def _normalize_data_bearing_map_route(
         ),
         "data_bearing_map_route_normalized",
     )
+
 
 ###############################################################################
 def _normalize_recent_scope(
@@ -1546,6 +1724,7 @@ def _recent_scope_as_current(temporal: AgentTemporalScope) -> AgentTemporalScope
         return temporal.model_copy(update={"mode": "current"})
     return None
 
+
 ###############################################################################
 def _prune_target_requirements(
     route: CapabilityRoute,
@@ -1561,6 +1740,7 @@ def _prune_target_requirements(
     if len(kept) == len(route.target_requirements):
         return route
     return route.model_copy(update={"target_requirements": kept})
+
 
 ###############################################################################
 def _normalize_metadata_only_analysis_route(
@@ -1589,6 +1769,7 @@ def _normalize_metadata_only_analysis_route(
         ),
         "metadata_only_analysis_route_normalized",
     )
+
 
 ###############################################################################
 def _normalize_location_map_route(
@@ -1681,6 +1862,7 @@ def _normalize_location_map_route(
         ),
         "location_map_route_normalized",
     )
+
 
 ###############################################################################
 def _concrete_scope_kind(

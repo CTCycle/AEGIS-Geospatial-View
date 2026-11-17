@@ -8,8 +8,26 @@ from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.provider_registry import ProviderRegistry
-from server.services.geospatial.overpass import OverpassInvalidQueryError, OverpassRateLimitError, OverpassRequestError
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderInvalidQueryError, ProviderRateLimitError, ProviderRequest, ProviderUnavailableError, FeatureRequest, ProviderResponse, ProviderResult, provider_cache_key, response_without_credentials, safe_request_params, ProviderMalformedPayloadError, ProviderUnsupportedError
+from server.services.geospatial.overpass import (
+    OverpassInvalidQueryError,
+    OverpassRateLimitError,
+    OverpassRequestError,
+)
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderInvalidQueryError,
+    ProviderRateLimitError,
+    ProviderRequest,
+    ProviderUnavailableError,
+    FeatureRequest,
+    ProviderResponse,
+    ProviderResult,
+    provider_cache_key,
+    response_without_credentials,
+    safe_request_params,
+    ProviderMalformedPayloadError,
+    ProviderUnsupportedError,
+)
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
@@ -17,14 +35,23 @@ from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers.overpass import OverpassProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
-from server.services.geospatial.providers.tomtom import TomTomProvider, build_tomtom_tile_url
+from server.services.geospatial.providers.tomtom import (
+    TomTomProvider,
+    build_tomtom_tile_url,
+)
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
-from server.services.agent.capability_execution import _response_summary, CapabilityExecutionService, ToolExecutionContext
+from server.services.agent.capability_execution import (
+    _response_summary,
+    CapabilityExecutionService,
+    ToolExecutionContext,
+)
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
 from server.services.geospatial.providers.ourairports import OurAirportsProvider
 from server.services.geospatial.providers.nominatim import NominatimProvider
-from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
+from server.services.geospatial.providers.mobility_database import (
+    MobilityDatabaseProvider,
+)
 from urllib.parse import parse_qs, urlsplit
 from server.services.geospatial.openaq import OpenAQRequestError, OpenAQService
 from server.common.time import parse_retry_after
@@ -35,11 +62,8 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 # --- test_geospatial_provider_adapters_core.py ---
 
 
-
-
 ###############################################################################
 class _OpenMeteoService:
-
     # -------------------------------------------------------------------------
     async def get_weather_forecast(self, *, latitude: float, longitude: float):
         return {
@@ -86,6 +110,7 @@ class _OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+
 ###############################################################################
 class _OverpassService:
     default_radius_m = 1000.0
@@ -111,6 +136,7 @@ class _OverpassService:
             "resolved_at": "2026-05-11T00:00:00+00:00",
             "attribution": "OSM",
         }
+
 
 ###############################################################################
 class _OpenAQService:
@@ -142,9 +168,9 @@ class _OpenAQService:
             "attribution": "OpenAQ",
         }
 
+
 ###############################################################################
 class _PVGISService:
-
     # -------------------------------------------------------------------------
     async def get_point_estimate(self, latitude: float, longitude: float):
         return {
@@ -193,10 +219,12 @@ GIBS_WMS_XML = """<?xml version="1.0"?>
 </WMS_Capabilities>
 """
 
+
 ###############################################################################
 async def _gibs_capabilities_fetcher(url: str, headers: dict[str, str] | None = None):
     del headers
     return GIBS_WMTS_XML if "wmts" in url else GIBS_WMS_XML
+
 
 ###############################################################################
 def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
@@ -225,6 +253,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     assert air.payload["renderingMode"] == "clustered-points"
     assert air.payload["features"][0]["metadata"]["pollutantSymbols"]["pm25"] == 8
 
+
 ###############################################################################
 def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
@@ -244,12 +273,12 @@ def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     assert feature["metadata"]["windArrow"] == {"speed": 7, "direction": 270}
     assert feature["metadata"]["pressure"] == 1008
 
+
 ###############################################################################
 def test_openmeteo_provider_preserves_zero_measurements() -> None:
 
     ###############################################################################
     class _ZeroWeatherService(_OpenMeteoService):
-
         # -------------------------------------------------------------------------
         async def get_weather_forecast(self, *, latitude: float, longitude: float):
             return {
@@ -285,6 +314,7 @@ def test_openmeteo_provider_preserves_zero_measurements() -> None:
     assert feature["metadata"]["windArrow"] == {"speed": 0, "direction": 0}
     assert response.result_status == "partial"
 
+
 ###############################################################################
 def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() -> None:
     forecast = [
@@ -294,7 +324,6 @@ def test_openmeteo_provider_preserves_hourly_forecast_alongside_map_feature() ->
 
     ###############################################################################
     class _HourlyWeatherService(_OpenMeteoService):
-
         # -------------------------------------------------------------------------
         async def get_weather_forecast(self, *, latitude: float, longitude: float):
             return {
@@ -338,6 +367,7 @@ def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     assert response.payload["features"][0]["category"] == "clinic"
     assert service.calls[0]["amenity_tags"] is None
 
+
 ###############################################################################
 def test_overpass_provider_maps_supported_amenity_groups() -> None:
     service = _OverpassService()
@@ -360,6 +390,7 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
         "doctors",
     ]
 
+
 ###############################################################################
 def test_overpass_provider_maps_nested_specific_category_to_service_filter() -> None:
     service = _OverpassService()
@@ -378,19 +409,18 @@ def test_overpass_provider_maps_nested_specific_category_to_service_filter() -> 
     assert service.calls[0]["amenity_tags"] is None
     assert service.calls[0]["categories"] == ["pharmacy"]
 
+
 ###############################################################################
 def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
 
     ###############################################################################
     class _RateLimitedService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             raise OverpassRateLimitError("limited")
 
     ###############################################################################
     class _TimeoutService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             raise OverpassRequestError("timed out")
@@ -414,12 +444,12 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             )
         )
 
+
 ###############################################################################
 def test_overpass_provider_distinguishes_invalid_query_from_transport_failure() -> None:
 
     ###############################################################################
     class _InvalidQueryService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             raise OverpassInvalidQueryError("unsupported category")
@@ -434,12 +464,12 @@ def test_overpass_provider_distinguishes_invalid_query_from_transport_failure() 
             )
         )
 
+
 ###############################################################################
 def test_overpass_provider_returns_empty_result() -> None:
 
     ###############################################################################
     class _EmptyService(_OverpassService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             return {"items": [], "attribution": "OSM"}
@@ -455,6 +485,7 @@ def test_overpass_provider_returns_empty_result() -> None:
 
     assert response.payload["features"] == []
     assert response.payload["totalResults"] == 0
+
 
 ###############################################################################
 def test_openaq_provider_returns_station_features() -> None:
@@ -472,6 +503,7 @@ def test_openaq_provider_returns_station_features() -> None:
     assert response.payload["features"][0]["measurements"]["pm25"]["value"] == 8.0
     assert response.payload["summary"]["pm25"]["mean"] == 8.0
 
+
 ###############################################################################
 def test_openaq_provider_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
@@ -480,6 +512,7 @@ def test_openaq_provider_requires_key() -> None:
                 ProviderRequest(capability_id="openaq_air_quality")
             )
         )
+
 
 ###############################################################################
 def test_openaq_provider_filters_pollutants() -> None:
@@ -496,12 +529,12 @@ def test_openaq_provider_filters_pollutants() -> None:
     assert set(response.payload["summary"]) == {"pm25"}
     assert set(response.payload["features"][0]["measurements"]) == {"pm25"}
 
+
 ###############################################################################
 def test_openaq_provider_returns_empty_bbox_result() -> None:
 
     ###############################################################################
     class _EmptyOpenAQService(_OpenAQService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_measurements(
             self, *, lat: float, lon: float, radius_m: float
@@ -521,12 +554,12 @@ def test_openaq_provider_returns_empty_bbox_result() -> None:
     assert response.payload["features"] == []
     assert response.payload["summary"] == {}
 
+
 ###############################################################################
 def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
 
     ###############################################################################
     class _FailingOpenAQService(_OpenAQService):
-
         # -------------------------------------------------------------------------
         async def get_nearby_measurements(
             self, *, lat: float, lon: float, radius_m: float
@@ -564,6 +597,7 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
     assert stale.payload["features"][0]["name"] == "Station"
     assert stale.warnings
 
+
 ###############################################################################
 def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     provider = PVGISProvider(service=_PVGISService())  # type: ignore[arg-type]
@@ -582,12 +616,14 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     assert response.result_type == "metadata"
     assert response.result_status == "ok"
 
+
 ###############################################################################
 def test_tomtom_requires_keys_before_emitting_urls() -> None:
     with pytest.raises(ProviderAuthError):
         run_async_in_thread(
             TomTomProvider().fetch(ProviderRequest(capability_id="tomtom_traffic_flow"))
         )
+
 
 ###############################################################################
 def test_tomtom_provider_normalizes_live_incidents() -> None:
@@ -630,6 +666,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
     assert response.payload["features"][0]["name"] == "Lane closed"
     assert response.payload["features"][0]["metadata"]["roadNumbers"] == ["A1"]
 
+
 ###############################################################################
 def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
     response = run_async_in_thread(
@@ -643,6 +680,7 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
     )
     assert response.payload["credentialPolicy"] == "server-side-only"
     assert "tomtom-test" not in str(response.payload)
+
 
 ###############################################################################
 def test_provider_registry_ignores_environment_keys_for_gated_adapters(
@@ -659,6 +697,7 @@ def test_provider_registry_ignores_environment_keys_for_gated_adapters(
                 "tomtom", ProviderRequest(capability_id="tomtom_traffic_flow")
             )
         )
+
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
@@ -678,10 +717,14 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     )
     assert response.attribution
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     ("day", "satisfied"),
-    [(datetime(2026, 5, 4, tzinfo=UTC), True), (datetime(2026, 5, 11, tzinfo=UTC), False)],
+    [
+        (datetime(2026, 5, 4, tzinfo=UTC), True),
+        (datetime(2026, 5, 11, tzinfo=UTC), False),
+    ],
 )
 def test_nasa_gibs_provider_reports_whether_the_dated_layer_covers_the_day(
     day: datetime, satisfied: bool
@@ -700,12 +743,18 @@ def test_nasa_gibs_provider_reports_whether_the_dated_layer_covers_the_day(
     assert bool(response.warnings) is (not satisfied)
     assert response.result_status == ("ok" if satisfied else "valid_empty")
 
+
 ###############################################################################
 def test_nasa_gibs_provider_gives_no_temporal_verdict_without_a_time_extent() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         del headers
         xml = GIBS_WMTS_XML if "wmts" in url else GIBS_WMS_XML
-        return re.sub(r"<Dimension>.*?</Dimension>|<Dimension .*?</Dimension>", "", xml, flags=re.S)
+        return re.sub(
+            r"<Dimension>.*?</Dimension>|<Dimension .*?</Dimension>",
+            "",
+            xml,
+            flags=re.S,
+        )
 
     response = run_async_in_thread(
         NASAGIBSProvider(fetcher=fetcher).fetch(
@@ -719,6 +768,7 @@ def test_nasa_gibs_provider_gives_no_temporal_verdict_without_a_time_extent() ->
     assert response.coverage is None
     assert response.result_status == "ok"
     assert not response.warnings
+
 
 ###############################################################################
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
@@ -736,6 +786,7 @@ def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
     assert "f=geojson" in response.payload["featuresUrl"]
     assert "geometry=-1.0%2C2.0%2C3.0%2C4.0" in response.payload["featuresUrl"]
 
+
 ###############################################################################
 def test_census_provider_selects_demographic_choropleth() -> None:
     response = run_async_in_thread(
@@ -752,6 +803,7 @@ def test_census_provider_selects_demographic_choropleth() -> None:
     assert response.payload["status"] == "server-side-only"
     assert "featuresUrl" not in response.payload
 
+
 ###############################################################################
 def test_census_cartographic_query_caps_records_and_generalizes_to_bbox_span() -> None:
     response = run_async_in_thread(
@@ -766,6 +818,7 @@ def test_census_cartographic_query_caps_records_and_generalizes_to_bbox_span() -
     url = response.payload["featuresUrl"]
     assert "resultRecordCount=2000" in url
     assert "maxAllowableOffset=0.000420" in url
+
 
 ###############################################################################
 def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
@@ -802,6 +855,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
     assert response.payload["features"][0]["preview_image_url"].endswith("preview.jpg")
     assert response.payload["features"][0]["embedding_allowed"] is False
 
+
 ###############################################################################
 def test_windy_webcams_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
@@ -810,6 +864,7 @@ def test_windy_webcams_requires_key() -> None:
                 ProviderRequest(capability_id="windy_webcams", params={"live": True})
             )
         )
+
 
 ###############################################################################
 def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
@@ -842,6 +897,7 @@ def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
     assert feature["preview_image_url"] is None
     assert feature["stale"] is True
     assert feature["metadata"]["preview_expired"] is True
+
 
 ###############################################################################
 def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
@@ -880,6 +936,7 @@ def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
     assert denied["embedding_allowed"] is False
     assert denied["embed_url"] is None
 
+
 ###############################################################################
 def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
     async def first_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -916,9 +973,8 @@ def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
     assert stale.payload["features"][0]["name"] == "Cached camera"
     assert stale.warnings
 
+
 # --- test_geospatial_optional_provider_adapters.py ---
-
-
 
 
 ###############################################################################
@@ -945,6 +1001,7 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     assert response.payload["status"] == "server-side-only"
     assert "tourism-key" not in str(response.payload)
 
+
 ###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
     response = run_async_in_thread(
@@ -969,6 +1026,7 @@ def test_openchargemap_supports_optional_key() -> None:
     assert "charge-key" not in str(response.payload)
     assert "charge-key" not in str(keyed.payload)
 
+
 ###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:
     response = run_async_in_thread(
@@ -979,6 +1037,7 @@ def test_ourairports_returns_source_ready_descriptor() -> None:
 
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].endswith("airports.csv")
+
 
 ###############################################################################
 def test_opentripmap_live_fetch_normalizes_geojson() -> None:
@@ -1008,6 +1067,7 @@ def test_opentripmap_live_fetch_normalizes_geojson() -> None:
     assert response.payload["featureCount"] == 1
     assert response.payload["features"][0]["category"] == "tourism"
 
+
 ###############################################################################
 def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     async def fetcher(url, headers):
@@ -1027,6 +1087,7 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     assert response.payload["features"] == []
     assert response.payload["featureCount"] == 0
 
+
 ###############################################################################
 def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
@@ -1041,6 +1102,7 @@ def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
                 )
             )
         )
+
 
 ###############################################################################
 def test_optional_live_provider_uses_stale_cache_on_failure() -> None:
@@ -1067,6 +1129,7 @@ def test_optional_live_provider_uses_stale_cache_on_failure() -> None:
     assert first.stale is False
     assert second.stale is True
     assert "stale cached" in second.warnings[0]
+
 
 ###############################################################################
 def test_tomtom_incident_point_lies_inside_the_requested_bbox() -> None:
@@ -1109,6 +1172,7 @@ def test_tomtom_incident_point_lies_inside_the_requested_bbox() -> None:
         for feature in features
     )
 
+
 ###############################################################################
 def test_tomtom_flow_descriptor_is_renderable_raster_evidence() -> None:
     response = run_async_in_thread(
@@ -1129,8 +1193,8 @@ def test_tomtom_flow_descriptor_is_renderable_raster_evidence() -> None:
         "https://api.tomtom.com/traffic/map/4/tile/flow/absolute/12/2190/1520.png?key=k"
     )
 
-# --- test_geospatial_provider_contracts.py ---
 
+# --- test_geospatial_provider_contracts.py ---
 
 
 ###############################################################################
@@ -1150,6 +1214,7 @@ class _FeatureOnlyProvider:
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         raise AssertionError("fetch_features should be preferred")
 
+
 ###############################################################################
 def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
     registry = ProviderRegistry(providers=[_FeatureOnlyProvider()])
@@ -1160,6 +1225,7 @@ def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
 
     assert response.payload == {"api_key": "<redacted>", "value": 1}
     assert response.attribution == ["Example Attribution"]
+
 
 ###############################################################################
 def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
@@ -1177,6 +1243,7 @@ def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
     assert "secret" not in key_a
     assert key_a.startswith("provider:layer:")
 
+
 ###############################################################################
 def test_safe_request_params_redacts_credentials() -> None:
     params = safe_request_params(
@@ -1189,6 +1256,7 @@ def test_safe_request_params_redacts_credentials() -> None:
         "token": "<redacted>",
     }
 
+
 ###############################################################################
 def test_response_redaction_preserves_map_url_template_tokens() -> None:
     response = response_without_credentials(
@@ -1197,17 +1265,16 @@ def test_response_redaction_preserves_map_url_template_tokens() -> None:
             provider_id="fema",
             payload={
                 "tileUrl": (
-                    "https://hazards.example/export?"
-                    "bbox={bbox-epsg-3857}&format=png32"
+                    "https://hazards.example/export?bbox={bbox-epsg-3857}&format=png32"
                 )
             },
         )
     )
 
     assert response.payload["tileUrl"] == (
-        "https://hazards.example/export?"
-        "bbox={bbox-epsg-3857}&format=png32"
+        "https://hazards.example/export?bbox={bbox-epsg-3857}&format=png32"
     )
+
 
 ###############################################################################
 def test_nominatim_provider_geocodes_live_contract_payload() -> None:
@@ -1236,6 +1303,7 @@ def test_nominatim_provider_geocodes_live_contract_payload() -> None:
     assert response.payload["resultCount"] == 1
     assert response.payload["results"][0]["latitude"] == 41.8933
 
+
 ###############################################################################
 def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:
     catalog = tmp_path / "feeds.csv"
@@ -1258,7 +1326,9 @@ def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:
 
 
 ###############################################################################
-def test_mobility_database_default_cache_uses_canonical_cache_root(monkeypatch, tmp_path) -> None:
+def test_mobility_database_default_cache_uses_canonical_cache_root(
+    monkeypatch, tmp_path
+) -> None:
     cache_root = tmp_path / "canonical-cache"
     monkeypatch.setenv("AEGIS_CACHE_ROOT", str(cache_root))
     monkeypatch.delenv("AEGIS_MOBILITY_DATABASE_CATALOG_PATH", raising=False)
@@ -1267,10 +1337,8 @@ def test_mobility_database_default_cache_uses_canonical_cache_root(monkeypatch, 
 
     assert provider.catalog_path == cache_root / "mobility-database" / "feeds_v2.csv"
 
+
 # --- test_geospatial_provider_hardening.py ---
-
-
-
 
 
 ###############################################################################
@@ -1295,7 +1363,6 @@ def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) ->
 
     ###############################################################################
     class _Client:
-
         # -------------------------------------------------------------------------
         def stream(self, *args, **kwargs):
             return _Response()
@@ -1310,6 +1377,7 @@ def test_shared_http_rejects_redirects_and_limits_response_bytes(monkeypatch) ->
         provider_http._raise_for_status(
             httpx.Response(302, headers={"location": "/next"})
         )
+
 
 ###############################################################################
 def test_shared_http_uses_scoped_remaining_timeout(monkeypatch) -> None:
@@ -1334,7 +1402,6 @@ def test_shared_http_uses_scoped_remaining_timeout(monkeypatch) -> None:
 
     ###############################################################################
     class _Client:
-
         # -------------------------------------------------------------------------
         def stream(self, *args, **kwargs):
             timeouts.append(kwargs.get("timeout"))
@@ -1348,6 +1415,7 @@ def test_shared_http_uses_scoped_remaining_timeout(monkeypatch) -> None:
     assert run_async_in_thread(_fetch()) == b"ok"
     assert timeouts == [pytest.approx(0.37)]
 
+
 ###############################################################################
 def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
     with pytest.raises(ProviderRateLimitError) as error:
@@ -1358,6 +1426,7 @@ def test_shared_http_preserves_retry_after_without_exposing_headers() -> None:
     assert error.value.retry_after_seconds == 7.0
     assert "retry-after" not in str(error.value).lower()
 
+
 ###############################################################################
 def test_retry_after_accepts_delta_seconds_and_http_dates() -> None:
     future = format_datetime(datetime.now(UTC) + timedelta(seconds=120), usegmt=True)
@@ -1366,6 +1435,7 @@ def test_retry_after_accepts_delta_seconds_and_http_dates() -> None:
     assert parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT") == 0.0
     assert parse_retry_after("soon") is None
     assert parse_retry_after("nan") is None
+
 
 ###############################################################################
 def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:
@@ -1418,6 +1488,7 @@ def test_openaq_v3_joins_location_sensors_to_latest_measurements() -> None:
     assert all("secret" not in url for url, _ in calls)
     assert all(headers["X-API-Key"] == "secret" for _, headers in calls)
 
+
 ###############################################################################
 def test_openaq_request_failure_is_not_converted_to_empty_data() -> None:
     def requester(url: str, headers: dict[str, str]):
@@ -1429,6 +1500,7 @@ def test_openaq_request_failure_is_not_converted_to_empty_data() -> None:
                 api_key="secret", requester=requester
             ).get_nearby_measurements(41.9, 12.5)
         )
+
 
 ###############################################################################
 def test_noaa_coops_discovers_stations_and_requests_station_observations() -> None:
@@ -1466,6 +1538,7 @@ def test_noaa_coops_discovers_stations_and_requests_station_observations() -> No
     assert len(calls) == 2
     assert response.payload["features"][0]["id"] == "9414290"
     assert response.payload["features"][0]["value"] == 1.25
+
 
 ###############################################################################
 def test_census_demographics_discovers_boundary_layer_and_joins_acs() -> None:
@@ -1516,6 +1589,7 @@ def test_census_demographics_discovers_boundary_layer_and_joins_acs() -> None:
     assert feature["properties"]["population"] == 1234
     assert any("api.census.gov/data/2024" in url for url in calls)
 
+
 ###############################################################################
 def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mode() -> (
     None
@@ -1545,6 +1619,7 @@ def test_local_open_data_requires_configured_source_id_and_preserves_geojson_mod
     )
     assert response.payload["renderingMode"] == "geojson"
     assert response.payload["sourceId"] == "local_parcels"
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1576,11 +1651,14 @@ def test_native_tool_maps_provider_failures_to_canonical_codes(
     assert result.error is not None
     assert result.error.code == expected_code
 
+
 ###############################################################################
 def test_ourairports_live_request_reports_no_records_instead_of_a_descriptor() -> None:
     with pytest.raises(ProviderUnsupportedError, match="no live airport records"):
         run_async_in_thread(
             OurAirportsProvider().fetch(
-                ProviderRequest(capability_id="ourairports_airports", params={"live": True})
+                ProviderRequest(
+                    capability_id="ourairports_airports", params={"live": True}
+                )
             )
         )

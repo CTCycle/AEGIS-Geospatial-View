@@ -23,10 +23,19 @@ from server.services.agent.tool_executor import ToolExecutor
 from server.services.agent.tool_registry import ToolRegistry
 
 _CORPUS: dict[str, Any] = json.loads(
-    (Path(__file__).parents[3] / "fixtures/agent/final_answer_replay.json").read_text(encoding="utf-8")
+    (Path(__file__).parents[3] / "fixtures/agent/final_answer_replay.json").read_text(
+        encoding="utf-8"
+    )
 )
 _CASES: list[dict[str, Any]] = _CORPUS["cases"]
-_EMPTY_TEMPLATE = ("the place .", "place at .", "place at ;", "the place ;", " for .", " for ;")
+_EMPTY_TEMPLATE = (
+    "the place .",
+    "place at .",
+    "place at ;",
+    "the place ;",
+    " for .",
+    " for ;",
+)
 
 
 ###############################################################################
@@ -71,7 +80,9 @@ def _restore(run: str) -> AgentRunState:
 ###############################################################################
 def _request(state: AgentRunState) -> AgentLoopRequest:
     return AgentLoopRequest(
-        provider="fake", model="fake-model", state=state,
+        provider="fake",
+        model="fake-model",
+        state=state,
         budget=AgentExecutionBudget(total_seconds=10, hard_max_seconds=10),
     )
 
@@ -141,5 +152,7 @@ def test_disclosure_names_a_targetless_obligation_without_an_empty_value() -> No
     disclosure = AgentLoop.completion_summary(state).disclosure()
 
     assert "the name of the requested place" in disclosure
-    assert "the requested place" in disclosure.replace("the name of the requested place", "")
+    assert "the requested place" in disclosure.replace(
+        "the name of the requested place", ""
+    )
     assert not any(fragment in disclosure for fragment in _EMPTY_TEMPLATE)

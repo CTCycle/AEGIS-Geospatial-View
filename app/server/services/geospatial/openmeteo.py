@@ -34,6 +34,7 @@ OPENMETEO_AIR_QUALITY_MAX_FORECAST_DAYS = 7
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 def zoned_observation_time(stamp: object, payload: dict[str, Any]) -> object:
     """Attach the point's UTC offset to a local Open-Meteo timestamp.
@@ -57,9 +58,11 @@ def zoned_observation_time(stamp: object, payload: dict[str, Any]) -> object:
         return stamp
     return parsed.replace(tzinfo=timezone(timedelta(seconds=offset))).isoformat()
 
+
 ###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""
+
 
 ###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
@@ -69,6 +72,7 @@ class OpenMeteoRequestError(OpenMeteoServiceError):
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
 
 ###############################################################################
 class OpenMeteoRateLimitError(OpenMeteoRequestError):
@@ -81,6 +85,7 @@ class OpenMeteoRateLimitError(OpenMeteoRequestError):
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
 
+
 ###############################################################################
 def clip_window_to_forecast_range(
     window: tuple[datetime, datetime], now: datetime, *, max_forecast_days: int
@@ -91,10 +96,15 @@ def clip_window_to_forecast_range(
     """
 
     today = now.astimezone(UTC).date()
-    earliest = datetime.combine(today - timedelta(days=OPENMETEO_MAX_PAST_DAYS), datetime.min.time(), UTC)
-    latest = datetime.combine(today + timedelta(days=max_forecast_days), datetime.min.time(), UTC)
+    earliest = datetime.combine(
+        today - timedelta(days=OPENMETEO_MAX_PAST_DAYS), datetime.min.time(), UTC
+    )
+    latest = datetime.combine(
+        today + timedelta(days=max_forecast_days), datetime.min.time(), UTC
+    )
     start, end = max(window[0], earliest), min(window[1], latest)
     return (start, end) if end > start else None
+
 
 ###############################################################################
 def window_query_params(window: tuple[datetime, datetime]) -> dict[str, str]:
@@ -113,6 +123,7 @@ def window_query_params(window: tuple[datetime, datetime]) -> dict[str, str]:
         "timezone": "UTC",
     }
 
+
 ###############################################################################
 def requested_hourly_variables(attributes: object) -> tuple[str, ...]:
     """Hourly weather variables named by requested attributes.
@@ -124,11 +135,17 @@ def requested_hourly_variables(attributes: object) -> tuple[str, ...]:
 
     if not isinstance(attributes, list):
         return ()
-    wanted = {re.sub(r"[^a-z0-9]+", "", str(item).casefold()) for item in cast(list[object], attributes)}
+    wanted = {
+        re.sub(r"[^a-z0-9]+", "", str(item).casefold())
+        for item in cast(list[object], attributes)
+    }
     return tuple(
-        name for name in OpenMeteoService.WEATHER_VARIABLES
-        if name.replace("_", "") in wanted and name not in OpenMeteoService.WEATHER_GRID_VARIABLES
+        name
+        for name in OpenMeteoService.WEATHER_VARIABLES
+        if name.replace("_", "") in wanted
+        and name not in OpenMeteoService.WEATHER_GRID_VARIABLES
     )
+
 
 ###############################################################################
 class OpenMeteoService:
@@ -224,7 +241,7 @@ class OpenMeteoService:
         if not points:
             raise ValueError("Weather grids require at least one point.")
         batches = [
-            points[start:start + WEATHER_GRID_BATCH_SIZE]
+            points[start : start + WEATHER_GRID_BATCH_SIZE]
             for start in range(0, len(points), WEATHER_GRID_BATCH_SIZE)
         ]
         semaphore = asyncio.Semaphore(self.grid_batch_concurrency)
@@ -235,13 +252,17 @@ class OpenMeteoService:
             async with semaphore:
                 for attempt in range(WEATHER_GRID_BATCH_ATTEMPTS):
                     try:
-                        return await self._weather_grid_batch(batch, past_days, forecast_days, window, extra_variables), None
+                        return await self._weather_grid_batch(
+                            batch, past_days, forecast_days, window, extra_variables
+                        ), None
                     except OpenMeteoRateLimitError:
                         raise
                     except OpenMeteoServiceError as exc:
                         LOGGER.warning(
                             "openmeteo grid batch failed points=%d attempt=%d error=%s",
-                            len(batch), attempt + 1, exc,
+                            len(batch),
+                            attempt + 1,
+                            exc,
                         )
                         status = getattr(exc, "status_code", None)
                         transient = status is None or status >= 500
@@ -292,8 +313,11 @@ class OpenMeteoService:
                 }
             ),
         }
-        payload = await self._fetch_json(endpoint=self.weather_base_url,
-                                         params=params, provider_key="openmeteo_weather_grid")
+        payload = await self._fetch_json(
+            endpoint=self.weather_base_url,
+            params=params,
+            provider_key="openmeteo_weather_grid",
+        )
         locations = payload.get("locations", [payload])
         if not is_json_array(locations):
             raise OpenMeteoRequestError("Open-Meteo grid response is malformed.")
@@ -338,7 +362,9 @@ class OpenMeteoService:
         }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
-        for index in range(len(timeline) if window is not None else min(72, len(timeline))):
+        for index in range(
+            len(timeline) if window is not None else min(72, len(timeline))
+        ):
             row = {"time": timeline[index]}
             row.update(
                 {
@@ -422,7 +448,9 @@ class OpenMeteoService:
         }
         preview: list[dict[str, Any]] = []
         hourly_forecast: list[dict[str, Any]] = []
-        for index in range(len(timeline) if window is not None else min(72, len(timeline))):
+        for index in range(
+            len(timeline) if window is not None else min(72, len(timeline))
+        ):
             row: dict[str, Any] = {"time": timeline[index]}
             for key, values in pollutants.items():
                 row[key] = values[index] if index < len(values) else None
@@ -447,7 +475,9 @@ class OpenMeteoService:
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
             "resolved_at": fetched_at,
-            "observation_time": zoned_observation_time(preview[0].get("time"), payload) if preview else None,
+            "observation_time": zoned_observation_time(preview[0].get("time"), payload)
+            if preview
+            else None,
             "units": self._units(payload),
             "requested_variables": list(self.AIR_QUALITY_VARIABLES),
             "request_parameters": dict(params),
@@ -607,7 +637,9 @@ class OpenMeteoService:
         if response.status_code == 429:
             raise OpenMeteoRateLimitError(
                 "Open-Meteo rate limit reached.",
-                retry_after_seconds=parse_retry_after(response.headers.get("Retry-After")),
+                retry_after_seconds=parse_retry_after(
+                    response.headers.get("Retry-After")
+                ),
             )
         if not response.is_success:
             raise OpenMeteoRequestError(
@@ -655,7 +687,8 @@ class OpenMeteoService:
         now = time.time()
         with self._lock:
             for expired in [
-                key for key, (ts, _) in self._cache.items()
+                key
+                for key, (ts, _) in self._cache.items()
                 if now - ts > self.cache_ttl_s
             ]:
                 del self._cache[expired]
@@ -675,7 +708,8 @@ class OpenMeteoService:
             previous = self._last_call_by_key.get(key)
             slot = max(
                 now,
-                (-math.inf if previous is None else previous) + self.min_call_interval_s,
+                (-math.inf if previous is None else previous)
+                + self.min_call_interval_s,
             )
             self._last_call_by_key[key] = slot
         return slot - now, slot, previous

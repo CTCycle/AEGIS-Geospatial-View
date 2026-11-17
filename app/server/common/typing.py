@@ -2,21 +2,26 @@ from __future__ import annotations
 
 from typing import Any, TypeGuard
 
+
 ###############################################################################
 def is_json_object(value: object) -> TypeGuard[dict[str, Any]]:
     return isinstance(value, dict)
+
 
 ###############################################################################
 def is_json_array(value: object) -> TypeGuard[list[Any]]:
     return isinstance(value, list)
 
+
 ###############################################################################
 def json_object(value: Any) -> dict[str, Any]:
     return value if is_json_object(value) else {}
 
+
 ###############################################################################
 def json_array(value: Any) -> list[Any]:
     return value if is_json_array(value) else []
+
 
 ###############################################################################
 def with_nested_scalars(record: dict[str, Any]) -> dict[str, Any]:
@@ -34,7 +39,8 @@ def with_nested_scalars(record: dict[str, Any]) -> dict[str, Any]:
                 {
                     f"{key}.{name}": item
                     for name, item in value.items()
-                    if isinstance(item, (str, int, float)) and not isinstance(item, bool)
+                    if isinstance(item, (str, int, float))
+                    and not isinstance(item, bool)
                 }
             )
     return flat

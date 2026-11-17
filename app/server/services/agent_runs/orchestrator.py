@@ -33,9 +33,9 @@ from server.services.llm.errors import LLMConfigurationError
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class AgentRunOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -75,7 +75,11 @@ class AgentRunOrchestrator:
             elif snapshot.active_run_version != expected_version:
                 return await self.execute_run(run_id)
             return None
-        LOGGER.info("agent_run event=started run_id=%s version=%s", run_id, snapshot.active_run_version)
+        LOGGER.info(
+            "agent_run event=started run_id=%s version=%s",
+            run_id,
+            snapshot.active_run_version,
+        )
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
         await self._publish_trace(
             snapshot,
@@ -110,8 +114,12 @@ class AgentRunOrchestrator:
                     # Context telemetry must not turn a valid agent result into
                     # a failed run when the event sink is unavailable.
                     log_unexpected_failure(
-                        LOGGER, exc, stage="context_event_persistence", level=logging.WARNING,
-                        run_id=snapshot.run_id, event_type=event_type.value,
+                        LOGGER,
+                        exc,
+                        stage="context_event_persistence",
+                        level=logging.WARNING,
+                        run_id=snapshot.run_id,
+                        event_type=event_type.value,
                     )
                 finally:
                     context_events.task_done()
@@ -174,9 +182,9 @@ class AgentRunOrchestrator:
                         conversation_state={},
                         run_state=run_state,
                         state_hash=_hash_json(run_state),
-                        completed_call_fingerprints=list(
-                            state.successful_fingerprints
-                        )[-32:],
+                        completed_call_fingerprints=list(state.successful_fingerprints)[
+                            -32:
+                        ],
                         completion_reason=state.termination_reason,
                     ).model_dump(mode="json"),
                 ),
@@ -208,7 +216,10 @@ class AgentRunOrchestrator:
                 await self._publish_cancelled(latest)
                 return None
             log_unexpected_failure(
-                LOGGER, exc, stage="agent_execution", run_id=run_id,
+                LOGGER,
+                exc,
+                stage="agent_execution",
+                run_id=run_id,
                 run_version=snapshot.active_run_version,
             )
             safe_message = self._safe_failure_message(exc)
@@ -440,9 +451,7 @@ class AgentRunOrchestrator:
                     run_state=(
                         response.execution_trace.get("checkpoint")
                         if isinstance(response.execution_trace, dict)
-                        and isinstance(
-                            response.execution_trace.get("checkpoint"), dict
-                        )
+                        and isinstance(response.execution_trace.get("checkpoint"), dict)
                         else None
                     ),
                     state_hash=hashlib.sha256(
@@ -627,11 +636,9 @@ class AgentRunOrchestrator:
         raw = trace.payload
         evidence_refs = raw.get("evidence_refs")
         safe_refs = (
-            [
-                str(item)
-                for item in cast(list[Any], evidence_refs)
-                if str(item).strip()
-            ][:16]
+            [str(item) for item in cast(list[Any], evidence_refs) if str(item).strip()][
+                :16
+            ]
             if isinstance(evidence_refs, list)
             else []
         )
@@ -742,7 +749,9 @@ class AgentRunOrchestrator:
         if isinstance(exc, ProviderError):
             return "The map data provider could not complete this request. Try again later."
         text = str(exc).strip().lower()
-        if isinstance(exc, LLMConfigurationError) and text.startswith("no agent model is selected."):
+        if isinstance(exc, LLMConfigurationError) and text.startswith(
+            "no agent model is selected."
+        ):
             return "Select an agent model in Settings before sending a message."
         if "credential" in text or "api key" in text or "authentication" in text:
             return "The configured agent provider is not ready. Open Settings and configure its credential."
@@ -756,8 +765,7 @@ class AgentRunOrchestrator:
     @staticmethod
     def _response_failed(response: ChatTurnResponse) -> bool:
         return (
-            response.operation.status == "failed"
-            or response.operation.kind == "error"
+            response.operation.status == "failed" or response.operation.kind == "error"
         )
 
     # -------------------------------------------------------------------------
@@ -772,6 +780,7 @@ class AgentRunOrchestrator:
             return latest.content
         return snapshot.aggregated_request
 
+
 ###############################################################################
 def _hash_json(value: dict[str, Any]) -> str:
     return hashlib.sha256(
@@ -779,6 +788,7 @@ def _hash_json(value: dict[str, Any]) -> str:
             "utf-8"
         )
     ).hexdigest()
+
 
 ###############################################################################
 def _tool_label(tool_name: str | None) -> str:

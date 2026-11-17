@@ -20,6 +20,7 @@ from server.services.agent_runs.steering import RunSteeringService
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["realtime"])
 metrics_router = APIRouter(prefix="/realtime", tags=["realtime"])
 
+
 ###############################################################################
 @router.websocket(CONVERSATION_REALTIME_ROUTE)
 async def realtime_socket(
@@ -70,6 +71,7 @@ async def realtime_socket(
         render_completion_service=render_completion_service,
     )
     await connection.run()
+
 
 ###############################################################################
 @metrics_router.get("/metrics", include_in_schema=False)

@@ -25,24 +25,30 @@ from server.common.time import parse_retry_after
 # Overpass payloads can be megabytes each, so the response cache stays small.
 OVERPASS_CACHE_MAX_ENTRIES = 64
 
+
 ###############################################################################
 class OverpassServiceError(ProviderError):
     """Base exception for Overpass failures."""
+
 
 ###############################################################################
 class OverpassRequestError(OverpassServiceError):
     """Raised when an Overpass request or response cannot be completed."""
 
+
 ###############################################################################
 class OverpassInvalidQueryError(OverpassServiceError, ProviderInvalidQueryError):
     """Raised when a request is structurally valid but not executable."""
+
 
 ###############################################################################
 class OverpassRateLimitError(OverpassServiceError, ProviderRateLimitError):
     """Raised when Overpass rejects a request due to rate limits."""
 
+
 # Overpass tag keys and values are interpolated into the query text.
 _OSM_TOKEN = re.compile(r"^[a-z][a-z0-9_:]*$")
+
 
 ###############################################################################
 def _overpass_http_error(error: HTTPError) -> OverpassServiceError:
@@ -55,8 +61,11 @@ def _overpass_http_error(error: HTTPError) -> OverpassServiceError:
             retry_after_seconds=parse_retry_after(error.headers.get("Retry-After")),
         )
     if 400 <= error.code < 500 and error.code != 408:
-        return OverpassInvalidQueryError(f"Overpass rejected the query: HTTP {error.code}.")
+        return OverpassInvalidQueryError(
+            f"Overpass rejected the query: HTTP {error.code}."
+        )
     return OverpassRequestError(f"Overpass request failed: HTTP {error.code}.")
+
 
 ###############################################################################
 class OverpassService:
@@ -161,9 +170,7 @@ class OverpassService:
         default_radius_m: float | None = None,
         default_limit: int | None = None,
     ) -> None:
-        configured = settings or OverpassSettings(
-            **JsonOverpassSettings().model_dump()
-        )
+        configured = settings or OverpassSettings(**JsonOverpassSettings().model_dump())
         self.base_url = base_url or configured.base_url
         self.user_agent = user_agent or configured.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else configured.timeout
@@ -227,7 +234,8 @@ class OverpassService:
             dict.fromkeys(
                 selector
                 for selector in selectors
-                if _OSM_TOKEN.fullmatch(selector[0]) and _OSM_TOKEN.fullmatch(selector[1])
+                if _OSM_TOKEN.fullmatch(selector[0])
+                and _OSM_TOKEN.fullmatch(selector[1])
             )
         )
         if categories and not selectors:
@@ -250,7 +258,13 @@ class OverpassService:
         # selectors (shop, leisure, aeroway, tourism, ...) keep their results.
         category_keys = tuple(
             dict.fromkeys(
-                [*(key for key, _ in selectors), "amenity", "public_transport", "railway", "highway"]
+                [
+                    *(key for key, _ in selectors),
+                    "amenity",
+                    "public_transport",
+                    "railway",
+                    "highway",
+                ]
             )
         )
         points: list[dict[str, Any]] = []
@@ -277,7 +291,7 @@ class OverpassService:
             try:
                 lat_value = float(str(lat))
                 lon_value = float(str(lon))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             distance_m = self._haversine_distance_m(
                 latitude, longitude, lat_value, lon_value
@@ -554,7 +568,8 @@ class OverpassService:
         with self._lock:
             now = time.time()
             for key in [
-                key for key, (ts, _payload) in self._cache.items()
+                key
+                for key, (ts, _payload) in self._cache.items()
                 if now - ts > self.cache_ttl_s
             ]:
                 del self._cache[key]

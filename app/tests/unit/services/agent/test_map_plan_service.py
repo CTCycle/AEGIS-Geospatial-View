@@ -55,14 +55,17 @@ SRTM_LEGEND = {
 
 LOCATION = ResolvedLocation(label="Zurich HB", latitude=47.378, longitude=8.540)
 
+
 ###############################################################################
 class FakeCapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, object]]:
         return [
             {"id": "basemap:osm", "metadata": {"keywords": ["street map"]}},
-            {"id": "esri_world_imagery", "metadata": {"keywords": ["satellite", "satellitare"]}},
+            {
+                "id": "esri_world_imagery",
+                "metadata": {"keywords": ["satellite", "satellitare"]},
+            },
         ]
 
     # -------------------------------------------------------------------------
@@ -118,9 +121,9 @@ class FakeCapabilityRegistry:
         }
         return values.get(capability_id)
 
+
 ###############################################################################
 class FakeEvidenceRepository:
-
     # -------------------------------------------------------------------------
     def get_summary(
         self,
@@ -216,9 +219,9 @@ class FakeEvidenceRepository:
             }
         ).encode()
 
+
 ###############################################################################
 class _AdmissionEvidenceRepository(FakeEvidenceRepository):
-
     # -------------------------------------------------------------------------
     def __init__(self, *, status: str, map_eligibility: str) -> None:
         self.status = status
@@ -253,6 +256,7 @@ class _AdmissionEvidenceRepository(FakeEvidenceRepository):
         if summary is None:
             return None
         return summary, json.dumps({"features": [{"id": "hospital-1"}]}).encode()
+
 
 ###############################################################################
 class _TwoCityEvidenceRepository(FakeEvidenceRepository):
@@ -306,6 +310,7 @@ class _TwoCityEvidenceRepository(FakeEvidenceRepository):
             }
         ).encode()
 
+
 ###############################################################################
 class _ForecastEvidenceRepository(FakeEvidenceRepository):
     """Numeric point features, optionally with provenance units."""
@@ -351,6 +356,7 @@ class _ForecastEvidenceRepository(FakeEvidenceRepository):
             {"type": "FeatureCollection", "features": features}
         ).encode()
 
+
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -379,7 +385,10 @@ async def test_value_encoded_evidence_layer_carries_a_continuous_legend(
                     action="add_evidence_layer",
                     evidence_ref="evidence:forecast",
                     capability_id="places:hospitals",
-                    value_encoding={"mode": "graduated", "field": "precipitation_sum_mm"},  # type: ignore[arg-type]
+                    value_encoding={
+                        "mode": "graduated",
+                        "field": "precipitation_sum_mm",
+                    },  # type: ignore[arg-type]
                 )
             ],
         ),
@@ -389,7 +398,9 @@ async def test_value_encoded_evidence_layer_carries_a_continuous_legend(
 
     assert result.status == "success"
     assert state.prepared_map_session is not None
-    legend = state.prepared_map_session.overlay_collection.instances[-1].descriptor["legend"]
+    legend = state.prepared_map_session.overlay_collection.instances[-1].descriptor[
+        "legend"
+    ]
     assert legend["kind"] == "continuous"
     assert legend["title"] == "precipitation_sum_mm"
     assert legend["units"] == expected_units
@@ -399,6 +410,7 @@ async def test_value_encoded_evidence_layer_carries_a_continuous_legend(
     ]
     assert legend["entries"][1]["label"] == expected_label
     assert legend["nodata_colors"] == []
+
 
 ###############################################################################
 def _state(
@@ -415,6 +427,7 @@ def _state(
         evidence_refs=["evidence:hospitals"],
         active_map_session=active_map_session,
     )
+
 
 ###############################################################################
 def _active_session() -> MapSession:
@@ -442,6 +455,7 @@ def _active_session() -> MapSession:
         ),
     )
 
+
 ###############################################################################
 def _service() -> MapPlanService:
     return MapPlanService(
@@ -449,25 +463,39 @@ def _service() -> MapPlanService:
         evidence_repository=FakeEvidenceRepository(),
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
-@pytest.mark.parametrize("count,extent,tight", [
-    (5, [12.474, 41.896, 12.478, 41.900], True),
-    (1, [12.476, 41.898, 12.476, 41.898], False),
-    (5, [12.476, 41.898, 12.476, 41.898], False),
-])
+@pytest.mark.parametrize(
+    "count,extent,tight",
+    [
+        (5, [12.474, 41.896, 12.478, 41.900], True),
+        (1, [12.476, 41.898, 12.476, 41.898], False),
+        (5, [12.476, 41.898, 12.476, 41.898], False),
+    ],
+)
 async def test_derived_viewport_distinguishes_nearby_results_but_keeps_single_point_guard(
-    count: int, extent: list[float], tight: bool,
+    count: int,
+    extent: list[float],
+    tight: bool,
 ) -> None:
     builder = MapSessionBuilder(capability_registry=FakeCapabilityRegistry())  # type: ignore[arg-type]
     candidate = await builder.build(
         location=ResolvedLocation(label="Pantheon", latitude=41.898, longitude=12.476),
         active_session=_active_session(),
-        evidence=[AgentEvidenceEnvelope(
-            ok=True, status="available", evidence_ref="ranked",
-            summary={"located_record_count": count, "bbox": extent},
-        )],
-        actions=[SetViewportAction(action="set_viewport", strategy="fit_evidence", evidence_refs=["ranked"])],
+        evidence=[
+            AgentEvidenceEnvelope(
+                ok=True,
+                status="available",
+                evidence_ref="ranked",
+                summary={"located_record_count": count, "bbox": extent},
+            )
+        ],
+        actions=[
+            SetViewportAction(
+                action="set_viewport", strategy="fit_evidence", evidence_refs=["ranked"]
+            )
+        ],
     )
     assert candidate.viewport.bbox is not None
     west, south, east, north = candidate.viewport.bbox
@@ -477,6 +505,7 @@ async def test_derived_viewport_distinguishes_nearby_results_but_keeps_single_po
         assert south <= extent[1] <= extent[3] <= north
     else:
         assert east - west >= 0.25 and north - south >= 0.25
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -514,11 +543,13 @@ def test_render_descriptor_admission_rejects_unsafe_geojson_sources(
     with pytest.raises(MapPlanBuildError):
         MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
 
+
 ###############################################################################
 def test_render_descriptor_admission_accepts_relative_geojson_source() -> None:
     descriptor = {"rendering_mode": "geojson", "url": "/api/geospatial/layer"}
 
     MapSessionBuilder._validate_render_descriptor(descriptor)  # pyright: ignore[reportPrivateUsage]
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -552,6 +583,7 @@ async def test_raster_tile_provider_url_is_normalized_for_candidate_rendering() 
     assert overlay.descriptor["source_url"] == (
         "https://hazards.fema.gov/export?bbox={bbox-epsg-3857}"
     )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -587,6 +619,7 @@ async def test_nested_provider_raster_payload_is_admitted_for_map_plan() -> None
     assert overlay.descriptor["default_time"] == "2026-06-18"
     assert overlay.descriptor["legend"] == SRTM_LEGEND
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
@@ -610,7 +643,7 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-                actions=[
+            actions=[
                 AddEvidenceLayerAction(
                     action="add_evidence_layer",
                     evidence_ref="evidence:hospitals",
@@ -654,11 +687,19 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
 
     # The answer names the layer with the drawn count, and flags a cut against the source count.
     state.active_map_session = state.prepared_map_session
-    state.tool_results.append(ToolResult(
-        call_id="execute-hospitals", tool_name="execute_geospatial_capability", status="success",
-        summary="Found hospitals.", evidence_refs=["evidence:hospitals"], data={"feature_count": 1},
-        metadata=ToolExecutionMetadata(capability_id="places:hospitals", duration_ms=0),
-    ))
+    state.tool_results.append(
+        ToolResult(
+            call_id="execute-hospitals",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="Found hospitals.",
+            evidence_refs=["evidence:hospitals"],
+            data={"feature_count": 1},
+            metadata=ToolExecutionMetadata(
+                capability_id="places:hospitals", duration_ms=0
+            ),
+        )
+    )
     # The later map-plan result names the same evidence but carries no count.
     state.tool_results.append(result)
     assert "(1 record)" in AgentLoop._verified_map_fallback(state)  # pyright: ignore[reportPrivateUsage]
@@ -667,10 +708,13 @@ async def test_apply_prepares_candidate_without_mutating_active_map() -> None:
     assert "(1 of 91 records shown)" in AgentLoop._verified_map_fallback(state)  # pyright: ignore[reportPrivateUsage]
     assert AgentLoop.completion_summary(state).truncations == [(1, 91)]
 
+
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("use_derived_layer", [False, True])
-async def test_geometry_candidate_requires_the_verified_result_layer(use_derived_layer: bool) -> None:
+async def test_geometry_candidate_requires_the_verified_result_layer(
+    use_derived_layer: bool,
+) -> None:
     state = _state(active_map_session=_active_session())
     state.route = CapabilityRoute(
         primary_domain=CapabilityDomain.SPATIAL_ANALYSIS,
@@ -678,34 +722,53 @@ async def test_geometry_candidate_requires_the_verified_result_layer(use_derived
         presentation="map",
         geometry_operation="buffer",
     )
-    state.tool_results.append(ToolResult(
-        call_id="buffer", tool_name="transform_evidence", status="success", summary="Buffered hospitals",
-        evidence_refs=["evidence:hospitals"], data={"located_record_count": 1},
-        metadata=ToolExecutionMetadata(duration_ms=0, geometry_operations=["buffer"]),
-    ))
+    state.tool_results.append(
+        ToolResult(
+            call_id="buffer",
+            tool_name="transform_evidence",
+            status="success",
+            summary="Buffered hospitals",
+            evidence_refs=["evidence:hospitals"],
+            data={"located_record_count": 1},
+            metadata=ToolExecutionMetadata(
+                duration_ms=0, geometry_operations=["buffer"]
+            ),
+        )
+    )
     actions = (
-        [AddEvidenceLayerAction(
-            action="add_evidence_layer", evidence_ref="evidence:hospitals", capability_id="places:hospitals",
-        )]
+        [
+            AddEvidenceLayerAction(
+                action="add_evidence_layer",
+                evidence_ref="evidence:hospitals",
+                capability_id="places:hospitals",
+            )
+        ]
         if use_derived_layer
         else [SetViewportAction(action="set_viewport", strategy="fit_location")]
     )
     result = await _service().apply(
         MapPlan(expected_collection_revision=2, actions=actions),
         state,
-        ToolExecutionContext(conversation_id="conversation-1", call_id="call-map-geometry"),
+        ToolExecutionContext(
+            conversation_id="conversation-1", call_id="call-map-geometry"
+        ),
     )
     if use_derived_layer:
         assert result.status == "success"
         assert state.prepared_map_session is not None
     else:
-        assert result.error is not None and result.error.code == "requested_geometry_missing"
+        assert (
+            result.error is not None
+            and result.error.code == "requested_geometry_missing"
+        )
         assert state.prepared_map_session is None
 
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view() -> None:
+async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view() -> (
+    None
+):
     state = _state()
     state.evidence_refs = ["evidence:zurich", "evidence:lisbon"]
     service = MapPlanService(
@@ -750,6 +813,7 @@ async def test_same_capability_evidence_for_two_places_keeps_both_layers_in_view
         47.3744489,
     ]
 
+
 ###############################################################################
 class _TimeWindowRepository(_TwoCityEvidenceRepository):
     """Two queries of one capability and place that differ only in time window."""
@@ -764,8 +828,15 @@ class _TimeWindowRepository(_TwoCityEvidenceRepository):
         if summary is None:
             return None
         window = "2026-10-01" if evidence_id == "evidence:old" else "2026-11-05"
-        query = {"operation": "list", "location_ref": "zurich", "start_time_iso": window}
-        return summary.model_copy(update={"summary": {**summary.summary, "query": query}})
+        query = {
+            "operation": "list",
+            "location_ref": "zurich",
+            "start_time_iso": window,
+        }
+        return summary.model_copy(
+            update={"summary": {**summary.summary, "query": query}}
+        )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -781,9 +852,13 @@ async def test_requery_with_a_new_time_window_replaces_the_earlier_layer() -> No
     def plan(ref: str, revision: int) -> MapPlan:
         return MapPlan(
             expected_collection_revision=revision,
-            actions=[AddEvidenceLayerAction(
-                action="add_evidence_layer", evidence_ref=ref, capability_id="places:hospitals"
-            )],
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref=ref,
+                    capability_id="places:hospitals",
+                )
+            ],
         )
 
     await service.apply(plan("evidence:old", 0), state, context)
@@ -800,6 +875,7 @@ async def test_requery_with_a_new_time_window_replaces_the_earlier_layer() -> No
         for item in state.prepared_map_session.overlay_collection.instances
     ] == ["evidence:new"]
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_an_action_on_a_superseded_layer_follows_its_replacement() -> None:
@@ -810,28 +886,48 @@ async def test_an_action_on_a_superseded_layer_follows_its_replacement() -> None
         evidence_repository=_TimeWindowRepository(),
     )
     context = ToolExecutionContext(conversation_id="conversation-1")
-    first = await service.apply(MapPlan(expected_collection_revision=0, actions=[AddEvidenceLayerAction(
-        action="add_evidence_layer", evidence_ref="evidence:old", capability_id="places:hospitals"
-    )]), state, context)
+    first = await service.apply(
+        MapPlan(
+            expected_collection_revision=0,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:old",
+                    capability_id="places:hospitals",
+                )
+            ],
+        ),
+        state,
+        context,
+    )
     assert first.status == "success" and state.prepared_map_session is not None
     old_id = state.prepared_map_session.overlay_collection.instances[0].instance_id
     state.active_map_session = state.prepared_map_session
 
-    result = await service.apply(MapPlan(
-        expected_collection_revision=state.active_map_session.overlay_collection.revision,
-        actions=[
-            AddEvidenceLayerAction(
-                action="add_evidence_layer", evidence_ref="evidence:new", capability_id="places:hospitals"
-            ),
-            SetLayerOpacityAction(action="set_layer_opacity", instance_id=old_id, opacity=0.5),
-        ],
-    ), state, context)
+    result = await service.apply(
+        MapPlan(
+            expected_collection_revision=state.active_map_session.overlay_collection.revision,
+            actions=[
+                AddEvidenceLayerAction(
+                    action="add_evidence_layer",
+                    evidence_ref="evidence:new",
+                    capability_id="places:hospitals",
+                ),
+                SetLayerOpacityAction(
+                    action="set_layer_opacity", instance_id=old_id, opacity=0.5
+                ),
+            ],
+        ),
+        state,
+        context,
+    )
 
     assert result.status == "success"
     assert state.prepared_map_session is not None
     [layer] = state.prepared_map_session.overlay_collection.instances
     assert layer.descriptor["evidence_ref"] == "evidence:new"
     assert layer.opacity == 0.5
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -854,9 +950,12 @@ async def test_location_only_plan_gets_catalog_default_basemap() -> None:
     assert state.prepared_map_session.basemap_id == "basemap:osm"
     assert state.prepared_map_session.overlay_collection.instances == []
 
+
 ###############################################################################
 @pytest.mark.asyncio
-@pytest.mark.parametrize("message", ["Show me Sanremo in satellite view", "vista satellitare di Sanremo"])
+@pytest.mark.parametrize(
+    "message", ["Show me Sanremo in satellite view", "vista satellitare di Sanremo"]
+)
 async def test_location_only_plan_uses_basemap_named_by_the_user(message: str) -> None:
     state = _state()
     state.evidence_refs = []
@@ -875,6 +974,7 @@ async def test_location_only_plan_uses_basemap_named_by_the_user(message: str) -
     assert result.status == "success"
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "esri_world_imagery"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -898,6 +998,7 @@ async def test_named_basemap_style_overrides_a_different_model_choice() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "esri_world_imagery"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_named_basemap_applies_on_an_active_map_without_set_basemap() -> None:
@@ -920,21 +1021,34 @@ async def test_named_basemap_applies_on_an_active_map_without_set_basemap() -> N
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "basemap:osm"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "view,action,expected",
     [
         ([8.0, 45.0, 10.0, 46.0], {"strategy": "zoom_in"}, [8.5, 45.25, 9.5, 45.75]),
-        ([8.0, 45.0, 10.0, 46.0], {"strategy": "zoom_out", "steps": 2}, [5.0, 43.5, 13.0, 47.5]),
-        ([8.0, 45.0, 10.0, 46.0], {"strategy": "pan", "direction": "north"}, [8.0, 45.5, 10.0, 46.5]),
+        (
+            [8.0, 45.0, 10.0, 46.0],
+            {"strategy": "zoom_out", "steps": 2},
+            [5.0, 43.5, 13.0, 47.5],
+        ),
+        (
+            [8.0, 45.0, 10.0, 46.0],
+            {"strategy": "pan", "direction": "north"},
+            [8.0, 45.5, 10.0, 46.5],
+        ),
         (
             [8.0, 45.0, 10.0, 46.0],
             {"strategy": "zoom_in", "anchor": "location"},
             [8.04, 47.128, 9.04, 47.628],
         ),
         # Zooming far out stops at the renderable world.
-        ([-100.0, -40.0, 100.0, 40.0], {"strategy": "zoom_out", "steps": 4}, [-180.0, -85.0, 180.0, 85.0]),
+        (
+            [-100.0, -40.0, 100.0, 40.0],
+            {"strategy": "zoom_out", "steps": 4},
+            [-180.0, -85.0, 180.0, 85.0],
+        ),
     ],
 )
 async def test_zoom_and_pan_move_the_client_reported_view(
@@ -946,7 +1060,9 @@ async def test_zoom_and_pan_move_the_client_reported_view(
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-            actions=[SetViewportAction.model_validate({"action": "set_viewport", **action})],
+            actions=[
+                SetViewportAction.model_validate({"action": "set_viewport", **action})
+            ],
         ),
         state,
         ToolExecutionContext(conversation_id="conversation-1"),
@@ -956,6 +1072,7 @@ async def test_zoom_and_pan_move_the_client_reported_view(
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.bounds == pytest.approx(expected)
     assert state.prepared_map_session.basemap_id == "basemap:osm"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -978,6 +1095,7 @@ async def test_zoom_on_the_city_centre_centres_on_the_shown_place() -> None:
         {"latitude": LOCATION.latitude, "longitude": LOCATION.longitude}
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_first_map_uses_the_style_named_before_the_place_was_given() -> None:
@@ -986,7 +1104,10 @@ async def test_first_map_uses_the_style_named_before_the_place_was_given() -> No
     state.user_message = "Zurich"
     state.recent_messages = [
         {"role": "user", "content": "Switch to satellite view"},
-        {"role": "assistant", "content": "There is no map yet. Which place should I show?"},
+        {
+            "role": "assistant",
+            "content": "There is no map yet. Which place should I show?",
+        },
     ]
     result = await _service().apply(
         MapPlan(
@@ -1000,6 +1121,7 @@ async def test_first_map_uses_the_style_named_before_the_place_was_given() -> No
     assert result.status == "success"
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.basemap_id == "esri_world_imagery"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1035,6 +1157,7 @@ async def test_valid_empty_location_only_plan_carries_completion_status() -> Non
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.payload["result_status"] == "valid_empty"
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_stale_revision_is_rejected_without_candidate() -> None:
@@ -1042,7 +1165,7 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=1,
-                actions=[
+            actions=[
                 SetLayerVisibilityAction(
                     action="set_layer_visibility",
                     instance_id="traffic-1",
@@ -1058,6 +1181,7 @@ async def test_stale_revision_is_rejected_without_candidate() -> None:
     assert result.error is not None
     assert result.error.code == "stale_map_revision"
     assert state.prepared_map_session is None
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1098,6 +1222,7 @@ async def test_active_map_move_uses_the_validated_new_route_target() -> None:
         "longitude": salta.longitude,
     }
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
@@ -1131,6 +1256,7 @@ async def test_active_map_move_does_not_fall_back_to_prior_location() -> None:
     # A named but unresolved place is a tool-order correction, not a question.
     assert result.error.recovery == "choose_alternate_tool"
     assert state.prepared_map_session is None
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1175,6 +1301,7 @@ async def test_data_layer_plan_uses_spatial_scope_location_target() -> None:
     assert state.prepared_map_session is not None
     assert state.prepared_map_session.resolved_location == location
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_missing_evidence_is_rejected() -> None:
@@ -1183,7 +1310,7 @@ async def test_missing_evidence_is_rejected() -> None:
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-                actions=[
+            actions=[
                 AddEvidenceLayerAction(
                     action="add_evidence_layer",
                     evidence_ref="evidence:hospitals",
@@ -1198,6 +1325,7 @@ async def test_missing_evidence_is_rejected() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == "unknown_evidence"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1223,6 +1351,7 @@ async def test_not_renderable_evidence_is_rejected_before_candidate_build() -> N
     assert result.error is not None
     assert result.error.code == "evidence_not_renderable"
     assert state.prepared_map_session is None
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1264,6 +1393,7 @@ async def test_non_usable_evidence_cannot_satisfy_a_requested_layer(
     assert result.error.code == "evidence_not_renderable"
     assert state.prepared_map_session is None
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> None:
@@ -1288,20 +1418,26 @@ async def test_vector_tile_descriptor_without_source_metadata_is_rejected() -> N
     assert result.error.code == "render_descriptor_unavailable"
     assert state.prepared_map_session is None
 
+
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation", ["set_layer_visibility", "hide"])
-async def test_visibility_mutation_increments_candidate_revision(operation: str) -> None:
+async def test_visibility_mutation_increments_candidate_revision(
+    operation: str,
+) -> None:
     state = _state(active_map_session=_active_session())
     state.route = CapabilityRoute(
-        primary_domain=CapabilityDomain.MAP_STATE, task_mode="execute",
-        presentation="map", location_mode="none", operation=operation,
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        location_mode="none",
+        operation=operation,
         target_refs=["Traffic"],
     )
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-                actions=[
+            actions=[
                 SetLayerVisibilityAction(
                     action="set_layer_visibility",
                     instance_id="traffic-1",
@@ -1318,13 +1454,17 @@ async def test_visibility_mutation_increments_candidate_revision(operation: str)
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances[0].visible is False
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_unknown_layer_error_names_the_layers_on_the_map() -> None:
     state = _state(active_map_session=_active_session())
     state.route = CapabilityRoute(
-        primary_domain=CapabilityDomain.MAP_STATE, task_mode="execute",
-        presentation="map", location_mode="none", operation="hide",
+        primary_domain=CapabilityDomain.MAP_STATE,
+        task_mode="execute",
+        presentation="map",
+        location_mode="none",
+        operation="hide",
         target_refs=["Traffic"],
     )
     result = await _service().apply(
@@ -1347,6 +1487,7 @@ async def test_unknown_layer_error_names_the_layers_on_the_map() -> None:
     # A guessed id is answered with the real ones so the retry can differ.
     assert result.error.message.endswith("Layers on the map: traffic-1 (Traffic).")
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_remove_layer_mutation_removes_instance_and_increments_revision() -> None:
@@ -1354,9 +1495,7 @@ async def test_remove_layer_mutation_removes_instance_and_increments_revision() 
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-            actions=[
-                RemoveLayerAction(action="remove_layer", instance_id="traffic-1")
-            ],
+            actions=[RemoveLayerAction(action="remove_layer", instance_id="traffic-1")],
         ),
         state,
         ToolExecutionContext(conversation_id="conversation-1"),
@@ -1367,13 +1506,19 @@ async def test_remove_layer_mutation_removes_instance_and_increments_revision() 
     assert state.prepared_map_session.overlay_collection.revision == 3
     assert state.prepared_map_session.overlay_collection.instances == []
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_comparison_viewport_is_widened_to_every_evidence_extent() -> None:
     builder = MapSessionBuilder(capability_registry=FakeCapabilityRegistry())  # type: ignore[arg-type]
     evidence = [
-        AgentEvidenceEnvelope(ok=True, status="available", evidence_ref=ref, summary={"bbox": bbox})
-        for ref, bbox in (("paris", [2.35, 48.85, 2.35, 48.85]), ("berlin", [13.4, 52.52, 13.4, 52.52]))
+        AgentEvidenceEnvelope(
+            ok=True, status="available", evidence_ref=ref, summary={"bbox": bbox}
+        )
+        for ref, bbox in (
+            ("paris", [2.35, 48.85, 2.35, 48.85]),
+            ("berlin", [13.4, 52.52, 13.4, 52.52]),
+        )
     ]
     candidate = await builder.build(
         location=ResolvedLocation(label="Paris", latitude=48.85, longitude=2.35),
@@ -1381,7 +1526,9 @@ async def test_comparison_viewport_is_widened_to_every_evidence_extent() -> None
         evidence=evidence,
         actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
     )
-    west, south, east, north = viewport_covering_evidence(candidate, evidence).viewport.bbox or []
+    west, south, east, north = (
+        viewport_covering_evidence(candidate, evidence).viewport.bbox or []
+    )
 
     assert west <= 2.35 and east >= 13.4 and south <= 48.85 and north >= 52.52
 
@@ -1390,8 +1537,12 @@ async def test_comparison_viewport_is_widened_to_every_evidence_extent() -> None
 def test_location_only_map_view_must_frame_every_requested_place() -> None:
     state = _state()
     state.location_refs = {
-        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
-        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        "paris": ResolvedLocation(
+            label="Paris, France", latitude=48.85, longitude=2.35
+        ),
+        "berlin": ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
     }
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.MAP_RENDERING,
@@ -1406,13 +1557,18 @@ def test_location_only_map_view_must_frame_every_requested_place() -> None:
     assert targets_outside_view(state, [2.2, 48.8, 2.5, 48.9]) == ["Berlin"]
     assert targets_outside_view(state, [2.0, 48.0, 14.0, 53.0]) == []
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_location_only_map_of_two_places_is_widened_to_frame_both() -> None:
     state = _state()
     state.location_refs = {
-        "paris": ResolvedLocation(label="Paris, France", latitude=48.85, longitude=2.35),
-        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        "paris": ResolvedLocation(
+            label="Paris, France", latitude=48.85, longitude=2.35
+        ),
+        "berlin": ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
     }
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.MAP_RENDERING,
@@ -1428,8 +1584,14 @@ async def test_location_only_map_of_two_places_is_widened_to_frame_both() -> Non
         MapPlan(
             expected_collection_revision=0,
             actions=[
-                SetViewportAction(action="set_viewport", strategy="fit_location", location_ref="paris"),
-                SetViewportAction(action="set_viewport", strategy="fit_location", location_ref="berlin"),
+                SetViewportAction(
+                    action="set_viewport", strategy="fit_location", location_ref="paris"
+                ),
+                SetViewportAction(
+                    action="set_viewport",
+                    strategy="fit_location",
+                    location_ref="berlin",
+                ),
             ],
         ),
         state,
@@ -1441,12 +1603,17 @@ async def test_location_only_map_of_two_places_is_widened_to_frame_both() -> Non
     west, south, east, north = state.prepared_map_session.viewport.bbox or []
     assert west < 2.35 and east > 13.4 and south < 48.85 and north > 52.52
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_location_only_map_rejects_a_parent_standing_in_for_an_unresolved_landmark() -> None:
+async def test_location_only_map_rejects_a_parent_standing_in_for_an_unresolved_landmark() -> (
+    None
+):
     state = _state()
     state.location_refs = {
-        "berlin": ResolvedLocation(label="Berlin, Germany", latitude=52.52, longitude=13.4),
+        "berlin": ResolvedLocation(
+            label="Berlin, Germany", latitude=52.52, longitude=13.4
+        ),
     }
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.MAP_RENDERING,
@@ -1471,6 +1638,7 @@ async def test_location_only_map_rejects_a_parent_standing_in_for_an_unresolved_
     assert result.error is not None and result.error.code == "target_not_resolved"
     assert state.prepared_map_session is None
 
+
 ###############################################################################
 def _marking_state(
     places: dict[str, ResolvedLocation], targets: list[str] | None = None
@@ -1492,13 +1660,18 @@ def _marking_state(
     AgentLoop._compile_native_goal(state, route)  # pyright: ignore[reportPrivateUsage]
     return state
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_marking_places_pins_them_on_the_shown_map_and_keeps_the_view() -> None:
     state = _marking_state(
         {
-            "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
-            "Grossmunster": ResolvedLocation(label="Grossmunster, Zurich", latitude=47.370, longitude=8.544),
+            "Kunsthaus": ResolvedLocation(
+                label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548
+            ),
+            "Grossmunster": ResolvedLocation(
+                label="Grossmunster, Zurich", latitude=47.370, longitude=8.544
+            ),
         },
         # A route remark in parentheses must not leave the place unresolved.
         targets=["Kunsthaus", "Grossmunster (old town)"],
@@ -1510,7 +1683,9 @@ async def test_marking_places_pins_them_on_the_shown_map_and_keeps_the_view() ->
         MapPlan(
             expected_collection_revision=2,
             actions=[
-                MarkLocationsAction(action="mark_locations", location_refs=["Kunsthaus", "Grossmunster"]),
+                MarkLocationsAction(
+                    action="mark_locations", location_refs=["Kunsthaus", "Grossmunster"]
+                ),
                 # A re-fit of the shown place would discard the user's zoom.
                 SetViewportAction(action="set_viewport", strategy="fit_location"),
             ],
@@ -1525,10 +1700,14 @@ async def test_marking_places_pins_them_on_the_shown_map_and_keeps_the_view() ->
     assert candidate.resolved_location == LOCATION
     assert candidate.viewport.bbox == pytest.approx([8.50, 47.35, 8.58, 47.40])
     markers = next(
-        item for item in candidate.overlay_collection.instances
+        item
+        for item in candidate.overlay_collection.instances
         if item.rendering_mode == "place-markers"
     )
-    names = [feature["properties"]["name"] for feature in markers.descriptor["data"]["features"]]
+    names = [
+        feature["properties"]["name"]
+        for feature in markers.descriptor["data"]["features"]
+    ]
     assert names == ["Kunsthaus", "Grossmunster"]
     assert unmarked_route_targets(state) == []
     state.active_map_session = candidate
@@ -1536,23 +1715,34 @@ async def test_marking_places_pins_them_on_the_shown_map_and_keeps_the_view() ->
         "Marked 2 places on the map: Kunsthaus, Grossmunster."
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_marking_outside_the_view_frames_the_markers_under_the_requested_names() -> None:
-    state = _marking_state({
-        "Uetliberg": ResolvedLocation(label="Uetliberg, Zurich", latitude=47.349, longitude=8.491),
-        # The geocoder answered the district with a building inside it.
-        "niederdorf": ResolvedLocation(
-            label="Cabaret Voltaire, Spiegelgasse, Niederdorf, Zurich",
-            latitude=47.372,
-            longitude=8.544,
-        ),
-    })
+async def test_marking_outside_the_view_frames_the_markers_under_the_requested_names() -> (
+    None
+):
+    state = _marking_state(
+        {
+            "Uetliberg": ResolvedLocation(
+                label="Uetliberg, Zurich", latitude=47.349, longitude=8.491
+            ),
+            # The geocoder answered the district with a building inside it.
+            "niederdorf": ResolvedLocation(
+                label="Cabaret Voltaire, Spiegelgasse, Niederdorf, Zurich",
+                latitude=47.372,
+                longitude=8.544,
+            ),
+        }
+    )
 
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Uetliberg", "niederdorf"])],
+            actions=[
+                MarkLocationsAction(
+                    action="mark_locations", location_refs=["Uetliberg", "niederdorf"]
+                )
+            ],
         ),
         state,
         ToolExecutionContext(conversation_id="conversation-1"),
@@ -1566,11 +1756,16 @@ async def test_marking_outside_the_view_frames_the_markers_under_the_requested_n
     # Framed on the markers, not on the union with the old view.
     assert north < 47.40
     markers = next(
-        item for item in candidate.overlay_collection.instances
+        item
+        for item in candidate.overlay_collection.instances
         if item.rendering_mode == "place-markers"
     )
-    names = [feature["properties"]["name"] for feature in markers.descriptor["data"]["features"]]
+    names = [
+        feature["properties"]["name"]
+        for feature in markers.descriptor["data"]["features"]
+    ]
     assert names == ["Uetliberg", "Niederdorf"]
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1581,7 +1776,9 @@ async def test_marking_a_distant_place_moves_the_map_subject_with_the_view() -> 
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Rome"])],
+            actions=[
+                MarkLocationsAction(action="mark_locations", location_refs=["Rome"])
+            ],
         ),
         state,
         ToolExecutionContext(conversation_id="conversation-1"),
@@ -1594,12 +1791,17 @@ async def test_marking_a_distant_place_moves_the_map_subject_with_the_view() -> 
     west, south, east, north = candidate.viewport.bbox or []
     assert west < rome.longitude < east and south < rome.latitude < north
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_marking_route_rejects_plans_that_do_not_mark_resolved_places() -> None:
-    state = _marking_state({
-        "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
-    })
+    state = _marking_state(
+        {
+            "Kunsthaus": ResolvedLocation(
+                label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548
+            ),
+        }
+    )
     framing_only = ApplyMapPlanInput(
         expected_collection_revision=2,
         actions=[SetViewportAction(action="set_viewport", strategy="fit_location")],
@@ -1612,7 +1814,11 @@ async def test_marking_route_rejects_plans_that_do_not_mark_resolved_places() ->
     result = await _service().apply(
         MapPlan(
             expected_collection_revision=2,
-            actions=[MarkLocationsAction(action="mark_locations", location_refs=["Opera House"])],
+            actions=[
+                MarkLocationsAction(
+                    action="mark_locations", location_refs=["Opera House"]
+                )
+            ],
         ),
         state,
         ToolExecutionContext(conversation_id="conversation-1"),
@@ -1620,13 +1826,16 @@ async def test_marking_route_rejects_plans_that_do_not_mark_resolved_places() ->
     assert result.status == "failed"
     assert result.error is not None and result.error.code == "missing_location"
 
+
 ###############################################################################
 def test_marking_recovery_keeps_each_place_on_its_own_lookup() -> None:
     gallery = "National Gallery of Canada, 380 Sussex Drive, Byward Market, Ottawa"
     state = _marking_state(
         {
             # The district lookup returned the gallery building inside it.
-            "byward market, ottawa": ResolvedLocation(label=gallery, latitude=45.429, longitude=-75.699),
+            "byward market, ottawa": ResolvedLocation(
+                label=gallery, latitude=45.429, longitude=-75.699
+            ),
             "national gallery of canada, ottawa": ResolvedLocation(
                 label=gallery, latitude=45.4295, longitude=-75.6988
             ),
@@ -1640,40 +1849,64 @@ def test_marking_recovery_keeps_each_place_on_its_own_lookup() -> None:
         "national gallery of canada, ottawa",
     ]
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_marker_value_labels_must_come_from_the_retrieved_data() -> None:
-    state = _marking_state({
-        "Kunsthaus": ResolvedLocation(label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548),
-    })
-    state.tool_results.append(ToolResult(
-        call_id="weather", tool_name="execute_geospatial_capability", status="success",
-        summary="ok", data={"current": {"temperature_2m": 18.3}},
-        metadata=ToolExecutionMetadata(duration_ms=1),
-    ))
+    state = _marking_state(
+        {
+            "Kunsthaus": ResolvedLocation(
+                label="Kunsthaus, Zurich", latitude=47.370, longitude=8.548
+            ),
+        }
+    )
+    state.tool_results.append(
+        ToolResult(
+            call_id="weather",
+            tool_name="execute_geospatial_capability",
+            status="success",
+            summary="ok",
+            data={"current": {"temperature_2m": 18.3}},
+            metadata=ToolExecutionMetadata(duration_ms=1),
+        )
+    )
 
     async def mark(label: str) -> ToolResult:
         return await _service().apply(
             MapPlan(
                 expected_collection_revision=2,
-                actions=[MarkLocationsAction(
-                    action="mark_locations", location_refs=["Kunsthaus"], annotations={"Kunsthaus": label},
-                )],
+                actions=[
+                    MarkLocationsAction(
+                        action="mark_locations",
+                        location_refs=["Kunsthaus"],
+                        annotations={"Kunsthaus": label},
+                    )
+                ],
             ),
             state,
             ToolExecutionContext(conversation_id="conversation-1"),
         )
 
     invented = await mark("21.7 °C")
-    assert invented.error is not None and invented.error.code == "annotation_not_in_evidence"
+    assert (
+        invented.error is not None
+        and invented.error.code == "annotation_not_in_evidence"
+    )
 
     assert (await mark("18.3 °C")).status == "success"
     markers = next(
-        item for item in (state.prepared_map_session or _active_session()).overlay_collection.instances
+        item
+        for item in (
+            state.prepared_map_session or _active_session()
+        ).overlay_collection.instances
         if item.rendering_mode == "place-markers"
     )
     properties = markers.descriptor["data"]["features"][0]["properties"]
-    assert properties["name"] == "Kunsthaus: 18.3 °C" and properties["annotation"] == "18.3 °C"
+    assert (
+        properties["name"] == "Kunsthaus: 18.3 °C"
+        and properties["annotation"] == "18.3 °C"
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -1722,7 +1955,9 @@ async def test_fit_location_honours_requested_area() -> None:
         active_session=_active_session(),
         evidence=[],
         actions=[
-            SetViewportAction(action="set_viewport", strategy="fit_location", target_area_km2=100)
+            SetViewportAction(
+                action="set_viewport", strategy="fit_location", target_area_km2=100
+            )
         ],
     )
     west, south, east, north = candidate.viewport.bbox or []

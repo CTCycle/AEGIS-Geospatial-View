@@ -44,53 +44,122 @@ SUPPORTED_OPENCODE_PROTOCOLS = frozenset(
 # does not reliably carry the endpoint family. Keep the published endpoint
 # table explicit instead of guessing from model names.
 _ZEN_RESPONSES = {
-    "gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-    "gpt-5.5", "gpt-5.5-pro", "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini",
-    "gpt-5.4-nano", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.2",
-    "gpt-5.2-codex", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-max",
-    "gpt-5.1-codex-mini", "gpt-5", "gpt-5-codex", "gpt-5-nano",
-    "grok-4.6", "grok-4.5", "grok-build-0.1", "muse-spark-1.3",
-    "muse-spark-1.2", "muse-spark-1.3-contributor-free",
+    "gpt-6-astra",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.5-pro",
+    "gpt-5.4",
+    "gpt-5.4-pro",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.3-codex",
+    "gpt-5.3-codex-spark",
+    "gpt-5.2",
+    "gpt-5.2-codex",
+    "gpt-5.1",
+    "gpt-5.1-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex-mini",
+    "gpt-5",
+    "gpt-5-codex",
+    "gpt-5-nano",
+    "grok-4.6",
+    "grok-4.5",
+    "grok-build-0.1",
+    "muse-spark-1.3",
+    "muse-spark-1.2",
+    "muse-spark-1.3-contributor-free",
 }
 
 _ZEN_CHAT = {
-    "deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp",
-    "minimax-m3", "minimax-m2.7", "minimax-m2.5", "glm-5.3-flash",
-    "glm-5.3", "glm-5.2", "glm-5.1", "glm-5", "kimi-k2.5", "kimi-k2.6",
-    "kimi-k2.7-code", "kimi-k3", "big-pickle", "mimo-v2.5-free",
-    "ling-3.0-flash-fin-free", "nemotron-3-ultra-free",
+    "deepseek-v4-pro",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+    "minimax-m3",
+    "minimax-m2.7",
+    "minimax-m2.5",
+    "glm-5.3-flash",
+    "glm-5.3",
+    "glm-5.2",
+    "glm-5.1",
+    "glm-5",
+    "kimi-k2.5",
+    "kimi-k2.6",
+    "kimi-k2.7-code",
+    "kimi-k3",
+    "big-pickle",
+    "mimo-v2.5-free",
+    "ling-3.0-flash-fin-free",
+    "nemotron-3-ultra-free",
     "nemotron-3.5-lightning-free",
 }
 
 _ZEN_MESSAGES = {
-    "claude-fable-5-1", "claude-fable-5", "claude-opus-5", "claude-opus-4-8",
-    "claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5", "claude-sonnet-5",
-    "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-haiku-4-5",
-    "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus",
+    "claude-fable-5-1",
+    "claude-fable-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+    "qwen3.7-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
 }
 
 _ZEN_GOOGLE = {
-    "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
-    "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro",
     "gemini-3-flash",
 }
 
 _ZEN_GO_RESPONSES = {
-    "grok-4.6", "gpt-5.6-luna", "muse-spark-1.3-contributor",
+    "grok-4.6",
+    "gpt-5.6-luna",
+    "muse-spark-1.3-contributor",
     "muse-spark-1.2-contributor",
 }
 
 _ZEN_GO_CHAT = {
-    "glm-5.3-flash", "glm-5.3", "glm-5.2", "glm-5.1", "kimi-k3",
-    "kimi-k2.7-code", "kimi-k2.6", "longcat-2.0", "deepseek-v4-pro",
-    "deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp",
+    "glm-5.3-flash",
+    "glm-5.3",
+    "glm-5.2",
+    "glm-5.1",
+    "kimi-k3",
+    "kimi-k2.7-code",
+    "kimi-k2.6",
+    "longcat-2.0",
+    "deepseek-v4-pro",
+    "deepseek-v4.1-flash",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
     "mimo-v2.5",
-    "mimo-v2.5-pro", "hy4-preview", "hy3", "omen-alpha",
+    "mimo-v2.5-pro",
+    "hy4-preview",
+    "hy3",
+    "omen-alpha",
 }
 
 _ZEN_GO_MESSAGES = {
-    "minimax-m3", "minimax-m2.7", "minimax-m2.5", "qwen3.8-max",
-    "qwen3.8-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus",
+    "minimax-m3",
+    "minimax-m2.7",
+    "minimax-m2.5",
+    "qwen3.8-max",
+    "qwen3.8-flash",
+    "qwen3.7-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
 }
 
 OPENCODE_PROTOCOL_REGISTRY: dict[str, dict[str, str]] = {
@@ -137,6 +206,7 @@ OPENCODE_BASE_URLS = {
     OPENCODE_GO_PROVIDER: DEFAULT_OPENCODE_GO_BASE_URL,
 }
 
+
 ###############################################################################
 class _OpenCodeResponsesTransport(OpenAIProvider):
     """OpenAI Responses serialization with OpenCode identity and headers."""
@@ -172,6 +242,7 @@ class _OpenCodeResponsesTransport(OpenAIProvider):
     # -------------------------------------------------------------------------
     def supports_vision(self, model: str) -> bool | None:
         return bool(self._parent.supports_vision(model))
+
 
 ###############################################################################
 class OpenCodeProvider(DeepSeekProvider):
@@ -288,18 +359,18 @@ class OpenCodeProvider(DeepSeekProvider):
     def supports_tools(self, model: str) -> bool | None:
         if self.protocol_for_model(model) not in SUPPORTED_OPENCODE_PROTOCOLS:
             return False
-        declared = self._declared_model_capabilities.get(
-            model.strip().lower(), {}
-        ).get("supports_tools")
+        declared = self._declared_model_capabilities.get(model.strip().lower(), {}).get(
+            "supports_tools"
+        )
         return declared if isinstance(declared, bool) else None
 
     # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool | None:
         if self.protocol_for_model(model) not in SUPPORTED_OPENCODE_PROTOCOLS:
             return False
-        declared = self._declared_model_capabilities.get(
-            model.strip().lower(), {}
-        ).get("supports_structured_output")
+        declared = self._declared_model_capabilities.get(model.strip().lower(), {}).get(
+            "supports_structured_output"
+        )
         return declared if isinstance(declared, bool) else True
 
     # -------------------------------------------------------------------------
@@ -400,24 +471,30 @@ class OpenCodeProvider(DeepSeekProvider):
                 metadata[key] = item[key]
         limit = item.get("limit")
         if is_json_object(limit):
-            if not any(
-                key in metadata
-                for key in (
-                    "context_window_tokens",
-                    "context_length",
-                    "context_window",
-                    "max_context_tokens",
+            if (
+                not any(
+                    key in metadata
+                    for key in (
+                        "context_window_tokens",
+                        "context_length",
+                        "context_window",
+                        "max_context_tokens",
+                    )
                 )
-            ) and limit.get("context") is not None:
+                and limit.get("context") is not None
+            ):
                 metadata["context_window_tokens"] = limit["context"]
-            if not any(
-                key in metadata
-                for key in (
-                    "maximum_output_tokens",
-                    "max_output_tokens",
-                    "max_completion_tokens",
+            if (
+                not any(
+                    key in metadata
+                    for key in (
+                        "maximum_output_tokens",
+                        "max_output_tokens",
+                        "max_completion_tokens",
+                    )
                 )
-            ) and limit.get("output") is not None:
+                and limit.get("output") is not None
+            ):
                 metadata["maximum_output_tokens"] = limit["output"]
         if published is not None:
             if published.context_tokens and not any(
@@ -514,7 +591,9 @@ class OpenCodeProvider(DeepSeekProvider):
         return request
 
     # -------------------------------------------------------------------------
-    def _learn_constraint(self, error: LLMProviderRequestError, request: LLMRequest) -> bool:
+    def _learn_constraint(
+        self, error: LLMProviderRequestError, request: LLMRequest
+    ) -> bool:
         """Record a rejected request control; True when a retry can differ."""
 
         detail = str(error.__cause__ or "").lower()
@@ -532,7 +611,9 @@ class OpenCodeProvider(DeepSeekProvider):
         return True
 
     # -------------------------------------------------------------------------
-    def _with_constraints(self, request: LLMRequest, call: Callable[[LLMRequest], Any]) -> Any:
+    def _with_constraints(
+        self, request: LLMRequest, call: Callable[[LLMRequest], Any]
+    ) -> Any:
         for _ in range(len(_CONSTRAINTS)):
             constrained = self._constrained(request)
             try:
@@ -561,7 +642,10 @@ class OpenCodeProvider(DeepSeekProvider):
         if transport is not self:
             return transport.chat(routed, **kwargs)
         return self._with_constraints(
-            request, lambda constrained: super(OpenCodeProvider, self).chat(constrained, **kwargs)
+            request,
+            lambda constrained: super(OpenCodeProvider, self).chat(
+                constrained, **kwargs
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -570,7 +654,10 @@ class OpenCodeProvider(DeepSeekProvider):
         if transport is not self:
             return await transport.achat(routed, **kwargs)
         return await self._awith_constraints(
-            request, lambda constrained: super(OpenCodeProvider, self).achat(constrained, **kwargs)
+            request,
+            lambda constrained: super(OpenCodeProvider, self).achat(
+                constrained, **kwargs
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -587,7 +674,9 @@ class OpenCodeProvider(DeepSeekProvider):
             return transport.structured_output(routed, schema)
         return self._with_constraints(
             request,
-            lambda constrained: super(OpenCodeProvider, self).structured_output(constrained, schema),
+            lambda constrained: super(OpenCodeProvider, self).structured_output(
+                constrained, schema
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -597,7 +686,9 @@ class OpenCodeProvider(DeepSeekProvider):
             return await transport.astructured_output(routed, schema)
         return await self._awith_constraints(
             request,
-            lambda constrained: super(OpenCodeProvider, self).astructured_output(constrained, schema),
+            lambda constrained: super(OpenCodeProvider, self).astructured_output(
+                constrained, schema
+            ),
         )
 
     # -------------------------------------------------------------------------

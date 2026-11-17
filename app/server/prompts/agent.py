@@ -110,6 +110,7 @@ NATIVE_AGENT_SYSTEM_PROMPT = (
     "one line. Then stop."
 )
 
+
 ###############################################################################
 def build_native_agent_system_prompt() -> str:
     return "\n\n".join(
@@ -121,6 +122,7 @@ def build_native_agent_system_prompt() -> str:
             INTERNAL_INFORMATION_RESTRICTIONS,
         ]
     )
+
 
 ###############################################################################
 def build_native_context_messages(
@@ -145,7 +147,9 @@ def build_native_context_messages(
         "map_memory": map_memory,
         "summary": summary,
         "relevant_tool_outcomes": [
-            {**item, "summary": _columnar_series(item["summary"])} if "summary" in item else item
+            {**item, "summary": _columnar_series(item["summary"])}
+            if "summary" in item
+            else item
             for item in relevant_tool_outcomes
         ],
         "recent_observations": list(recent_observations or []),
@@ -157,7 +161,10 @@ def build_native_context_messages(
         {"role": "system", "content": build_native_agent_system_prompt()},
         # Stored history records carry id/turn_index bookkeeping; strict
         # chat endpoints reject unknown message fields.
-        *({"role": item["role"], "content": item["content"]} for item in recent_messages),
+        *(
+            {"role": item["role"], "content": item["content"]}
+            for item in recent_messages
+        ),
         {
             "role": "system",
             "content": (
@@ -195,7 +202,10 @@ def _columnar_series(value: Any) -> Any:
         )
     ):
         columns = [str(name) for name in cast("dict[str, Any]", first)]
-        return {"columns": columns, "rows": [[row[name] for name in columns] for row in items]}
+        return {
+            "columns": columns,
+            "rows": [[row[name] for name in columns] for row in items],
+        }
     return [_columnar_series(item) for item in items]
 
 

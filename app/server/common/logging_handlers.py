@@ -92,7 +92,10 @@ def log_unexpected_failure(
     logger.log(
         level,
         "unexpected_failure stage=%s %s exception_type=%s\n%s",
-        stage, fields, type(exc).__name__, trace,
+        stage,
+        fields,
+        type(exc).__name__,
+        trace,
     )
 
 

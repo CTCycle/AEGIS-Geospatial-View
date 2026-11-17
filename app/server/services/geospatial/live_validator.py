@@ -193,13 +193,17 @@ PROVIDER_SMOKE_CHECKS = (
     ),
     LiveCheck(
         provider_id="gdacs",
-        request=ProviderRequest(capability_id="gdacs_disaster_events", params={"live": True}),
+        request=ProviderRequest(
+            capability_id="gdacs_disaster_events", params={"live": True}
+        ),
         response_contract="feature_collection",
         required_payload_keys=("features",),
     ),
     LiveCheck(
         provider_id="geoboundaries",
-        request=ProviderRequest(capability_id="geoboundaries_admin", params={"country": "CH", "live": True}),
+        request=ProviderRequest(
+            capability_id="geoboundaries_admin", params={"country": "CH", "live": True}
+        ),
         response_contract="feature_collection",
         required_payload_keys=("features",),
     ),
@@ -390,6 +394,7 @@ _SECRET_PATTERN = re.compile(
     r"(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^\s,;}]+"
 )
 
+
 ###############################################################################
 async def validate_live_geospatial_sources(
     *,
@@ -412,6 +417,7 @@ async def validate_live_geospatial_sources(
         elif result.status == "skipped":
             report.skipped_count += 1
     return report
+
 
 ###############################################################################
 async def _run_check(
@@ -519,17 +525,20 @@ async def _run_check(
             f"Unexpected provider failure: {_sanitize_message(str(exc))}",
         )
 
+
 ###############################################################################
 def _access_mode(check: LiveCheck) -> str:
     if check.requires_credentials:
         return "credentialed"
     return check.access_mode
 
+
 ###############################################################################
 def _capability_id(check: LiveCheck) -> str:
     if check.request is not None:
         return check.request.capability_id
     return f"{check.provider_id}:smoke"
+
 
 ###############################################################################
 def _credential_is_configured(registry: ProviderRegistry, provider_id: str) -> bool:
@@ -544,6 +553,7 @@ def _credential_is_configured(registry: ProviderRegistry, provider_id: str) -> b
         callable(provider_credentials_present)
         and provider_credentials_present(provider_id)
     )
+
 
 ###############################################################################
 def _source_is_configured(check: LiveCheck, request: ProviderRequest) -> bool:
@@ -581,10 +591,9 @@ def _source_is_configured(check: LiveCheck, request: ProviderRequest) -> bool:
         return True
     return Path(raw_value).expanduser().is_file()
 
+
 ###############################################################################
-def _materialize_request(
-    check: LiveCheck, request: ProviderRequest
-) -> ProviderRequest:
+def _materialize_request(check: LiveCheck, request: ProviderRequest) -> ProviderRequest:
     if not check.request_env:
         return request
     params = dict(request.params)
@@ -593,6 +602,7 @@ def _materialize_request(
         if value:
             params[parameter] = value
     return replace(request, params=params)
+
 
 ###############################################################################
 def _skipped_result(
@@ -605,6 +615,7 @@ def _skipped_result(
         status="skipped",
         message=_sanitize_message(message),
     )
+
 
 ###############################################################################
 def _failed_result(
@@ -623,10 +634,9 @@ def _failed_result(
         feature_count=feature_count,
     )
 
+
 ###############################################################################
-def _validate_payload(
-    check: LiveCheck, payload: object
-) -> str | None:
+def _validate_payload(check: LiveCheck, payload: object) -> str | None:
     if not is_json_object(payload):
         return "Provider response payload must be a JSON object."
     if payload.get("error"):
@@ -664,6 +674,7 @@ def _validate_payload(
         return "Provider JSON payload must not be empty."
     return None
 
+
 ###############################################################################
 def _validate_feature_collection(payload: dict[str, Any]) -> str | None:
     features = payload.get("features")
@@ -673,6 +684,7 @@ def _validate_feature_collection(payload: dict[str, Any]) -> str | None:
         if not is_json_object(feature) or not _has_feature_geometry(feature):
             return "Provider response contains a feature without valid geometry."
     return None
+
 
 ###############################################################################
 def _validate_result_list(payload: dict[str, Any]) -> str | None:
@@ -684,6 +696,7 @@ def _validate_result_list(payload: dict[str, Any]) -> str | None:
             return "Provider response contains a result without valid coordinates."
     return None
 
+
 ###############################################################################
 def _has_feature_geometry(feature: dict[str, Any]) -> bool:
     latitude = feature.get("latitude")
@@ -694,6 +707,7 @@ def _has_feature_geometry(feature: dict[str, Any]) -> bool:
     if not is_json_object(geometry):
         return False
     return _valid_coordinates(geometry.get("coordinates"))
+
 
 ###############################################################################
 def _valid_coordinate_pair(latitude: object, longitude: object) -> bool:
@@ -708,6 +722,7 @@ def _valid_coordinate_pair(latitude: object, longitude: object) -> bool:
         and -180.0 <= float(longitude) <= 180.0
     )
 
+
 ###############################################################################
 def _valid_coordinates(value: object) -> bool:
     if not is_json_array(value):
@@ -716,15 +731,16 @@ def _valid_coordinates(value: object) -> bool:
         return True
     return any(_valid_coordinates(item) for item in value)
 
+
 ###############################################################################
 def _validate_raster_metadata(payload: dict[str, Any]) -> str | None:
     url_keys = ("tileUrl", "tile_url", "serviceUrl", "coverageDownloadUrl")
     if not any(
-        isinstance(payload.get(key), str) and payload[key].strip()
-        for key in url_keys
+        isinstance(payload.get(key), str) and payload[key].strip() for key in url_keys
     ):
         return "Raster response is missing a usable service or tile URL."
     return None
+
 
 ###############################################################################
 def _validate_dataset(payload: dict[str, Any]) -> str | None:
@@ -734,6 +750,7 @@ def _validate_dataset(payload: dict[str, Any]) -> str | None:
     ):
         return "Dataset response is missing its declared structure."
     return None
+
 
 ###############################################################################
 def _feature_count(payload: dict[str, Any]) -> int:
@@ -754,13 +771,16 @@ def _feature_count(payload: dict[str, Any]) -> int:
         return 1
     return 0
 
+
 ###############################################################################
 def _sanitize_message(message: str) -> str:
     return _SECRET_PATTERN.sub(r"\1=<redacted>", message)
 
+
 ###############################################################################
 def _format_report(report: LiveValidationReport) -> str:
     return json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True)
+
 
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:

@@ -10,14 +10,27 @@ from server.services.agent.basemap_intent import (
 )
 
 BASEMAPS = [
-    {"id": "osm_default", "metadata": {"label": "OpenStreetMap", "keywords": ["street", "street map"]}},
+    {
+        "id": "osm_default",
+        "metadata": {"label": "OpenStreetMap", "keywords": ["street", "street map"]},
+    },
     {
         "id": "esri_world_imagery",
-        "metadata": {"label": "Satellite Imagery", "keywords": ["satellite", "aerial", "from above"]},
+        "metadata": {
+            "label": "Satellite Imagery",
+            "keywords": ["satellite", "aerial", "from above"],
+        },
     },
-    {"id": "osm_dark", "metadata": {"label": "Dark Basemap", "keywords": ["dark", "night"]}},
-    {"id": "positron", "metadata": {"label": "Positron", "keywords": ["light", "clean"]}},
+    {
+        "id": "osm_dark",
+        "metadata": {"label": "Dark Basemap", "keywords": ["dark", "night"]},
+    },
+    {
+        "id": "positron",
+        "metadata": {"label": "Positron", "keywords": ["light", "clean"]},
+    },
 ]
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -38,11 +51,13 @@ BASEMAPS = [
 def test_match_requested_basemap(message: str, expected: str | None) -> None:
     assert match_requested_basemap(message, BASEMAPS) == expected
 
+
 ###############################################################################
 def test_basemap_descriptions_carry_label_and_keywords() -> None:
     assert basemap_descriptions(BASEMAPS)["esri_world_imagery"] == (
         "Satellite Imagery (satellite, aerial, from above)"
     )
+
 
 ###############################################################################
 def test_match_requested_basemaps_reports_conflicting_styles() -> None:
@@ -50,6 +65,7 @@ def test_match_requested_basemaps_reports_conflicting_styles() -> None:
         "esri_world_imagery",
         "osm_dark",
     ]
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -60,5 +76,7 @@ def test_match_requested_basemaps_reports_conflicting_styles() -> None:
         ("Switch to satellite view", []),
     ],
 )
-def test_unsupported_basemap_styles_are_named(message: str, expected: list[str]) -> None:
+def test_unsupported_basemap_styles_are_named(
+    message: str, expected: list[str]
+) -> None:
     assert unsupported_basemap_styles(message) == expected

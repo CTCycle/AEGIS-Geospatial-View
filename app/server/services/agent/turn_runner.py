@@ -23,8 +23,15 @@ from server.domain.agent.context import AgentContextPackage
 from server.domain.agent.capability_route import AgentRunState, ConversationTask
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.agent.reliability import AgentExecutionBudget
-from server.domain.geospatial.providers import ProviderExecutionPolicy, provider_execution_scope
-from server.services.agent.agent_loop import AgentLoop, AgentLoopOutcome, AgentLoopRequest
+from server.domain.geospatial.providers import (
+    ProviderExecutionPolicy,
+    provider_execution_scope,
+)
+from server.services.agent.agent_loop import (
+    AgentLoop,
+    AgentLoopOutcome,
+    AgentLoopRequest,
+)
 from server.services.agent.agent_state_factory import AgentStateFactory
 from server.services.agent.completion import ledger_outcomes
 
@@ -50,6 +57,7 @@ type FailureCategory = Literal[
     "cancelled",
     "superseded",
 ]
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -83,12 +91,15 @@ class AgentTurnRequest:
     checkpoint_callback: Callable[[AgentRunState], Awaitable[None]] | None = None
     run_state_check: Callable[[], str | None] | None = None
 
+
 ###############################################################################
 class AgentTurnRunner:
     """Run one typed native turn and build a bounded public result."""
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, agent_loop: AgentLoop, execution_settings: Any = None) -> None:
+    def __init__(
+        self, *, agent_loop: AgentLoop, execution_settings: Any = None
+    ) -> None:
         self.agent_loop = agent_loop
         self.execution_settings = execution_settings
 
@@ -129,18 +140,28 @@ class AgentTurnRunner:
         # Policy holders are request-scoped; handlers and registries stay shared.
         scoped_loop = copy(self.agent_loop)
         if isinstance(configured, AgentExecutionSettings):
-            scoped_loop.transport_policy = LLMTransportPolicy.from_execution_settings(configured)
+            scoped_loop.transport_policy = LLMTransportPolicy.from_execution_settings(
+                configured
+            )
             scoped_loop.tool_executor = copy(self.agent_loop.tool_executor)
-            scoped_loop.tool_executor.timeout_seconds = configured.tool_execution_seconds
+            scoped_loop.tool_executor.timeout_seconds = (
+                configured.tool_execution_seconds
+            )
             if isinstance(self.agent_loop.provider_factory, LLMFactory):
                 scoped_loop.provider_factory = copy(self.agent_loop.provider_factory)
-                scoped_loop.provider_factory.transport_policy = scoped_loop.transport_policy
-        provider_policy = ProviderExecutionPolicy(
-            timeout_seconds=configured.provider_request_seconds,
-            max_attempts=configured.provider_max_attempts,
-            retry_backoff_base_seconds=configured.retry_backoff_base_seconds,
-            retry_backoff_max_seconds=configured.retry_backoff_max_seconds,
-        ) if isinstance(configured, AgentExecutionSettings) else None
+                scoped_loop.provider_factory.transport_policy = (
+                    scoped_loop.transport_policy
+                )
+        provider_policy = (
+            ProviderExecutionPolicy(
+                timeout_seconds=configured.provider_request_seconds,
+                max_attempts=configured.provider_max_attempts,
+                retry_backoff_base_seconds=configured.retry_backoff_base_seconds,
+                retry_backoff_max_seconds=configured.retry_backoff_max_seconds,
+            )
+            if isinstance(configured, AgentExecutionSettings)
+            else None
+        )
         with provider_execution_scope(provider_policy):
             outcome = await scoped_loop.run(
                 AgentLoopRequest(
@@ -154,33 +175,51 @@ class AgentTurnRunner:
                         if request.context_package is not None
                         else {}
                     ),
-                    max_model_call_seconds=_setting(configured, "native_model_call_seconds"),
+                    max_model_call_seconds=_setting(
+                        configured, "native_model_call_seconds"
+                    ),
                     max_iterations=_setting(configured, "max_iterations"),
                     max_model_calls=_setting(configured, "complex_max_model_calls"),
                     max_tool_calls=_setting(configured, "complex_max_tool_calls"),
-                    max_state_transitions=_setting(configured, "complex_max_state_transitions"),
-                    simple_max_model_calls=_setting(configured, "simple_max_model_calls"),
+                    max_state_transitions=_setting(
+                        configured, "complex_max_state_transitions"
+                    ),
+                    simple_max_model_calls=_setting(
+                        configured, "simple_max_model_calls"
+                    ),
                     simple_max_tool_calls=_setting(configured, "simple_max_tool_calls"),
-                    simple_max_state_transitions=_setting(configured, "simple_max_state_transitions"),
-                    max_parallel_tool_calls=_setting(configured, "max_parallel_tool_calls"),
-                    max_consecutive_tool_failures=_setting(configured, "max_consecutive_tool_failures"),
-                    max_same_failed_fingerprint=_setting(configured, "max_same_failed_fingerprint"),
+                    simple_max_state_transitions=_setting(
+                        configured, "simple_max_state_transitions"
+                    ),
+                    max_parallel_tool_calls=_setting(
+                        configured, "max_parallel_tool_calls"
+                    ),
+                    max_consecutive_tool_failures=_setting(
+                        configured, "max_consecutive_tool_failures"
+                    ),
+                    max_same_failed_fingerprint=_setting(
+                        configured, "max_same_failed_fingerprint"
+                    ),
                     max_route_corrections=_setting(configured, "max_route_corrections"),
-                    max_validation_corrections=_setting(configured, "max_validation_corrections"),
-                    max_discovery_attempts=_setting(configured, "max_discovery_attempts"),
+                    max_validation_corrections=_setting(
+                        configured, "max_validation_corrections"
+                    ),
+                    max_discovery_attempts=_setting(
+                        configured, "max_discovery_attempts"
+                    ),
                     max_tool_result_chars=_setting(configured, "max_tool_result_chars"),
-                    max_no_progress_corrections=_setting(configured, "max_no_progress_corrections"),
-                    max_unproductive_steps=_setting(configured, "max_unproductive_steps"),
+                    max_no_progress_corrections=_setting(
+                        configured, "max_no_progress_corrections"
+                    ),
+                    max_unproductive_steps=_setting(
+                        configured, "max_unproductive_steps"
+                    ),
                     max_render_attempts=_setting(configured, "max_render_attempts"),
                     vision_policy=str(
                         getattr(configured, "vision_policy", None) or "disabled"
                     ),
-                    vision_max_calls=int(
-                        _setting(configured, "vision_max_calls")
-                    ),
-                    max_output_tokens=int(
-                        _setting(configured, "max_output_tokens")
-                    ),
+                    vision_max_calls=int(_setting(configured, "vision_max_calls")),
+                    max_output_tokens=int(_setting(configured, "max_output_tokens")),
                     context_usage_callback=request.context_usage_callback,
                     trace_callback=request.trace_callback,
                     checkpoint_callback=request.checkpoint_callback,
@@ -192,9 +231,9 @@ class AgentTurnRunner:
             outcome=outcome,
         )
 
+
 ###############################################################################
 class AgentResponseBuilder:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def build(
@@ -304,6 +343,7 @@ def _latest_context_usage(
             continue
     return None
 
+
 ###############################################################################
 def _phase_usage(trace: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Model calls and input tokens per loop phase (routing, execution, finalization)."""
@@ -313,7 +353,9 @@ def _phase_usage(trace: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         phase = item.get("call_phase")
         if not isinstance(phase, str):
             continue
-        tokens = item.get("reported_input_tokens") or item.get("estimated_input_tokens") or 0
+        tokens = (
+            item.get("reported_input_tokens") or item.get("estimated_input_tokens") or 0
+        )
         tokens = tokens if isinstance(tokens, int) else 0
         entry = phases.setdefault(
             phase, {"model_calls": 0, "total_input_tokens": 0, "peak_request_tokens": 0}
@@ -322,6 +364,7 @@ def _phase_usage(trace: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         entry["total_input_tokens"] += tokens
         entry["peak_request_tokens"] = max(entry["peak_request_tokens"], tokens)
     return phases
+
 
 ###############################################################################
 def _operation(
@@ -387,6 +430,7 @@ def _operation(
         message=message,
     )
 
+
 ###############################################################################
 def _presentation_status(
     outcome: AgentLoopOutcome,
@@ -403,6 +447,7 @@ def _presentation_status(
         return "ready"
     return "failed"
 
+
 ###############################################################################
 def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.failure_detail:
@@ -412,6 +457,7 @@ def _fallback_message(outcome: AgentLoopOutcome) -> str:
     if outcome.stopped_reason == "insufficient_evidence":
         return "I could not verify enough evidence to complete the request."
     return "The agent completed without a final response."
+
 
 ###############################################################################
 def _response_failure_category(value: str | None) -> FailureCategory | None:
@@ -439,11 +485,16 @@ def _response_failure_category(value: str | None) -> FailureCategory | None:
         return cast(FailureCategory, value)
     return None
 
+
 ###############################################################################
 def _setting(settings: Any, name: str) -> Any:
     default = getattr(AgentExecutionSettings(), name)
     value = getattr(settings, name, default) if settings is not None else default
-    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    return (
+        value
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+        else default
+    )
 
 
 __all__ = ["AgentResponseBuilder", "AgentTurnRequest", "AgentTurnRunner"]

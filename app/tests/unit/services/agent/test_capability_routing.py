@@ -3,36 +3,69 @@ import json
 import pytest
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from server.domain.agent.tool_result import ModelObservation, ToolExecutionMetadata, ToolResult
+from server.domain.agent.tool_result import (
+    ModelObservation,
+    ToolExecutionMetadata,
+    ToolResult,
+)
 from server.domain.geospatial.providers import ProviderResponse
 from server.domain.agent.decision import ResolvedLocation
-from server.services.agent.capability_execution import CapabilityExecutionService, ToolExecutionContext, _response_summary
+from server.services.agent.capability_execution import (
+    CapabilityExecutionService,
+    ToolExecutionContext,
+    _response_summary,
+)
 from server.services.agent.tool_definitions import ExecuteCapabilityInput
-from server.services.geospatial.providers.base import ProviderInvalidQueryError, ProviderTimeoutError
+from server.services.geospatial.providers.base import (
+    ProviderInvalidQueryError,
+    ProviderTimeoutError,
+)
 from typing import Any, cast
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.capability_route import AgentPhase, AgentRunState, CapabilityRoute
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState,
+    CapabilityRoute,
+)
 from server.domain.geospatial.registry import GeospatialManifestSnapshot
-from server.services.agent.capability_router import CapabilityRouter, build_location_map_fallback_route
+from server.services.agent.capability_router import (
+    CapabilityRouter,
+    build_location_map_fallback_route,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 # --- test_capability_execution.py ---
 
 
-
-
 ###############################################################################
 @pytest.mark.asyncio
-@pytest.mark.parametrize("coordinates, expected", [([8.5, 47.3], True), ([100, 0], False), ([8.5], False)])
-async def test_provider_geometry_is_checked_against_requested_bbox(coordinates, expected) -> None:
-    response = ProviderResponse(capability_id="places:hospitals", provider_id="overpass",
-        result_type="features", payload={"type": "FeatureCollection", "features": [
-            {"type": "Feature", "geometry": {"type": "Point", "coordinates": coordinates}}]})
+@pytest.mark.parametrize(
+    "coordinates, expected", [([8.5, 47.3], True), ([100, 0], False), ([8.5], False)]
+)
+async def test_provider_geometry_is_checked_against_requested_bbox(
+    coordinates, expected
+) -> None:
+    response = ProviderResponse(
+        capability_id="places:hospitals",
+        provider_id="overpass",
+        result_type="features",
+        payload={
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": coordinates},
+                }
+            ],
+        },
+    )
     result = await _service(FakeProviderRegistry(response)).execute_capability(
         ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[8, 47, 9, 48]),
-        ToolExecutionContext(conversation_id="conversation-1"))
+        ToolExecutionContext(conversation_id="conversation-1"),
+    )
     assert result.metadata.coverage["spatial_scope_satisfied"] is expected
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -49,7 +82,10 @@ async def test_raster_result_satisfies_spatial_scope_for_bounded_request(
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="fema",
-        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/export"},
+        payload={
+            "renderingMode": "raster-tile",
+            "tileUrl": "https://example.test/export",
+        },
         result_type="raster",
     )
     provider = FakeProviderRegistry(response)
@@ -65,13 +101,19 @@ async def test_raster_result_satisfies_spatial_scope_for_bounded_request(
     assert result.status == "success"
     assert result.metadata.coverage["spatial_scope_satisfied"] is True
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_single_frame_raster_for_a_monthly_aggregation_is_disclosed_but_not_rejected() -> None:
+async def test_single_frame_raster_for_a_monthly_aggregation_is_disclosed_but_not_rejected() -> (
+    None
+):
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="overpass",
-        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/tiles"},
+        payload={
+            "renderingMode": "raster-tile",
+            "tileUrl": "https://example.test/tiles",
+        },
         result_type="raster",
         coverage={"time": "2026-07-01", "temporal_scope_satisfied": True},
     )
@@ -94,17 +136,31 @@ async def test_single_frame_raster_for_a_monthly_aggregation_is_disclosed_but_no
     )
 
     # A product that summarises the whole period is not a single frame.
-    composite = ProviderResponse(**{**response.__dict__, "coverage": {**(response.coverage or {}), "period_composite": True}})
+    composite = ProviderResponse(
+        **{
+            **response.__dict__,
+            "coverage": {**(response.coverage or {}), "period_composite": True},
+        }
+    )
     summary = await _service(FakeProviderRegistry(composite)).execute_capability(
-        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[8, 45, 10, 46],
-                               start_time_iso="2026-07-01", end_time_iso="2026-07-31"),
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals",
+            bbox=[8, 45, 10, 46],
+            start_time_iso="2026-07-01",
+            end_time_iso="2026-07-31",
+        ),
         ToolExecutionContext(conversation_id="conversation-1"),
     )
-    assert not any("Only one frame" in warning for warning in summary.data.get("warnings", []))
+    assert not any(
+        "Only one frame" in warning for warning in summary.data.get("warnings", [])
+    )
+
 
 ###############################################################################
 @pytest.mark.asyncio
-async def test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope() -> None:
+async def test_vector_result_over_resolved_location_satisfies_spatial_and_temporal_scope() -> (
+    None
+):
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="overpass",
@@ -134,6 +190,7 @@ async def test_vector_result_over_resolved_location_satisfies_spatial_and_tempor
     assert result.status == "success"
     assert result.metadata.coverage["spatial_scope_satisfied"] is True
     assert result.metadata.coverage["temporal_scope_satisfied"] is True
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -172,31 +229,43 @@ async def test_normalized_point_feature_is_checked_against_requested_bbox(
         result_type="features",
     )
     result = await _service(FakeProviderRegistry(response)).execute_capability(
-        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[135, 30, 145, 40]),
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals", bbox=[135, 30, 145, 40]
+        ),
         ToolExecutionContext(conversation_id="conversation-1"),
     )
 
     assert result.status == "success"
     assert result.metadata.coverage["spatial_scope_satisfied"] is expected
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_request() -> None:
+async def test_valid_empty_vector_result_satisfies_spatial_scope_for_bounded_request() -> (
+    None
+):
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="overpass",
-        payload={"renderingMode": "clustered-points", "features": [], "totalResults": 0},
+        payload={
+            "renderingMode": "clustered-points",
+            "features": [],
+            "totalResults": 0,
+        },
         result_type="features",
         result_status="valid_empty",
     )
     result = await _service(FakeProviderRegistry(response)).execute_capability(
-        ExecuteCapabilityInput(capability_id="places:hospitals", bbox=[-145, -5, -135, 5]),
+        ExecuteCapabilityInput(
+            capability_id="places:hospitals", bbox=[-145, -5, -135, 5]
+        ),
         ToolExecutionContext(conversation_id="conversation-1"),
     )
 
     assert result.status == "valid_empty"
     assert result.metadata.coverage["spatial_scope_satisfied"] is True
     assert result.metadata.coverage["query_complete"] is True
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -216,7 +285,13 @@ async def test_provider_declared_circle_coverage_satisfies_spatial_scope() -> No
                     "geometry": {
                         "type": "Polygon",
                         "coordinates": [
-                            [[12.48, 41.89], [12.50, 41.89], [12.50, 41.90], [12.48, 41.90], [12.48, 41.89]]
+                            [
+                                [12.48, 41.89],
+                                [12.50, 41.89],
+                                [12.50, 41.90],
+                                [12.48, 41.90],
+                                [12.48, 41.89],
+                            ]
                         ],
                     },
                 }
@@ -241,13 +316,17 @@ async def test_provider_declared_circle_coverage_satisfies_spatial_scope() -> No
     assert result.status == "success"
     assert result.metadata.coverage["spatial_scope_satisfied"] is True
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_raster_result_without_scope_leaves_spatial_scope_unsatisfied() -> None:
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="fema",
-        payload={"renderingMode": "raster-tile", "tileUrl": "https://example.test/export"},
+        payload={
+            "renderingMode": "raster-tile",
+            "tileUrl": "https://example.test/export",
+        },
         result_type="raster",
     )
     result = await _service(FakeProviderRegistry(response)).execute_capability(
@@ -258,9 +337,9 @@ async def test_raster_result_without_scope_leaves_spatial_scope_unsatisfied() ->
     assert result.status == "success"
     assert result.metadata.coverage.get("spatial_scope_satisfied") is False
 
+
 ###############################################################################
 class FakeCapabilityRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, manifest: dict[str, object] | None) -> None:
         self.manifest = manifest
@@ -269,9 +348,9 @@ class FakeCapabilityRegistry:
     def get_capability(self, capability_id: str) -> dict[str, object] | None:
         return self.manifest if capability_id == "places:hospitals" else None
 
+
 ###############################################################################
 class FakeRuntimeRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, enabled: bool = True, available: bool = True) -> None:
         self.enabled = enabled
@@ -285,9 +364,9 @@ class FakeRuntimeRegistry:
     def access_available(self, capability_id: str) -> bool:
         return self.available
 
+
 ###############################################################################
 class FakeProviderRegistry:
-
     # -------------------------------------------------------------------------
     def __init__(self, response: ProviderResponse | Exception) -> None:
         self.response = response
@@ -300,9 +379,9 @@ class FakeProviderRegistry:
             raise self.response
         return self.response
 
+
 ###############################################################################
 class FakeEvidenceRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, error: Exception | None = None) -> None:
         self.calls: list[dict[str, object]] = []
@@ -314,6 +393,7 @@ class FakeEvidenceRepository:
             raise self.error
         self.calls.append(kwargs)
         return SimpleNamespace(evidence_id="evidence:provider-1")
+
 
 ###############################################################################
 def _service(
@@ -331,9 +411,12 @@ def _service(
         evidence_repository=evidence,
     )
 
+
 ###############################################################################
 @pytest.mark.asyncio
-async def test_execute_capability_persists_full_payload_and_returns_bounded_summary() -> None:
+async def test_execute_capability_persists_full_payload_and_returns_bounded_summary() -> (
+    None
+):
     response = ProviderResponse(
         capability_id="places:hospitals",
         provider_id="overpass",
@@ -373,16 +456,19 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     assert result.call_id == "call-1"
     assert result.evidence_refs == ["evidence:provider-1"]
     assert isinstance(result.data, dict)
-    assert result.data.items() >= {
-        "capability_id": "places:hospitals",
-        "provider_id": "overpass",
-        "result_status": "ok",
-        "result_type": "features",
-        "feature_count": 1,
-        "map_eligibility": "renderable",
-        "stale": False,
-        "bbox": [8.54, 47.37, 8.54, 47.37],
-    }.items()
+    assert (
+        result.data.items()
+        >= {
+            "capability_id": "places:hospitals",
+            "provider_id": "overpass",
+            "result_status": "ok",
+            "result_type": "features",
+            "feature_count": 1,
+            "map_eligibility": "renderable",
+            "stale": False,
+            "bbox": [8.54, 47.37, 8.54, 47.37],
+        }.items()
+    )
     assert result.data["query"] == {
         "operation": "within_distance",
         "location_ref": "location:zurich-hb",
@@ -397,6 +483,7 @@ async def test_execute_capability_persists_full_payload_and_returns_bounded_summ
     request = provider.requests[0][1]
     assert request.params["filters"] == {"category": "hospital"}  # type: ignore[attr-defined]
     assert request.params["radius_m"] == 5000  # type: ignore[attr-defined]
+
 
 ###############################################################################
 def test_feature_summary_exposes_bounded_preview_to_model() -> None:
@@ -449,6 +536,7 @@ def test_feature_summary_exposes_bounded_preview_to_model() -> None:
     assert preview[-1]["name"] == "Pharmacy 9"
     assert all("raw_tags" not in item for item in preview)
 
+
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -473,6 +561,7 @@ async def test_provider_statuses_are_normalized(
     )
 
     assert result.status == expected_status
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -502,6 +591,7 @@ async def test_provider_failures_remain_typed(
     assert result.error.error_type == error_type
     assert result.error.recovery == recovery
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_disabled_capability_is_rejected_before_provider_execution() -> None:
@@ -524,6 +614,7 @@ async def test_disabled_capability_is_rejected_before_provider_execution() -> No
     assert result.error.code == "capability_disabled"
     assert provider.requests == []
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_evidence_persistence_failure_is_a_typed_result() -> None:
@@ -544,6 +635,7 @@ async def test_evidence_persistence_failure_is_a_typed_result() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.error_type == "provider_malformed_response"
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -570,6 +662,7 @@ async def test_resolved_location_is_forwarded_as_provider_coordinates() -> None:
     request = provider.requests[0][1]
     assert request.params["latitude"] == 47.3769  # type: ignore[attr-defined]
     assert request.params["longitude"] == 8.5417  # type: ignore[attr-defined]
+
 
 ###############################################################################
 @pytest.mark.asyncio
@@ -604,6 +697,7 @@ async def test_manifest_metadata_is_forwarded_to_descriptor_provider() -> None:
         "layer_id": "WORLDCOVER_2021_MAP",
     }
 
+
 ###############################################################################
 def test_weather_summary_exposes_bounded_current_observations() -> None:
     summary = _response_summary(
@@ -630,6 +724,7 @@ def test_weather_summary_exposes_bounded_current_observations() -> None:
     }
     assert summary["timezone"] == "Europe/Rome"
 
+
 ###############################################################################
 def test_solar_summary_exposes_bounded_pvgis_estimate() -> None:
     summary = _response_summary(
@@ -648,6 +743,7 @@ def test_solar_summary_exposes_bounded_pvgis_estimate() -> None:
         "yearly_kwh_per_kwp": 1267.38,
         "unit": "kWh/kWp/year",
     }
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -733,13 +829,17 @@ def test_forecast_summary_exposes_at_most_24_allowlisted_hourly_rows(
     assert series["fields"][0] == "time"
     assert len(json.dumps(projected, separators=(",", ":"))) <= 2048
 
+
 ###############################################################################
 def test_raster_summary_is_renderable_only_with_a_source() -> None:
     renderable = _response_summary(
         ProviderResponse(
             capability_id="esa_worldcover",
             provider_id="esa",
-            payload={"renderingMode": "wmts", "serviceUrl": "https://example.test/wmts"},
+            payload={
+                "renderingMode": "wmts",
+                "serviceUrl": "https://example.test/wmts",
+            },
             result_type="raster",
         )
     )
@@ -754,6 +854,7 @@ def test_raster_summary_is_renderable_only_with_a_source() -> None:
 
     assert renderable["map_eligibility"] == "renderable"
     assert unavailable["map_eligibility"] == "unknown"
+
 
 ###############################################################################
 def test_normalized_polygon_feature_is_renderable_and_has_bounds() -> None:
@@ -789,14 +890,12 @@ def test_normalized_polygon_feature_is_renderable_and_has_bounds() -> None:
     assert summary["map_eligibility"] == "renderable"
     assert summary["bbox"] == [-95.6, 29.5, -95.3, 29.9]
 
+
 # --- test_capability_router.py ---
-
-
 
 
 ###############################################################################
 class _Runtime:
-
     # -------------------------------------------------------------------------
     def __init__(self, *, disabled: set[str] | None = None) -> None:
         self.disabled = disabled or set()
@@ -809,11 +908,12 @@ class _Runtime:
     def access_available(self, capability_id: str) -> bool:
         return capability_id not in self.disabled
 
+
 ###############################################################################
 def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
     registry = CapabilityRegistry.from_catalog_snapshot(
         GeospatialManifestSnapshot(
-        providers=(),
+            providers=(),
             basemaps=[
                 {
                     "id": "osm_default",
@@ -852,6 +952,7 @@ def _router(runtime: _Runtime | None = None) -> CapabilityRouter:
         runtime_registry=cast(Any, runtime or _Runtime()),
     )
 
+
 ###############################################################################
 def _state(*, active_map: bool = False) -> AgentRunState:
     state = AgentRunState(
@@ -863,6 +964,7 @@ def _state(*, active_map: bool = False) -> AgentRunState:
     if active_map:
         state.active_map_session = cast(Any, object())
     return state
+
 
 ###############################################################################
 def _route(**overrides: Any) -> CapabilityRoute:
@@ -876,6 +978,7 @@ def _route(**overrides: Any) -> CapabilityRoute:
     values.update(overrides)
     return CapabilityRoute.model_validate(values)
 
+
 ###############################################################################
 def test_router_shortlists_without_selecting_final_arguments() -> None:
     decision = _router().validate_route(
@@ -888,7 +991,9 @@ def test_router_shortlists_without_selecting_final_arguments() -> None:
 
 
 ###############################################################################
-def test_router_does_not_geocode_the_data_subject_and_keeps_a_world_target_alone() -> None:
+def test_router_does_not_geocode_the_data_subject_and_keeps_a_world_target_alone() -> (
+    None
+):
     decision = _router().validate_route(
         _route(
             location_mode="search_area",
@@ -903,14 +1008,19 @@ def test_router_does_not_geocode_the_data_subject_and_keeps_a_world_target_alone
     assert "data_subject_not_a_place" in decision.reason_codes
 
     named = _router().validate_route(
-        _route(capability_queries=["traffic Zurich", "traffic"], target_refs=["Zurich"]),
+        _route(
+            capability_queries=["traffic Zurich", "traffic"], target_refs=["Zurich"]
+        ),
         user_message="Show traffic in Zurich.",
         active_state=_state(),
     )
     assert named.route.target_refs == ["Zurich"]
 
+
 ###############################################################################
-def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resolution() -> None:
+def test_router_normalizes_radius_scope_to_provider_bbox_after_location_resolution() -> (
+    None
+):
     state = _state()
     state.location_refs["austin"] = ResolvedLocation(
         label="Austin, Texas",
@@ -1007,6 +1117,7 @@ def test_router_keeps_solar_estimate_on_metadata_only_text_route() -> None:
     assert decision.route.presentation == "text"
     assert "metadata_only_analysis_route_normalized" in decision.reason_codes
 
+
 ###############################################################################
 def _text_vs_render_router(*, renderable_matches: bool) -> CapabilityRouter:
     contract = {
@@ -1043,13 +1154,19 @@ def _text_vs_render_router(*, renderable_matches: bool) -> CapabilityRouter:
                     "capabilityKind": "analysis-tool",
                     "description": "Soil clay, sand and pH values",
                     "agenticUse": {"domains": ["data_retrieval"]},
-                    "executionContract": {**contract, "render_support": "metadata_only"},
+                    "executionContract": {
+                        **contract,
+                        "render_support": "metadata_only",
+                    },
                 }
             ],
             runtime_profiles=(),
         )
     )
-    return CapabilityRouter(capability_registry=registry, runtime_registry=cast(Any, _Runtime()))
+    return CapabilityRouter(
+        capability_registry=registry, runtime_registry=cast(Any, _Runtime())
+    )
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1069,8 +1186,12 @@ def test_both_route_prefers_a_clearly_better_text_capability(
     expected_presentation: str,
     expected_ids: list[str],
 ) -> None:
-    decision = _text_vs_render_router(renderable_matches=renderable_matches).validate_route(
-        _route(presentation=presentation, operation="inspect", capability_queries=["soil"]),
+    decision = _text_vs_render_router(
+        renderable_matches=renderable_matches
+    ).validate_route(
+        _route(
+            presentation=presentation, operation="inspect", capability_queries=["soil"]
+        ),
         user_message="What is the soil composition?",
         active_state=_state(),
     )
@@ -1078,8 +1199,11 @@ def test_both_route_prefers_a_clearly_better_text_capability(
     assert decision.route.presentation == expected_presentation
     assert decision.capability_ids[:1] == expected_ids
 
+
 ###############################################################################
-def test_both_route_keeps_the_map_when_a_renderable_capability_matches_as_well() -> None:
+def test_both_route_keeps_the_map_when_a_renderable_capability_matches_as_well() -> (
+    None
+):
     decision = _router().validate_route(
         _route(presentation="both", operation="inspect"),
         user_message="Show traffic in Zurich.",
@@ -1088,6 +1212,7 @@ def test_both_route_keeps_the_map_when_a_renderable_capability_matches_as_well()
 
     assert decision.route.presentation == "both"
     assert decision.capability_ids == ["traffic"]
+
 
 ###############################################################################
 def test_router_rejects_answer_route_with_execution_intent() -> None:
@@ -1107,6 +1232,7 @@ def test_router_rejects_answer_route_with_execution_intent() -> None:
     assert "route_task_mode_requires_conversation_domain" in decision.reason_codes
     assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_rejects_clarify_route_that_attempts_execution() -> None:
     decision = _router().validate_route(
@@ -1125,6 +1251,7 @@ def test_router_rejects_clarify_route_that_attempts_execution() -> None:
     assert decision.status == "rejected"
     assert "route_task_mode_disallows_capability_queries" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     decision = _router().validate_route(
@@ -1137,6 +1264,7 @@ def test_router_rejects_hallucinated_ids_and_reports_no_capability() -> None:
     assert decision.rejected_capability_ids == ["not-in-catalog"]
     assert "unknown_capability_id" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_requires_active_map_for_map_state_follow_up() -> None:
     decision = _router().validate_route(
@@ -1147,6 +1275,7 @@ def test_router_requires_active_map_for_map_state_follow_up() -> None:
 
     assert decision.status == "clarification"
     assert "active_map_required" in decision.reason_codes
+
 
 ###############################################################################
 def test_layer_edit_without_a_map_is_not_searched_as_a_place() -> None:
@@ -1166,13 +1295,16 @@ def test_layer_edit_without_a_map_is_not_searched_as_a_place() -> None:
     assert decision.route.primary_domain is CapabilityDomain.MAP_STATE
     assert "no layer to change" in str(decision.clarification_question)
 
+
 ###############################################################################
 def test_layer_edit_without_a_map_shows_a_known_place_the_message_names() -> None:
     # S16-T2: the radar was unavailable, so no map exists; Tokyo was resolved
     # in the earlier turn and the follow-up names it again.
     state = _state()
     state.location_refs = {
-        "tokyo": ResolvedLocation(label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan")
+        "tokyo": ResolvedLocation(
+            label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan"
+        )
     }
     decision = _router().validate_route(
         _route(
@@ -1191,13 +1323,16 @@ def test_layer_edit_without_a_map_shows_a_known_place_the_message_names() -> Non
     assert decision.route.target_refs == ["Tokyo"]
     assert "map_state_without_map_becomes_new_map" in decision.reason_codes
 
+
 ###############################################################################
 def test_removed_layer_subject_is_not_the_new_map_target() -> None:
     # S16-T2 (looping sample): the route model named the removed layer's
     # subject ("weather radar") as the target, which no resolution can satisfy.
     state = _state()
     state.location_refs = {
-        "tokyo, japan": ResolvedLocation(label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan")
+        "tokyo, japan": ResolvedLocation(
+            label="Tokyo, Japan", latitude=35.68, longitude=139.69, country="Japan"
+        )
     }
     decision = _router().validate_route(
         _route(
@@ -1214,14 +1349,18 @@ def test_removed_layer_subject_is_not_the_new_map_target() -> None:
     assert decision.route.primary_domain is CapabilityDomain.PLACE_SEARCH
     assert decision.route.target_refs == ["Tokyo"]
 
+
 ###############################################################################
 def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> None:
     state = _state()
     state.active_map_session = cast(
-        Any, SimpleNamespace(
+        Any,
+        SimpleNamespace(
             overlay_collection=SimpleNamespace(instances=[]),
-            resolved_location=ResolvedLocation(label="Florence", latitude=43.77, longitude=11.25),
-        )
+            resolved_location=ResolvedLocation(
+                label="Florence", latitude=43.77, longitude=11.25
+            ),
+        ),
     )
     decision = _router().validate_route(
         _route(
@@ -1239,6 +1378,7 @@ def test_router_does_not_require_a_place_for_basemap_switch_on_active_map() -> N
     assert decision.route.location_mode == "none"
     assert decision.route.target_refs == []
 
+
 ###############################################################################
 def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     decision = _router(_Runtime(disabled={"traffic"})).validate_route(
@@ -1250,6 +1390,7 @@ def test_router_handles_runtime_disabled_explicit_candidate() -> None:
     assert decision.status == "no_capability"
     assert decision.rejected_capability_ids == ["traffic"]
     assert "capability_disabled" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
@@ -1265,20 +1406,24 @@ def test_router_opens_discovery_when_semantic_shortlist_is_empty() -> None:
     assert decision.status == "discovery_required"
     assert "discovery_required" in decision.reason_codes
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "target,kept",
     [("Milan city center", []), ("Rome city centre", ["Rome city centre"])],
 )
-def test_zoom_on_the_shown_city_centre_is_not_a_new_place(target: str, kept: list[str]) -> None:
+def test_zoom_on_the_shown_city_centre_is_not_a_new_place(
+    target: str, kept: list[str]
+) -> None:
     state = _state()
     state.active_map_session = cast(
-        Any, SimpleNamespace(
+        Any,
+        SimpleNamespace(
             overlay_collection=SimpleNamespace(instances=[]),
             resolved_location=ResolvedLocation(
                 label="Milan, Lombardy, Italy", latitude=45.46, longitude=9.19
             ),
-        )
+        ),
     )
     decision = _router().validate_route(
         _route(
@@ -1294,6 +1439,7 @@ def test_zoom_on_the_shown_city_centre_is_not_a_new_place(target: str, kept: lis
 
     assert decision.route.target_refs == kept
     assert decision.route.location_mode == "none"
+
 
 ###############################################################################
 def test_map_state_route_naming_a_place_without_a_map_becomes_a_new_map() -> None:
@@ -1313,6 +1459,7 @@ def test_map_state_route_naming_a_place_without_a_map_becomes_a_new_map() -> Non
     assert decision.route.location_mode == "target"
     assert decision.route.target_refs == ["Genoa, Italy"]
 
+
 ###############################################################################
 def test_basemap_inventory_question_is_limited_to_basemaps() -> None:
     decision = _router().validate_route(
@@ -1329,6 +1476,7 @@ def test_basemap_inventory_question_is_limited_to_basemaps() -> None:
     assert decision.route.operation == "discover_available_map_data"
     assert decision.route.capability_queries == ["basemap"]
 
+
 ###############################################################################
 def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> None:
     router = _router()
@@ -1337,7 +1485,10 @@ def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> N
     )
     route = CapabilityRoute(
         primary_domain=CapabilityDomain.PROVIDER_DISCOVERY,
-        secondary_domains=[CapabilityDomain.PLACE_SEARCH, CapabilityDomain.MAP_RENDERING],
+        secondary_domains=[
+            CapabilityDomain.PLACE_SEARCH,
+            CapabilityDomain.MAP_RENDERING,
+        ],
         task_mode="execute",
         presentation="text",
         location_mode="target",
@@ -1359,6 +1510,7 @@ def test_broad_catalog_question_routes_to_unfiltered_capability_discovery() -> N
     assert decision.route.operation == "discover_available_map_data"
     assert decision.route.capability_queries == []
     assert decision.capability_ids == []
+
 
 ###############################################################################
 def test_router_clarifies_broad_infrastructure_category_before_shortlisting() -> None:
@@ -1385,8 +1537,11 @@ def test_router_clarifies_broad_infrastructure_category_before_shortlisting() ->
             "Transit",
         ]
 
+
 ###############################################################################
-def test_clarify_route_carries_normalized_options_and_execute_route_drops_them() -> None:
+def test_clarify_route_carries_normalized_options_and_execute_route_drops_them() -> (
+    None
+):
     clarify = _router().validate_route(
         _route(
             primary_domain=CapabilityDomain.CONVERSATION,
@@ -1425,6 +1580,7 @@ def test_clarify_route_carries_normalized_options_and_execute_route_drops_them()
     )
     assert execute.route.clarification_options == []
 
+
 ###############################################################################
 def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() -> None:
     decision = _router().validate_route(
@@ -1439,6 +1595,7 @@ def test_raw_infrastructure_request_cannot_be_silently_guessed_into_subtype() ->
     assert decision.status == "clarification"
     assert decision.capability_ids == []
     assert "ambiguous_infrastructure_category" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_returns_boundary_limitation_without_replacing_active_map() -> None:
@@ -1467,8 +1624,11 @@ def test_router_returns_boundary_limitation_without_replacing_active_map() -> No
     assert "left the active map unchanged" in decision.clarification_question
     assert state.active_map_session is active_map
 
+
 ###############################################################################
-def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> None:
+def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools() -> (
+    None
+):
     decision = _router().validate_route(
         _route(location_mode="none"),
         user_message="Show traffic on a new map.",
@@ -1479,6 +1639,7 @@ def test_router_normalizes_new_map_location_prerequisite_and_hides_basemap_tools
     assert decision.route.location_mode != "none"
     assert "location_required_for_new_map" in decision.reason_codes
     assert "osm_default" not in decision.capability_ids
+
 
 ###############################################################################
 def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> None:
@@ -1492,10 +1653,13 @@ def test_location_map_fallback_route_is_limited_to_non_data_map_wording() -> Non
 
     assert build_location_map_fallback_route("Show hospitals near Springfield") is None
 
+
 ###############################################################################
 @pytest.mark.parametrize("presentation", ["text", "map"])
 @pytest.mark.parametrize("operation", ["remove_layer", "change_basemap"])
-def test_router_uses_active_map_for_layer_lifecycle_updates(presentation: str, operation: str) -> None:
+def test_router_uses_active_map_for_layer_lifecycle_updates(
+    presentation: str, operation: str
+) -> None:
     state = _state(active_map=True)
     state.location_refs["current map"] = ResolvedLocation(
         label="Current map",
@@ -1519,6 +1683,7 @@ def test_router_uses_active_map_for_layer_lifecycle_updates(presentation: str, o
     assert decision.route.location_mode == "none"
     assert decision.route.presentation in {"map", "both"}
     assert "active_map_update_uses_current_map" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> None:
@@ -1550,6 +1715,7 @@ def test_router_normalizes_data_bearing_add_layer_routes_after_active_map() -> N
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_keeps_named_provider_layer_requests_executable() -> None:
     # "Add the RainViewer radar to this map" names a provider, but it asks for
@@ -1572,6 +1738,7 @@ def test_router_keeps_named_provider_layer_requests_executable() -> None:
     assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_normalizes_new_data_bearing_map_routes() -> None:
@@ -1596,6 +1763,7 @@ def test_router_normalizes_new_data_bearing_map_routes() -> None:
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_map_route_normalized" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_keeps_data_retrieval_on_poi_map_search_route() -> None:
     decision = _router().validate_route(
@@ -1613,6 +1781,7 @@ def test_router_keeps_data_retrieval_on_poi_map_search_route() -> None:
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert "data_bearing_place_search_route_normalized" in decision.reason_codes
     assert "location_map_route_normalized" not in decision.reason_codes
+
 
 ###############################################################################
 def test_router_adds_data_retrieval_to_text_only_poi_search_route() -> None:
@@ -1635,6 +1804,7 @@ def test_router_adds_data_retrieval_to_text_only_poi_search_route() -> None:
     assert CapabilityDomain.DATA_RETRIEVAL in decision.route.secondary_domains
     assert CapabilityDomain.MAP_RENDERING not in decision.route.secondary_domains
     assert "data_bearing_place_search_route_normalized" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_keeps_text_only_coordinate_lookup_free_of_provider_data() -> None:
@@ -1661,6 +1831,7 @@ def test_router_keeps_text_only_coordinate_lookup_free_of_provider_data() -> Non
     assert decision.route.location_mode != "none"
     assert decision.capability_ids == []
     assert "text_only_coordinate_lookup_route_normalized" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_normalizes_saved_evidence_inspection_without_provider_lookup() -> None:
@@ -1696,6 +1867,7 @@ def test_router_normalizes_saved_evidence_inspection_without_provider_lookup() -
     assert decision.route.filters == {}
     assert decision.capability_ids == []
     assert "text_evidence_inspection_route_normalized" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_does_not_assume_evidence_exists_in_a_new_conversation() -> None:
@@ -1736,6 +1908,7 @@ def test_router_normalizes_geocoding_route_for_location_only_map() -> None:
     assert decision.route.capability_queries == ["place search", "map viewport"]
     assert "location_map_route_normalized" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_normalizes_named_landmark_map_route() -> None:
     decision = _router().validate_route(
@@ -1758,6 +1931,7 @@ def test_router_normalizes_named_landmark_map_route() -> None:
     assert decision.route.capability_queries == ["place search", "map viewport"]
     assert "location_map_route_normalized" in decision.reason_codes
 
+
 ###############################################################################
 def test_router_preserves_explicit_poi_landmark_lookup() -> None:
     decision = _router().validate_route(
@@ -1776,12 +1950,11 @@ def test_router_preserves_explicit_poi_landmark_lookup() -> None:
     assert decision.route.capability_queries == ["place search", "poi"]
     assert "location_map_route_normalized" not in decision.reason_codes
 
+
 ###############################################################################
 def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     decision = _router().validate_route(
-        _route(
-            temporal_scope={"mode": "historical", "granularity": "recent"}
-        ),
+        _route(temporal_scope={"mode": "historical", "granularity": "recent"}),
         user_message="Show recent traffic in Zurich.",
         active_state=_state(),
     )
@@ -1789,6 +1962,7 @@ def test_router_normalizes_undated_recent_historical_scope_to_current() -> None:
     assert decision.status == "accepted"
     assert decision.route.temporal_scope.mode == "current"
     assert "recent_scope_normalized_to_current" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_normalizes_undated_recent_aggregation_scope_to_current() -> None:
@@ -1807,6 +1981,7 @@ def test_router_normalizes_undated_recent_aggregation_scope_to_current() -> None
     assert decision.status == "accepted"
     assert decision.route.temporal_scope.mode == "current"
     assert "recent_scope_normalized_to_current" in decision.reason_codes
+
 
 ###############################################################################
 def test_router_preserves_dated_historical_scope() -> None:
@@ -1829,15 +2004,21 @@ def test_router_preserves_dated_historical_scope() -> None:
 
 
 ###############################################################################
-@pytest.mark.parametrize("mode,refs,analysis", [
-    ("none", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
-    ("target", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
-    ("search_area", [], {"kind": "hotspot", "metric": "count"}),
-])
-def test_router_normalizes_discovery_area(mode: str, refs: list[str], analysis: dict[str, str]) -> None:
+@pytest.mark.parametrize(
+    "mode,refs,analysis",
+    [
+        ("none", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
+        ("target", ["Europe"], {"kind": "rank", "metric": "precipitation"}),
+        ("search_area", [], {"kind": "hotspot", "metric": "count"}),
+    ],
+)
+def test_router_normalizes_discovery_area(
+    mode: str, refs: list[str], analysis: dict[str, str]
+) -> None:
     decision = _router().validate_route(
         _route(location_mode=mode, target_refs=refs, analysis=analysis),
-        user_message="Where did it rain most?", active_state=_state(),
+        user_message="Where did it rain most?",
+        active_state=_state(),
     )
     assert decision.route.location_mode == "search_area"
     assert decision.route.target_refs == (refs or ["World"])
@@ -1848,13 +2029,20 @@ def test_router_normalizes_discovery_area(mode: str, refs: list[str], analysis: 
 
 ###############################################################################
 def test_location_fallback_does_not_swallow_analysis_query() -> None:
-    assert build_location_map_fallback_route("Show me where in Europe it rained most") is None
+    assert (
+        build_location_map_fallback_route("Show me where in Europe it rained most")
+        is None
+    )
+
 
 ###############################################################################
 def _catalog_router() -> CapabilityRouter:
     capabilities = CapabilityRegistry()
-    runtime = RuntimeRegistry(catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None)
+    runtime = RuntimeRegistry(
+        catalog_snapshot=capabilities.catalog_snapshot, credentials_repo=None
+    )
     return CapabilityRouter(capability_registry=capabilities, runtime_registry=runtime)
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1882,7 +2070,10 @@ def test_fast_route_accepts_single_place_display(message: str, target: str) -> N
         route,
         user_message=message,
         active_state=AgentRunState(
-            request_id="fast", conversation_id="fast", phase=AgentPhase.ROUTE_REQUEST, user_message=message
+            request_id="fast",
+            conversation_id="fast",
+            phase=AgentPhase.ROUTE_REQUEST,
+            user_message=message,
         ),
     )
     # The loop proceeds on either status, exactly as for a model route.
@@ -1909,13 +2100,17 @@ def test_model_spelling_of_fast_target_keeps_coordinate_output_off_the_catalog(
         ),
         user_message=message,
         active_state=AgentRunState(
-            request_id="fast", conversation_id="fast", phase=AgentPhase.ROUTE_REQUEST, user_message=message
+            request_id="fast",
+            conversation_id="fast",
+            phase=AgentPhase.ROUTE_REQUEST,
+            user_message=message,
         ),
     )
 
     assert decision.route.primary_domain is CapabilityDomain.MAP_RENDERING
     assert CapabilityDomain.DATA_RETRIEVAL not in decision.route.secondary_domains
     assert "catalog_entity_route_normalized" not in decision.reason_codes
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -1939,6 +2134,7 @@ def test_model_spelling_of_fast_target_keeps_coordinate_output_off_the_catalog(
 )
 def test_fast_route_defers_everything_else_to_the_model(message: str) -> None:
     assert _catalog_router().fast_route(message) is None
+
 
 ###############################################################################
 def test_plural_catalog_entity_place_route_keeps_data_retrieval() -> None:
@@ -1970,6 +2166,7 @@ def test_plural_catalog_entity_place_route_keeps_data_retrieval() -> None:
         *decision.route.secondary_domains,
     }
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "message",
@@ -1982,16 +2179,18 @@ def test_plural_catalog_entity_place_route_keeps_data_retrieval() -> None:
 def test_viewport_requests_are_not_catalog_entity_requests(message: str) -> None:
     assert not CapabilityRegistry().requests_catalog_entities(message)
 
+
 ###############################################################################
 def test_marking_places_on_the_shown_map_is_a_location_only_marker_route() -> None:
     state = _state()
     state.active_map_session = cast(
-        Any, SimpleNamespace(
+        Any,
+        SimpleNamespace(
             overlay_collection=SimpleNamespace(instances=[]),
             resolved_location=ResolvedLocation(
                 label="Ottawa, Ontario, Canada", latitude=45.42, longitude=-75.69
             ),
-        )
+        ),
     )
     places = ["Parliament Hill, Ottawa", "ByWard Market, Ottawa"]
     router = _router()
@@ -2022,9 +2221,14 @@ def test_marking_places_on_the_shown_map_is_a_location_only_marker_route() -> No
     )
     assert unnamed.status == "clarification"
 
+
 ###############################################################################
-def test_coordinate_lookup_stays_free_of_provider_data_against_the_real_catalog() -> None:
-    router = CapabilityRouter(capability_registry=CapabilityRegistry(), runtime_registry=RuntimeRegistry())
+def test_coordinate_lookup_stays_free_of_provider_data_against_the_real_catalog() -> (
+    None
+):
+    router = CapabilityRouter(
+        capability_registry=CapabilityRegistry(), runtime_registry=RuntimeRegistry()
+    )
     route = _route(
         primary_domain=CapabilityDomain.PLACE_SEARCH,
         presentation="text",
@@ -2041,7 +2245,9 @@ def test_coordinate_lookup_stays_free_of_provider_data_against_the_real_catalog(
         route, user_message="What are the coordinates of Lisbon?", active_state=_state()
     )
     records = router.validate_route(
-        route, user_message="What are the coordinates of the airports in Lisbon?", active_state=_state()
+        route,
+        user_message="What are the coordinates of the airports in Lisbon?",
+        active_state=_state(),
     )
 
     assert lookup.route.secondary_domains == []
@@ -2060,7 +2266,10 @@ def test_map_state_operation_no_action_can_perform_is_answered_in_text() -> None
             operation="add_legend",
             target_refs=["Precipitation Rate (IMERG, 30min)"],
             obligations=[
-                {"kind": "identification", "target_refs": ["Precipitation Rate (IMERG, 30min)"]}
+                {
+                    "kind": "identification",
+                    "target_refs": ["Precipitation Rate (IMERG, 30min)"],
+                }
             ],
         ),
         user_message="Can you explain what I'm seeing right now in the canvas?",
@@ -2090,9 +2299,11 @@ def test_declared_identification_is_kept_only_for_coordinates() -> None:
         active_state=_state(),
     )
 
-    assert [item.target_refs for item in decision.route.obligations if item.kind == "identification"] == [
-        ["41.9,12.5"]
-    ]
+    assert [
+        item.target_refs
+        for item in decision.route.obligations
+        if item.kind == "identification"
+    ] == [["41.9,12.5"]]
 
 
 ###############################################################################

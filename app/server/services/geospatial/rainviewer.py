@@ -19,17 +19,19 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class RainViewerServiceError(Exception):
     """Base exception for RainViewer failures."""
+
 
 ###############################################################################
 class RainViewerRequestError(RainViewerServiceError):
     """Raised when RainViewer metadata cannot be fetched."""
 
+
 ###############################################################################
 class RainViewerService:
-
     MAX_TILE_ZOOM = 7
     COLOR_SCHEME = 2
     _FRAME_PATH = re.compile(r"^/v2/radar/[A-Za-z0-9._~/-]+$")
@@ -82,7 +84,9 @@ class RainViewerService:
         radar = json_object(payload.get("radar"))
         past_frames = self._validated_past_frames(radar.get("past"))
         if not past_frames:
-            raise RainViewerRequestError("RainViewer did not return recent radar history frames.")
+            raise RainViewerRequestError(
+                "RainViewer did not return recent radar history frames."
+            )
 
         latest, latest_time = max(past_frames, key=lambda item: item[1])
         host = self._validated_host(payload.get("host"))
@@ -111,9 +115,7 @@ class RainViewerService:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _validated_past_frames(
-        cls, value: object
-    ) -> list[tuple[dict[str, Any], int]]:
+    def _validated_past_frames(cls, value: object) -> list[tuple[dict[str, Any], int]]:
         validated: list[tuple[dict[str, Any], int]] = []
         for raw_frame in json_array(value):
             if not is_json_object(raw_frame):
@@ -133,7 +135,9 @@ class RainViewerService:
             parsed = urlsplit(value.strip())
             port = parsed.port
         except ValueError as exc:
-            raise RainViewerRequestError("RainViewer metadata host is invalid.") from exc
+            raise RainViewerRequestError(
+                "RainViewer metadata host is invalid."
+            ) from exc
         hostname = (parsed.hostname or "").lower()
         if (
             parsed.scheme.lower() != "https"
@@ -144,8 +148,7 @@ class RainViewerService:
             or parsed.query
             or parsed.fragment
             or not (
-                hostname == "rainviewer.com"
-                or hostname.endswith(".rainviewer.com")
+                hostname == "rainviewer.com" or hostname.endswith(".rainviewer.com")
             )
         ):
             raise RainViewerRequestError("RainViewer metadata host is not trusted.")

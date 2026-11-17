@@ -34,9 +34,9 @@ _RESPONSE_EVENT_TYPES = frozenset(
     {RunEventType.COMPLETED, RunEventType.CLARIFICATION_NEEDED}
 )
 
+
 ###############################################################################
 class RunLifecycleService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -123,11 +123,19 @@ class RunLifecycleService:
             raise RunNotFoundError(message) from exc
         except PermissionError as exc:
             raise RunAccessError(str(exc)) from exc
-        if created and payload.attachment_id is not None and self.attachment_store is not None:
+        if (
+            created
+            and payload.attachment_id is not None
+            and self.attachment_store is not None
+        ):
             self.attachment_store.bind_attachment(
                 payload.attachment_id, conversation_id, run.run_id
             )
-        if created and payload.map_view is not None and self.attachment_store is not None:
+        if (
+            created
+            and payload.map_view is not None
+            and self.attachment_store is not None
+        ):
             self.attachment_store.bind_map_view(
                 run.run_id, payload.map_view.model_dump(mode="json")
             )
@@ -232,7 +240,7 @@ class RunLifecycleService:
                 context_usage.setdefault("usage_percent", None)
             try:
                 return ChatTurnResponse.model_validate(payload)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
 
     # -------------------------------------------------------------------------

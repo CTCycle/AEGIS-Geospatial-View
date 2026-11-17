@@ -25,9 +25,9 @@ from server.services.geospatial.spatial_constraints import (
 GEODESIC_METHOD = "WGS84 ellipsoid geodesic (pyproj)"
 _COMPASS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 
+
 ###############################################################################
 class MeasureToolHandler:
-
     # -------------------------------------------------------------------------
     async def measure(
         self,
@@ -56,7 +56,9 @@ class MeasureToolHandler:
         if request.operation == "distance":
             if len(locations) < 2:
                 return _failure("distance needs at least two locations.", started)
-            measurements = [_distance(first, second) for first, second in combinations(locations, 2)]
+            measurements = [
+                _distance(first, second) for first, second in combinations(locations, 2)
+            ]
             first = measurements[0]
             summary = (
                 f"Geodesic distance from {first['from_label']} to {first['to_label']}: "
@@ -98,6 +100,7 @@ class MeasureToolHandler:
             ),
         )
 
+
 ###############################################################################
 def _distance(
     first: tuple[str, ResolvedLocation], second: tuple[str, ResolvedLocation]
@@ -115,6 +118,7 @@ def _distance(
         "bearing_compass": _COMPASS[round(bearing / 45.0) % 8],
         "between": "resolved centre points",
     }
+
 
 ###############################################################################
 def _extent(key: str, location: ResolvedLocation) -> dict[str, Any]:
@@ -134,16 +138,23 @@ def _extent(key: str, location: ResolvedLocation) -> dict[str, Any]:
         {
             "bbox": [west, south, east, north],
             "width_km": round(
-                geodesic_distance_m(middle_latitude, west, middle_latitude, east) / 1000.0, 1
+                geodesic_distance_m(middle_latitude, west, middle_latitude, east)
+                / 1000.0,
+                1,
             ),
             "height_km": round(
-                geodesic_distance_m(south, middle_longitude, north, middle_longitude) / 1000.0, 1
+                geodesic_distance_m(south, middle_longitude, north, middle_longitude)
+                / 1000.0,
+                1,
             ),
-            "bbox_area_km2": round(geodesic_bbox_area_km2([west, south, east, north]), 1),
+            "bbox_area_km2": round(
+                geodesic_bbox_area_km2([west, south, east, north]), 1
+            ),
             "note": "Measured on the bounding box, not the administrative boundary.",
         }
     )
     return measurement
+
 
 ###############################################################################
 def _failure(message: str, started: float) -> ToolResult:

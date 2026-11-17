@@ -19,6 +19,7 @@ COAST_BUFFER_DEG = 0.05
 # country's shape is attributed to it.
 COUNTRY_LOOKUP_TOLERANCE_DEG = 0.1
 
+
 ###############################################################################
 @lru_cache(maxsize=1)
 def country_shapes() -> dict[str, Geometry]:
@@ -27,13 +28,17 @@ def country_shapes() -> dict[str, Geometry]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     shapes: dict[str, list[Geometry]] = {}
     for feature in payload["features"]:
-        shapes.setdefault(feature["properties"]["iso2"], []).append(shape(feature["geometry"]))
+        shapes.setdefault(feature["properties"]["iso2"], []).append(
+            shape(feature["geometry"])
+        )
     return {code: unary_union(parts) for code, parts in shapes.items()}
+
 
 ###############################################################################
 @lru_cache(maxsize=1)
 def _prepared_country_shapes() -> dict[str, "PreparedGeometry[Geometry]"]:
     return {code: prep(geometry) for code, geometry in country_shapes().items()}
+
 
 ###############################################################################
 def country_at(longitude: float, latitude: float) -> str | None:
@@ -48,6 +53,7 @@ def country_at(longitude: float, latitude: float) -> str | None:
     )
     return code if distance <= COUNTRY_LOOKUP_TOLERANCE_DEG else None
 
+
 ###############################################################################
 @lru_cache(maxsize=64)
 def land_mask(
@@ -60,7 +66,9 @@ def land_mask(
     unknown = [code for code in countries if code not in shapes]
     if unknown:
         raise ValueError(f"Unknown country codes for land mask: {', '.join(unknown)}")
-    members = [shapes[code] for code in countries] if countries else list(shapes.values())
+    members = (
+        [shapes[code] for code in countries] if countries else list(shapes.values())
+    )
     # The default buffer keeps coastal cells the simplified coastline cuts off;
     # callers widen it to keep offshore observations near the region.
     return prep(unary_union(members).intersection(box(*bbox)).buffer(buffer_deg))

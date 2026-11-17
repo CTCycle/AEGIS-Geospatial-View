@@ -18,15 +18,14 @@ from server.common.typing import is_json_array
 # when the owning run terminates.
 ###############################################################################
 
-SUPPORTED_CAPTURE_MIME_TYPES = frozenset(
-    {"image/jpeg", "image/png", "image/webp"}
-)
+SUPPORTED_CAPTURE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 # Client-side downscale/compression keeps captures well under this bound; the
 # cap protects the store and the LLM request from runaway payloads.
 MAX_CAPTURE_BASE64_CHARS = 3 * 1024 * 1024
 DEFAULT_CAPTURE_TTL_SECONDS = 900.0
 # User-uploaded images share the capture bounds and TTL under this session key.
 USER_ATTACHMENT_SESSION = "user_attachment"
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -45,6 +44,7 @@ class RenderCapture:
     def image_bytes(self) -> bytes:
         return base64.b64decode(self.image_base64)
 
+
 ###############################################################################
 def _is_valid_base64(value: str) -> bool:
     if not value:
@@ -52,8 +52,9 @@ def _is_valid_base64(value: str) -> bool:
     try:
         base64.b64decode(value, validate=True)
         return True
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
+
 
 ###############################################################################
 class RenderCaptureStore:
@@ -68,7 +69,9 @@ class RenderCaptureStore:
         self._map_views: dict[str, tuple[float, dict[str, Any]]] = {}
 
     # -------------------------------------------------------------------------
-    def _key(self, run_id: str, map_session_id: str, collection_revision: int) -> tuple[str, str, int]:
+    def _key(
+        self, run_id: str, map_session_id: str, collection_revision: int
+    ) -> tuple[str, str, int]:
         return (run_id, map_session_id, collection_revision)
 
     # -------------------------------------------------------------------------
@@ -122,7 +125,12 @@ class RenderCaptureStore:
         if is_json_array(viewport_bounds) and len(viewport_bounds) == 4:
             if not all(isinstance(item, (int, float)) for item in viewport_bounds):
                 raise ValueError("viewport_bounds must contain numeric values.")
-            bounds = (float(viewport_bounds[0]), float(viewport_bounds[1]), float(viewport_bounds[2]), float(viewport_bounds[3]))
+            bounds = (
+                float(viewport_bounds[0]),
+                float(viewport_bounds[1]),
+                float(viewport_bounds[2]),
+                float(viewport_bounds[3]),
+            )
         self._expire()
         capture = RenderCapture(
             run_id=run_id,
@@ -181,7 +189,9 @@ class RenderCaptureStore:
         )
 
     # -------------------------------------------------------------------------
-    def bind_attachment(self, attachment_id: str, conversation_id: str, run_id: str) -> bool:
+    def bind_attachment(
+        self, attachment_id: str, conversation_id: str, run_id: str
+    ) -> bool:
         """Move an uploaded image onto the run that will consume it."""
         if not self.has_attachment(attachment_id, conversation_id):
             return False
@@ -212,11 +222,7 @@ class RenderCaptureStore:
 
     # -------------------------------------------------------------------------
     def delete_for_run(self, run_id: str) -> int:
-        removed = [
-            key
-            for key in self._captures
-            if key[0] == run_id
-        ]
+        removed = [key for key in self._captures if key[0] == run_id]
         for key in removed:
             self._captures.pop(key, None)
         self._map_views.pop(run_id, None)

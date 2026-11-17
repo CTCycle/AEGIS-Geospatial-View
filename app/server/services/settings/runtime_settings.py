@@ -34,9 +34,7 @@ class RuntimeSettingsService:
         )
 
     # -------------------------------------------------------------------------
-    def update_settings(
-        self, patch: Mapping[str, Any]
-    ) -> RuntimeSettingsResponse:
+    def update_settings(self, patch: Mapping[str, Any]) -> RuntimeSettingsResponse:
         updated = self.repository.update(patch)
         restart_required = self._restart_required(updated)
         return self._response(

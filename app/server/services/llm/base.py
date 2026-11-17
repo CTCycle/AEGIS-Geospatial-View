@@ -15,6 +15,7 @@ from server.services.llm.types import (
 )
 from server.services.llm.errors import LLMRequestSchemaError, LLMStructuredOutputError
 
+
 ###############################################################################
 def parse_native_tool_arguments(
     value: object,
@@ -40,6 +41,7 @@ def parse_native_tool_arguments(
         return None, "arguments_not_object"
     return None, "arguments_not_object"
 
+
 ###############################################################################
 def normalize_native_tool_name(
     value: object,
@@ -49,6 +51,7 @@ def normalize_native_tool_name(
 
     name = str(value or "").strip()
     return name, parse_error or ("missing_name" if not name else None)
+
 
 ###############################################################################
 class LLMProvider(ABC):
@@ -144,9 +147,8 @@ class LLMProvider(ABC):
                 detail="Native tools cannot be combined with a structured response schema.",
             )
         for tool in request.tools or []:
-            if (
-                not tool.name.strip()
-                or not self._is_json_schema(tool.parameters_json_schema)
+            if not tool.name.strip() or not self._is_json_schema(
+                tool.parameters_json_schema
             ):
                 raise LLMRequestSchemaError(
                     provider=self.provider_name,

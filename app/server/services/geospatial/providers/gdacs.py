@@ -19,7 +19,11 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
     ProviderResponse,
 )
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_bytes_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_bytes_url,
+)
 
 GDACS_EVENTS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH"
 GDACS_ATTRIBUTION = "GDACS, Global Disaster Alert and Coordination System (UN, EC)"
@@ -29,12 +33,29 @@ GDACS_CURRENT_DAYS = 7
 GDACS_PAGE_SIZE = 100
 GDACS_MAX_PAGES = 10
 EVENT_TYPES: dict[str, str] = {
-    "earthquake": "EQ", "earthquakes": "EQ", "eq": "EQ",
-    "cyclone": "TC", "cyclones": "TC", "tropical cyclone": "TC", "hurricane": "TC", "typhoon": "TC", "tc": "TC",
-    "flood": "FL", "floods": "FL", "fl": "FL",
-    "volcano": "VO", "volcanoes": "VO", "volcanic eruption": "VO", "vo": "VO",
-    "drought": "DR", "droughts": "DR", "dr": "DR",
-    "wildfire": "WF", "wildfires": "WF", "forest fire": "WF", "wf": "WF",
+    "earthquake": "EQ",
+    "earthquakes": "EQ",
+    "eq": "EQ",
+    "cyclone": "TC",
+    "cyclones": "TC",
+    "tropical cyclone": "TC",
+    "hurricane": "TC",
+    "typhoon": "TC",
+    "tc": "TC",
+    "flood": "FL",
+    "floods": "FL",
+    "fl": "FL",
+    "volcano": "VO",
+    "volcanoes": "VO",
+    "volcanic eruption": "VO",
+    "vo": "VO",
+    "drought": "DR",
+    "droughts": "DR",
+    "dr": "DR",
+    "wildfire": "WF",
+    "wildfires": "WF",
+    "forest fire": "WF",
+    "wf": "WF",
 }
 ALERT_LEVELS = {"green": "Green", "orange": "Orange", "red": "Red"}
 
@@ -48,7 +69,9 @@ async def fetch_gdacs_json(url: str, headers: dict[str, str] | None = None) -> o
     try:
         return json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ProviderMalformedPayloadError("Provider returned malformed JSON.") from exc
+        raise ProviderMalformedPayloadError(
+            "Provider returned malformed JSON."
+        ) from exc
 
 
 ###############################################################################
@@ -75,14 +98,20 @@ class GDACSProvider:
         truncated = True
         for page in range(1, GDACS_MAX_PAGES + 1):
             batch = normalize_gdacs_events(
-                await call_json_fetcher(self.fetcher, f"{url}&{urlencode({'pagenumber': page})}")
+                await call_json_fetcher(
+                    self.fetcher, f"{url}&{urlencode({'pagenumber': page})}"
+                )
             )
             events.extend(batch)
             if len(batch) < GDACS_PAGE_SIZE:
                 truncated = False
                 break
         features = _within_bbox(_unique(events), request.bbox)
-        times = [value for value in (item.get("time") for item in features) if isinstance(value, int)]
+        times = [
+            value
+            for value in (item.get("time") for item in features)
+            if isinstance(value, int)
+        ]
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
@@ -95,13 +124,18 @@ class GDACSProvider:
             },
             attribution=[GDACS_ATTRIBUTION],
             warnings=(
-                [f"Result capped at {GDACS_MAX_PAGES * GDACS_PAGE_SIZE} events; narrow the "
-                 "period, event types or alert levels for the full list."]
-                if truncated else []
+                [
+                    f"Result capped at {GDACS_MAX_PAGES * GDACS_PAGE_SIZE} events; narrow the "
+                    "period, event types or alert levels for the full list."
+                ]
+                if truncated
+                else []
             ),
             result_status="ok" if features else "valid_empty",
             result_type="features",
-            observation_time=datetime.fromtimestamp(max(times) / 1000, UTC).isoformat() if times else None,
+            observation_time=datetime.fromtimestamp(max(times) / 1000, UTC).isoformat()
+            if times
+            else None,
             coverage={
                 "type": "bbox" if request.bbox else "global",
                 "temporal_scope_satisfied": True,
@@ -119,7 +153,9 @@ class GDACSProvider:
 ###############################################################################
 def normalize_gdacs_events(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload) or not is_json_array(payload.get("features")):
-        raise ProviderMalformedPayloadError("GDACS payload must be a GeoJSON FeatureCollection.")
+        raise ProviderMalformedPayloadError(
+            "GDACS payload must be a GeoJSON FeatureCollection."
+        )
     features: list[dict[str, object]] = []
     for item in json_object(payload).get("features", []):
         feature = json_object(item)
@@ -128,8 +164,10 @@ def normalize_gdacs_events(payload: object) -> list[dict[str, object]]:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
         if not (
-            isinstance(latitude, int | float) and isinstance(longitude, int | float)
-            and -90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0
+            isinstance(latitude, int | float)
+            and isinstance(longitude, int | float)
+            and -90.0 <= latitude <= 90.0
+            and -180.0 <= longitude <= 180.0
         ):
             continue
         properties = json_object(feature.get("properties"))
@@ -137,24 +175,26 @@ def normalize_gdacs_events(payload: object) -> list[dict[str, object]]:
         links = json_object(properties.get("url"))
         event_type = str(properties.get("eventtype") or "")
         event_id = properties.get("eventid")
-        features.append({
-            "id": f"{event_type}{event_id}-{properties.get('episodeid')}",
-            "name": properties.get("name") or properties.get("eventname"),
-            "category": event_type,
-            "latitude": float(latitude),
-            "longitude": float(longitude),
-            "alert_level": properties.get("alertlevel"),
-            "alert_score": properties.get("alertscore"),
-            "severity": severity.get("severity"),
-            "severity_text": severity.get("severitytext"),
-            "severity_unit": severity.get("severityunit"),
-            "country": properties.get("country"),
-            "time": _epoch_ms(properties.get("fromdate")),
-            "end_time": _epoch_ms(properties.get("todate")),
-            "is_current": properties.get("iscurrent"),
-            "footprint_basis": "reported_point",
-            "url": links.get("report"),
-        })
+        features.append(
+            {
+                "id": f"{event_type}{event_id}-{properties.get('episodeid')}",
+                "name": properties.get("name") or properties.get("eventname"),
+                "category": event_type,
+                "latitude": float(latitude),
+                "longitude": float(longitude),
+                "alert_level": properties.get("alertlevel"),
+                "alert_score": properties.get("alertscore"),
+                "severity": severity.get("severity"),
+                "severity_text": severity.get("severitytext"),
+                "severity_unit": severity.get("severityunit"),
+                "country": properties.get("country"),
+                "time": _epoch_ms(properties.get("fromdate")),
+                "end_time": _epoch_ms(properties.get("todate")),
+                "is_current": properties.get("iscurrent"),
+                "footprint_basis": "reported_point",
+                "url": links.get("report"),
+            }
+        )
     return features
 
 
@@ -162,7 +202,11 @@ def normalize_gdacs_events(payload: object) -> list[dict[str, object]]:
 def _time_range(request: ProviderRequest) -> tuple[datetime, datetime]:
     end_value = request.params.get("end_time_iso")
     try:
-        end = datetime.fromisoformat(str(end_value).replace("Z", "+00:00")) if end_value else datetime.now(UTC)
+        end = (
+            datetime.fromisoformat(str(end_value).replace("Z", "+00:00"))
+            if end_value
+            else datetime.now(UTC)
+        )
     except ValueError as exc:
         raise ProviderInvalidQueryError("The end time must be ISO-8601.") from exc
     end = end if end.tzinfo else end.replace(tzinfo=UTC)
@@ -171,7 +215,9 @@ def _time_range(request: ProviderRequest) -> tuple[datetime, datetime]:
     if end <= start:
         raise ProviderInvalidQueryError("The end time must follow the start time.")
     if end - start > timedelta(days=GDACS_RANGE_MAX_DAYS):
-        raise ProviderInvalidQueryError(f"GDACS ranges are limited to {GDACS_RANGE_MAX_DAYS} days.")
+        raise ProviderInvalidQueryError(
+            f"GDACS ranges are limited to {GDACS_RANGE_MAX_DAYS} days."
+        )
     return start, end
 
 
@@ -233,4 +279,6 @@ def _epoch_ms(value: object) -> int | None:
         parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
     except ValueError:
         return None
-    return int((parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).timestamp() * 1000)
+    return int(
+        (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).timestamp() * 1000
+    )

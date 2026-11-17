@@ -66,6 +66,7 @@ CAPABILITY_ROUTE_SYSTEM_PROMPT = (
     "Return the call immediately without explanation."
 )
 
+
 ###############################################################################
 def build_capability_route_prompt() -> str:
     return "\n\n".join(

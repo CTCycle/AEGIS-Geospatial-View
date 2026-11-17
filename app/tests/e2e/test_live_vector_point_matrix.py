@@ -160,7 +160,6 @@ def _proxy_capability_id(url: str) -> str | None:
 
 ###############################################################################
 class _VectorPointCapture:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
@@ -335,9 +334,7 @@ def _scenario_result(
         event for event in capture.events if event.get("transport") == "aegis_proxy"
     ]
     direct_upstream_events = [
-        event
-        for event in capture.events
-        if event.get("transport") == "direct_upstream"
+        event for event in capture.events if event.get("transport") == "direct_upstream"
     ]
     proxy_capabilities = sorted(
         {
@@ -368,8 +365,7 @@ def _scenario_result(
         "prompt": prompt,
         "expected_kind": expected_kind,
         "expected_capability": expected_capability,
-        "expected_capability_selected": expected_capability
-        in selected_capability_ids,
+        "expected_capability_selected": expected_capability in selected_capability_ids,
         "classification": classification,
         "assistant_response_visible": page.locator(".chat-message--assistant").count()
         > 0,

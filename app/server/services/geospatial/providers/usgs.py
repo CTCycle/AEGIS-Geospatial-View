@@ -32,6 +32,7 @@ EARTHQUAKE_RANGE_MAX_DAYS = 366
 # Events within about 50 km of a macro region's member countries count as in it.
 REGION_OFFSHORE_BUFFER_DEG = 0.5
 
+
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
@@ -73,7 +74,12 @@ class USGSProvider(GeospatialProvider):
             features = _filter_features_to_radius(features, request.params)
             minimum = _min_magnitude(request)
             if minimum is not None:
-                features = [item for item in features if (magnitude := _float_or_none(item.get("magnitude"))) is not None and magnitude >= minimum]
+                features = [
+                    item
+                    for item in features
+                    if (magnitude := _float_or_none(item.get("magnitude"))) is not None
+                    and magnitude >= minimum
+                ]
             return ProviderResponse(
                 capability_id=request.capability_id,
                 provider_id=self.provider_id,
@@ -88,7 +94,9 @@ class USGSProvider(GeospatialProvider):
                 attribution=["U.S. Geological Survey"],
                 result_status="valid_empty" if not features else "ok",
                 result_type="features",
-                coverage=_earthquake_coverage(request, truncated=False, note=self.COMPLETENESS_NOTE),
+                coverage=_earthquake_coverage(
+                    request, truncated=False, note=self.COMPLETENESS_NOTE
+                ),
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -108,8 +116,12 @@ class USGSProvider(GeospatialProvider):
     async def _earthquake_range(self, request: ProviderRequest) -> ProviderResponse:
         start, end = _resolve_time_range(request)
         features_url = _fdsn_event_url(
-            start, end, request.bbox, _min_magnitude(request),
-            base_url=self.FDSN_URL, response_format=self.FDSN_FORMAT,
+            start,
+            end,
+            request.bbox,
+            _min_magnitude(request),
+            base_url=self.FDSN_URL,
+            response_format=self.FDSN_FORMAT,
         )
         label = f"{self.CATALOG_NAME} {start.date()} to {end.date()}"
         payload: dict[str, object] = {
@@ -161,8 +173,13 @@ class USGSProvider(GeospatialProvider):
             result_status="valid_empty" if not features else "ok",
             result_type="features",
             observation_time=observation_time,
-            coverage={**_earthquake_coverage(request, truncated=truncated, note=self.COMPLETENESS_NOTE),
-                      **region_coverage, "temporal_scope_satisfied": True},
+            coverage={
+                **_earthquake_coverage(
+                    request, truncated=truncated, note=self.COMPLETENESS_NOTE
+                ),
+                **region_coverage,
+                "temporal_scope_satisfied": True,
+            },
             source_url=features_url,
         )
 
@@ -218,6 +235,7 @@ class USGSProvider(GeospatialProvider):
             result_type="metadata",
         )
 
+
 ###############################################################################
 def _resolve_time_range(request: ProviderRequest) -> tuple[datetime, datetime]:
     start = request.time
@@ -241,6 +259,7 @@ def _resolve_time_range(request: ProviderRequest) -> tuple[datetime, datetime]:
             f"Earthquake ranges are limited to {EARTHQUAKE_RANGE_MAX_DAYS} days."
         )
     return start, end
+
 
 ###############################################################################
 def _fdsn_event_url(
@@ -270,6 +289,7 @@ def _fdsn_event_url(
             maxlatitude=bbox[3],
         )
     return f"{base_url}?{urlencode(query)}"
+
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
@@ -312,6 +332,7 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
             }
         )
     return features
+
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
@@ -363,15 +384,17 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
         )
     return features
 
+
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
     if not isinstance(value, int | float | str):
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if math.isfinite(number) else None
+
 
 ###############################################################################
 def _valid_coordinates(latitude: object, longitude: object) -> bool:
@@ -385,6 +408,7 @@ def _valid_coordinates(latitude: object, longitude: object) -> bool:
         and -90.0 <= float(latitude) <= 90.0
         and -180.0 <= float(longitude) <= 180.0
     )
+
 
 ###############################################################################
 def _filter_features_to_bbox(
@@ -411,6 +435,7 @@ def _filter_features_to_bbox(
             filtered.append(feature)
     return filtered
 
+
 ###############################################################################
 def _filter_features_to_radius(
     features: list[dict[str, object]],
@@ -434,7 +459,8 @@ def _filter_features_to_radius(
         for feature in features
         if (
             (feature_latitude := _float_or_none(feature.get("latitude"))) is not None
-            and (feature_longitude := _float_or_none(feature.get("longitude"))) is not None
+            and (feature_longitude := _float_or_none(feature.get("longitude")))
+            is not None
             and geodesic_distance_m(
                 latitude,
                 longitude,
@@ -459,15 +485,21 @@ async def _filter_features_to_region(
     region = find_macro_region_entry(str(request.params.get("macro_region") or ""))
     if region is None or not region.countries or request.bbox is None:
         return features, {}
-    mask = await asyncio.to_thread(land_mask, request.bbox, region.countries, REGION_OFFSHORE_BUFFER_DEG)
+    mask = await asyncio.to_thread(
+        land_mask, request.bbox, region.countries, REGION_OFFSHORE_BUFFER_DEG
+    )
     kept = [
-        feature for feature in features
+        feature
+        for feature in features
         if (latitude := _float_or_none(feature.get("latitude"))) is not None
         and (longitude := _float_or_none(feature.get("longitude"))) is not None
         and mask.contains(Point(longitude, latitude))
     ]
-    return kept, {"region": region.name, "region_offshore_buffer_deg": REGION_OFFSHORE_BUFFER_DEG,
-                  "excluded_outside_region_events": len(features) - len(kept)}
+    return kept, {
+        "region": region.name,
+        "region_offshore_buffer_deg": REGION_OFFSHORE_BUFFER_DEG,
+        "excluded_outside_region_events": len(features) - len(kept),
+    }
 
 
 ###############################################################################
@@ -475,14 +507,24 @@ def _min_magnitude(request: ProviderRequest) -> float | None:
     filters = request.params.get("filters")
     # Models spell the same threshold several ways; an unread spelling would
     # silently drop the user's magnitude constraint.
-    value = next(
-        (
-            filters[key]
-            for key in ("min_magnitude", "magnitude_min", "minmagnitude", "min_mag", "magnitude")
-            if key in filters and filters[key] is not None
-        ),
-        None,
-    ) if is_json_object(filters) else None
+    value = (
+        next(
+            (
+                filters[key]
+                for key in (
+                    "min_magnitude",
+                    "magnitude_min",
+                    "minmagnitude",
+                    "min_mag",
+                    "magnitude",
+                )
+                if key in filters and filters[key] is not None
+            ),
+            None,
+        )
+        if is_json_object(filters)
+        else None
+    )
     if value is None:
         return None
     try:
@@ -495,7 +537,13 @@ def _min_magnitude(request: ProviderRequest) -> float | None:
 
 
 ###############################################################################
-def _earthquake_coverage(request: ProviderRequest, *, truncated: bool, note: str) -> dict[str, Any]:
-    return {"bbox": list(request.bbox) if request.bbox else None,
-            "min_magnitude": _min_magnitude(request), "truncated": truncated,
-            "value_kind": "observation", "completeness_note": note}
+def _earthquake_coverage(
+    request: ProviderRequest, *, truncated: bool, note: str
+) -> dict[str, Any]:
+    return {
+        "bbox": list(request.bbox) if request.bbox else None,
+        "min_magnitude": _min_magnitude(request),
+        "truncated": truncated,
+        "value_kind": "observation",
+        "completeness_note": note,
+    }

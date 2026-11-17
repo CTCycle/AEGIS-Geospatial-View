@@ -39,12 +39,14 @@ ALLOWED_INVARIANTS = frozenset(
     }
 )
 
+
 ###############################################################################
 def _string_set(value: object) -> set[str] | None:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
     normalized = {item.strip() for item in value if item.strip()}
     return normalized
+
 
 ###############################################################################
 def validate_scenario_matrix(document: object) -> list[str]:
@@ -159,6 +161,7 @@ def validate_scenario_matrix(document: object) -> list[str]:
             )
 
     return errors
+
 
 ###############################################################################
 def load_scenario_matrix(path: Path | None = None) -> dict[str, Any]:

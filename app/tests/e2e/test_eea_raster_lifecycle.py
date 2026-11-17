@@ -65,7 +65,9 @@ def test_eea_coverage_and_gbif_lifecycle(
             settings["agent_model_provider"],
             settings["agent_model_name"],
         ) != ("opencode-go", "deepseek-v4.1-flash"):
-            pytest.skip("EEA/GBIF lifecycle requires OpenCode Go / deepseek-v4.1-flash.")
+            pytest.skip(
+                "EEA/GBIF lifecycle requires OpenCode Go / deepseek-v4.1-flash."
+            )
         page.goto(base_url)
         page.get_by_role("button", name="Start new chat").click()
         steps = (

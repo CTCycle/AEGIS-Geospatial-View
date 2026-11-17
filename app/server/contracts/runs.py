@@ -10,6 +10,7 @@ from server.contracts.geospatial import ClientMapView, MapSession
 from server.domain.agent.conversation import ConversationState
 from server.domain.agent.capability_route import AgentTaskState
 
+
 ###############################################################################
 class AgentRunState(StrEnum):
     PENDING = "pending"
@@ -28,11 +29,13 @@ TERMINAL_RUN_STATES = {
     AgentRunState.CANCELLED,
 }
 
+
 ###############################################################################
 class ConversationCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = None
+
 
 ###############################################################################
 class ConversationCreateResponse(BaseModel):
@@ -40,6 +43,7 @@ class ConversationCreateResponse(BaseModel):
 
     conversation_id: str
     title: str | None = None
+
 
 ###############################################################################
 class ConversationMessageSnapshot(BaseModel):
@@ -49,6 +53,7 @@ class ConversationMessageSnapshot(BaseModel):
     content: str
     created_at: datetime
 
+
 ###############################################################################
 class ActiveConversationRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -56,10 +61,13 @@ class ActiveConversationRunSnapshot(BaseModel):
     run_id: str
     run_version: int = Field(..., ge=1)
     state: AgentRunState
-    presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
+    presentation_status: Literal[
+        "not_required", "pending", "ready", "failed", "render_timeout"
+    ] = "not_required"
     presentation: dict[str, Any] | None = None
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
+
 
 ###############################################################################
 class ConversationRunSummary(BaseModel):
@@ -88,6 +96,7 @@ class ConversationRunSummary(BaseModel):
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
 
+
 ###############################################################################
 class ConversationSummary(BaseModel):
     """Searchable, bounded conversation listing item."""
@@ -104,6 +113,7 @@ class ConversationSummary(BaseModel):
     active_run: ActiveConversationRunSnapshot | None = None
     latest_run: ConversationRunSummary | None = None
 
+
 ###############################################################################
 class ConversationListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -114,9 +124,8 @@ class ConversationListResponse(BaseModel):
     next_cursor: str | None = None
     has_more: bool = False
     total: int = Field(default=0, ge=0)
-    pagination: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]()
-    )
+    pagination: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 class RunTraceEntry(BaseModel):
@@ -146,6 +155,7 @@ class RunTraceEntry(BaseModel):
     error: Any | None = None
     payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
+
 ###############################################################################
 class RunTraceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -153,15 +163,12 @@ class RunTraceResponse(BaseModel):
     conversation_id: str
     run_id: str
     run_version: int | None = Field(default=None, ge=1)
-    events: list[RunTraceEntry] = Field(
-        default_factory=lambda: list[RunTraceEntry]()
-    )
+    events: list[RunTraceEntry] = Field(default_factory=lambda: list[RunTraceEntry]())
     next_cursor: str | None = None
     has_more: bool = False
     total: int = Field(default=0, ge=0)
-    pagination: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]()
-    )
+    pagination: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+
 
 ###############################################################################
 class ConversationSnapshotResponse(BaseModel):
@@ -180,6 +187,7 @@ class ConversationSnapshotResponse(BaseModel):
     recent_runs: list[ConversationRunSummary] = Field(
         default_factory=lambda: list[ConversationRunSummary]()
     )
+
 
 ###############################################################################
 class AgentRunCreateRequest(BaseModel):
@@ -215,6 +223,7 @@ class AgentRunCreateRequest(BaseModel):
             raise ValueError("client_request_id is too long")
         return normalized
 
+
 ###############################################################################
 class AgentRunCreateResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -223,6 +232,7 @@ class AgentRunCreateResult(BaseModel):
     run_id: str
     run_version: int
     state: AgentRunState
+
 
 ###############################################################################
 class AgentRunSnapshot(BaseModel):
@@ -241,11 +251,14 @@ class AgentRunSnapshot(BaseModel):
     cancel_requested_at: datetime | None = None
     error_code: str | None = None
     error_message: str | None = None
-    presentation_status: Literal["not_required", "pending", "ready", "failed", "render_timeout"] = "not_required"
+    presentation_status: Literal[
+        "not_required", "pending", "ready", "failed", "render_timeout"
+    ] = "not_required"
     presentation: dict[str, Any] | None = None
     response: dict[str, Any] | None = None
     current_iteration: int | None = Field(default=None, ge=0)
     task_state: AgentTaskState | None = None
+
 
 ###############################################################################
 class AgentRunCancelResponse(BaseModel):
@@ -255,6 +268,7 @@ class AgentRunCancelResponse(BaseModel):
     run_id: str
     state: AgentRunState
     cancel_requested_at: datetime | None = None
+
 
 ###############################################################################
 class ActiveRunContext(BaseModel):

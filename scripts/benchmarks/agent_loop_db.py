@@ -59,7 +59,6 @@ EVIDENCE_SIZES_MIB = (1, 4, 15.5)
 
 ###############################################################################
 class _StatementCounter:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: SQLiteRepository) -> None:
         self.count = 0
@@ -86,7 +85,11 @@ def _seed_history(database: SQLiteRepository, conversation_id: str, size: int) -
     }
     tool_payload = {
         "tool_calls": [
-            {"name": "search_location", "arguments": {"query": "Rome"}, "status": "success"}
+            {
+                "name": "search_location",
+                "arguments": {"query": "Rome"},
+                "status": "success",
+            }
             for _ in range(4)
         ]
     }
@@ -98,7 +101,10 @@ def _seed_history(database: SQLiteRepository, conversation_id: str, size: int) -
                 request_id=f"bench-{index // 2}",
                 role="user" if index % 2 == 0 else "assistant",
                 content=f"Message {index}: show the weather around the Colosseum. " * 4,
-                structured_payload={"request_id": f"bench-{index // 2}", "native": True},
+                structured_payload={
+                    "request_id": f"bench-{index // 2}",
+                    "native": True,
+                },
                 tool_payload=tool_payload if index % 2 else None,
                 map_session=map_session if index % 2 else None,
             )
@@ -123,14 +129,20 @@ def _seed_run(
                 run_version=snapshot.active_run_version,
                 type=RunEventType.TRACE,
                 visibility=RunEventVisibility.INTERNAL,
-                payload={"kind": "tool_result", "sequence": sequence, "summary": "x" * 400},
+                payload={
+                    "kind": "tool_result",
+                    "sequence": sequence,
+                    "summary": "x" * 400,
+                },
             )
         )
     return snapshot.run_id
 
 
 ###############################################################################
-def run_control_check(runs: AgentRunRepository, run_id: str, version: int) -> str | None:
+def run_control_check(
+    runs: AgentRunRepository, run_id: str, version: int
+) -> str | None:
     """Mirror ``AgentRunOrchestrator``'s per-trace run-state check."""
 
     control = runs.get_run_control(run_id)
@@ -152,13 +164,20 @@ def turn_history(history: ChatHistoryService, conversation_id: str) -> int:
 
 ###############################################################################
 def _evidence_payload(size_mib: float) -> dict[str, Any]:
-    feature = {"latitude": 41.89, "longitude": 12.49, "precipitation_sum_mm": 9.25, "time": "2026-10-31T00:00"}
+    feature = {
+        "latitude": 41.89,
+        "longitude": 12.49,
+        "precipitation_sum_mm": 9.25,
+        "time": "2026-10-31T00:00",
+    }
     count = int(size_mib * 1024 * 1024 / (len(json.dumps(feature)) + 12))
     return {"features": [dict(feature, id=index) for index in range(count)]}
 
 
 ###############################################################################
-def evidence_write(evidence: AgentEvidenceRepository, conversation_id: str, payload: Any) -> str:
+def evidence_write(
+    evidence: AgentEvidenceRepository, conversation_id: str, payload: Any
+) -> str:
     """Mirror one capability-execution evidence write."""
 
     return evidence.create(
@@ -239,7 +258,9 @@ def main() -> None:
             conversation_id = conversations.create_conversation(f"history {size}").id
             _seed_history(database, conversation_id, size)
             results["scenarios"][f"turn_history_{size}"] = _measure(
-                counter, lambda: turn_history(history, conversation_id), args.repetitions
+                counter,
+                lambda: turn_history(history, conversation_id),
+                args.repetitions,
             )
         evidence = AgentEvidenceRepository(database)
         evidence_conversation = conversations.create_conversation("evidence").id

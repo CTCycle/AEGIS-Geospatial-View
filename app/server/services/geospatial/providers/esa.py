@@ -16,6 +16,7 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
+
 ###############################################################################
 class ESAProvider(GeospatialProvider):
     provider_id = "esa"
@@ -48,9 +49,7 @@ class ESAProvider(GeospatialProvider):
     ) -> dict[str, Any]:
         protocol = _protocol(metadata)
         layer_id = str(
-            metadata.get("layer_id")
-            or metadata.get("layers")
-            or request.capability_id
+            metadata.get("layer_id") or metadata.get("layers") or request.capability_id
         )
         base_payload: dict[str, Any] = {
             "serviceUrl": metadata.get("url"),
@@ -115,7 +114,9 @@ class ESAProvider(GeospatialProvider):
                 )
             if isinstance(exc, ProviderUnavailableError):
                 raise
-            raise ProviderUnavailableError(f"ESA {protocol} validation failed.") from exc
+            raise ProviderUnavailableError(
+                f"ESA {protocol} validation failed."
+            ) from exc
         if not is_json_object(validation):
             if cached.status == CacheLookupStatus.STALE and is_json_object(
                 cached.value
@@ -162,6 +163,7 @@ class ESAProvider(GeospatialProvider):
             stale=stale,
         )
 
+
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
@@ -170,11 +172,15 @@ def _metadata(request: ProviderRequest) -> dict[str, Any]:
 
 ###############################################################################
 def _protocol(metadata: dict[str, Any]) -> str:
-    value = str(
-        metadata.get("source_protocol")
-        or metadata.get("renderingMode")
-        or metadata.get("rendering_mode")
-        or metadata.get("type")
-        or ""
-    ).strip().lower()
+    value = (
+        str(
+            metadata.get("source_protocol")
+            or metadata.get("renderingMode")
+            or metadata.get("rendering_mode")
+            or metadata.get("type")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     return "wms" if value == "wms" else "wmts"

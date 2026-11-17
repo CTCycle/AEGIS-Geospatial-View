@@ -1,11 +1,20 @@
 from __future__ import annotations
 from tests.conftest import run_async_in_thread
-from server.services.geospatial.providers.base import ProviderRequest, ProviderAuthError, ProviderRateLimitError, ProviderUnavailableError
+from server.services.geospatial.providers.base import (
+    ProviderRequest,
+    ProviderAuthError,
+    ProviderRateLimitError,
+    ProviderUnavailableError,
+)
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers._request import grid_points
-from server.services.geospatial.openmeteo import OpenMeteoRateLimitError, OpenMeteoRequestError, OpenMeteoService
+from server.services.geospatial.openmeteo import (
+    OpenMeteoRateLimitError,
+    OpenMeteoRequestError,
+    OpenMeteoService,
+)
 from server.services.geospatial.land_mask import country_shapes, land_mask
 from server.services.geospatial.providers import http as provider_http
 from server.services.catalog.loader import find_macro_region_entry, load_macro_regions
@@ -21,11 +30,13 @@ from datetime import UTC, datetime, timedelta
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 from server.services.geospatial.cache import GeospatialCache
-from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 
 # --- test_geospatial_raster_and_secret_providers.py ---
-
 
 
 ###############################################################################
@@ -39,6 +50,7 @@ def test_rainviewer_provider_emits_renderable_raster_payload() -> None:
     assert rainviewer.payload["renderingMode"] == "raster-tile"
     assert rainviewer.attribution
 
+
 ###############################################################################
 def test_tomtom_traffic_flow_keeps_key_server_side() -> None:
     response = run_async_in_thread(
@@ -50,13 +62,12 @@ def test_tomtom_traffic_flow_keeps_key_server_side() -> None:
     assert response.payload["credentialPolicy"] == "server-side-only"
     assert "tomtom-secret" not in str(response.payload)
 
-# --- test_geospatial_weather_sampling.py ---
 
+# --- test_geospatial_weather_sampling.py ---
 
 
 ###############################################################################
 class _OpenMeteoService:
-
     # -------------------------------------------------------------------------
     async def get_weather_forecast(self, *, latitude: float, longitude: float):
         return {
@@ -83,6 +94,7 @@ class _OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+
 ###############################################################################
 def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:
     response = run_async_in_thread(
@@ -100,11 +112,15 @@ def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:
 
 
 ###############################################################################
-@pytest.mark.parametrize("bbox", [(-180, -85, 180, 85), (-25, 34, 45, 72), (8, 45, 8.1, 70)])
+@pytest.mark.parametrize(
+    "bbox", [(-180, -85, 180, 85), (-25, 34, 45, 72), (8, 45, 8.1, 70)]
+)
 def test_weather_grid_cap_and_interior_centres(bbox):
     points, spacing, excluded = grid_points(bbox)
     assert 1 <= len(points) <= 100 and spacing > 0 and excluded == 0
-    assert all(bbox[0] < lon < bbox[2] and bbox[1] < lat < bbox[3] for lat, lon in points)
+    assert all(
+        bbox[0] < lon < bbox[2] and bbox[1] < lat < bbox[3] for lat, lon in points
+    )
 
 
 ###############################################################################
@@ -112,10 +128,25 @@ def test_region_mask_excludes_sea_and_non_member_land():
     europe = find_macro_region_entry("Europe")
     assert europe is not None
     mask = land_mask(europe.bbox, europe.countries)
-    inside = {name: mask.contains(Point(lon, lat)) for name, (lon, lat) in {
-        "Lisbon": (-9.14, 38.72), "Warsaw": (21.01, 52.23), "Rabat": (-6.84, 34.02),
-        "Ankara": (32.85, 39.93), "Tunis": (10.18, 36.8), "Bay of Biscay": (-5.0, 45.5)}.items()}
-    assert inside == {"Lisbon": True, "Warsaw": True, "Rabat": False, "Ankara": False, "Tunis": False, "Bay of Biscay": False}
+    inside = {
+        name: mask.contains(Point(lon, lat))
+        for name, (lon, lat) in {
+            "Lisbon": (-9.14, 38.72),
+            "Warsaw": (21.01, 52.23),
+            "Rabat": (-6.84, 34.02),
+            "Ankara": (32.85, 39.93),
+            "Tunis": (10.18, 36.8),
+            "Bay of Biscay": (-5.0, 45.5),
+        }.items()
+    }
+    assert inside == {
+        "Lisbon": True,
+        "Warsaw": True,
+        "Rabat": False,
+        "Ankara": False,
+        "Tunis": False,
+        "Bay of Biscay": False,
+    }
     points, spacing, excluded = grid_points(europe.bbox, 300, mask)
     assert 255 <= len(points) <= 300 and excluded > 0 and spacing < 3
     assert all(mask.contains(Point(lon, lat)) for lat, lon in points)
@@ -124,7 +155,9 @@ def test_region_mask_excludes_sea_and_non_member_land():
 ###############################################################################
 def test_macro_region_members_have_shapes():
     shapes = country_shapes()
-    assert all(code in shapes for region in load_macro_regions() for code in region.countries)
+    assert all(
+        code in shapes for region in load_macro_regions() for code in region.countries
+    )
 
 
 ###############################################################################
@@ -137,25 +170,50 @@ async def test_weather_grid_region_refinement_future_hours_and_provenance():
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
+        async def get_weather_grid(
+            self, points, past_days, extra_variables=(), failure_reasons=None
+        ):
             requested.append(points)
-            row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 30},
-                   "hourly": {"time": ["2026-10-20T11:00", "2026-10-20T12:00", "2026-10-20T13:00"],
-                              "temperature_2m": [28, 30, 99], "precipitation": [2, 3, 100]}}
+            row = {
+                "elevation": 0,
+                "current": {"time": "2026-10-20T12:00", "temperature_2m": 30},
+                "hourly": {
+                    "time": [
+                        "2026-10-20T11:00",
+                        "2026-10-20T12:00",
+                        "2026-10-20T13:00",
+                    ],
+                    "temperature_2m": [28, 30, 99],
+                    "precipitation": [2, 3, 100],
+                },
+            }
             return [{**row, "current": {}}] + [row for _ in points[1:]]
+
     europe = find_macro_region_entry("Europe")
     assert europe is not None
-    result = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
-        capability_id="openmeteo_weather_forecast", bbox=europe.bbox,
-        params={"sampling": "area", "macro_region": "Europe"}))
+    result = await OpenMeteoProvider(service=Service()).fetch(
+        ProviderRequest(
+            capability_id="openmeteo_weather_forecast",
+            bbox=europe.bbox,
+            params={"sampling": "area", "macro_region": "Europe"},
+        )
+    )
     features = result.payload["features"]
     mask = land_mask(europe.bbox, europe.countries)
     # Elevation zero is no longer treated as sea; the region mask decides.
-    assert all(mask.contains(Point(lon, lat)) for batch in requested for lat, lon in batch)
-    assert features[0]["precipitation_sum_mm"] == 5 and features[0]["temperature_2m_max_c"] == 30
+    assert all(
+        mask.contains(Point(lon, lat)) for batch in requested for lat, lon in batch
+    )
+    assert (
+        features[0]["precipitation_sum_mm"] == 5
+        and features[0]["temperature_2m_max_c"] == 30
+    )
     assert len(requested) == 2 and 0 < len(requested[1]) <= 80
     assert {f["sample_stage"] for f in features} == {"coarse", "refined"}
-    assert result.coverage["region"] == "Europe" and result.coverage["excluded_outside_region_points"] > 0
+    assert (
+        result.coverage["region"] == "Europe"
+        and result.coverage["excluded_outside_region_points"] > 0
+    )
     assert result.coverage["refined_point_count"] == len(requested[1]) - 1
     assert result.coverage["value_kind"] == "model_estimate"
     assert result.result_status == "partial"
@@ -172,14 +230,28 @@ async def test_weather_grid_country_mask_excludes_neighbouring_countries():
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
+        async def get_weather_grid(
+            self, points, past_days, extra_variables=(), failure_reasons=None
+        ):
             requested.extend(points)
-            row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
-                   "hourly": {"time": ["2026-10-20T12:00"], "temperature_2m": [10], "precipitation": [0]}}
+            row = {
+                "elevation": 0,
+                "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
+                "hourly": {
+                    "time": ["2026-10-20T12:00"],
+                    "temperature_2m": [10],
+                    "precipitation": [0],
+                },
+            }
             return [row for _ in points]
-    result = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
-        capability_id="openmeteo_weather_forecast", bbox=(5.96, 45.82, 10.49, 47.81),
-        params={"sampling": "area", "mask_countries": ["CH"]}))
+
+    result = await OpenMeteoProvider(service=Service()).fetch(
+        ProviderRequest(
+            capability_id="openmeteo_weather_forecast",
+            bbox=(5.96, 45.82, 10.49, 47.81),
+            params={"sampling": "area", "mask_countries": ["CH"]},
+        )
+    )
     mask = land_mask((5.96, 45.82, 10.49, 47.81), ("CH",))
     assert requested and all(mask.contains(Point(lon, lat)) for lat, lon in requested)
     assert result.coverage["mask_countries"] == ["CH"]
@@ -191,26 +263,44 @@ async def test_weather_grid_country_mask_excludes_neighbouring_countries():
 async def test_weather_grid_batches_requests_under_8kb():
     service = OpenMeteoService()
     calls = []
+
     def get_json(**kwargs):
         calls.append(kwargs)
-        return {"locations": [{"elevation": 10}] * len(kwargs["params"]["latitude"].split(","))}
+        return {
+            "locations": [{"elevation": 10}]
+            * len(kwargs["params"]["latitude"].split(","))
+        }
+
     with patch.object(service, "_get_json", side_effect=get_json):
-        points, _, _ = grid_points((-180, -85, 180, 85), 300, land_mask((-180, -85, 180, 85)))
+        points, _, _ = grid_points(
+            (-180, -85, 180, 85), 300, land_mask((-180, -85, 180, 85))
+        )
         result = await service.get_weather_grid(points, 30)
     assert len(result) == len(points) and len(calls) == 3
     assert all(call["params"]["past_days"] == "14" for call in calls)
-    assert all(len(call["endpoint"] + "?" + urlencode(call["params"])) < 8192 for call in calls)
+    assert all(
+        len(call["endpoint"] + "?" + urlencode(call["params"])) < 8192 for call in calls
+    )
+
 
 ###############################################################################
 def _grid_sample(latitude: float, *, stamp: str = "2026-10-20T12:00") -> dict:
-    return {"latitude": latitude, "current": {"time": "2026-10-20T12:00", "temperature_2m": 20},
-            "hourly": {"time": [stamp], "temperature_2m": [20], "precipitation": [latitude]}}
+    return {
+        "latitude": latitude,
+        "current": {"time": "2026-10-20T12:00", "temperature_2m": 20},
+        "hourly": {
+            "time": [stamp],
+            "temperature_2m": [20],
+            "precipitation": [latitude],
+        },
+    }
 
 
 ###############################################################################
 @pytest.mark.asyncio
 async def test_weather_grid_keeps_points_aligned_when_a_batch_is_short_or_fails():
     points = [(float(index), 0.0) for index in range(250)]
+
     def get_json(**kwargs):
         latitudes = [float(value) for value in kwargs["params"]["latitude"].split(",")]
         if latitudes[0] == 100.0:
@@ -219,11 +309,15 @@ async def test_weather_grid_keeps_points_aligned_when_a_batch_is_short_or_fails(
         if latitudes[0] == 200.0:
             raise OpenMeteoRequestError("boom")
         return {"locations": [_grid_sample(latitude) for latitude in latitudes]}
+
     service = OpenMeteoService(grid_batch_concurrency=3)
     with patch.object(service, "_get_json", side_effect=get_json):
         samples = await service.get_weather_grid(points, 0)
     assert len(samples) == len(points)
-    assert all(samples[i] is not None and samples[i]["latitude"] == points[i][0] for i in range(100))
+    assert all(
+        samples[i] is not None and samples[i]["latitude"] == points[i][0]
+        for i in range(100)
+    )
     assert all(sample is None for sample in samples[100:])
     # A fresh service: the first call cached its successful batch.
     service = OpenMeteoService(grid_batch_concurrency=3)
@@ -236,6 +330,7 @@ async def test_weather_grid_keeps_points_aligned_when_a_batch_is_short_or_fails(
 @pytest.mark.asyncio
 async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
     in_flight = max_in_flight = 0
+
     async def get_json(**kwargs):
         nonlocal in_flight, max_in_flight
         in_flight += 1
@@ -244,15 +339,18 @@ async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
         await asyncio.sleep(0.2)
         in_flight -= 1
         return {"locations": [{}] * len(kwargs["params"]["latitude"].split(","))}
+
     points = [(float(index), 0.0) for index in range(400)]
     service = OpenMeteoService(grid_batch_concurrency=2)
     with patch.object(service, "_get_json", side_effect=get_json):
         assert len(await service.get_weather_grid(points, 0)) == 400
     assert max_in_flight == 2
     calls = []
+
     def rate_limited(**kwargs):
         calls.append(kwargs)
         raise OpenMeteoRateLimitError("slow down", retry_after_seconds=30)
+
     service = OpenMeteoService(grid_batch_concurrency=1)
     with patch.object(service, "_get_json", side_effect=rate_limited):
         with pytest.raises(OpenMeteoRateLimitError):
@@ -263,7 +361,9 @@ async def test_weather_grid_bounds_concurrency_and_stops_on_rate_limit():
 ###############################################################################
 def test_openmeteo_rate_slots_are_reserved_atomically():
     service = OpenMeteoService(min_call_interval_s=0.1)
-    with patch("server.services.geospatial.openmeteo.time.monotonic", return_value=50.0):
+    with patch(
+        "server.services.geospatial.openmeteo.time.monotonic", return_value=50.0
+    ):
         delays = [service._reserve_rate_limit_slot("grid")[0] for _ in range(3)]
     assert delays == pytest.approx([0.0, 0.1, 0.2])
 
@@ -274,7 +374,9 @@ async def test_openmeteo_cancelled_rate_wait_releases_its_slot():
     service = OpenMeteoService(min_call_interval_s=5)
     service._reserve_rate_limit_slot("grid")
     waiter = asyncio.create_task(
-        service._fetch_json(endpoint="https://weather.example", params={}, provider_key="grid")
+        service._fetch_json(
+            endpoint="https://weather.example", params={}, provider_key="grid"
+        )
     )
     await asyncio.sleep(0.01)
     waiter.cancel()
@@ -286,7 +388,9 @@ async def test_openmeteo_cancelled_rate_wait_releases_its_slot():
 
 ###############################################################################
 def test_openmeteo_cache_sweeps_expired_entries_and_stays_bounded(monkeypatch):
-    monkeypatch.setattr("server.services.geospatial.openmeteo.OPENMETEO_CACHE_MAX_ENTRIES", 3)
+    monkeypatch.setattr(
+        "server.services.geospatial.openmeteo.OPENMETEO_CACHE_MAX_ENTRIES", 3
+    )
     service = OpenMeteoService(cache_ttl_s=60)
     with patch("server.services.geospatial.openmeteo.time.time", return_value=0.0):
         service._cache_set("old", {})
@@ -309,17 +413,23 @@ async def test_openmeteo_http_maps_statuses_and_normalizes_arrays(monkeypatch):
         "garbled": httpx.Response(200, content=b"not json"),
     }
     agents = set()
+
     def handler(request: httpx.Request) -> httpx.Response:
         agents.add(request.headers["User-Agent"])
         case = request.url.params["case"]
         if case == "offline":
             raise httpx.ConnectError("offline", request=request)
         return responses[case]
+
     service = OpenMeteoService(user_agent="aegis-test")
+
     async def get(case):
         return await service._get_json(
-            endpoint="https://weather.example/forecast", params={"case": case}, provider_key="k"
+            endpoint="https://weather.example/forecast",
+            params={"case": case},
+            provider_key="k",
         )
+
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         monkeypatch.setattr(provider_http, "_ASYNC_HTTP_CLIENT", client)
         assert await get("array") == {"locations": [{"elevation": 1}]}
@@ -337,12 +447,14 @@ async def test_openmeteo_http_maps_statuses_and_normalizes_arrays(monkeypatch):
 @pytest.mark.asyncio
 async def test_weather_grid_rate_limit_cancels_waiting_and_in_flight_batches():
     release = asyncio.Event()
+
     async def get_json(**kwargs):
         if kwargs["params"]["latitude"].startswith("0.00000"):
             await asyncio.sleep(0.05)
             raise OpenMeteoRateLimitError("slow down", retry_after_seconds=30)
         await release.wait()
         return {"locations": [{}] * len(kwargs["params"]["latitude"].split(","))}
+
     points = [(float(index), 0.0) for index in range(300)]
     service = OpenMeteoService(grid_batch_concurrency=3)
     started = time.monotonic()
@@ -358,9 +470,11 @@ async def test_weather_grid_rate_limit_cancels_waiting_and_in_flight_batches():
         release.set()
     # A batch still waiting for its rate slot never sends its request.
     calls = []
+
     def rate_limited(**kwargs):
         calls.append(kwargs)
         raise OpenMeteoRateLimitError("slow down")
+
     service = OpenMeteoService(grid_batch_concurrency=2, min_call_interval_s=5)
     with patch.object(service, "_get_json", side_effect=rate_limited):
         with pytest.raises(OpenMeteoRateLimitError):
@@ -375,7 +489,9 @@ class _GridService:
     def __init__(self, coarse, refined):
         self.stages = [coarse, refined]
 
-    async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
+    async def get_weather_grid(
+        self, points, past_days, extra_variables=(), failure_reasons=None
+    ):
         stage = self.stages.pop(0)
         if isinstance(stage, Exception):
             raise stage
@@ -384,8 +500,11 @@ class _GridService:
 
 ###############################################################################
 def _grid_request() -> ProviderRequest:
-    return ProviderRequest(capability_id="openmeteo_weather_forecast", bbox=(8.0, 45.0, 10.0, 47.0),
-                           params={"sampling": "area"})
+    return ProviderRequest(
+        capability_id="openmeteo_weather_forecast",
+        bbox=(8.0, 45.0, 10.0, 47.0),
+        params={"sampling": "area"},
+    )
 
 
 ###############################################################################
@@ -396,22 +515,41 @@ async def test_weather_grid_counts_every_missing_sample_across_both_stages():
         samples[1] = None
         samples[2] = _grid_sample(points[2][0], stamp="not-a-time")
         return samples
-    result = await OpenMeteoProvider(service=_GridService(coarse, OpenMeteoRequestError("x"))).fetch(_grid_request())
+
+    result = await OpenMeteoProvider(
+        service=_GridService(coarse, OpenMeteoRequestError("x"))
+    ).fetch(_grid_request())
     coverage = result.coverage
     assert result.result_status == "partial" and result.partial
-    assert coverage["refinement_requested_point_count"] > 0 and coverage["refined_point_count"] == 0
+    assert (
+        coverage["refinement_requested_point_count"] > 0
+        and coverage["refined_point_count"] == 0
+    )
     assert coverage["point_count"] + coverage["missing_point_count"] == (
-        coverage["requested_point_count"] + coverage["refinement_requested_point_count"])
+        coverage["requested_point_count"] + coverage["refinement_requested_point_count"]
+    )
     # Each feature keeps the coordinates of the point it was sampled for.
-    assert all(f["precipitation_sum_mm"] == f["latitude"] for f in result.payload["features"])
+    assert all(
+        f["precipitation_sum_mm"] == f["latitude"] for f in result.payload["features"]
+    )
 
     def complete(points):
         return [_grid_sample(lat) for lat, _ in points]
+
     def short(points):
         return complete(points)[1:]
-    result = await OpenMeteoProvider(service=_GridService(complete, short)).fetch(_grid_request())
-    assert result.result_status == "partial" and result.coverage["refined_point_count"] == 0
-    assert result.coverage["missing_point_count"] == result.coverage["refinement_requested_point_count"]
+
+    result = await OpenMeteoProvider(service=_GridService(complete, short)).fetch(
+        _grid_request()
+    )
+    assert (
+        result.result_status == "partial"
+        and result.coverage["refined_point_count"] == 0
+    )
+    assert (
+        result.coverage["missing_point_count"]
+        == result.coverage["refinement_requested_point_count"]
+    )
 
 
 ###############################################################################
@@ -419,8 +557,11 @@ async def test_weather_grid_counts_every_missing_sample_across_both_stages():
 async def test_weather_grid_without_usable_samples_is_a_failure_not_empty():
     def unusable(points):
         return [_grid_sample(lat, stamp="bad") for lat, _ in points]
+
     with pytest.raises(ProviderUnavailableError):
-        await OpenMeteoProvider(service=_GridService(unusable, unusable)).fetch(_grid_request())
+        await OpenMeteoProvider(service=_GridService(unusable, unusable)).fetch(
+            _grid_request()
+        )
 
 
 ###############################################################################
@@ -428,9 +569,12 @@ async def test_weather_grid_without_usable_samples_is_a_failure_not_empty():
 async def test_weather_grid_refinement_rate_limit_propagates_with_retry_after():
     def samples(points):
         return [_grid_sample(lat) for lat, _ in points]
+
     limited = OpenMeteoRateLimitError("slow down", retry_after_seconds=30)
     with pytest.raises(ProviderRateLimitError) as error:
-        await OpenMeteoProvider(service=_GridService(samples, limited)).fetch(_grid_request())
+        await OpenMeteoProvider(service=_GridService(samples, limited)).fetch(
+            _grid_request()
+        )
     assert error.value.retry_after_seconds == 30
 
 
@@ -443,19 +587,29 @@ async def test_weather_grid_counts_malformed_measurements_as_missing():
         # An aware stamp cannot be ordered against the naive current time.
         samples[1]["hourly"]["time"] = ["2026-10-20T12:00+00:00"]
         return samples
+
     def refined(points):
         return [_grid_sample(lat) for lat, _ in points]
-    result = await OpenMeteoProvider(service=_GridService(coarse, refined)).fetch(_grid_request())
+
+    result = await OpenMeteoProvider(service=_GridService(coarse, refined)).fetch(
+        _grid_request()
+    )
     assert result.partial and result.coverage["missing_point_count"] == 2
+
 
 ###############################################################################
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("available_hours", "covered"), [(72, True), (36, False)])
-async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(available_hours, covered):
+async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(
+    available_hours, covered
+):
     midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     start, end = midnight + timedelta(days=1), midnight + timedelta(days=2)
     # Open-Meteo times are local to the point (UTC+1) and hour-ending.
-    local_hours = [(midnight + timedelta(hours=hour + 1)).replace(tzinfo=None) for hour in range(available_hours)]
+    local_hours = [
+        (midnight + timedelta(hours=hour + 1)).replace(tzinfo=None)
+        for hour in range(available_hours)
+    ]
     requested: list[tuple[datetime, datetime] | None] = []
 
     ###############################################################################
@@ -463,15 +617,38 @@ async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(availa
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, forecast_days=None, window=None, extra_variables=(), failure_reasons=None):
+        async def get_weather_grid(
+            self,
+            points,
+            past_days,
+            forecast_days=None,
+            window=None,
+            extra_variables=(),
+            failure_reasons=None,
+        ):
             requested.append(window)
-            sample = {"utc_offset_seconds": 3600, "current": {"time": local_hours[0].isoformat(timespec="minutes"), "temperature_2m": 10},
-                      "hourly": {"time": [stamp.isoformat(timespec="minutes") for stamp in local_hours],
-                                 "temperature_2m": [10] * available_hours, "precipitation": [1] * available_hours}}
+            sample = {
+                "utc_offset_seconds": 3600,
+                "current": {
+                    "time": local_hours[0].isoformat(timespec="minutes"),
+                    "temperature_2m": 10,
+                },
+                "hourly": {
+                    "time": [
+                        stamp.isoformat(timespec="minutes") for stamp in local_hours
+                    ],
+                    "temperature_2m": [10] * available_hours,
+                    "precipitation": [1] * available_hours,
+                },
+            }
             return [sample for _ in points]
 
-    request = ProviderRequest(capability_id="openmeteo_weather_forecast", bbox=(8.0, 45.0, 10.0, 47.0), time=start,
-                              params={"sampling": "area", "end_time_iso": end.isoformat()})
+    request = ProviderRequest(
+        capability_id="openmeteo_weather_forecast",
+        bbox=(8.0, 45.0, 10.0, 47.0),
+        time=start,
+        params={"sampling": "area", "end_time_iso": end.isoformat()},
+    )
     result = await OpenMeteoProvider(service=Service()).fetch(request)
 
     # The exact requested dates are asked of the endpoint, not a rolling span.
@@ -485,8 +662,6 @@ async def test_weather_grid_forecast_window_sums_only_window_hours_in_utc(availa
 
 
 # --- test_geospatial_webcam_provider.py ---
-
-
 
 
 ###############################################################################
@@ -512,6 +687,7 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     assert calls[0][1] == {"x-windy-api-key": "windy-test"}
     assert response.payload["renderingMode"] == "camera-points"
 
+
 ###############################################################################
 def test_windy_webcam_live_failure_after_descriptor_is_not_reported_stale() -> None:
 
@@ -519,7 +695,9 @@ def test_windy_webcam_live_failure_after_descriptor_is_not_reported_stale() -> N
         raise RuntimeError("upstream failure")
 
     provider = WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher)
-    request = ProviderRequest(capability_id="windy_webcams", bbox=(7.0, 45.0, 7.5, 45.5))
+    request = ProviderRequest(
+        capability_id="windy_webcams", bbox=(7.0, 45.0, 7.5, 45.5)
+    )
     run_async_in_thread(provider.fetch(request))
 
     with pytest.raises(RuntimeError):
@@ -532,6 +710,7 @@ def test_windy_webcam_live_failure_after_descriptor_is_not_reported_stale() -> N
                 )
             )
         )
+
 
 ###############################################################################
 def test_local_open_data_camera_template_fetches_configured_source() -> None:
@@ -560,6 +739,7 @@ def test_local_open_data_camera_template_fetches_configured_source() -> None:
     assert response.payload["features"][0]["properties"]["officialUrl"].startswith(
         "https://"
     )
+
 
 # --- test_geospatial_camera_permissions.py ---
 
@@ -601,8 +781,8 @@ def test_webcam_embedding_requires_explicit_provider_permission() -> None:
     assert denied["embedding_allowed"] is False
     assert denied["embed_url"] is None
 
-# --- test_geospatial_camera_staleness.py ---
 
+# --- test_geospatial_camera_staleness.py ---
 
 
 ###############################################################################
@@ -637,13 +817,12 @@ def test_webcam_provider_marks_stale_and_expired_previews() -> None:
     assert feature["preview_image_url"] is None
     assert feature["metadata"]["preview_expired"] is True
 
-# --- test_rainviewer_provider.py ---
 
+# --- test_rainviewer_provider.py ---
 
 
 ###############################################################################
 class _Clock:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.value = 0.0
@@ -652,9 +831,9 @@ class _Clock:
     def __call__(self) -> float:
         return self.value
 
+
 ###############################################################################
 class _RainViewerService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self, payload: dict[str, object] | None = None, *, fail: bool = False
@@ -676,6 +855,7 @@ class _RainViewerService:
             raise RainViewerRequestError("offline")
         return self.payload
 
+
 ###############################################################################
 def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     service = _RainViewerService()
@@ -690,6 +870,7 @@ def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     assert response.payload["renderingMode"] == "raster-tile"
     assert response.payload["tileUrl"] == "https://tiles.test/{z}/{x}/{y}.png"
     assert response.stale is False
+
 
 ###############################################################################
 def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
@@ -720,6 +901,7 @@ def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
     assert response.payload["tileUrl"] == "https://stale.test/{z}/{x}/{y}.png"
     assert response.warnings
 
+
 ###############################################################################
 def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     provider = RainViewerProvider(service=_RainViewerService(fail=True))  # type: ignore[arg-type]
@@ -732,6 +914,7 @@ def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     assert response.result_type == "raster"
     assert response.payload["tileUrl"] is None
     assert response.warnings
+
 
 ###############################################################################
 def test_rainviewer_provider_returns_empty_state_for_malformed_payload() -> None:
@@ -746,6 +929,7 @@ def test_rainviewer_provider_returns_empty_state_for_malformed_payload() -> None
     assert response.payload["status"] == "empty"
     assert response.payload["frameCount"] == 0
     assert "usable radar tile frame" in response.warnings[0]
+
 
 ###############################################################################
 def test_rainviewer_provider_uses_stale_cache_when_payload_is_malformed() -> None:
@@ -775,6 +959,7 @@ def test_rainviewer_provider_uses_stale_cache_when_payload_is_malformed() -> Non
     assert response.stale is True
     assert response.payload["tileUrl"] == "https://stale.test/{z}/{x}/{y}.png"
 
+
 ###############################################################################
 def test_rainviewer_provider_caches_successful_metadata_for_five_minutes() -> None:
     service = _RainViewerService()
@@ -787,12 +972,12 @@ def test_rainviewer_provider_caches_successful_metadata_for_five_minutes() -> No
     assert first.payload == second.payload
     assert service.calls == 1
 
+
 ###############################################################################
 def test_rainviewer_provider_handles_timeout_like_service_failure() -> None:
 
     ###############################################################################
     class _TimeoutService:
-
         # -------------------------------------------------------------------------
         async def get_latest_radar_metadata(self) -> dict[str, object]:
             raise RainViewerRequestError("timed out")
@@ -806,8 +991,8 @@ def test_rainviewer_provider_handles_timeout_like_service_failure() -> None:
     assert response.payload["status"] == "empty"
     assert "timed out" in response.warnings[0]
 
-# --- test_rainviewer_service.py ---
 
+# --- test_rainviewer_service.py ---
 
 
 ###############################################################################
@@ -842,6 +1027,7 @@ def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
     assert second["latest_time"] == 200
     assert calls == ["https://api.rainviewer.com/public/weather-maps.json"]
 
+
 ###############################################################################
 def test_rainviewer_service_rejects_malformed_payload() -> None:
     async def _fetcher(
@@ -859,8 +1045,8 @@ def test_rainviewer_service_rejects_malformed_payload() -> None:
     else:
         raise AssertionError("RainViewerRequestError was not raised.")
 
-# --- test_geospatial_snapshot_prototypes.py ---
 
+# --- test_geospatial_snapshot_prototypes.py ---
 
 
 ###############################################################################
@@ -878,6 +1064,7 @@ def test_openchargemap_requires_key_for_hosted_access() -> None:
         assert "Geospatial Access" in str(exc)
     else:
         raise AssertionError("Hosted Open Charge Map access must not be anonymous.")
+
 
 ###############################################################################
 def test_openchargemap_reads_local_snapshot(tmp_path) -> None:
@@ -908,6 +1095,7 @@ def test_openchargemap_reads_local_snapshot(tmp_path) -> None:
     assert response.payload["sourceMode"] == "local-snapshot"
     assert response.payload["featureCount"] == 1
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_weather_grid_carries_a_requested_hourly_variable_to_the_provider_and_features():
@@ -918,16 +1106,36 @@ async def test_weather_grid_carries_a_requested_hourly_variable_to_the_provider_
         weather_base_url = "https://api.open-meteo.com/v1/forecast"
 
         # -------------------------------------------------------------------------
-        async def get_weather_grid(self, points, past_days, extra_variables=(), failure_reasons=None):
+        async def get_weather_grid(
+            self, points, past_days, extra_variables=(), failure_reasons=None
+        ):
             seen.append(extra_variables)
-            row = {"elevation": 0, "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
-                   "hourly": {"time": ["2026-10-20T11:00", "2026-10-20T12:00"], "temperature_2m": [9, 10],
-                              "precipitation": [0, 0], "cloud_cover": [10, 30]},
-                   "hourly_units": {"cloud_cover": "%"}}
+            row = {
+                "elevation": 0,
+                "current": {"time": "2026-10-20T12:00", "temperature_2m": 10},
+                "hourly": {
+                    "time": ["2026-10-20T11:00", "2026-10-20T12:00"],
+                    "temperature_2m": [9, 10],
+                    "precipitation": [0, 0],
+                    "cloud_cover": [10, 30],
+                },
+                "hourly_units": {"cloud_cover": "%"},
+            }
             return [row for _ in points]
-    result = await OpenMeteoProvider(service=Service()).fetch(ProviderRequest(
-        capability_id="openmeteo_weather_forecast", bbox=(5.95, 45.8, 10.5, 47.8),
-        params={"sampling": "area", "mask_countries": ["CH"], "requested_attributes": ["cloud cover", "visibility"]}))
+
+    result = await OpenMeteoProvider(service=Service()).fetch(
+        ProviderRequest(
+            capability_id="openmeteo_weather_forecast",
+            bbox=(5.95, 45.8, 10.5, 47.8),
+            params={
+                "sampling": "area",
+                "mask_countries": ["CH"],
+                "requested_attributes": ["cloud cover", "visibility"],
+            },
+        )
+    )
     assert seen[0] == ("cloud_cover",)
-    assert all(feature["cloud_cover_mean"] == 20 for feature in result.payload["features"])
+    assert all(
+        feature["cloud_cover_mean"] == 20 for feature in result.payload["features"]
+    )
     assert result.units["cloud_cover_mean"] == "%"

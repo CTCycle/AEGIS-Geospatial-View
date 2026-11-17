@@ -9,8 +9,6 @@ from server.contracts.geospatial import LocationSearchRequest
 # --- test_nominatim_service.py ---
 
 
-
-
 ###############################################################################
 def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -57,6 +55,7 @@ def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
     assert ranked[0]["source_url"].endswith("/search")
     assert ranked[0]["fetched_at"] == "2026-09-01T10:00:00+00:00"
 
+
 ###############################################################################
 def test_nominatim_rank_candidates_preserves_named_river_semantics() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -91,6 +90,7 @@ def test_nominatim_rank_candidates_preserves_named_river_semantics() -> None:
     assert ranked
     assert ranked[0]["selected_result_type"] == "river"
     assert ranked[0]["selected_result_class"] == "waterway"
+
 
 ###############################################################################
 def test_nominatim_rank_candidates_prefers_city_boundary_over_parent_region() -> None:
@@ -135,6 +135,7 @@ def test_nominatim_rank_candidates_prefers_city_boundary_over_parent_region() ->
 
     assert ranked[0]["lat"] == 12.3
 
+
 ###############################################################################
 def test_nominatim_uses_localized_city_name_metadata_before_parent_result() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -175,6 +176,7 @@ def test_nominatim_uses_localized_city_name_metadata_before_parent_result() -> N
 
     assert ranked[0]["lat"] == 19.43
 
+
 ###############################################################################
 def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -213,6 +215,7 @@ def test_nominatim_surfaces_unqualified_same_level_city_ambiguity() -> None:
         ]
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_nominatim_uses_structured_city_context_for_ambiguity_labels() -> None:
@@ -263,6 +266,7 @@ def test_nominatim_uses_structured_city_context_for_ambiguity_labels() -> None:
         "Milan, Lombardy, Italy",
     ]
 
+
 ###############################################################################
 def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -289,15 +293,27 @@ def test_nominatim_accepts_a_dominant_unqualified_city_candidate() -> None:
         },
     ]
 
-    assert service._find_ambiguous_candidates(
-        ranked,
-        expected_location_type="city",
-        query="Rome",
-        has_parent_context=False,
-    ) == []
+    assert (
+        service._find_ambiguous_candidates(
+            ranked,
+            expected_location_type="city",
+            query="Rome",
+            has_parent_context=False,
+        )
+        == []
+    )
+
 
 ###############################################################################
-def _city_candidate(name: str, region: str, country: str, *, lat: float, confidence: float, importance: float) -> dict[str, object]:
+def _city_candidate(
+    name: str,
+    region: str,
+    country: str,
+    *,
+    lat: float,
+    confidence: float,
+    importance: float,
+) -> dict[str, object]:
     return {
         "display_name": f"{name}, {region}, {country}",
         "lat": lat,
@@ -310,14 +326,32 @@ def _city_candidate(name: str, region: str, country: str, *, lat: float, confide
     }
 
 
-def test_nominatim_accepts_a_clearly_more_prominent_city_but_not_a_comparable_one() -> None:
+def test_nominatim_accepts_a_clearly_more_prominent_city_but_not_a_comparable_one() -> (
+    None
+):
     service = NominatimService(user_agent="test-suite", timeout=0.1)
 
-    def ambiguous(first_importance: float, second_importance: float) -> list[dict[str, object]]:
+    def ambiguous(
+        first_importance: float, second_importance: float
+    ) -> list[dict[str, object]]:
         return service._find_ambiguous_candidates(
             [
-                _city_candidate("Wellington", "Wellington", "New Zealand", lat=-41.3, confidence=0.75, importance=first_importance),
-                _city_candidate("Wellington", "Texas", "United States", lat=34.8, confidence=0.7, importance=second_importance),
+                _city_candidate(
+                    "Wellington",
+                    "Wellington",
+                    "New Zealand",
+                    lat=-41.3,
+                    confidence=0.75,
+                    importance=first_importance,
+                ),
+                _city_candidate(
+                    "Wellington",
+                    "Texas",
+                    "United States",
+                    lat=34.8,
+                    confidence=0.7,
+                    importance=second_importance,
+                ),
             ],
             expected_location_type="city",
             query="Wellington",
@@ -327,15 +361,25 @@ def test_nominatim_accepts_a_clearly_more_prominent_city_but_not_a_comparable_on
     assert ambiguous(0.66, 0.46) == []
     assert len(ambiguous(0.6, 0.55)) == 2
 
+
 ###############################################################################
 def test_nominatim_dominance_follows_recorded_geocoder_importance() -> None:
     # Importance values recorded from Nominatim for the bare queries.
     service = NominatimService(user_agent="test-suite", timeout=0.1)
 
-    def ambiguous(query: str, places: list[tuple[str, str, str, float]]) -> list[dict[str, object]]:
+    def ambiguous(
+        query: str, places: list[tuple[str, str, str, float]]
+    ) -> list[dict[str, object]]:
         return service._find_ambiguous_candidates(
             [
-                _city_candidate(name, region, country, lat=index, confidence=0.75 - 0.01 * index, importance=importance)
+                _city_candidate(
+                    name,
+                    region,
+                    country,
+                    lat=index,
+                    confidence=0.75 - 0.01 * index,
+                    importance=importance,
+                )
                 for index, (name, region, country, importance) in enumerate(places)
             ],
             expected_location_type="city",
@@ -343,22 +387,31 @@ def test_nominatim_dominance_follows_recorded_geocoder_importance() -> None:
             has_parent_context=False,
         )
 
-    assert ambiguous(
-        "Wellington",
-        [
-            ("Wellington", "Wellington", "New Zealand", 0.67),
-            ("Wellington", "Texas", "United States", 0.511),
-            ("Wellington", "Kansas", "United States", 0.486),
-        ],
-    ) == []
-    assert len(ambiguous(
-        "Springfield",
-        [
-            ("Springfield", "Illinois", "United States", 0.613),
-            ("Springfield", "Massachusetts", "United States", 0.611),
-            ("Springfield", "Missouri", "United States", 0.596),
-        ],
-    )) == 2
+    assert (
+        ambiguous(
+            "Wellington",
+            [
+                ("Wellington", "Wellington", "New Zealand", 0.67),
+                ("Wellington", "Texas", "United States", 0.511),
+                ("Wellington", "Kansas", "United States", 0.486),
+            ],
+        )
+        == []
+    )
+    assert (
+        len(
+            ambiguous(
+                "Springfield",
+                [
+                    ("Springfield", "Illinois", "United States", 0.613),
+                    ("Springfield", "Massachusetts", "United States", 0.611),
+                    ("Springfield", "Missouri", "United States", 0.596),
+                ],
+            )
+        )
+        == 2
+    )
+
 
 ###############################################################################
 def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() -> None:
@@ -386,11 +439,15 @@ def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() ->
 
     def ambiguous(expected: str) -> list[dict[str, object]]:
         return service._find_ambiguous_candidates(
-            ranked, expected_location_type=expected, query="Brandenburg Gate", has_parent_context=False
+            ranked,
+            expected_location_type=expected,
+            query="Brandenburg Gate",
+            has_parent_context=False,
         )
 
     assert ambiguous("landmark") == []
     assert len(ambiguous("street")) == 2
+
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -398,7 +455,12 @@ def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() ->
     [
         (
             "Turin",
-            ("Turin, Piedmont, Italy", "Italy", 0.77, ["44.99", "45.14", "7.58", "7.77"]),
+            (
+                "Turin, Piedmont, Italy",
+                "Italy",
+                0.77,
+                ["44.99", "45.14", "7.58", "7.77"],
+            ),
             (
                 "Turin, Belvidere Township, Monona County, Iowa, United States",
                 "United States",
@@ -408,7 +470,12 @@ def test_nominatim_does_not_rival_a_landmark_with_a_street_of_the_same_name() ->
         ),
         (
             "Madrid",
-            ("Madrid, Community of Madrid, Spain", "Spain", 0.819, ["40.31", "40.64", "-3.89", "-3.52"]),
+            (
+                "Madrid, Community of Madrid, Spain",
+                "Spain",
+                0.819,
+                ["40.31", "40.64", "-3.89", "-3.52"],
+            ),
             (
                 "Madrid, Boone County, Iowa, United States",
                 "United States",
@@ -453,12 +520,16 @@ def test_nominatim_prefers_prominent_city_over_same_name_small_place(
     )
 
     assert ranked[0]["display_name"] == major[0]
-    assert service._find_ambiguous_candidates(
-        ranked,
-        expected_location_type="city",
-        query=query,
-        has_parent_context=False,
-    ) == []
+    assert (
+        service._find_ambiguous_candidates(
+            ranked,
+            expected_location_type="city",
+            query=query,
+            has_parent_context=False,
+        )
+        == []
+    )
+
 
 ###############################################################################
 def test_nominatim_uses_exact_parent_for_qualified_city_ambiguity() -> None:
@@ -492,12 +563,16 @@ def test_nominatim_uses_exact_parent_for_qualified_city_ambiguity() -> None:
         },
     ]
 
-    assert service._find_ambiguous_candidates(
-        ranked,
-        expected_location_type="city",
-        query="Houston, Texas",
-        has_parent_context=True,
-    ) == []
+    assert (
+        service._find_ambiguous_candidates(
+            ranked,
+            expected_location_type="city",
+            query="Houston, Texas",
+            has_parent_context=True,
+        )
+        == []
+    )
+
 
 ###############################################################################
 def test_nominatim_prioritizes_exact_qualified_city_parent() -> None:
@@ -547,6 +622,7 @@ def test_nominatim_prioritizes_exact_qualified_city_parent() -> None:
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -555,9 +631,7 @@ def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
             {
                 "lat": "52.1975",
                 "lon": "0.1391",
-                "display_name": (
-                    "Cambridge, Cambridgeshire, England, United Kingdom"
-                ),
+                "display_name": ("Cambridge, Cambridgeshire, England, United Kingdom"),
                 "class": "boundary",
                 "type": "administrative",
                 "addresstype": "city",
@@ -599,6 +673,7 @@ def test_nominatim_deduplicates_city_boundary_and_centroid() -> None:
     assert len(ranked) == 2
     assert "ambiguous_candidates" not in ranked[0]
 
+
 ###############################################################################
 def test_nominatim_deduplicates_city_boundary_without_parent_fields() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -623,12 +698,16 @@ def test_nominatim_deduplicates_city_boundary_without_parent_fields() -> None:
         },
     ]
 
-    assert service._find_ambiguous_candidates(
-        ranked,
-        expected_location_type="city",
-        query="Ljubljana, Slovenia",
-        has_parent_context=True,
-    ) == []
+    assert (
+        service._find_ambiguous_candidates(
+            ranked,
+            expected_location_type="city",
+            query="Ljubljana, Slovenia",
+            has_parent_context=True,
+        )
+        == []
+    )
+
 
 ###############################################################################
 def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
@@ -665,6 +744,7 @@ def test_nominatim_prepares_language_and_name_metadata_for_validation() -> None:
     run_async_in_thread(_run())
     assert captured["namedetails"] == "1"
     assert captured["accept-language"] == "en"
+
 
 ###############################################################################
 def test_nominatim_retries_generic_named_target_with_bounded_acronym_variant() -> None:
@@ -707,6 +787,7 @@ def test_nominatim_retries_generic_named_target_with_bounded_acronym_variant() -
         "northern coastal research center, Noordwijk, Netherlands",
         "ncrc, Noordwijk, Netherlands",
     ]
+
 
 ###############################################################################
 def test_nominatim_retries_mount_feature_when_exact_results_are_pois() -> None:
@@ -764,6 +845,7 @@ def test_nominatim_retries_mount_feature_when_exact_results_are_pois() -> None:
         "kilimanjaro, Tanzania",
     ]
 
+
 ###############################################################################
 def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -790,6 +872,7 @@ def test_nominatim_rejects_partial_acronym_child_for_named_target() -> None:
     )
 
     assert ranked == []
+
 
 ###############################################################################
 def test_nominatim_keeps_station_candidate_for_transport_qualified_query() -> None:
@@ -818,6 +901,7 @@ def test_nominatim_keeps_station_candidate_for_transport_qualified_query() -> No
 
     assert len(ranked) == 1
 
+
 ###############################################################################
 def test_nominatim_asks_for_context_when_query_is_only_a_generic_descriptor() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)
@@ -843,14 +927,21 @@ def test_nominatim_asks_for_context_when_query_is_only_a_generic_descriptor() ->
     ]
 
     result = service._find_ambiguous_candidates(
-        ranked, expected_location_type=None, query="central station", has_parent_context=False
+        ranked,
+        expected_location_type=None,
+        query="central station",
+        has_parent_context=False,
     )
     named = service._find_ambiguous_candidates(
-        ranked, expected_location_type=None, query="Amsterdam Centraal", has_parent_context=False
+        ranked,
+        expected_location_type=None,
+        query="Amsterdam Centraal",
+        has_parent_context=False,
     )
 
     assert len(result) == 2
     assert named == []
+
 
 ###############################################################################
 def test_nominatim_district_ranking_rejects_nearby_child_features() -> None:
@@ -887,8 +978,8 @@ def test_nominatim_district_ranking_rejects_nearby_child_features() -> None:
     assert len(ranked) == 1
     assert ranked[0]["selected_result_type"] == "suburb"
 
-# --- test_location_search_request_schema.py ---
 
+# --- test_location_search_request_schema.py ---
 
 
 ###############################################################################
@@ -909,6 +1000,7 @@ def _base_payload() -> dict[str, object]:
             "radius_m": 2500.0,
         },
     }
+
 
 ###############################################################################
 def test_accepts_canonical_request_fields() -> None:
@@ -935,6 +1027,7 @@ def test_accepts_canonical_request_fields() -> None:
     assert request.viewport_intent is not None
     assert request.viewport_intent.scope == "street"
 
+
 ###############################################################################
 @pytest.mark.parametrize(
     "removed_field,value",
@@ -948,31 +1041,60 @@ def test_rejects_removed_request_fields(removed_field: str, value: object) -> No
     with pytest.raises(ValidationError):
         LocationSearchRequest.model_validate({**_base_payload(), removed_field: value})
 
+
 ###############################################################################
-def test_nominatim_does_not_rival_an_exact_city_with_a_longer_name_that_only_lists_it_as_alias() -> None:
+def test_nominatim_does_not_rival_an_exact_city_with_a_longer_name_that_only_lists_it_as_alias() -> (
+    None
+):
     service = NominatimService(user_agent="test-suite", timeout=0.1)
     city = {
-        "display_name": "Saint-Étienne, Loire, Auvergne-Rhône-Alpes, France", "lat": 45.43, "lon": 4.39,
-        "confidence": 0.82, "geocoder_importance": 0.65,
-        "selected_result_type": "administrative", "selected_address_type": "city",
-        "address": {"city": "Saint-Étienne", "state": "Auvergne-Rhône-Alpes", "country": "France"},
+        "display_name": "Saint-Étienne, Loire, Auvergne-Rhône-Alpes, France",
+        "lat": 45.43,
+        "lon": 4.39,
+        "confidence": 0.82,
+        "geocoder_importance": 0.65,
+        "selected_result_type": "administrative",
+        "selected_address_type": "city",
+        "address": {
+            "city": "Saint-Étienne",
+            "state": "Auvergne-Rhône-Alpes",
+            "country": "France",
+        },
         "namedetails": {"name": "Saint-Étienne", "name:fr": "Saint-Étienne"},
     }
     village = {
-        "display_name": "Saint-Étienne-la-Cigogne, Plaine-d'Argenson, Nouvelle-Aquitaine, France", "lat": 46.2, "lon": -0.4,
-        "confidence": 0.8159, "geocoder_importance": 0.52,
+        "display_name": "Saint-Étienne-la-Cigogne, Plaine-d'Argenson, Nouvelle-Aquitaine, France",
+        "lat": 46.2,
+        "lon": -0.4,
+        "confidence": 0.8159,
+        "geocoder_importance": 0.52,
         "selected_result_type": "village",
-        "address": {"village": "Saint-Étienne-la-Cigogne", "state": "Nouvelle-Aquitaine", "country": "France"},
-        "namedetails": {"name": "Saint-Étienne-la-Cigogne", "alt_name": "Saint-Étienne"},
+        "address": {
+            "village": "Saint-Étienne-la-Cigogne",
+            "state": "Nouvelle-Aquitaine",
+            "country": "France",
+        },
+        "namedetails": {
+            "name": "Saint-Étienne-la-Cigogne",
+            "alt_name": "Saint-Étienne",
+        },
     }
 
-    assert service._find_ambiguous_candidates(
-        [city, village], expected_location_type="city", query="Saint-Etienne, France", has_parent_context=True
-    ) == []
+    assert (
+        service._find_ambiguous_candidates(
+            [city, village],
+            expected_location_type="city",
+            query="Saint-Etienne, France",
+            has_parent_context=True,
+        )
+        == []
+    )
 
 
 ###############################################################################
-def test_nominatim_retries_a_transient_dns_failure_but_not_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nominatim_retries_a_transient_dns_failure_but_not_a_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from urllib.error import URLError
     import socket
 

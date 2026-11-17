@@ -8,13 +8,21 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from server.common.identifiers import location_ref_matches, normalize_target_key, parse_coordinate_pair
+from server.common.identifiers import (
+    location_ref_matches,
+    normalize_target_key,
+    parse_coordinate_pair,
+)
 from server.common.typing import json_object
 from server.contracts.geospatial import MapSession
 from server.domain.agent.capability_domains import CapabilityDomain
-from server.domain.agent.decision import ResolvedLocation, normalize_clarification_options
+from server.domain.agent.decision import (
+    ResolvedLocation,
+    normalize_clarification_options,
+)
 from server.domain.agent.tool_result import ModelObservation, ToolResult
 from server.domain.agent.vision_policy import VisionState
+
 
 ###############################################################################
 class AgentAnalysisIntent(BaseModel):
@@ -27,12 +35,16 @@ class AgentAnalysisIntent(BaseModel):
     order: str = Field(default="descending", max_length=40)
     top_k: int = Field(default=5, ge=1, le=25)
 
+
 GeometryOperationKind = Literal[
     "area", "buffer", "spatial_join", "intersection", "union", "difference", "clip"
 ]
 
 # "identification": name or describe a place, e.g. what place coordinates are.
-ObligationKind = Literal["location", "data", "analysis", "presentation", "identification"]
+ObligationKind = Literal[
+    "location", "data", "analysis", "presentation", "identification"
+]
+
 
 ###############################################################################
 class RouteObligation(BaseModel):
@@ -44,6 +56,7 @@ class RouteObligation(BaseModel):
     target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     variable: str | None = Field(default=None, min_length=1, max_length=120)
     required: bool = True
+
 
 ###############################################################################
 class CapabilityRoute(BaseModel):
@@ -90,7 +103,9 @@ class CapabilityRoute(BaseModel):
     # request contract without a separate interpretation stage.
     operation: str | None = Field(default=None, min_length=1, max_length=80)
     target_refs: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
-    temporal_scope: "AgentTemporalScope" = Field(default_factory=lambda: AgentTemporalScope())
+    temporal_scope: "AgentTemporalScope" = Field(
+        default_factory=lambda: AgentTemporalScope()
+    )
     spatial_scope: "AgentSpatialScope | None" = None
     target_area_km2: float | None = Field(
         default=None,
@@ -133,9 +148,12 @@ class CapabilityRoute(BaseModel):
                     f"target_requirements names '{requirement.target_ref}', which is not in target_refs"
                 )
             if key in seen:
-                raise ValueError(f"target_requirements repeats '{requirement.target_ref}'")
+                raise ValueError(
+                    f"target_requirements repeats '{requirement.target_ref}'"
+                )
             seen.add(key)
         return self
+
 
 ###############################################################################
 class TargetRequirement(BaseModel):
@@ -146,6 +164,7 @@ class TargetRequirement(BaseModel):
     target_ref: str = Field(min_length=1, max_length=160)
     temporal_scope: "AgentTemporalScope | None" = None
     spatial_scope: "AgentSpatialScope | None" = None
+
 
 ###############################################################################
 class AgentTemporalScope(BaseModel):
@@ -159,6 +178,7 @@ class AgentTemporalScope(BaseModel):
     end_time_iso: str | None = Field(default=None, max_length=80)
     granularity: str = Field(default="none", max_length=40)
     aggregation: str = Field(default="none", max_length=40)
+
 
 ###############################################################################
 class AgentSpatialScope(BaseModel):
@@ -190,6 +210,7 @@ class AgentSpatialScope(BaseModel):
 
 CapabilityRoute.model_rebuild()
 
+
 ###############################################################################
 class RequestObligation(BaseModel):
     """One server-normalized part of the request the run must honour.
@@ -207,6 +228,7 @@ class RequestObligation(BaseModel):
     variable: str | None = Field(default=None, max_length=120)
     temporal_scope: AgentTemporalScope | None = None
     required: bool = True
+
 
 ###############################################################################
 class AgentGoal(BaseModel):
@@ -233,12 +255,11 @@ class AgentGoal(BaseModel):
     target_requirements: list[TargetRequirement] = Field(
         default_factory=lambda: list[TargetRequirement](), max_length=16
     )
-    filters: dict[str, object] = Field(
-        default_factory=lambda: dict[str, object]()
-    )
+    filters: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
     obligations: list[RequestObligation] = Field(
         default_factory=lambda: list[RequestObligation](), max_length=32
     )
+
 
 ###############################################################################
 class CompletionContract(BaseModel):
@@ -248,14 +269,14 @@ class CompletionContract(BaseModel):
 
     operation: str
     data_requirement: Literal["none", "provider_data"] = "none"
-    requirements: list[str] = Field(
-        default_factory=lambda: list[str](), max_length=16
-    )
+    requirements: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     location_required: bool = False
     evidence_required: bool = False
     # Requested analytical components; each needs validated evidence from a
     # capability whose manifest covers it (one source may cover several).
-    data_obligations: list[str] = Field(default_factory=lambda: list[str](), max_length=4)
+    data_obligations: list[str] = Field(
+        default_factory=lambda: list[str](), max_length=4
+    )
     map_preparation_required: bool = False
     temporal_scope_required: bool = False
     spatial_scope_required: bool = False
@@ -277,6 +298,7 @@ CompletionRequirementKind = Literal[
     "final_text",
 ]
 
+
 ###############################################################################
 class CompletionRequirement(BaseModel):
     """One server-owned obligation in a native run or render handshake."""
@@ -290,6 +312,7 @@ class CompletionRequirement(BaseModel):
     target_id: str | None = None
     evidence_ref: str | None = None
     failure_code: str | None = None
+
 
 ###############################################################################
 class RenderObservation(BaseModel):
@@ -305,7 +328,9 @@ class RenderObservation(BaseModel):
     # Share of the prepared result extent inside the browser viewport; below 1
     # the user sees only part of the result (for example after a minzoom bump).
     results_in_viewport: float | None = Field(default=None, ge=0.0, le=1.0)
-    checks: dict[str, bool] = Field(default_factory=lambda: dict[str, bool](), max_length=32)
+    checks: dict[str, bool] = Field(
+        default_factory=lambda: dict[str, bool](), max_length=32
+    )
     overlay_results: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]](), max_length=64
     )
@@ -331,6 +356,7 @@ TaskStatus = Literal[
     "superseded",
 ]
 
+
 ###############################################################################
 class AgentTask(BaseModel):
     """One lightweight, run-scoped obligation.
@@ -352,6 +378,7 @@ class AgentTask(BaseModel):
     obligation_id: str | None = Field(default=None, max_length=200)
     result: dict[str, object] | None = None
     failure_code: str | None = Field(default=None, max_length=120)
+
 
 ###############################################################################
 class AgentTaskState(BaseModel):
@@ -401,12 +428,18 @@ class AgentTaskState(BaseModel):
             description=description[:500],
             status="in_progress",
         )
-        names = list(dict.fromkeys(str(item).strip() for item in requirements or [] if str(item).strip()))
+        names = list(
+            dict.fromkeys(
+                str(item).strip() for item in requirements or [] if str(item).strip()
+            )
+        )
         children: list[AgentTask] = []
         if compound:
             # A requirement an obligation already tracks gets no second task.
             tracked = {
-                "location_resolved" if item.kind == "location" else obligation_requirement(item.kind, names)
+                "location_resolved"
+                if item.kind == "location"
+                else obligation_requirement(item.kind, names)
                 for item in obligations or []
                 if item.required
             }
@@ -453,7 +486,9 @@ class AgentTaskState(BaseModel):
             current_iteration=0,
             max_iterations=max(1, min(1000, int(max_iterations))),
             tasks=[root, *children][:32],
-            completion_requirements=[CompletionRequirement(name=name) for name in names],
+            completion_requirements=[
+                CompletionRequirement(name=name) for name in names
+            ],
         )
 
     # -------------------------------------------------------------------------
@@ -488,12 +523,16 @@ class AgentTaskState(BaseModel):
     def to_payload(self) -> dict[str, object]:
         return self.model_dump(mode="json", exclude_none=True)
 
+
 ###############################################################################
 # in_progress: started, awaiting the browser or a later step of the request.
 # failed: attempted, and the source or requested transform failed.
 # blocked: the run stopped before the obligation was met; ``reason`` says why.
 # superseded: a later request took the obligation over; kept for history only.
-ConversationTaskStatus = Literal["in_progress", "completed", "failed", "blocked", "superseded"]
+ConversationTaskStatus = Literal[
+    "in_progress", "completed", "failed", "blocked", "superseded"
+]
+
 
 ###############################################################################
 class ConversationTask(BaseModel):
@@ -525,6 +564,7 @@ class ConversationTask(BaseModel):
     source_request_id: str = Field(min_length=1, max_length=160)
     completed_at: datetime | None = None
 
+
 ###############################################################################
 # Completion requirements that satisfy each obligation kind, most specific
 # first.  An obligation with none of them in the contract is unrouted.
@@ -547,6 +587,7 @@ OBLIGATION_REQUIREMENTS: dict[ObligationKind, tuple[str, ...]] = {
     "identification": ("location_resolved", "search_area_bound"),
 }
 
+
 ###############################################################################
 def obligation_requirement(kind: ObligationKind, requirements: list[str]) -> str | None:
     """Return the completion requirement that satisfies an obligation kind."""
@@ -554,6 +595,7 @@ def obligation_requirement(kind: ObligationKind, requirements: list[str]) -> str
     return next(
         (name for name in OBLIGATION_REQUIREMENTS[kind] if name in requirements), None
     )
+
 
 ###############################################################################
 def same_target(left: str, right: str) -> bool:
@@ -565,8 +607,11 @@ def same_target(left: str, right: str) -> bool:
         or location_ref_matches(right, left, None)
     )
 
+
 ###############################################################################
-def places_named_in(message: str, locations: dict[str, ResolvedLocation]) -> list[tuple[str, str]]:
+def places_named_in(
+    message: str, locations: dict[str, ResolvedLocation]
+) -> list[tuple[str, str]]:
     """Return (key, name) of each resolved place the message names again.
 
     A place counts as named when its leading label part ("Tokyo" of "Tokyo,
@@ -581,6 +626,7 @@ def places_named_in(message: str, locations: dict[str, ResolvedLocation]) -> lis
         if len(normalized) >= 3 and f" {normalized} " in text:
             named.append((str(key), name))
     return named
+
 
 ###############################################################################
 def names_data_subject(query: str, route: CapabilityRoute) -> bool:
@@ -599,11 +645,16 @@ def names_data_subject(query: str, route: CapabilityRoute) -> bool:
 
     asked = tokens(query)
     terms = [
-        *(item.variable for item in route.obligations if item.kind in {"data", "analysis"}),
+        *(
+            item.variable
+            for item in route.obligations
+            if item.kind in {"data", "analysis"}
+        ),
         route.analysis.metric if route.analysis else None,
         *route.capability_queries,
     ]
     return bool(asked) and any(asked == tokens(term) for term in terms if term)
+
 
 ###############################################################################
 def derive_request_obligations(
@@ -622,7 +673,9 @@ def derive_request_obligations(
     check can see that the route dropped it.
     """
 
-    route_scope = route.temporal_scope if route.temporal_scope != AgentTemporalScope() else None
+    route_scope = (
+        route.temporal_scope if route.temporal_scope != AgentTemporalScope() else None
+    )
 
     def scope_for(target: str | None) -> AgentTemporalScope | None:
         requirement = next(
@@ -640,7 +693,10 @@ def derive_request_obligations(
     obligations: list[RequestObligation] = []
     # A map-state route edits the current map: its targets name layers and
     # styles on it, not places to locate.
-    if route.location_mode != "none" and route.primary_domain is not CapabilityDomain.MAP_STATE:
+    if (
+        route.location_mode != "none"
+        and route.primary_domain is not CapabilityDomain.MAP_STATE
+    ):
         obligations.extend(
             RequestObligation(
                 id=f"location:{_safe_task_id(target)}",
@@ -654,13 +710,18 @@ def derive_request_obligations(
         *(data_variables or route.capability_queries[:1])
     ] or [None]
     # Data and its map are per requested place; spatial-scope anchors are not.
-    places = list(dict.fromkeys(ref.strip() for ref in route.target_refs if ref.strip()))
+    places = list(
+        dict.fromkeys(ref.strip() for ref in route.target_refs if ref.strip())
+    )
     if "required_data_retrieved" in requirements:
         data_targets: list[str | None] = [*places] or [None]
         obligations.extend(
             RequestObligation(
                 id=":".join(
-                    ["data", *(_safe_task_id(part) for part in (target, variable) if part)]
+                    [
+                        "data",
+                        *(_safe_task_id(part) for part in (target, variable) if part),
+                    ]
                 ),
                 kind="data",
                 target_ids=[target] if target else [],
@@ -712,13 +773,17 @@ def derive_request_obligations(
                 variable=(
                     route.analysis.metric
                     if route.analysis is not None
-                    else variables[0] if len(variables) == 1 else None
+                    else variables[0]
+                    if len(variables) == 1
+                    else None
                 ),
             )
         )
     for declared in route.obligations:
         targets = [
-            next((known for known in target_ids if same_target(ref, known)), ref.strip())
+            next(
+                (known for known in target_ids if same_target(ref, known)), ref.strip()
+            )
             for ref in declared.target_refs
             if ref.strip()
         ]
@@ -731,7 +796,9 @@ def derive_request_obligations(
             for existing in obligations
         ):
             continue
-        base = ":".join([declared.kind, *(_safe_task_id(t) for t in targets)] or [declared.kind])
+        base = ":".join(
+            [declared.kind, *(_safe_task_id(t) for t in targets)] or [declared.kind]
+        )
         identifier = base
         suffix = 2
         while any(item.id == identifier for item in obligations):
@@ -748,6 +815,7 @@ def derive_request_obligations(
             )
         )
     return obligations[:32]
+
 
 ###############################################################################
 def unrouted_obligations(
@@ -786,10 +854,14 @@ def unrouted_obligations(
         return None
     compound = {"analysis", "presentation"}
     unrouted_kinds = {item.kind for item in unrouted}
-    if compound <= {item.kind for item in required} and len(unrouted_kinds & compound) == 1:
+    if (
+        compound <= {item.kind for item in required}
+        and len(unrouted_kinds & compound) == 1
+    ):
         # "Compare ... and show it on the map" kept only one of its halves.
         return "compound_obligation_dropped", unrouted
     return f"{unrouted[0].kind}_obligation_unrouted", unrouted
+
 
 ###############################################################################
 def dropped_obligations(
@@ -805,31 +877,51 @@ def dropped_obligations(
     for item in previous:
         if not item.required:
             continue
-        same_kind = [other for other in current if other.required and other.kind == item.kind]
+        same_kind = [
+            other for other in current if other.required and other.kind == item.kind
+        ]
         geometry = item.id.startswith("analysis:geometry:")
         if geometry:
             same_kind = [
-                other for other in same_kind
+                other
+                for other in same_kind
                 if other.id == item.id
-                or (item.id == "analysis:geometry:derived" and other.id.startswith("analysis:geometry:"))
+                or (
+                    item.id == "analysis:geometry:derived"
+                    and other.id.startswith("analysis:geometry:")
+                )
             ]
         elif item.kind == "analysis":
-            same_kind = [other for other in same_kind if not other.id.startswith("analysis:geometry:")]
+            same_kind = [
+                other
+                for other in same_kind
+                if not other.id.startswith("analysis:geometry:")
+            ]
         if not same_kind:
             dropped.append(item)
             continue
-        if (geometry or item.kind in {"location", "data", "identification"}) and not all(
-            any(same_target(target, other_target) for other in same_kind for other_target in other.target_ids)
+        if (
+            geometry or item.kind in {"location", "data", "identification"}
+        ) and not all(
+            any(
+                same_target(target, other_target)
+                for other in same_kind
+                for other_target in other.target_ids
+            )
             for target in item.target_ids
         ):
             dropped.append(item)
     return dropped
 
+
 ###############################################################################
 def _safe_task_id(value: str) -> str:
     normalized = "-".join(str(value).strip().casefold().split())
-    safe = "".join(char if char.isalnum() or char in "-_" else "-" for char in normalized)
+    safe = "".join(
+        char if char.isalnum() or char in "-_" else "-" for char in normalized
+    )
     return (safe.strip("-") or "unknown")[:96]
+
 
 ###############################################################################
 class CapabilityRouteDecision(BaseModel):
@@ -849,11 +941,10 @@ class CapabilityRouteDecision(BaseModel):
     rejected_capability_ids: list[str] = Field(
         default_factory=lambda: list[str](), max_length=8
     )
-    reason_codes: list[str] = Field(
-        default_factory=lambda: list[str](), max_length=16
-    )
+    reason_codes: list[str] = Field(default_factory=lambda: list[str](), max_length=16)
     clarification_question: str | None = Field(default=None, max_length=500)
     clarification_options: list[str] = Field(default_factory=lambda: list[str]())
+
 
 ###############################################################################
 class AgentPhase(StrEnum):
@@ -870,6 +961,7 @@ class AgentPhase(StrEnum):
     FINALIZE = "finalize"
     FAILED = "failed"
 
+
 ###############################################################################
 class LoopDecision(StrEnum):
     """Authoritative outcome of one route/tool/render control observation."""
@@ -882,6 +974,7 @@ class LoopDecision(StrEnum):
     FAIL = "fail"
     CANCEL = "cancel"
     SUPERSEDE = "supersede"
+
 
 ###############################################################################
 class AgentRunState(BaseModel):
@@ -903,12 +996,8 @@ class AgentRunState(BaseModel):
     active_directives: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]]()
     )
-    task_state: dict[str, object] = Field(
-        default_factory=lambda: dict[str, object]()
-    )
-    map_memory: dict[str, object] = Field(
-        default_factory=lambda: dict[str, object]()
-    )
+    task_state: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
+    map_memory: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
     summary: dict[str, object] | None = None
     recent_messages: list[dict[str, object]] = Field(
         default_factory=lambda: list[dict[str, object]]()
@@ -963,9 +1052,7 @@ class AgentRunState(BaseModel):
     render_attempts: int = Field(default=0, ge=0, le=32)
     render_verified: bool = False
     render_retry_exhausted: bool = False
-    prepared_map_action_fingerprint: str | None = Field(
-        default=None, max_length=64
-    )
+    prepared_map_action_fingerprint: str | None = Field(default=None, max_length=64)
     failed_render_fingerprints: dict[str, int] = Field(
         default_factory=lambda: dict[str, int]()
     )
@@ -981,7 +1068,9 @@ class AgentRunState(BaseModel):
     # Transient provider failures per "capability|target": one retry is allowed.
     transient_failures: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
     # Targets whose data source kept failing, mapped to the capability that failed.
-    failed_data_targets: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
+    failed_data_targets: dict[str, str] = Field(
+        default_factory=lambda: dict[str, str]()
+    )
     route_corrections: int = Field(default=0, ge=0)
     # At most one revision per run: old route, new route and the evidence that
     # showed the first interpretation could not be executed.
@@ -1091,6 +1180,7 @@ class AgentRunState(BaseModel):
 
         return cls.model_validate(payload)
 
+
 ###############################################################################
 def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:
     """Keep model-facing result data without embedding raw provider payloads."""
@@ -1101,8 +1191,10 @@ def _checkpoint_tool_result(value: ToolResult) -> dict[str, Any]:
     # weather tables) may omit query fields, but render/resume must retain the
     # binding without retaining provider arguments or raw payloads.
     location_ref = json_object(json_object(value.data).get("query")).get("location_ref")
-    if value.tool_name == "execute_geospatial_capability" and isinstance(location_ref, str):
+    if value.tool_name == "execute_geospatial_capability" and isinstance(
+        location_ref, str
+    ):
         data = {**data, "query": {"location_ref": location_ref}}
-    return value.model_copy(update={"data": data or observation.result}, deep=True).model_dump(
-        mode="json"
-    )
+    return value.model_copy(
+        update={"data": data or observation.result}, deep=True
+    ).model_dump(mode="json")

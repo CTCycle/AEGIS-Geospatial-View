@@ -88,8 +88,14 @@ def _working_set_mib() -> tuple[float, float]:
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.GetCurrentProcess.restype = wintypes.HANDLE
     psapi = ctypes.WinDLL("psapi", use_last_error=True)
-    psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ProcessMemoryCounters), wintypes.DWORD]
-    psapi.GetProcessMemoryInfo(kernel.GetCurrentProcess(), ctypes.byref(counters), counters.cb)
+    psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(_ProcessMemoryCounters),
+        wintypes.DWORD,
+    ]
+    psapi.GetProcessMemoryInfo(
+        kernel.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+    )
     return counters.WorkingSetSize / 2**20, counters.PeakWorkingSetSize / 2**20
 
 
@@ -116,7 +122,9 @@ def _feature_payload(rng: random.Random, target_bytes: int) -> dict[str, Any]:
 
 
 ###############################################################################
-def _seed_messages(database: SQLiteRepository, conversation_id: str, rng: random.Random) -> None:
+def _seed_messages(
+    database: SQLiteRepository, conversation_id: str, rng: random.Random
+) -> None:
     """Average ~114 KB per message, matching the production payload columns."""
 
     with database.session() as session:
@@ -129,7 +137,9 @@ def _seed_messages(database: SQLiteRepository, conversation_id: str, rng: random
                     request_id=f"bench-{index // 2}",
                     role="assistant" if assistant else "user",
                     content=f"Message {index}: show the weather around the Colosseum.",
-                    structured_payload=_feature_payload(rng, 26_000) if assistant else None,
+                    structured_payload=_feature_payload(rng, 26_000)
+                    if assistant
+                    else None,
                     tool_payload=_feature_payload(rng, 28_000) if assistant else None,
                     map_session=_feature_payload(rng, 170_000) if assistant else None,
                 )
@@ -160,10 +170,15 @@ def _seed_run_events(
         )
 
     for index in range(SMALL_EVENTS):
-        append(RunEventType.TRACE, {"kind": "progress", "step": index, "note": "x" * 300})
+        append(
+            RunEventType.TRACE, {"kind": "progress", "step": index, "note": "x" * 300}
+        )
     big = int(BIG_EVENT_MIB * 2**20)
     append(RunEventType.MAP_PREPARED, _feature_payload(rng, big))
-    append(RunEventType.COMPLETED, {"assistant_message": "done", **_feature_payload(rng, big)})
+    append(
+        RunEventType.COMPLETED,
+        {"assistant_message": "done", **_feature_payload(rng, big)},
+    )
     return snapshot.run_id
 
 
@@ -212,7 +227,11 @@ async def _stream_until_terminal(publisher: RunEventPublisher, run_id: str) -> i
     seen = 0
     async for event in publisher.events(run_id):
         seen += 1
-        if event.type in {RunEventType.COMPLETED, RunEventType.CANCELLED, RunEventType.ERROR}:
+        if event.type in {
+            RunEventType.COMPLETED,
+            RunEventType.CANCELLED,
+            RunEventType.ERROR,
+        }:
             break
     return seen
 
@@ -248,44 +267,62 @@ def _seed(path: Path) -> dict[str, str]:
 
 
 # -----------------------------------------------------------------------------
-def _run_scenario(name: str, path: Path, meta: dict[str, str], repetitions: int) -> dict[str, Any]:
+def _run_scenario(
+    name: str, path: Path, meta: dict[str, str], repetitions: int
+) -> dict[str, Any]:
     database, repos = _open(path)
     history = repos["history"]
     if name == "snapshot_messages":
-        list_messages = getattr(history, "list_message_headers", None) or history.list_messages
+        list_messages = (
+            getattr(history, "list_message_headers", None) or history.list_messages
+        )
         operation: Callable[[], object] = lambda: list_messages(
             conversation_id=meta["message_conversation"]
         )
     elif name == "evidence_summaries":
-        operation = lambda: repos["evidence"].list_summaries(meta["evidence_conversation"], limit=100)
+        operation = lambda: repos["evidence"].list_summaries(
+            meta["evidence_conversation"], limit=100
+        )
     elif name == "terminal_lookup":
         publisher = RunEventPublisher(repos["events"])
         completed = {RunEventType.COMPLETED, RunEventType.CLARIFICATION_NEEDED}
 
         def operation() -> object:
             if hasattr(publisher, "latest_event"):
-                return publisher.latest_event(meta["run_id"], types=frozenset(completed))
+                return publisher.latest_event(
+                    meta["run_id"], types=frozenset(completed)
+                )
             return next(
-                event for event in reversed(publisher.replay(meta["run_id"]))
+                event
+                for event in reversed(publisher.replay(meta["run_id"]))
                 if event.type in completed
             )
     else:
         publisher = RunEventPublisher(repos["events"])
-        operation = lambda: asyncio.run(_stream_until_terminal(publisher, meta["run_id"]))
+        operation = lambda: asyncio.run(
+            _stream_until_terminal(publisher, meta["run_id"])
+        )
     result = _measure(operation, repetitions)
     database.engine.dispose()
     return result
 
 
 # -----------------------------------------------------------------------------
-SCENARIOS = ("snapshot_messages", "evidence_summaries", "event_stream", "terminal_lookup")
+SCENARIOS = (
+    "snapshot_messages",
+    "evidence_summaries",
+    "event_stream",
+    "terminal_lookup",
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repetitions", type=int, default=10)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--scenario", choices=SCENARIOS, help="internal: child process mode")
+    parser.add_argument(
+        "--scenario", choices=SCENARIOS, help="internal: child process mode"
+    )
     parser.add_argument("--db", type=Path, help="internal: child process mode")
     args = parser.parse_args()
 
@@ -295,7 +332,11 @@ def main() -> None:
         return
 
     commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=False
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout.strip()
     results: dict[str, Any] = {"commit": commit, "scenarios": {}}
     with tempfile.TemporaryDirectory() as directory:
@@ -305,11 +346,23 @@ def main() -> None:
         # One fresh process per scenario so peak working set is not polluted.
         for name in SCENARIOS:
             completed = subprocess.run(
-                [sys.executable, __file__, "--scenario", name, "--db", str(path),
-                 "--repetitions", str(args.repetitions)],
-                capture_output=True, text=True, check=True,
+                [
+                    sys.executable,
+                    __file__,
+                    "--scenario",
+                    name,
+                    "--db",
+                    str(path),
+                    "--repetitions",
+                    str(args.repetitions),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
-            results["scenarios"][name] = json.loads(completed.stdout.strip().splitlines()[-1])
+            results["scenarios"][name] = json.loads(
+                completed.stdout.strip().splitlines()[-1]
+            )
 
     rendered = json.dumps(results, indent=2)
     print(rendered)

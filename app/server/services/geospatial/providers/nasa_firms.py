@@ -18,6 +18,7 @@ from server.services.geospatial.spatial_constraints import geodesic_distance_m
 
 TextFetcher = Callable[[str], Awaitable[str] | str]
 
+
 ###############################################################################
 class NASAFIRMSProvider(GeospatialProvider):
     provider_id = "nasa_firms"
@@ -70,6 +71,7 @@ class NASAFIRMSProvider(GeospatialProvider):
             result_type="metadata",
         )
 
+
 ###############################################################################
 async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
     value = fetcher(url)
@@ -77,9 +79,11 @@ async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
         return await value
     return value
 
+
 ###############################################################################
 async def _fetch_text_url(url: str) -> str:
     return await fetch_text_url(url)
+
 
 ###############################################################################
 def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
@@ -116,6 +120,7 @@ def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
         )
     return features
 
+
 ###############################################################################
 def _firms_timestamp(row: dict[str, str]) -> str | None:
     date = (row.get("acq_date") or "").strip()
@@ -126,6 +131,7 @@ def _firms_timestamp(row: dict[str, str]) -> str | None:
         return date
     return f"{date}T{time[:2]}:{time[2:]}:00Z"
 
+
 ###############################################################################
 def _float_or_none(value: str | None) -> float | None:
     if value is None or not str(value).strip():
@@ -134,6 +140,7 @@ def _float_or_none(value: str | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
 
 ###############################################################################
 def _filter_features_to_radius(

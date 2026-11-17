@@ -44,7 +44,7 @@ def record_geometry(item: Any) -> BaseGeometry | None:
     if is_json_object(geometry):
         try:
             parsed = shape(geometry)
-        except (ValueError, TypeError, KeyError, AttributeError, GEOSException):
+        except ValueError, TypeError, KeyError, AttributeError, GEOSException:
             return None
         return None if parsed.is_empty else parsed
     for source in (item, item.get("properties")):
@@ -52,9 +52,12 @@ def record_geometry(item: Any) -> BaseGeometry | None:
             continue
         latitude, longitude = source.get("latitude"), source.get("longitude")
         if (
-            isinstance(latitude, int | float) and isinstance(longitude, int | float)
-            and not isinstance(latitude, bool) and not isinstance(longitude, bool)
-            and -90 <= latitude <= 90 and -180 <= longitude <= 180
+            isinstance(latitude, int | float)
+            and isinstance(longitude, int | float)
+            and not isinstance(latitude, bool)
+            and not isinstance(longitude, bool)
+            and -90 <= latitude <= 90
+            and -180 <= longitude <= 180
         ):
             return Point(float(longitude), float(latitude))
     return None
@@ -78,14 +81,18 @@ def buffer_km(geometry: BaseGeometry, distance_km: float) -> BaseGeometry:
     """Buffer by a true distance using a projection centred on the geometry."""
 
     if not 0 < distance_km <= MAX_BUFFER_KM:
-        raise GeometryOperationError(f"Buffer distance must be in (0, {MAX_BUFFER_KM:g}] km.")
+        raise GeometryOperationError(
+            f"Buffer distance must be in (0, {MAX_BUFFER_KM:g}] km."
+        )
     centre = geometry.centroid
     local = CRS.from_proj4(
         f"+proj=aeqd +lat_0={centre.y} +lon_0={centre.x} +datum=WGS84 +units=m +no_defs"
     )
     forward = Transformer.from_crs("EPSG:4326", local, always_xy=True).transform
     inverse = Transformer.from_crs(local, "EPSG:4326", always_xy=True).transform
-    return transform(inverse, transform(forward, geometry).buffer(distance_km * 1000.0, 32))
+    return transform(
+        inverse, transform(forward, geometry).buffer(distance_km * 1000.0, 32)
+    )
 
 
 ###############################################################################
@@ -126,7 +133,9 @@ def spatial_join(
     target_shapes = [record_geometry(item) for item in targets]
     join_shapes = [record_geometry(item) for item in joins]
     check_bounds([*target_shapes, *join_shapes])
-    indexed = [(index, geom) for index, geom in enumerate(join_shapes) if geom is not None]
+    indexed = [
+        (index, geom) for index, geom in enumerate(join_shapes) if geom is not None
+    ]
     if not indexed:
         raise GeometryOperationError("The join evidence has no located records.")
     tree = STRtree([geom for _index, geom in indexed])
@@ -134,13 +143,19 @@ def spatial_join(
     for item, geometry in zip(targets, target_shapes, strict=True):
         if geometry is None:
             continue
-        area = buffer_km(geometry, float(distance_km or 0)) if predicate == "within_distance" else geometry
+        area = (
+            buffer_km(geometry, float(distance_km or 0))
+            if predicate == "within_distance"
+            else geometry
+        )
         candidates = tree.query(area)
         matched: list[int] = []
         for position in candidates:
             join_index, join_geometry = indexed[int(position)]
             if (
-                area.covers(join_geometry) if predicate == "within" else area.intersects(join_geometry)
+                area.covers(join_geometry)
+                if predicate == "within"
+                else area.intersects(join_geometry)
             ):
                 matched.append(join_index)
         if mode == "filter" and not matched:
@@ -149,8 +164,10 @@ def spatial_join(
         if mode == "attach" and matched:
             first = properties(joins[min(matched)])
             scalars = [
-                (key, value) for key, value in first.items()
-                if not isinstance(value, dict | list) and key not in {"source_ref", "source_place"}
+                (key, value)
+                for key, value in first.items()
+                if not isinstance(value, dict | list)
+                and key not in {"source_ref", "source_place"}
             ]
             for key, value in scalars[:MAX_ATTACHED_FIELDS]:
                 properties(item)[f"join_{key}"] = value
@@ -190,8 +207,12 @@ def overlay(
             f"{kind} needs polygon footprints in the first evidence set; use clip for points."
         )
     if kind == "union":
-        dissolved = unary_union([geom for geom in left_shapes if is_polygonal(geom)] + right_polygons)
-        return [_area_record({"properties": {"overlay": "union"}}, dissolved, properties)]
+        dissolved = unary_union(
+            [geom for geom in left_shapes if is_polygonal(geom)] + right_polygons
+        )
+        return [
+            _area_record({"properties": {"overlay": "union"}}, dissolved, properties)
+        ]
     if kind == "intersection":
         tree = STRtree(right_polygons)
         output: list[dict[str, Any]] = []
@@ -208,7 +229,11 @@ def overlay(
     for item, geometry in zip(left, left_shapes, strict=True):
         if geometry is None or (kind == "difference" and not is_polygonal(geometry)):
             continue
-        piece = geometry.difference(mask) if kind == "difference" else geometry.intersection(mask)
+        piece = (
+            geometry.difference(mask)
+            if kind == "difference"
+            else geometry.intersection(mask)
+        )
         if piece.is_empty:
             continue
         record = _copy(item)

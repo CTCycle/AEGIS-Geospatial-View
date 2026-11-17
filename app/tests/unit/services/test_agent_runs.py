@@ -11,7 +11,10 @@ from sqlalchemy.pool import StaticPool
 
 from server.contracts.runs import AgentRunCreateRequest, AgentRunState
 from server.contracts.events import RunEventCreate, RunEventType, RunEventVisibility
-from server.domain.agent.capability_route import AgentPhase, AgentRunState as NativeRunState
+from server.domain.agent.capability_route import (
+    AgentPhase,
+    AgentRunState as NativeRunState,
+)
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.domain.steering import SteeringMessageRequest
 from server.repositories.agent_run_events import AgentRunEventRepository
@@ -32,6 +35,7 @@ from server.services.geospatial.render_capture import RenderCaptureStore
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 
+
 ###############################################################################
 class _InMemoryBackend:
     db_path = None
@@ -46,9 +50,9 @@ class _InMemoryBackend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
+
 ###############################################################################
 class _FakeRunOrchestrator:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started: list[str] = []
@@ -56,6 +60,7 @@ class _FakeRunOrchestrator:
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
         self.started.append(run_id)
+
 
 ###############################################################################
 @pytest.fixture()
@@ -69,6 +74,7 @@ def run_repositories() -> dict[str, object]:
         "steering": AgentSteeringRepository(backend),
         "events": event_repository,
     }
+
 
 ###############################################################################
 def _services(run_repositories):
@@ -90,6 +96,7 @@ def _services(run_repositories):
     )
     return lifecycle, steering, publisher, fake_orchestrator
 
+
 ###############################################################################
 def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     service = AggregatedRequestService()
@@ -102,6 +109,7 @@ def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     )
     assert "1. focus parks" in aggregate
     assert "2. use satellite" in aggregate
+
 
 ###############################################################################
 def test_event_repository_replay_orders_and_filters_visibility(
@@ -145,6 +153,7 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
+
 ###############################################################################
 def test_overflowing_subscriber_is_evicted_and_resumes_from_durable_log(
     run_repositories,
@@ -165,8 +174,11 @@ def test_overflowing_subscriber_is_evicted_and_resumes_from_durable_log(
 
     async def publish(label: str):
         return await publisher.publish(
-            conversation_id="conv_1", run_id="run_1", run_version=1,
-            type=RunEventType.PROGRESS, payload={"label": label},
+            conversation_id="conv_1",
+            run_id="run_1",
+            run_version=1,
+            type=RunEventType.PROGRESS,
+            payload={"label": label},
         )
 
     async def _run() -> None:
@@ -197,6 +209,7 @@ def test_overflowing_subscriber_is_evicted_and_resumes_from_durable_log(
         ]
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_event_repository_loads_latest_native_checkpoint_for_run_version(
@@ -268,16 +281,12 @@ def test_event_repository_loads_latest_native_checkpoint_for_run_version(
         )
     )
 
-    loaded = repo.get_latest_checkpoint_state(
-        "run_checkpoint", run_version=1
-    )
+    loaded = repo.get_latest_checkpoint_state("run_checkpoint", run_version=1)
 
     assert loaded is not None
     assert loaded["request_id"] == "request_checkpoint_2"
-    assert (
-        repo.get_latest_checkpoint_state("run_checkpoint", run_version=2)
-        is None
-    )
+    assert repo.get_latest_checkpoint_state("run_checkpoint", run_version=2) is None
+
 
 ###############################################################################
 def test_event_repository_rejects_run_and_conversation_mismatch(
@@ -310,6 +319,7 @@ def test_event_repository_rejects_run_and_conversation_mismatch(
 
     assert repo.get_last_sequence("run_1") == 0
 
+
 ###############################################################################
 def test_create_run_rejects_second_active_run(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -330,6 +340,7 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
             )
         )
     assert first.state == "pending"
+
 
 ###############################################################################
 def test_terminal_render_failure_and_cancellation_close_pending_presentation(
@@ -391,8 +402,11 @@ def test_terminal_render_failure_and_cancellation_close_pending_presentation(
     assert cancelled.presentation["status"] == "failed"
     assert "pending_response" not in cancelled.presentation
 
+
 ###############################################################################
-def test_explicit_pending_failure_status_is_normalized_atomically(run_repositories) -> None:
+def test_explicit_pending_failure_status_is_normalized_atomically(
+    run_repositories,
+) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Explicit pending failure")
     run_result, _ = run_async_in_thread(
@@ -420,6 +434,7 @@ def test_explicit_pending_failure_status_is_normalized_atomically(run_repositori
     assert transitioned is True
     assert failed.state == AgentRunState.FAILED
     assert failed.presentation_status == "failed"
+
 
 ###############################################################################
 def test_superseding_pending_render_closes_the_old_presentation(
@@ -465,6 +480,7 @@ def test_superseding_pending_render_closes_the_old_presentation(
     assert superseded.presentation_status == "not_required"
     assert superseded.presentation is None
 
+
 ###############################################################################
 @pytest.mark.asyncio
 async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -> None:
@@ -489,23 +505,39 @@ async def test_lifecycle_resumes_persisted_active_native_run(run_repositories) -
 
     assert fake_orchestrator.started == ["run_restart"]
 
+
 ###############################################################################
-def test_run_start_binds_a_known_attachment_and_rejects_an_unknown_one(run_repositories) -> None:
+def test_run_start_binds_a_known_attachment_and_rejects_an_unknown_one(
+    run_repositories,
+) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     store = RenderCaptureStore()
     lifecycle.attachment_store = store
     conversation = lifecycle.create_conversation(title="Photo")
     with pytest.raises(RunAttachmentError):
-        run_async_in_thread(lifecycle.create_run_with_status(
+        run_async_in_thread(
+            lifecycle.create_run_with_status(
+                conversation.conversation_id,
+                AgentRunCreateRequest(
+                    message="Where is this?", attachment_id="att_missing"
+                ),
+            )
+        )
+    attachment_id = store.save_attachment(
+        conversation_id=conversation.conversation_id,
+        mime_type="image/jpeg",
+        image_base64="cGhvdG8=",
+        width=8,
+        height=8,
+    )
+    result, _ = run_async_in_thread(
+        lifecycle.create_run_with_status(
             conversation.conversation_id,
-            AgentRunCreateRequest(message="Where is this?", attachment_id="att_missing"),
-        ))
-    attachment_id = store.save_attachment(conversation_id=conversation.conversation_id, mime_type="image/jpeg",
-                                          image_base64="cGhvdG8=", width=8, height=8)
-    result, _ = run_async_in_thread(lifecycle.create_run_with_status(
-        conversation.conversation_id,
-        AgentRunCreateRequest(message="Where is this?", attachment_id=attachment_id),
-    ))
+            AgentRunCreateRequest(
+                message="Where is this?", attachment_id=attachment_id
+            ),
+        )
+    )
     assert store.attachment_for_run(result.run_id) is not None
 
 
@@ -531,6 +563,7 @@ def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> Non
     assert duplicate_created is False
     assert duplicate.run_id == first.run_id
     assert duplicate.state == first.state
+
 
 ###############################################################################
 def test_conversation_context_state_survives_repository_restart(
@@ -558,7 +591,10 @@ def test_conversation_context_state_survives_repository_restart(
     )
     hydrated = conversations.read_state(conversation.id)
     assert hydrated["context_revision"] == revision
-    assert hydrated["conversation_state"]["active_directives"][0]["directive_id"] == "dir_1"
+    assert (
+        hydrated["conversation_state"]["active_directives"][0]["directive_id"]
+        == "dir_1"
+    )
     hydrated_state = ConversationState.model_validate(hydrated["conversation_state"])
     assert hydrated_state.memory_projection()["active_location"]["label"] == "Rome"
     with pytest.raises(ValueError, match="revision conflict"):
@@ -567,6 +603,7 @@ def test_conversation_context_state_survives_repository_restart(
             expected_revision=initial["context_revision"],
             conversation_state=state.model_dump(mode="json"),
         )
+
 
 ###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
@@ -604,6 +641,7 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     assert duplicate.steering_id == first.steering_id
     assert duplicate.run_version == 2
     assert duplicate.duplicate is True
+
 
 ###############################################################################
 def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
@@ -647,7 +685,10 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
     snapshot = persisted["conversation_state"]
     assert response.state_delta_applied is True
     assert snapshot["constraints"]["latest_steering"]["kind"] == "scope_change"
-    assert snapshot["constraints"]["latest_steering"]["parameters"]["radius_text"] == "50 km"
+    assert (
+        snapshot["constraints"]["latest_steering"]["parameters"]["radius_text"]
+        == "50 km"
+    )
     assert snapshot["evidence_refs"] == ["weather-layer"]
     assert (
         run_repositories["steering"]
@@ -655,6 +696,7 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
         .state_delta_applied
         is True
     )
+
 
 ###############################################################################
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:
@@ -691,6 +733,7 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
             )
         )
 
+
 ###############################################################################
 def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
     run_repositories,
@@ -717,12 +760,12 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
 
     run_async_in_thread(_run())
 
+
 ###############################################################################
 def test_cancel_run_cancels_the_matching_in_flight_task(run_repositories) -> None:
 
     ###############################################################################
     class _BlockingOrchestrator:
-
         # -------------------------------------------------------------------------
         def __init__(self) -> None:
             self.started = asyncio.Event()
@@ -766,6 +809,7 @@ def test_cancel_run_cancels_the_matching_in_flight_task(run_repositories) -> Non
         await lifecycle.shutdown()
 
     run_async_in_thread(_run())
+
 
 ###############################################################################
 def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
@@ -884,16 +928,16 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
         "overlay_results": [],
         "failure_code": None,
     }
-    completed, duplicate, completed_response = (
-        run_repositories["runs"].acknowledge_render(
-            conversation_id=conversation.conversation_id,
-            run_id=run.run_id,
-            run_version=run.run_version,
-            map_session_id="map-session-1",
-            collection_revision=4,
-            status="ready",
-            acknowledgment=acknowledgment,
-        )
+    completed, duplicate, completed_response = run_repositories[
+        "runs"
+    ].acknowledge_render(
+        conversation_id=conversation.conversation_id,
+        run_id=run.run_id,
+        run_version=run.run_version,
+        map_session_id="map-session-1",
+        collection_revision=4,
+        status="ready",
+        acknowledgment=acknowledgment,
     )
     assert completed.state.value == "completed"
     assert completed.presentation_status == "ready"
@@ -926,9 +970,13 @@ def test_render_acknowledgment_promotes_candidate_once_and_is_idempotent(
     )
     assert replay.state.value == "completed"
     assert duplicate is True
-    assert run_repositories["conversations"].read_state(
-        conversation.conversation_id
-    )["context_revision"] == revision_after_commit
+    assert (
+        run_repositories["conversations"].read_state(conversation.conversation_id)[
+            "context_revision"
+        ]
+        == revision_after_commit
+    )
+
 
 ###############################################################################
 def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> None:
@@ -965,6 +1013,7 @@ def test_stale_render_ack_cannot_mutate_pending_candidate(run_repositories) -> N
         )
     assert run_repositories["runs"].get_run(run.run_id).state.value == "awaiting_render"
 
+
 ###############################################################################
 def test_render_deadline_starts_when_candidate_enters_awaiting_render(
     run_repositories,
@@ -987,7 +1036,11 @@ def test_render_deadline_starts_when_candidate_enters_awaiting_render(
             "pending_response": {
                 "map_session": {
                     "session_id": "map-session-deadline",
-                    "overlay_collection": {"collection_id": "active-map", "revision": 1, "instances": []},
+                    "overlay_collection": {
+                        "collection_id": "active-map",
+                        "revision": 1,
+                        "instances": [],
+                    },
                 }
             },
             "required_render_checks": {},
@@ -1002,12 +1055,15 @@ def test_render_deadline_starts_when_candidate_enters_awaiting_render(
         record.created_at = datetime.now(UTC) - timedelta(seconds=120)
         session.commit()
 
-    assert run_repositories["runs"].expire_pending_render(
-        conversation_id=conversation.conversation_id,
-        run_id=run.run_id,
-        run_version=run.run_version,
-        timeout_seconds=90,
-    ) is None
+    assert (
+        run_repositories["runs"].expire_pending_render(
+            conversation_id=conversation.conversation_id,
+            run_id=run.run_id,
+            run_version=run.run_version,
+            timeout_seconds=90,
+        )
+        is None
+    )
 
     with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
         record = session.get(AgentRunRecord, run.run_id)

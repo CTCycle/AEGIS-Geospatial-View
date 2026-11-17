@@ -23,6 +23,7 @@ _STOP_REASONS = {
     "max_tokens": "length",
 }
 
+
 ###############################################################################
 class _MessagesHTTPError(Exception):
     """Provider HTTP failure that keeps the response body for classification."""
@@ -31,6 +32,7 @@ class _MessagesHTTPError(Exception):
     def __init__(self, status_code: int, body: str) -> None:
         super().__init__(f"OpenCode Messages API returned {status_code}: {body[:500]}")
         self.status_code = status_code
+
 
 ###############################################################################
 class _Payload:
@@ -48,11 +50,17 @@ class _Payload:
     def model_dump(self, **_kwargs: Any) -> dict[str, Any]:
         return json_object(json.loads(json.dumps(self._data)))
 
+
 ###############################################################################
 def _wrap(value: Any) -> Any:
     if is_json_object(value):
         return _Payload(value)
-    return [_wrap(item) for item in json_array(value)] if isinstance(value, list) else value
+    return (
+        [_wrap(item) for item in json_array(value)]
+        if isinstance(value, list)
+        else value
+    )
+
 
 ###############################################################################
 def _image_block(url: str) -> dict[str, Any] | None:
@@ -64,6 +72,7 @@ def _image_block(url: str) -> dict[str, Any] | None:
         "type": "image",
         "source": {"type": "base64", "media_type": media_type, "data": data},
     }
+
 
 ###############################################################################
 def _content_blocks(content: Any) -> list[dict[str, Any]]:
@@ -81,15 +90,17 @@ def _content_blocks(content: Any) -> list[dict[str, Any]]:
                 blocks.append(block)
     return blocks
 
+
 ###############################################################################
 def _tool_input(arguments: Any) -> dict[str, Any]:
     if is_json_object(arguments):
         return arguments
     try:
         loaded: Any = json.loads(arguments or "{}")
-    except (TypeError, json.JSONDecodeError):
+    except TypeError, json.JSONDecodeError:
         return {}
     return json_object(loaded)
+
 
 ###############################################################################
 def _messages_and_system(
@@ -148,6 +159,7 @@ def _messages_and_system(
             append("user", _content_blocks(content))
     return "\n\n".join(system_parts), turns
 
+
 ###############################################################################
 def _tool_choice(value: Any) -> dict[str, Any] | None:
     if is_json_object(value):
@@ -160,6 +172,7 @@ def _tool_choice(value: Any) -> dict[str, Any] | None:
     if value == "none":
         return {"type": "none"}
     return {"type": "tool", "name": str(value)}
+
 
 ###############################################################################
 def build_messages_payload(**kwargs: Any) -> dict[str, Any]:
@@ -177,9 +190,7 @@ def build_messages_payload(**kwargs: Any) -> dict[str, Any]:
     if system:
         payload["system"] = system
     temperature = kwargs.get("temperature")
-    if isinstance(temperature, (int, float)) and not model.lower().startswith(
-        "claude"
-    ):
+    if isinstance(temperature, (int, float)) and not model.lower().startswith("claude"):
         payload["temperature"] = min(max(float(temperature), 0.0), 1.0)
     tools: list[dict[str, Any]] = []
     for raw_tool in json_array(kwargs.get("tools")):
@@ -205,6 +216,7 @@ def build_messages_payload(**kwargs: Any) -> dict[str, Any]:
         payload["stream"] = True
     return payload
 
+
 ###############################################################################
 def _usage(raw: Any) -> dict[str, int]:
     usage = json_object(raw)
@@ -215,6 +227,7 @@ def _usage(raw: Any) -> dict[str, int]:
         "completion_tokens": completion,
         "total_tokens": prompt + completion,
     }
+
 
 ###############################################################################
 def completion_from_message(body: dict[str, Any]) -> _Payload:
@@ -249,17 +262,21 @@ def completion_from_message(body: dict[str, Any]) -> _Payload:
                 {
                     "index": 0,
                     "message": message,
-                    "finish_reason": _STOP_REASONS.get(stop_reason, stop_reason or None),
+                    "finish_reason": _STOP_REASONS.get(
+                        stop_reason, stop_reason or None
+                    ),
                 }
             ],
             "usage": _usage(body.get("usage")),
         }
     )
 
+
 ###############################################################################
 def _raise_for_status(response: httpx.Response) -> None:
     if response.status_code >= 400:
         raise _MessagesHTTPError(response.status_code, response.text)
+
 
 ###############################################################################
 def _stream_chunks(lines: Iterator[str]) -> Iterator[_Payload]:
@@ -283,6 +300,7 @@ def _stream_chunks(lines: Iterator[str]) -> Iterator[_Payload]:
             if delta.get("type") == "text_delta" and delta.get("text"):
                 yield _Payload({"choices": [{"delta": {"content": delta["text"]}}]})
     yield _Payload({"choices": [], "usage": _usage(usage)})
+
 
 ###############################################################################
 class _Completions:
@@ -338,6 +356,7 @@ class _Completions:
         _raise_for_status(response)
         return completion_from_message(json_object(response.json()))
 
+
 ###############################################################################
 class _MessagesClient:
     """Drop-in for the SDK client surface DeepSeekProvider consumes."""
@@ -355,6 +374,7 @@ class _MessagesClient:
     # -------------------------------------------------------------------------
     def close(self) -> None:
         return None
+
 
 ###############################################################################
 class _AsyncMessagesClient:
@@ -378,6 +398,7 @@ class _AsyncMessagesClient:
     # -------------------------------------------------------------------------
     async def close(self) -> None:
         return None
+
 
 ###############################################################################
 class _OpenCodeMessagesTransport(DeepSeekProvider):

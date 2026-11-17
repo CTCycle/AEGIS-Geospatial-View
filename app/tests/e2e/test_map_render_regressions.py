@@ -20,9 +20,11 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
+
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
 
 ###############################################################################
 def _models_payload() -> dict[str, Any]:
@@ -43,6 +45,7 @@ def _models_payload() -> dict[str, Any]:
         "sources": {},
     }
 
+
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
     payload = chat_completion_map_payload(7001, "Search executed successfully.")
@@ -50,6 +53,7 @@ def _turn_payload() -> dict[str, Any]:
     payload["map_session"]["overlay_collection"]["instances"] = []
     payload["tool_payload"] = {"execution": "map_search", "selected_overlay_ids": []}
     return payload
+
 
 ###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
@@ -94,6 +98,7 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
 
     page.route("**/api/geospatial/tiles/osm_default/**", handle_osm_proxy)
 
+
 ###############################################################################
 def _collect_console_errors(page: Page) -> list[str]:
     errors: list[str] = []
@@ -104,6 +109,7 @@ def _collect_console_errors(page: Page) -> list[str]:
 
     page.on("console", capture)
     return errors
+
 
 ###############################################################################
 def _assert_no_render_blockers(errors: list[str]) -> None:
@@ -121,6 +127,7 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
     ]
     assert not blockers, f"Render-blocking console errors detected: {blockers}"
 
+
 ###############################################################################
 def _assert_map_uses_full_canvas(page: Page) -> None:
     """Verify the rendered map and MapLibre canvas share the full map frame."""
@@ -128,7 +135,9 @@ def _assert_map_uses_full_canvas(page: Page) -> None:
         "canvas panel": page.locator(".canvas-panel__body").bounding_box(),
         "map preview host": page.locator("app-map-preview").bounding_box(),
         "map frame": page.locator(".maplibre-wrap:visible").bounding_box(),
-        "map container": page.locator(".maplibre-container:visible").last.bounding_box(),
+        "map container": page.locator(
+            ".maplibre-container:visible"
+        ).last.bounding_box(),
         "map canvas": page.locator(".maplibregl-canvas:visible").last.bounding_box(),
     }
     missing = [name for name, box in boxes.items() if box is None]
@@ -141,12 +150,13 @@ def _assert_map_uses_full_canvas(page: Page) -> None:
         assert box is not None
         assert abs(box["x"] - panel["x"]) <= 2, f"{name} is not aligned to the canvas"
         assert abs(box["y"] - panel["y"]) <= 2, f"{name} is not aligned to the canvas"
-        assert abs(
-            (box["x"] + box["width"]) - (panel["x"] + panel["width"])
-        ) <= 2, f"{name} does not use the full canvas width"
-        assert abs(
-            (box["y"] + box["height"]) - (panel["y"] + panel["height"])
-        ) <= 2, f"{name} does not use the full canvas height"
+        assert abs((box["x"] + box["width"]) - (panel["x"] + panel["width"])) <= 2, (
+            f"{name} does not use the full canvas width"
+        )
+        assert abs((box["y"] + box["height"]) - (panel["y"] + panel["height"])) <= 2, (
+            f"{name} does not use the full canvas height"
+        )
+
 
 ###############################################################################
 def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
@@ -167,6 +177,7 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     assert requested_zooms, "Expected raster tile requests for map rendering"
     assert max(requested_zooms) <= 19
     _assert_no_render_blockers(errors)
+
 
 ###############################################################################
 def test_refresh_restores_rendered_map_without_console_errors(

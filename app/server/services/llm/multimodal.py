@@ -26,6 +26,7 @@ IMAGE_TOKEN_ESTIMATE = 1024
 TEXT_PART_TYPE = "text"
 IMAGE_PART_TYPE = "image"
 
+
 ###############################################################################
 def is_multimodal_content(content: object) -> TypeGuard[list[Any]]:
     """True when ``content`` is a list of typed parts (not a plain string)."""
@@ -34,9 +35,8 @@ def is_multimodal_content(content: object) -> TypeGuard[list[Any]]:
         return False
     if not content:
         return False
-    return all(
-        isinstance(item, dict) for item in cast("list[object]", content)
-    )
+    return all(isinstance(item, dict) for item in cast("list[object]", content))
+
 
 ###############################################################################
 def iter_image_parts(content: Any) -> Iterator[dict[str, Any]]:
@@ -50,6 +50,7 @@ def iter_image_parts(content: Any) -> Iterator[dict[str, Any]]:
             if isinstance(data, str) and data.strip():
                 yield item
 
+
 ###############################################################################
 def iter_text_parts(content: Any) -> Iterator[str]:
     """Yield the text fragments of a neutral multimodal ``content`` value."""
@@ -62,13 +63,16 @@ def iter_text_parts(content: Any) -> Iterator[str]:
             if isinstance(text, str) and text.strip():
                 yield text
 
+
 ###############################################################################
 def content_has_image(content: Any) -> bool:
     return any(True for _ in iter_image_parts(content))
 
+
 ###############################################################################
 def messages_contain_image(messages: Iterable[dict[str, Any]]) -> bool:
     return any(content_has_image(message.get("content")) for message in messages)
+
 
 ###############################################################################
 def image_data_url(
@@ -79,6 +83,7 @@ def image_data_url(
     """Serialize one base64 image part as a data URL (OpenAI/DeepSeek form)."""
 
     return f"data:{mime_type};base64,{data}"
+
 
 ###############################################################################
 def attach_image(
@@ -103,26 +108,25 @@ def attach_image(
             f"Supported: {sorted(SUPPORTED_IMAGE_MIME_TYPES)}."
         )
     parts: list[dict[str, Any]] = [{"type": TEXT_PART_TYPE, "text": caption}]
-    parts.append(
-        {"type": IMAGE_PART_TYPE, "mime_type": mime_type, "data": data}
-    )
+    parts.append({"type": IMAGE_PART_TYPE, "mime_type": mime_type, "data": data})
     return [*messages, {"role": "user", "content": parts}]
+
 
 ###############################################################################
 def image_part_count(messages: Iterable[dict[str, Any]]) -> int:
     """Count image parts across the message list (for telemetry/budget)."""
 
     return sum(
-        1
-        for message in messages
-        for _ in iter_image_parts(message.get("content"))
+        1 for message in messages for _ in iter_image_parts(message.get("content"))
     )
+
 
 ###############################################################################
 def estimate_image_tokens(messages: Iterable[dict[str, Any]]) -> int:
     """Token allowance for image parts across the message list."""
 
     return image_part_count(messages) * IMAGE_TOKEN_ESTIMATE
+
 
 ###############################################################################
 def text_from_multimodal_content(content: Any) -> str:
@@ -138,6 +142,7 @@ def text_from_multimodal_content(content: Any) -> str:
         return " ".join(iter_text_parts(content)).strip()
     return ""
 
+
 ###############################################################################
 def _normalize_part_list(
     content: Any,
@@ -147,6 +152,7 @@ def _normalize_part_list(
     if not is_multimodal_content(content):
         return None
     return list(content)
+
 
 ###############################################################################
 def normalize_image_content_for_ollama(
@@ -167,6 +173,7 @@ def normalize_image_content_for_ollama(
         if data:
             images.append(data)
     return text, images
+
 
 ###############################################################################
 def normalize_image_content_for_openai_chat(
@@ -196,12 +203,11 @@ def normalize_image_content_for_openai_chat(
                 parts.append(
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": image_data_url(data, mime_type=mime_type)
-                        },
+                        "image_url": {"url": image_data_url(data, mime_type=mime_type)},
                     }
                 )
     return parts or None
+
 
 ###############################################################################
 def normalize_image_content_for_openai_responses(
@@ -234,6 +240,7 @@ def normalize_image_content_for_openai_responses(
                     }
                 )
     return items or None
+
 
 ###############################################################################
 def normalize_image_content_for_google(

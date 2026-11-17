@@ -18,17 +18,19 @@ __all__ = [
     "LayerProviderService",
 ]
 
+
 ###############################################################################
 class LayerProviderError(Exception):
     """Base exception raised when a layer provider cannot fulfill a request."""
+
 
 ###############################################################################
 class LayerProviderNotFoundError(LayerProviderError):
     """Raised when a requested layer does not have a registered provider."""
 
+
 ###############################################################################
 class LayerProviderService:
-
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -110,7 +112,7 @@ class LayerProviderService:
         for value in values:
             try:
                 numeric = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if numeric > 0:
                 normalized.append(numeric)
@@ -164,6 +166,7 @@ class LayerProviderService:
         except LayerProviderError:
             return value
         return entry.label
+
 
 ###############################################################################
 def build_geospatial_layer_catalog(database: SQLiteRepository) -> LayerProviderService:

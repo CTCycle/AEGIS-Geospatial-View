@@ -17,7 +17,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import ConsoleMessage, Locator, Page, Route, WebSocketRoute, expect
+from playwright.sync_api import (
+    ConsoleMessage,
+    Locator,
+    Page,
+    Route,
+    WebSocketRoute,
+    expect,
+)
 from server.domain.realtime import RealtimeRenderAckPayload
 
 from tests.e2e.helpers.chat_stub_payloads import (
@@ -56,6 +63,7 @@ VISIBLE_TILE = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABbUlEQVR4nMWWsW7CMBCGD4vJ4hk6M0YMTJ36BEx9gCjqECGGioEpQ+aqQ4UYkMUD8BBMnRgsj8x9BuS5AivuxUkcOzbqP4AdxP/p7nwXjxabBVTKnqbs5wJRRbC7/oyosfrarj8BQBz3eh2u5cd7LQIthYklgjfJ61t0BjH2mvEogFasIEjzUdxEkdanURIlaSlp2ZkixRCDgkh313R3VetOgJbwYWBrAKCysAG8ipHWrQ/5hMrir5MtDIHct9O5WiwvZ2yN/3LIJ3jbAzCss9kMb/nqZLF2rUFSJUq7G2tl3eruGsF3wQxHxWBfLzhXreqPIFD/DUjvh4+vToxz4yfGeW9+bDUwDh/cHXUlmjwPQPu5zs+4D57LzHFe1QD2loGqv7yGx9jRuilx3LsEQdRQdWmZYTOKeFkPeGHcAFQW7ta+LwyihmqIhJUR1MmJQzFCR0XSV4xos0h0BDHCt+vB0lfm5uU8TgSWS/8v7kOV+6oVKA8AAAAASUVORK5CYII="
 )
 
+
 ###############################################################################
 def _envelope(
     *,
@@ -88,6 +96,7 @@ def _envelope(
             "payload": payload,
         }
     return json.dumps(envelope)
+
 
 ###############################################################################
 def _map_session() -> dict[str, Any]:
@@ -135,6 +144,7 @@ def _map_session() -> dict[str, Any]:
     }
     return session
 
+
 ###############################################################################
 def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
     session_id = str(map_session["session_id"])
@@ -162,6 +172,7 @@ def _prepared_presentation(map_session: dict[str, Any]) -> dict[str, Any]:
         },
     }
 
+
 ###############################################################################
 def _map_session_variant(attempt: int) -> dict[str, Any]:
     session = _map_session()
@@ -181,6 +192,7 @@ FAULT_SCENARIOS = (
     "retry_exhausted",
 )
 
+
 ###############################################################################
 def _tested_commit() -> str:
     configured = os.environ.get("APP_TEST_COMMIT")
@@ -199,13 +211,17 @@ def _tested_commit() -> str:
         raise RuntimeError("Could not determine the exact tested commit.")
     return commit
 
+
 ###############################################################################
 def _sanitize_evidence(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if any(marker in key_text.casefold() for marker in _SENSITIVE_EVIDENCE_KEY_MARKERS):
+            if any(
+                marker in key_text.casefold()
+                for marker in _SENSITIVE_EVIDENCE_KEY_MARKERS
+            ):
                 sanitized[key_text] = "[REDACTED]"
             else:
                 sanitized[key_text] = _sanitize_evidence(item)
@@ -216,20 +232,28 @@ def _sanitize_evidence(value: Any) -> Any:
         return [_sanitize_evidence(item) for item in value[:MAX_EVIDENCE_ITEMS]]
     return value
 
+
 ###############################################################################
 def _bounded_text(value: str) -> str:
     return " ".join(value.split())[:MAX_EVIDENCE_TEXT]
+
 
 ###############################################################################
 def _capture_console_output(page: Page) -> list[dict[str, str]]:
     console_output: list[dict[str, str]] = []
 
     def capture_console(message: ConsoleMessage) -> None:
-        if message.type in {"error", "warning"} and len(console_output) < MAX_EVIDENCE_ITEMS:
-            console_output.append({"type": message.type, "text": _bounded_text(message.text)})
+        if (
+            message.type in {"error", "warning"}
+            and len(console_output) < MAX_EVIDENCE_ITEMS
+        ):
+            console_output.append(
+                {"type": message.type, "text": _bounded_text(message.text)}
+            )
 
     page.on("console", capture_console)
     return console_output
+
 
 ###############################################################################
 def _candidate_refs(
@@ -275,6 +299,7 @@ def _candidate_refs(
         )
     return candidates
 
+
 ###############################################################################
 def _final_run_version(
     acknowledgments: list[dict[str, Any]],
@@ -287,6 +312,7 @@ def _final_run_version(
         if isinstance(item.get("run_version"), int):
             return item["run_version"]
     return None
+
 
 ###############################################################################
 def _scenario_evidence(
@@ -314,7 +340,9 @@ def _scenario_evidence(
         "acknowledgment_count": len(acknowledgments),
         "acknowledgments": _sanitize_evidence(acknowledgments),
         "ack_payloads": _sanitize_evidence(acknowledgments),
-        "synthetic_event_sequence": _sanitize_evidence(synthetic_events[:MAX_EVIDENCE_ITEMS]),
+        "synthetic_event_sequence": _sanitize_evidence(
+            synthetic_events[:MAX_EVIDENCE_ITEMS]
+        ),
         "final_ui_state_text": _bounded_text(page.locator("body").inner_text()),
         "console_output": _sanitize_evidence(console_output),
         "screenshot": str(screenshot_path),
@@ -324,6 +352,7 @@ def _scenario_evidence(
             fixture_state.get("rejected_acknowledgments", [])
         ),
     }
+
 
 ###############################################################################
 def _controlled_socket(
@@ -374,15 +403,25 @@ def _controlled_socket(
                 "run_id": active_run_id,
                 "run_version": effective_run_version,
             }
-            for key in ("code", "collection_revision", "map_session_id", "recovery", "status"):
+            for key in (
+                "code",
+                "collection_revision",
+                "map_session_id",
+                "recovery",
+                "status",
+            ):
                 if key in payload:
                     sequence_entry[key] = payload[key]
-            if event_type == "map_prepared" and isinstance(payload.get("map_session"), dict):
+            if event_type == "map_prepared" and isinstance(
+                payload.get("map_session"), dict
+            ):
                 map_session = payload["map_session"]
                 sequence_entry["map_session_id"] = map_session.get("session_id")
                 overlay_collection = map_session.get("overlay_collection")
                 if isinstance(overlay_collection, dict):
-                    sequence_entry["collection_revision"] = overlay_collection.get("revision")
+                    sequence_entry["collection_revision"] = overlay_collection.get(
+                        "revision"
+                    )
             synthetic_events.append(sequence_entry)
         parsed = json.loads(envelope)
         parsed["payload"]["run_version"] = effective_run_version
@@ -427,10 +466,17 @@ def _controlled_socket(
 
     def handle_socket(socket: WebSocketRoute) -> None:
         def handle_message(raw: str | bytes) -> None:
-            nonlocal active_run_id, active_run_version, current_map_session, current_presentation, render_attempt, cancelled, deferred_superseded_ack
+            nonlocal \
+                active_run_id, \
+                active_run_version, \
+                current_map_session, \
+                current_presentation, \
+                render_attempt, \
+                cancelled, \
+                deferred_superseded_ack
             try:
                 request = json.loads(raw)
-            except (TypeError, json.JSONDecodeError):
+            except TypeError, json.JSONDecodeError:
                 return
             if not isinstance(request, dict):
                 return
@@ -447,7 +493,9 @@ def _controlled_socket(
                 )
                 return
             if request_type == "run.start":
-                superseding_new_run = scenario == "superseded" and fixture_state.get("started")
+                superseding_new_run = scenario == "superseded" and fixture_state.get(
+                    "started"
+                )
                 if superseding_new_run:
                     fixture_state["superseded"] = True
                     active_run_id = SUPERSEDED_RUN_ID
@@ -473,9 +521,16 @@ def _controlled_socket(
                 send_event(
                     socket,
                     "progress",
-                    {"stage": "understanding_request", "label": "Understanding the request"},
+                    {
+                        "stage": "understanding_request",
+                        "label": "Understanding the request",
+                    },
                 )
-                send_event(socket, "assistant_text_completed", {"content": "Data prepared; the map is loading."})
+                send_event(
+                    socket,
+                    "assistant_text_completed",
+                    {"content": "Data prepared; the map is loading."},
+                )
                 send_prepared(socket)
                 if superseding_new_run:
                     reject_superseded_ack(
@@ -484,7 +539,9 @@ def _controlled_socket(
                             "run_id": RUN_ID,
                             "run_version": 1,
                             "map_session_id": map_session.get("session_id"),
-                            "collection_revision": map_session.get("overlay_collection", {}).get("revision"),
+                            "collection_revision": map_session.get(
+                                "overlay_collection", {}
+                            ).get("revision"),
                         },
                     )
                 if deferred_superseded_ack is not None:
@@ -589,14 +646,20 @@ def _controlled_socket(
                                 "expected": {
                                     "run_id": active_run_id,
                                     "run_version": active_run_version,
-                                    "map_session_id": current_map_session.get("session_id"),
-                                    "collection_revision": current_map_session.get("overlay_collection", {}).get("revision"),
+                                    "map_session_id": current_map_session.get(
+                                        "session_id"
+                                    ),
+                                    "collection_revision": current_map_session.get(
+                                        "overlay_collection", {}
+                                    ).get("revision"),
                                 },
                                 "observed": {
                                     "run_id": payload.get("run_id"),
                                     "run_version": payload.get("run_version"),
                                     "map_session_id": payload.get("map_session_id"),
-                                    "collection_revision": payload.get("collection_revision"),
+                                    "collection_revision": payload.get(
+                                        "collection_revision"
+                                    ),
                                 },
                             },
                         },
@@ -605,9 +668,7 @@ def _controlled_socket(
                     )
                 )
                 return
-            if scenario == "superseded" and (
-                not fixture_state.get("superseded")
-            ):
+            if scenario == "superseded" and (not fixture_state.get("superseded")):
                 deferred_superseded_ack = deepcopy(payload)
                 return
             if scenario == "superseded" and (
@@ -637,7 +698,10 @@ def _controlled_socket(
                     )
                 )
                 return
-            if scenario in {"failed_layer", "viewport_mismatch"} and render_attempt == 1:
+            if (
+                scenario in {"failed_layer", "viewport_mismatch"}
+                and render_attempt == 1
+            ):
                 failure_code = (
                     "required_layer_not_visible"
                     if scenario == "failed_layer"
@@ -853,6 +917,7 @@ def _controlled_socket(
         re.compile(r".*/api/conversations/[^/]+/realtime$"), handle_socket
     )
 
+
 ###############################################################################
 def _setup_controlled_routes(
     page: Page,
@@ -899,6 +964,7 @@ def _setup_controlled_routes(
         re.compile(r".*/api/conversations/[^/]+$"),
         lambda route: fulfill(route, conversation_snapshot_payload(map_session=None)),
     )
+
     def fulfill_empty_run_trace(route: Route) -> None:
         match = re.search(
             r"/api/conversations/([^/]+)/runs/([^/?]+)/trace(?:\?.*)?$",
@@ -929,22 +995,29 @@ def _setup_controlled_routes(
     )
     page.route(
         "**/api/geospatial/tiles/osm_default/**",
-        lambda route: route.fulfill(status=200, content_type="image/png", body=VISIBLE_TILE),
+        lambda route: route.fulfill(
+            status=200, content_type="image/png", body=VISIBLE_TILE
+        ),
     )
+
 
 ###############################################################################
 def _pending_map_message(page: Page) -> Locator:
     transcript = page.get_by_role("log", name="Conversation transcript")
     return transcript.get_by_text("Data prepared; the map is loading.", exact=True)
 
+
 ###############################################################################
-def _observe_pending_map_and_release_ack(page: Page, fixture_state: dict[str, Any]) -> None:
+def _observe_pending_map_and_release_ack(
+    page: Page, fixture_state: dict[str, Any]
+) -> None:
     expect(_pending_map_message(page)).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
     fixture_state["release_initial_render_ack"] = True
     answer = fixture_state.pop("answer_initial_render_ack", None)
     if answer is not None:
         answer()
+
 
 ###############################################################################
 def test_controlled_map_completion_requires_and_records_visible_rendering(
@@ -1015,7 +1088,9 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
             "collection_revision": COLLECTION_REVISION,
             "acknowledgment": _sanitize_evidence(acknowledgment),
             "canvas": canvas_box,
-            "console_errors": [entry["text"] for entry in console_output if entry["type"] == "error"],
+            "console_errors": [
+                entry["text"] for entry in console_output if entry["type"] == "error"
+            ],
         }
     )
     assert re.fullmatch(r"[0-9a-f]{40}", evidence["tested_commit"])
@@ -1025,8 +1100,12 @@ def test_controlled_map_completion_requires_and_records_visible_rendering(
         entry
         for entry in console_output
         if entry["type"] == "error"
-        and any(token in entry["text"].casefold() for token in ("typeerror", "webgl", "map source"))
+        and any(
+            token in entry["text"].casefold()
+            for token in ("typeerror", "webgl", "map source")
+        )
     ]
+
 
 ###############################################################################
 @pytest.mark.parametrize("scenario", FAULT_SCENARIOS)
@@ -1084,7 +1163,9 @@ def test_controlled_render_fault_scenarios(
         # candidate may already be prepared by this point; the fixture holds
         # its acknowledgement until the superseding command arrives so both
         # event orderings are exercised deterministically.
-        expect(page.get_by_role("button", name="Stop generating")).to_be_visible(timeout=15000)
+        expect(page.get_by_role("button", name="Stop generating")).to_be_visible(
+            timeout=15000
+        )
         composer.fill("Focus on Milan instead")
         composer.press("Enter")
     elif scenario == "cancelled":
@@ -1116,9 +1197,9 @@ def test_controlled_render_fault_scenarios(
         expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
         execution_status = page.locator("app-execution-status")
         execution_status.locator("button").click()
-        expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
-            "The map update could not be completed", timeout=15000
-        )
+        expect(
+            execution_status.locator(".execution-status__run-error")
+        ).to_contain_text("The map update could not be completed", timeout=15000)
     elif scenario == "stale_ack":
         for _ in range(150):
             if fixture_state.get("final_presentation_status") == "failed":
@@ -1131,9 +1212,9 @@ def test_controlled_render_fault_scenarios(
         expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
         execution_status = page.locator("app-execution-status")
         execution_status.locator("button").click()
-        expect(execution_status.locator(".execution-status__run-error")).to_contain_text(
-            "real-time connection", timeout=15000
-        )
+        expect(
+            execution_status.locator(".execution-status__run-error")
+        ).to_contain_text("real-time connection", timeout=15000)
     elif scenario == "mismatched_ack":
         expect(page.locator(".maplibregl-canvas").last).to_be_visible(timeout=15000)
         expect(page.locator(".chat-message--assistant").last).to_contain_text(
@@ -1145,7 +1226,9 @@ def test_controlled_render_fault_scenarios(
         assert fixture_state.get("final_presentation_status") == "ready"
     elif scenario == "cancelled":
         transcript = page.get_by_role("log", name="Conversation transcript")
-        expect(transcript.get_by_text("Run stopped. No result was produced.")).to_be_visible()
+        expect(
+            transcript.get_by_text("Run stopped. No result was produced.")
+        ).to_be_visible()
         expect(transcript.get_by_text("Map ready.", exact=True)).to_have_count(0)
         expect(page.get_by_role("button", name="Stop generating")).to_have_count(0)
         expect(page.locator(".maplibregl-canvas")).to_have_count(0)
@@ -1168,7 +1251,10 @@ def test_controlled_render_fault_scenarios(
         assert any(
             event.get("type") == "map_prepared"
             and (
-                (event.get("run_id") == SUPERSEDED_RUN_ID and event.get("run_version") == 1)
+                (
+                    event.get("run_id") == SUPERSEDED_RUN_ID
+                    and event.get("run_version") == 1
+                )
                 or (event.get("run_id") == RUN_ID and event.get("run_version") == 2)
             )
             for event in synthetic_events
@@ -1180,6 +1266,7 @@ def test_controlled_render_fault_scenarios(
         )
 
     assert re.fullmatch(r"[0-9a-f]{40}", _tested_commit())
+
 
 ###############################################################################
 def test_controlled_evidence_resolves_an_exact_commit() -> None:
